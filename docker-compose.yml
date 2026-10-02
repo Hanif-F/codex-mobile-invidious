@@ -1,0 +1,72 @@
+name: invidious-codex-v3
+services:
+  invidious:
+    build:
+      context: ./source
+      dockerfile: docker/Dockerfile
+      network: host
+      entitlements: [network.host]
+    restart: unless-stopped
+    ports: ["127.0.0.1:3000:3000"]
+    depends_on:
+      invidious-db:
+        condition: service_healthy
+        restart: true
+      companion:
+        condition: service_started
+    environment:
+      INVIDIOUS_CONFIG: |
+        db:
+          dbname: invidious
+          user: kemal
+          password: '${POSTGRES_PASSWORD:-kemal}'
+          host: invidious-db
+          port: 5432
+        check_tables: true
+        domain: invidious.wingress.net
+        alternative_domains: [mobivious.wingress.net]
+        https_only: true
+        external_port: 443
+        auth_trusted_proxies: ['${AUTH_TRUSTED_PROXY_CIDR:-127.0.0.1/32}']
+        invidious_companion:
+          - private_url: http://companion:8282/companion
+        invidious_companion_key: '${COMPANION_SECRET:?Copy your existing Companion key into .env}'
+        hmac_key: '${HMAC_KEY:?Copy your existing HMAC key into .env}'
+        dearrow_identity_key: '${DEARROW_IDENTITY_KEY:?Copy your existing identity key into .env}'
+    healthcheck:
+      test: [CMD-SHELL, 'wget -nv --tries=1 --spider http://127.0.0.1:3000/api/v1/stats || exit 1']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    logging:
+      options: {max-size: 100m, max-file: "4"}
+  companion:
+    image: ${COMPANION_IMAGE:-quay.io/invidious/invidious-companion:latest}
+    environment:
+      SERVER_SECRET_KEY: ${COMPANION_SECRET:?Copy your existing Companion key into .env}
+    restart: unless-stopped
+    cap_drop: [ALL]
+    read_only: true
+    volumes: ["companioncache:/var/tmp/youtubei.js:rw"]
+    security_opt: [no-new-privileges:true]
+    logging:
+      options: {max-size: 100m, max-file: "4"}
+  invidious-db:
+    image: postgres:14
+    restart: unless-stopped
+    volumes:
+      - postgresdata:/var/lib/postgresql/data
+      - ./source/config/sql:/config/sql:ro
+      - ./source/docker/init-invidious-db.sh:/docker-entrypoint-initdb.d/init-invidious-db.sh:ro
+    environment:
+      POSTGRES_DB: invidious
+      POSTGRES_USER: kemal
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kemal}
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  postgresdata:
+  companioncache:

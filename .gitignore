@@ -9,3 +9,5 @@ android/.idea/
 *.log
 artifacts/
 .tools/
+# Managed as an independent Git repository with its own origin/upstream remotes.
+/source/

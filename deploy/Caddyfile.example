@@ -1,0 +1,5 @@
+invidious.wingress.net, mobivious.wingress.net {
+    reverse_proxy 127.0.0.1:3000 {
+        flush_interval -1
+    }
+}
