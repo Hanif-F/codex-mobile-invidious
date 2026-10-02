@@ -30,6 +30,9 @@ class SessionStore(context: Context) {
     var maxHeight: Int
         get() = prefs.getInt("height", Int.MAX_VALUE)
         set(value) { prefs.edit().putInt("height", value).apply() }
+    var region: String
+        get() = prefs.getString("region", "US")!!
+        set(value) { prefs.edit().putString("region", value).apply() }
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         return (store.getKey("mobivious.session", null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {

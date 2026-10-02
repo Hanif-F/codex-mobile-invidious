@@ -43,7 +43,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 private val Teal = Color(0xFF006B61)
 private val dark = darkColorScheme(primary = Color(0xFF72DFD0), onPrimary = Color(0xFF003731), secondary = Color(0xFFB4CCC5), background = Color(0xFF101817), surface = Color(0xFF101817), surfaceContainer = Color(0xFF1C2523))
-private val light = lightColorScheme(primary = Teal, onPrimary = Color.White, secondary = Color(0xFF4B635D), background = Color(0xFFF6FAF7), surface = Color(0xFFF6FAF7), surfaceContainer = Color(0xFFE8F0EB))
+private val light = lightColorScheme(primary = Teal, onPrimary = Color.White, secondary = Color(0xFF4B635D), secondaryContainer = Color(0xFFCBE8DE), onSecondaryContainer = Color(0xFF153B32), background = Color(0xFFF6FAF7), surface = Color(0xFFF6FAF7), surfaceContainer = Color(0xFFE8F0EB))
 
 @OptIn(ExperimentalMaterial3Api::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -59,6 +59,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val offline by vm.offline.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(vm.tab) }
     var route by rememberSaveable { mutableStateOf(vm.route) }
     var watch by rememberSaveable { mutableStateOf(false) }
@@ -99,6 +100,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             ) { padding ->
                 if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, { addVideo = it }, { id -> navigate("Home", "channel:$id") }, ::play)
                 else Column(Modifier.padding(padding).fillMaxSize()) {
+                    if(offline) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (route.isEmpty() && tab == "Search") {
                         Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                             OutlinedTextField(search, { search = it }, label = { Text("Search videos or paste a link") }, singleLine = true, modifier = Modifier.weight(1f), trailingIcon = { IconButton(onClick = {
@@ -226,7 +228,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
         OutlinedTextField(region, { region = it.uppercase().take(2) }, label = { Text("Trending region (e.g. ID)") }, singleLine = true)
         TextButton(onClick = server) { Text("Server: ${vm.store.server.toHttpUrlOrNull()?.host}") }
         Text("Mobivious ${net.wingress.mobivious.BuildConfig.VERSION_NAME}\nPowered by Invidious & Companion", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    } }, confirmButton = { TextButton(onClick = { if(region.length == 2) vm.region = region; if(signedIn) vm.savePreferences(AccountPreferences(history, positions)); dismiss() }) { Text("Save") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Close") } })
+    } }, confirmButton = { TextButton(onClick = { if(region.length == 2) { vm.region = region; vm.store.region = region }; if(signedIn) vm.savePreferences(AccountPreferences(history, positions)); dismiss() }) { Text("Save") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Close") } })
 }
 @Composable private fun ToggleRow(label: String, value: Boolean, update: (Boolean) -> Unit) { Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(label, Modifier.weight(1f)); Switch(value, update) } }
 @Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit) { var sort by remember { mutableStateOf(vm.sort) }; var date by remember { mutableStateOf(vm.date) }; var duration by remember { mutableStateOf(vm.durationFilter) }; AlertDialog(onDismissRequest = dismiss, title = { Text("Search filters") }, text = { Column { Choice("Sort", listOf("relevance", "rating", "upload_date", "view_count"), sort) { sort = it }; Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }; Choice("Duration", listOf("", "short", "long"), duration) { duration = it } } }, confirmButton = { TextButton(onClick = { vm.sort = sort; vm.date = date; vm.durationFilter = duration; vm.refresh(); dismiss() }) { Text("Apply") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } }) }

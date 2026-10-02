@@ -19,6 +19,7 @@ class AppSmokeTest {
     private fun waitFor(timeout: Long = 20_000, condition: () -> Boolean) = compose.waitUntil(timeout, condition)
     private fun fixture(): JSONObject = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
     @Test fun accountBrowsingAndServicePlayback() {
+        (URL("http://127.0.0.1:18080/test/reset").openConnection() as java.net.HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; outputStream.use { it.write("{}".toByteArray()) }; inputStream.close(); disconnect() }
         compose.runOnUiThread { compose.activity.model.switchServer("http://127.0.0.1:18080") }
         waitFor { compose.activity.model.browse.value.videos.isNotEmpty() }
         compose.onNodeWithContentDescription("Account").performClick()
@@ -39,7 +40,7 @@ class AppSmokeTest {
         compose.runOnUiThread { assertEquals(1.5f, compose.activity.model.controller.value!!.playbackParameters.speed) }
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Pause").assertExists()
-        compose.onNodeWithContentDescription("Library").performClick()
+        compose.onNodeWithContentDescription("Library", useUnmergedTree = true).performClick()
         compose.onNodeWithText("New").performClick()
         compose.onNodeWithText("Title").performTextInput("Emulator playlist")
         compose.onNodeWithText("Save", useUnmergedTree = true).performClick()
@@ -56,13 +57,13 @@ class AppSmokeTest {
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         compose.runOnUiThread { compose.activity.enterPip() }
         waitFor { compose.activity.isInPictureInPictureMode }
-        assertTrue(compose.activity.model.controller.value!!.playWhenReady)
+        compose.runOnUiThread { assertTrue(compose.activity.model.controller.value!!.playWhenReady) }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         waitFor { !compose.activity.isInPictureInPictureMode }
         compose.runOnUiThread { compose.activity.model.store.pip = false; compose.activity.model.store.background = true; compose.activity.moveTaskToBack(true) }
         Thread.sleep(2000)
-        assertTrue(compose.activity.model.controller.value!!.playWhenReady)
+        compose.runOnUiThread { assertTrue(compose.activity.model.controller.value!!.playWhenReady) }
         context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         waitFor { compose.activity.model.playback.value.playing }
         compose.runOnUiThread { compose.activity.model.closePlayer() }

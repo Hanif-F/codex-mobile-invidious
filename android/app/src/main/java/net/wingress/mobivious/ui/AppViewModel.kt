@@ -33,6 +33,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val store = app.store
     val api = app.api
     val account = store.account
+    val offline = app.offline
     val browse = MutableStateFlow(BrowseState())
     val playback = MutableStateFlow(PlaybackState())
     val controller = MutableStateFlow<MediaController?>(null)
@@ -48,7 +49,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var route = ""
     var query = ""
     var discovery = "popular"
-    var region = "US"
+    var region = store.region
     var sort = "relevance"
     var date = ""
     var durationFilter = ""
@@ -56,6 +57,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var videoJob: Job? = null
     private var commentJob: Job? = null
     private var browseGeneration = 0
+    private var requestedVideo: String? = null
     private val future = MediaController.Builder(application, SessionToken(application, ComponentName(application, PlaybackService::class.java))).buildAsync()
     init {
         future.addListener({
@@ -67,6 +69,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     })
                     setPlaybackSpeed(store.defaultSpeed)
                     trackSelectionParameters = trackSelectionParameters.buildUpon().setMaxVideoSize(Int.MAX_VALUE, store.maxHeight).build()
+                    currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }?.let { id ->
+                        requestedVideo = id
+                        viewModelScope.launch { runCatching { api.video(id) }.onSuccess { playback.value = playback.value.copy(details = it) } }
+                    }
                 }
             }.onFailure { message.value = "Unable to connect to the player." }
         }, ContextCompat.getMainExecutor(application))
@@ -116,6 +122,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun play(id: String, explicit: Long? = null) {
         if (id == playback.value.details?.video?.id && explicit == null) { controller.value?.play(); return }
+        requestedVideo = id
         videoJob?.cancel(); commentJob?.cancel(); comments.value = Page(emptyList()); commentError.value = null
         playback.value = playback.value.copy(loading = true, error = null)
         videoJob = viewModelScope.launch {
@@ -143,7 +150,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: CancellationException) { throw e } catch (e: Exception) { playback.value = playback.value.copy(loading = false, error = friendly(e)) }
         }
     }
-    fun retryPlayback() { val id = playback.value.details?.video?.id ?: return; val at = playback.value.position / 1000; playback.value = playback.value.copy(details = null); play(id, at) }
+    fun retryPlayback() { val id = requestedVideo ?: return; val at = if (playback.value.details?.video?.id == id) playback.value.position / 1000 else null; playback.value = playback.value.copy(details = null); play(id, at) }
     fun closePlayer() { videoJob?.cancel(); controller.value?.stop(); controller.value?.clearMediaItems(); playback.value = PlaybackState() }
     fun togglePlay() { controller.value?.let { if (it.playWhenReady) it.pause() else it.play() } }
     fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
@@ -157,8 +164,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
-    fun logout() = action { api.logout(); closePlayer(); store.save(null); store.clearPositions(); navigate("Home") }
-    fun switchServer(value: String) { closePlayer(); store.save(null); store.clearPositions(); store.server = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); navigate("Home") }
+    fun logout() = action { try { api.logout() } finally { closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); navigate("Home") } }
+    fun switchServer(value: String) { val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); store.server = address; navigate("Home") }
     fun savePreferences(value: AccountPreferences) = action { api.preferences(value); preferences.value = value; if (!value.savePosition) store.clearPositions(); message.value = "Account settings saved" }
     fun toggleSubscribe(id: String) = action { api.subscribe(id, subscriptions.value.none { it.id == id }); subscriptions.value = api.subscriptions() }
     override fun onCleared() { MediaController.releaseFuture(future) }

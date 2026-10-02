@@ -9,8 +9,22 @@ import org.json.JSONObject
 import org.json.JSONArray
 import org.junit.Assert.*
 import org.junit.Test
+import java.nio.file.Files
 
 class CoreTest {
+    @Test fun offlineSnapshotsExpireAndNeverCrossAccountKeys() {
+        val directory = Files.createTempDirectory("mobivious-cache").toFile()
+        try {
+            var now = System.currentTimeMillis()
+            val cache = ResponseCache(directory) { now }
+            cache.write("server|Alice", "saved-feed")
+            assertEquals("saved-feed", cache.read("server|Alice"))
+            assertNull(cache.read("server|Bob"))
+            now += 25 * 60 * 60 * 1000L
+            assertNull(cache.read("server|Alice"))
+            cache.clear(); assertEquals(0, directory.listFiles()!!.size)
+        } finally { directory.deleteRecursively() }
+    }
     @Test fun linksAndTimestamps() {
         assertEquals(VideoLink("abcdefghijk", 3723), VideoLinks.parse("Watch https://youtu.be/abcdefghijk?t=1h2m3s", "https://instance.test"))
         assertEquals(VideoLink("abcdefghijk", 0), VideoLinks.parse("https://instance.test/watch?v=abcdefghijk&t=0", "https://instance.test"))

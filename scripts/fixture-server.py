@@ -70,6 +70,10 @@ class Handler(BaseHTTPRequestHandler):
     def mutate(self):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if p == '/test/reset':
+            state.update(position=0, watched=[], playlists=[], events=[])
+            prefs.update(watch_history=True, save_player_pos=True)
+            return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))
         if p == '/api/v1/mobile/login':

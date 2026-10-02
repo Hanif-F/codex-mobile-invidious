@@ -17,7 +17,8 @@ class ApiException(val status: Int, message: String, val retryAfter: String? = n
 
 class InvidiousApi(private val server: () -> String, private val account: () -> Account?,
     private val expired: () -> Unit = {}, private val client: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build()) {
+        .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build(),
+    private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}) {
     companion object {
         fun normalizeServer(input: String, debug: Boolean): String {
             val url = input.trim().trimEnd('/').toHttpUrl()
@@ -38,7 +39,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
             builder.header("Authorization", "Bearer ${session.token}")
         }
         builder.method(method, if (method in listOf("POST", "PUT", "PATCH")) (data ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()) else null)
-        client.newCall(builder.build()).execute().use { response ->
+        val cacheKey = if (method == "GET" && path in listOf("api/v1/popular", "api/v1/trending", "api/v1/search", "api/v1/auth/feed")) "$address|${if (auth) account()?.token else "public"}" else null
+        try { client.newCall(builder.build()).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
                 if (response.code == 401 && auth) expired()
@@ -52,7 +54,13 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     else -> "Request failed (${response.code})."
                 }, response.header("Retry-After"))
             }
+            if (cacheKey != null) { cache?.write(cacheKey, body); onOffline(false) }
             body
+        } } catch (e: IOException) {
+            if (e is ApiException && e.status < 500) throw e
+            val saved = cacheKey?.let { cache?.read(it) } ?: throw e
+            onOffline(true)
+            saved
         }
     }
     suspend fun login(username: String, password: String): Account {
