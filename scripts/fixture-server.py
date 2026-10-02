@@ -17,7 +17,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              authorId='UCfixture', lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
 prefs = dict(watch_history=True, save_player_pos=True, unrelated_setting='preserved')
-state = dict(position=0, watched=[], playlists=[], events=[])
+state = dict(position=0, watched=[], playlists=[], events=[], stream='dash')
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
@@ -51,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[video]))
         elif p == '/api/v1/videos/testvideo01':
             self.respond(dict(**video, description='A generated test video. No YouTube access is involved.',
-                              dashUrl='/media/dash.mpd', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
+                              dashUrl='/media/dash.mpd', hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=[]))
         elif p == '/api/v1/auth/preferences': self.respond(prefs)
         elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId='UCfixture')])
@@ -71,8 +71,11 @@ class Handler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], events=[])
+            state.update(position=0, watched=[], playlists=[], events=[], stream='dash')
             prefs.update(watch_history=True, save_player_pos=True)
+            return self.respond({})
+        if p == '/test/stream':
+            state['stream'] = data['type']
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))

@@ -20,7 +20,7 @@ PY
     -storepass:file keystore/storepass -keypass:file keystore/storepass \
     -keyalg RSA -keysize 4096 -validity 10000 -dname 'CN=Mobivious Personal, O=Mobivious' >/dev/null
 fi
-./gradlew testReleaseUnitTest assembleRelease --console=plain
+./gradlew :app:testDebugUnitTest :app:assembleRelease --console=plain
 mkdir -p ../artifacts
 cp app/build/outputs/apk/release/app-release.apk ../artifacts/Mobivious-0.1.0.apk
 sha256sum ../artifacts/Mobivious-0.1.0.apk

@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     fun updatePip(watching: Boolean) {
+        if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
         val active = watching && model.playback.value.details != null && model.playback.value.error == null && model.store.pip
         val playing = model.controller.value?.playWhenReady == true
         fun action(name: String, icon: Int, command: String, code: Int) = RemoteAction(Icon.createWithResource(this, icon), name, name,
@@ -50,7 +51,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 31) params.setAutoEnterEnabled(active && playing).setSeamlessResizeEnabled(true)
         setPictureInPictureParams(params.build())
     }
-    fun enterPip() { if (model.playback.value.details != null) enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
+    fun enterPip() { if (model.playback.value.details != null && packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
     override fun onUserLeaveHint() { super.onUserLeaveHint(); if (Build.VERSION.SDK_INT < 31 && model.store.pip && model.playback.value.playing) enterPip() }
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) { super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig); pipMode.value = isInPictureInPictureMode }
     override fun onStop() { super.onStop(); if (!isInPictureInPictureMode && !model.store.background) model.controller.value?.pause() }
