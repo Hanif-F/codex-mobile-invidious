@@ -20,6 +20,7 @@ app targets API 37 and supports API 26+. No physical phone was needed.
 | Existing live instance public API compatibility | 40 popular entries; video/DASH/caption responses verified |
 | Personal release APK build and signature verification | Passed |
 | Signed release browsing against the existing HTTPS instance | Passed |
+| Signed release live YouTube playback through Invidious/Companion | Playing, buffered, no player error |
 
 The database harness verifies legacy credentials, malformed/oversized sign-in,
 generic authentication errors, shared throttling, disabled login, token signature
@@ -73,5 +74,5 @@ The mobile hostname, TLS alias, Docker rollout and new account APIs have **not**
 been deployed on the Ubuntu server. Follow `deploy/README.md` and preserve the
 existing keys, project name and volumes. Account operations in the release app
 need that server patch; anonymous browsing can use the existing HTTPS instance.
-Physical POCO X6 Pro behavior, OEM background restrictions, and live YouTube
-playback after production rollout still need a device/server acceptance check.
+Physical POCO X6 Pro behavior, OEM background restrictions, and authenticated
+account features after production rollout still need a device/server acceptance check.
