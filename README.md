@@ -14,6 +14,7 @@ and deployment changes here. No remote pushes or production deployment are autom
 Open `android/` in Android Studio. Install SDK platform 37, Build Tools 36.0.0 and
 use JDK 17 or newer (the installed Android Studio JBR works). Gradle and library
 versions are pinned. Local SDK settings, signing material and build output are ignored.
+Validation results and repeatable emulator checks are recorded in `VERIFICATION.md`.
 
 ```sh
 cd android
