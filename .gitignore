@@ -1,0 +1,11 @@
+android/.gradle/
+android/.kotlin/
+android/**/build/
+android/local.properties
+android/keystore/
+android/signing.properties
+android/.idea/
+.env
+*.log
+artifacts/
+.tools/
