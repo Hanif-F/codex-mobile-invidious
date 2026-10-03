@@ -355,6 +355,27 @@ against production. The feature uses existing server APIs and needs no server
 deployment, migration or new token scope. No signed release or production rollout
 was performed.
 
+## Mobivious 0.2.1 release — 3 October 2026
+
+The release includes the channel first-page continuation fix and native
+Videos/Streams tabs, with automatic Streams selection for channels without
+uploads. It uses application ID `net.wingress.mobivious`, version name `0.2.1`
+and version code `4`, retaining minimum SDK 26, target SDK 37 and
+arm64-v8a/armeabi-v7a/x86/x86_64 support.
+
+`scripts/build-release.sh` passed all 58 Android unit/API tests, `assembleRelease`
+and `lintRelease` (zero errors, 32 existing/style/dependency warnings). APK package
+inspection, archive integrity, signature verification and checksum validation
+passed. The signing certificate matches the existing 0.2.0 APK; that previous
+APK's SHA-256 matches GitHub's published asset digest, confirming update continuity.
+The versioned APK and `.apk.sha256` are the assets for the GitHub `v0.2.1` release.
+Signing material stays local and ignored.
+
+No device is connected, so the native runtime/layout limitations recorded in the
+channel revision still apply. The channel fix and Streams browsing use existing
+public APIs and require no server deployment. Previously documented server
+requirements for account features still apply.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:

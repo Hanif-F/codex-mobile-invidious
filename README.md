@@ -50,7 +50,7 @@ local. For each release, update `versionName` and increment `versionCode` in
 
 ```sh
 # Match versionName for this release.
-release_version=0.2.0
+release_version=0.2.1
 scripts/build-release.sh
 
 # Confirm the APK's signature before publishing.
@@ -78,7 +78,8 @@ Account features require the server extensions described in `deploy/README.md`.
 
 ## Features
 
-Home popular/trending, filtered search and shared video links; channel browsing;
+Home popular/trending, filtered search and shared video links; channel browsing with
+paginated Videos/Streams tabs and automatic Streams selection for channels without uploads;
 native account sign-in; subscription feed and subscribe/unsubscribe; playlists and
 watch history; descriptions, captions, read-only comments and recommendations.
 The service-owned player supports adaptive streams, seeking, speed/quality/audio

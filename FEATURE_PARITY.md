@@ -3,7 +3,7 @@
 Reviewed on **3 October 2026** against the local source checkouts:
 
 - Web: `../invidious`, baseline audit at `a21a5513` plus the expanded native settings API changes; channel routes/API rechecked at `68e51ac2`. Includes this fork's custom features.
-- Android: baseline audit at `c43eb76`, app version `0.2.0`; rows 05 and 10 updated against `f045c84` plus the working-tree channel-loading and Streams changes.
+- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`. Current release version: `0.2.1` (version code 4).
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
