@@ -84,9 +84,18 @@ watch history; descriptions, captions, read-only comments and recommendations.
 The service-owned player supports adaptive streams, seeking, speed/quality/audio
 selection, background playback, system media controls, mini-player, fullscreen,
 audio only and picture in picture. The embedded and fullscreen player share fading
-controls, double-tap ten-second seeking, and one gear menu for quality, audio,
+controls, accumulated double-tap seeking, and one gear menu for quality, audio,
 captions, speed, audio only, picture in picture and Refresh buffer. Explicit URL timestamps override saved resume
 positions. History and resume settings are shared with the website.
+
+The quality menu selects exact supported representations with codec/FPS/bitrate
+details. Audio choices distinguish original, stable-volume and dubbed streams
+where metadata is available. Saved quality defaults include Auto, Best, 4320p
+through 144p and Worst; player choices apply to the current video. Double tap
+starts a ten-second skip, further taps add ten seconds, and opposite taps reset
+the direction. Playback pauses until a single jump 600 ms after the last tap,
+then restores its previous playing or paused state. Reliable audio labels use the
+additive video API metadata update; older instances retain manifest-based choices.
 
 Optional DeArrow titles appear throughout browsing and playback, with an original-title toggle. A native watch-page sheet supports title suggestions, all four guideline acknowledgements, voting and refresh. Signed-in settings and the encrypted contribution identity are shared with the website; Settings also supports private-ID import. Guests keep local title settings per instance. Contributions require the server API update and a fresh sign-in token.
 

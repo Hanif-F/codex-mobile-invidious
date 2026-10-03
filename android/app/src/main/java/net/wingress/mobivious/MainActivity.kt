@@ -64,8 +64,17 @@ class MainActivity : ComponentActivity() {
             if (fullscreen) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
         }
     }
-    fun enterPip() { if (model.playback.value.details != null && supportsPip()) enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
-    override fun onUserLeaveHint() { super.onUserLeaveHint(); if (Build.VERSION.SDK_INT < 31 && pipWatching && model.store.pip && model.playback.value.playing) enterPip() }
+    fun enterPip() { model.cancelAccumulatedSeek(); if (model.playback.value.details != null && supportsPip()) enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        model.cancelAccumulatedSeek()
+        updatePip(pipWatching)
+        if (Build.VERSION.SDK_INT < 31 && pipWatching && model.store.pip && model.playback.value.playing) enterPip()
+    }
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) { super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig); pipMode.value = isInPictureInPictureMode }
-    override fun onStop() { super.onStop(); if (!isInPictureInPictureMode && !model.store.background) model.controller.value?.pause() }
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) model.cancelAccumulatedSeek(isInPictureInPictureMode || model.store.background)
+        if (!isChangingConfigurations && !isInPictureInPictureMode && !model.store.background) model.controller.value?.pause()
+    }
 }

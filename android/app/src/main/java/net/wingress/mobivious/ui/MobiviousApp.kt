@@ -74,7 +74,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     var search by rememberSaveable { mutableStateOf(vm.query) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    fun navigate(selected: String, path: String = "") { tab = selected; route = path; watch = false; vm.navigate(selected, path) }
+    fun navigate(selected: String, path: String = "") { vm.cancelAccumulatedSeek(); tab = selected; route = path; watch = false; vm.navigate(selected, path) }
     fun play(video: Video) { watch = true; vm.play(video.id) }
     LaunchedEffect(shared.value) { if (shared.value) { watch = true; settingsPage = ""; shared.value = false } }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.message.value = null } }
@@ -84,10 +84,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         activity.setFullscreen(fullscreen && !pip)
         onDispose { activity.setFullscreen(false) }
     }
-    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
+    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
-    LaunchedEffect(settingsPage) { if (settingsPage == "Settings") vm.refreshSharedSettings() }
-    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank())) { when { fullscreen -> fullscreen = false; watch -> watch = false; else -> navigate(tab) } }
+    LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
+    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank())) { when { fullscreen -> fullscreen = false; watch -> { vm.cancelAccumulatedSeek(); watch = false }; else -> navigate(tab) } }
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
             if (pip || fullscreen) {
@@ -100,8 +100,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     if (watch) Text("Now playing", style = MaterialTheme.typography.titleMedium)
                     else if (route.isNotEmpty()) Text(channel?.name ?: playlist?.title ?: state.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("Mobivious", fontWeight = FontWeight.Bold) }
-                }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { if (watch) watch = false else navigate(tab) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
-                    IconButton(onClick = { settingsPage = "Settings" }) { Icon(Icons.Default.Settings, "App settings") }
+                }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { vm.cancelAccumulatedSeek(); if (watch) watch = false else navigate(tab) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
+                    IconButton(onClick = { vm.cancelAccumulatedSeek(); settingsPage = "Settings" }) { Icon(Icons.Default.Settings, "App settings") }
                     IconButton(onClick = { dialog = if (account == null) "login" else "account" }) { Icon(if (account == null) Icons.Default.AccountCircle else Icons.Default.VerifiedUser, "Account") }
                 }) },
                 snackbarHost = { SnackbarHost(snackbar) },

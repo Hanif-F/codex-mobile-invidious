@@ -12,7 +12,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -47,10 +49,16 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.session.MediaController
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.wingress.mobivious.data.SponsorBlockPlayback
 import net.wingress.mobivious.player.PlaybackService
+import net.wingress.mobivious.player.StreamCatalog
+import net.wingress.mobivious.player.AudioSection
+import net.wingress.mobivious.data.PreferenceRules
 
 private fun playerTime(ms: Long): String {
     val seconds = ms.coerceAtLeast(0) / 1000
@@ -68,6 +76,7 @@ internal fun VideoPlayer(
     onFullscreen: () -> Unit, onSettings: () -> Unit,
 ) {
     val current by rememberUpdatedState(playback)
+    val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
     val sponsorState by vm.sponsorBlock.collectAsStateWithLifecycle()
     val sponsor = sponsorState.takeIf { it.mediaId == playback.mediaId } ?: SponsorBlockPlayback()
     val compactPlay = !fullscreen && !settingsOpen && sponsor.active != null
@@ -86,6 +95,7 @@ internal fun VideoPlayer(
         onDispose { accessibility.removeTouchExplorationStateChangeListener(listener) }
     }
     fun interact() { interaction++; visible = true }
+    fun toggleControls() { vm.cancelAccumulatedSeek(); visible = !visible; interaction++ }
     fun seek(offset: Long) {
         if (current.seekable && !current.loading && current.error == null) {
             vm.seekBy(offset)
@@ -95,11 +105,14 @@ internal fun VideoPlayer(
         }
     }
     LaunchedEffect(playback.playWhenReady, playback.playerState, playback.error, playback.loading, controls) {
+        if (playback.error != null) vm.cancelAccumulatedSeek(false)
         if (!playback.playWhenReady || playback.playerState == Player.STATE_ENDED || playback.error != null || playback.loading) visible = true
     }
-    LaunchedEffect(visible, interaction, playback.playWhenReady, playback.playerState, playback.error, playback.loading, scrub != null, settingsOpen, exploring, focused, controls) {
+    LaunchedEffect(settingsOpen, controls) { if (settingsOpen || !controls) vm.cancelAccumulatedSeek() }
+    LaunchedEffect(pendingSeek) { if (pendingSeek != null) interact() }
+    LaunchedEffect(visible, interaction, playback.playWhenReady, playback.playerState, playback.error, playback.loading, scrub != null, settingsOpen, exploring, focused, controls, pendingSeek) {
         if (controls && visible && playback.playWhenReady && playback.playerState != Player.STATE_ENDED && playback.error == null &&
-            !playback.loading && scrub == null && !settingsOpen && !exploring && !focused) {
+            !playback.loading && scrub == null && !settingsOpen && !exploring && !focused && pendingSeek == null) {
             delay(3000)
             visible = false
         }
@@ -114,16 +127,33 @@ internal fun VideoPlayer(
         )
         Box(Modifier.matchParentSize().testTag("player-gestures")
         .pointerInput(playback.mediaId, controls) {
-            if (controls) detectTapGestures(
-                onTap = { visible = !visible; interaction++ },
-                onDoubleTap = { point ->
-                    when {
-                        point.x < size.width / 3f -> seek(-10_000)
-                        point.x > size.width * 2 / 3f -> seek(10_000)
-                        else -> { visible = !visible; interaction++ }
+            if (controls) coroutineScope {
+                var single: Job? = null
+                var firstTime = Long.MIN_VALUE
+                var firstZone = 0
+                fun zone(x: Float) = when { x < size.width / 3f -> -1; x > size.width * 2 / 3f -> 1; else -> 0 }
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    down.consume()
+                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
+                    up.consume()
+                    if ((up.position - down.position).getDistance() > viewConfiguration.touchSlop ||
+                        up.uptimeMillis - down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) return@awaitEachGesture
+                    val direction = zone(up.position.x)
+                    if (vm.pendingSeek.value != null) {
+                        single?.cancel(); firstTime = Long.MIN_VALUE
+                        if (direction == 0) toggleControls() else { vm.accumulateSeek(direction); interact() }
+                    } else if (single?.isActive == true && direction == firstZone &&
+                        down.uptimeMillis - firstTime in viewConfiguration.doubleTapMinTimeMillis..viewConfiguration.doubleTapTimeoutMillis) {
+                        single?.cancel(); firstTime = Long.MIN_VALUE
+                        if (direction == 0) toggleControls() else { vm.accumulateSeek(direction); interact() }
+                    } else {
+                        if (single?.isActive == true) { single?.cancel(); toggleControls() }
+                        firstTime = up.uptimeMillis; firstZone = direction
+                        single = launch { delay(viewConfiguration.doubleTapTimeoutMillis); toggleControls() }
                     }
-                },
-            )
+                }
+            }
         }
         .onKeyEvent { event ->
             if (controls && !settingsOpen && sponsor.active != null && event.key == Key.Enter && event.type == KeyEventType.KeyUp &&
@@ -132,7 +162,7 @@ internal fun VideoPlayer(
             } else false
         }.focusable(enabled = controls).semantics {
             if (controls) {
-                onClick(label = if (visible) "Hide player controls" else "Show player controls") { visible = !visible; interaction++; true }
+                onClick(label = if (visible) "Hide player controls" else "Show player controls") { toggleControls(); true }
                 customActions = listOf(
                     CustomAccessibilityAction("Back 10 seconds") { if (current.seekable) { seek(-10_000); true } else false },
                     CustomAccessibilityAction("Forward 10 seconds") { if (current.seekable) { seek(10_000); true } else false },
@@ -162,7 +192,7 @@ internal fun VideoPlayer(
                         Box(Modifier.fillMaxWidth()) {
                             Slider(
                                 value = scrub ?: playback.position.coerceAtMost(playback.duration).toFloat(),
-                                onValueChange = { scrub = it; interact() },
+                                onValueChange = { vm.cancelAccumulatedSeek(); scrub = it; interact() },
                                 onValueChangeFinished = { scrub?.let { vm.seekTo(it.toLong()) }; scrub = null; interact() },
                                 valueRange = 0f..playback.duration.coerceAtLeast(1).toFloat(),
                                 enabled = playback.seekable && playback.duration > 0 && !playback.loading && playback.error == null,
@@ -200,7 +230,7 @@ internal fun VideoPlayer(
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text("${playerTime(scrub?.toLong() ?: playback.position)} / ${if (playback.live) "LIVE" else if (playback.duration > 0) playerTime(playback.duration) else "—"}",
                                 Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.labelLarge)
-                            IconButton(onClick = { interact(); onSettings() }, enabled = controller != null) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }
+                            IconButton(onClick = { vm.cancelAccumulatedSeek(); interact(); onSettings() }, enabled = controller != null) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }
                             IconButton(onClick = { interact(); onFullscreen() }) { Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                                 if (fullscreen) "Exit full screen" else "Full screen", tint = Color.White) }
                         }
@@ -218,6 +248,15 @@ internal fun VideoPlayer(
             }
             feedback?.let { Text(it, Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = .8f), CircleShape).padding(16.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White) }
+            pendingSeek?.let { pending ->
+                Column(Modifier.align(if (pending.offset < 0) Alignment.CenterStart else Alignment.CenterEnd)
+                    .fillMaxWidth(1f / 3f).background(Color.Black.copy(alpha = .65f), CircleShape).padding(vertical = 20.dp)
+                    .testTag("pending-seek").semantics { liveRegion = LiveRegionMode.Polite }, horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(if (pending.offset < 0) Icons.Default.FastRewind else Icons.Default.FastForward, null, tint = Color.White)
+                    Text("${if (pending.offset < 0) "−" else "+"}${kotlin.math.abs(pending.offset) / 1000} seconds", color = Color.White,
+                        style = MaterialTheme.typography.labelLarge)
+                }
+            }
             if (!settingsOpen && playback.error == null && !playback.loading) {
                 Column(Modifier.align(Alignment.TopStart)
                     .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)) else Modifier)
@@ -257,13 +296,16 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 @Composable
 internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean, sponsorBlock: () -> Unit) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
-    val audio = playback.trackChoices(C.TRACK_TYPE_AUDIO)
+    val formats = playback.details?.formats.orEmpty()
+    val video = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_VIDEO, formats)
+    val audio = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, formats)
     val captions = playback.trackChoices(C.TRACK_TYPE_TEXT)
     val selection = playback.selection
     val audioOnly = selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true
     val audioAuto = selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_AUDIO } != false && selection?.preferredAudioLanguages.isNullOrEmpty()
     val selectedCaption = if (selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) == true) null else captions.firstOrNull { it.selected }
-    val quality = selection?.maxVideoHeight ?: vm.store.maxHeight
+    val qualityAuto = selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_VIDEO } != false
+    val selectedVideo = video.firstOrNull { it.explicitlySelected(selection) }
     val available = !playback.loading && playback.canSelectTracks
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
@@ -282,8 +324,8 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                 if (page == "Player settings") {
                     item { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
                     item { SettingRow("SponsorBlock") { sponsorBlock() } }
-                    item { SettingRow("Quality", if (quality == Int.MAX_VALUE) "Auto" else "Up to ${quality}p", available && !audioOnly) { page = "Quality" } }
-                    item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.label ?: "Default"}" else audio.firstOrNull { it.selected }?.label ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
+                    item { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.primary ?: "Auto", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
+                    item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
                     item { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
                     item { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
                     item {
@@ -294,15 +336,24 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     }
                     item { SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device", supportsPip && playback.details != null && playback.error == null && !playback.loading) { dismiss(); pip() } }
                 } else when (page) {
-                    "Quality" -> items(listOf(Int.MAX_VALUE, 2160, 1440, 1080, 720, 480, 360)) { height ->
-                        SettingChoice(if (height == Int.MAX_VALUE) "Auto" else "Up to ${height}p", quality == height, available && !audioOnly) { vm.quality(height); page = "Player settings" }
+                    "Quality" -> {
+                        item { SettingChoice("Auto", qualityAuto, available && !audioOnly) { vm.autoQuality(); page = "Player settings" } }
+                        items(video) { track -> SettingChoice(track.primary, track.explicitlySelected(selection), available && !audioOnly, track.secondary) {
+                            vm.selectTrack(track.group, track.index); page = "Player settings"
+                        } }
                     }
-                    "Playback speed" -> items(listOf(.25f, .5f, .75f, 1f, 1.25f, 1.5f, 1.75f, 2f)) { speed ->
+                    "Playback speed" -> items(PreferenceRules.speeds) { speed ->
                         SettingChoice(speedLabel(speed), playback.speed == speed, playback.canSetSpeed) { vm.speed(speed); page = "Player settings" }
                     }
                     "Audio" -> {
                         item { SettingChoice("Auto", audioAuto, available) { vm.autoAudio(); page = "Player settings" } }
-                        items(audio) { track -> SettingChoice(track.label, !audioAuto && track.selected, available) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
+                        AudioSection.entries.forEach { section ->
+                            val choices = audio.filter { it.section == section }
+                            if (choices.isNotEmpty()) {
+                                item { Text(section.title, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.titleSmall) }
+                                items(choices) { track -> SettingChoice(track.primary, !audioAuto && track.explicitlySelected(selection), available, track.secondary) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
+                            }
+                        }
                     }
                     "Captions" -> {
                         item { SettingChoice("Off", selectedCaption == null, available) { vm.captions(null); page = "Player settings" } }
@@ -323,10 +374,13 @@ private fun SettingRow(label: String, value: String = "", enabled: Boolean = tru
 }
 
 @Composable
-private fun SettingChoice(label: String, selected: Boolean, enabled: Boolean, click: () -> Unit) {
+private fun SettingChoice(label: String, selected: Boolean, enabled: Boolean, detail: String = "", click: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = click)
         .semantics { this.selected = selected }.padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+        Column(Modifier.weight(1f)) {
+            Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+            if (detail.isNotBlank()) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+        }
         if (selected) Icon(Icons.Default.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
     }
 }

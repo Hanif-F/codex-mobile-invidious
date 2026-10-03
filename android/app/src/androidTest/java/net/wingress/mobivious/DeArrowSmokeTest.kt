@@ -1,6 +1,7 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import androidx.media3.common.C
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -116,7 +117,8 @@ class DeArrowSmokeTest {
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 }
         val watchedAfter = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }
         assertEquals(watchedBefore, watchedAfter)
-        assertEquals(720, activity.model.controller.value!!.trackSelectionParameters.maxVideoHeight)
+        val videoOverride = activity.model.controller.value!!.trackSelectionParameters.overrides.values.single { it.type == C.TRACK_TYPE_VIDEO }
+        assertEquals(360, videoOverride.mediaTrackGroup.getFormat(videoOverride.trackIndices.single()).height)
     }
 
     @Test fun contributionsGuidelinesFailuresAndPrivateIdentity() {

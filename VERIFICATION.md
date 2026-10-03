@@ -229,6 +229,69 @@ checkout before the newly added account settings can be saved on production. It
 requires no migration, new key or token scope. Guests can use the local settings
 without that API update. No release APK was signed or production deployment made.
 
+## Exact stream controls and accumulated tap seeking — 3 October 2026
+
+Quality now offers Auto and exact supported video representations, including codec,
+FPS, bitrate tiers and available file sizes. Saved defaults match the web's Auto,
+Best, 4320p–144p and Worst choices. In-player quality choices apply only to the
+current video. Audio choices group original, stable-volume and dubbed variants;
+unknown and unlabeled tracks remain selectable. Matching uses representation
+identity and language/label metadata rather than audio itags alone. Refresh,
+same-video retry and controller reconnection preserve available selections.
+
+Double tap starts a ±10-second batch, subsequent single taps add 10 seconds, and
+an opposite tap replaces the accumulated total with 10 seconds in that direction.
+The player pauses at the starting position, seeks once after 600 ms of inactivity,
+and restores its previous playing or paused intent. Pending state belongs to the
+ViewModel and survives fullscreen/recreation. Competing seeks, settings/navigation,
+errors, media/account changes and PiP/background entry cancel the batch; accessibility
+and PiP seek actions retain immediate behavior.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 52 passed, including 15 new stream/accumulator scenarios |
+| Android debug and instrumentation APK builds | Passed |
+| Android debug lint | Passed; zero errors, 32 existing/style/dependency warnings |
+| Focused audio serialization and native preference Crystal specs | 6 passed |
+| Normal and API-only Invidious compiler checks (`--no-codegen`) | Passed |
+| Generated rich fixture and localhost API/media checks | Passed; four video representations and four audio variants with accessible initialization segments |
+| Python syntax, shell syntax and diff whitespace checks | Passed |
+| Android connected/runtime/layout checks | Unverified: emulator crashed before boot; connected tests reported no devices |
+
+Unit tests cover optional/string-valued format metadata, duplicate audio itags,
+language/stable-volume disambiguation, codec/FPS/bitrate details and tiers, unsupported
+tracks, exact override versus adaptive selected flags, ranked quality defaults,
+reload identity matching, ambiguous/vanished representations, original/dubbed role
+precedence, unlabeled audio, timing/deadline renewal, direction reset, bounded
+targets, cancellation, stale media and previous playing intent. Server tests verify
+additive audio metadata, false default flags, omission of unrelated upstream fields,
+and shared stable-volume detection from flags, labels and encoded URLs.
+
+Five new Compose scenarios compile for real exact video/audio selection, unchanged
+saved defaults, captions/speed, refresh/retry/recreation, ranked defaults, sequential
+single-tap accumulation and reversal, pause/resume intent, cancellation, fullscreen
+and PiP. Existing player/DeArrow assertions now inspect exact representation
+overrides, and retry checks preserve paused intent. These scenarios have **not run**: Android Emulator 37.2.12 exited with
+SIGSEGV (139) during a read-only headless startup with software graphics, Vulkan
+and cameras disabled. No physical device was connected. Native gesture timing,
+320dp/390dp and landscape layouts, light/dark screenshots, accessibility and actual
+Media3/MediaSession acceptance remain pending. Existing historical runtime results
+above do not validate this revision.
+
+Run `scripts/test-android.sh` with a working emulator/device. The script generates
+the rich media alongside the existing DASH/HLS fixtures, retaining older scenarios.
+Repeat the stream scenarios at narrow widths and in light/dark mode; menu captures
+are written to `/data/local/tmp/mobivious-stream-screenshots/`. Generated stable/dubbed
+variants use synthetic audio and metadata to test track selection, not upstream
+language translation or dynamic-range processing. Real moving live-window seeking
+still needs separate device acceptance.
+
+Reliable audio enrichment requires deploying the sibling video's additive
+`audioTrack`/`isDrc` API fields. Older instances fall back to manifest metadata and
+generic labels; all options remain limited to supported manifest tracks. This API
+change needs no database migration, new key, token scope or sign-in renewal. No
+production rollout or signed release was performed.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:

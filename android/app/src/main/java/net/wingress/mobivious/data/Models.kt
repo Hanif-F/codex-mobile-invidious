@@ -8,8 +8,12 @@ data class Video(val id: String, val title: String, val author: String = "", val
     val thumbnail: String = "", val duration: Long = 0, val views: Long = 0, val published: String = "",
     val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false)
 data class Caption(val label: String, val language: String, val url: String)
+data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
+data class StreamFormat(val id: String, val mimeType: String, val codec: String,
+    val width: Int, val height: Int, val fps: Float, val bitrate: Long, val bytes: Long,
+    val audio: AudioIdentity? = null, val drc: Boolean? = null)
 data class VideoDetails(val video: Video, val description: String, val dash: String, val hls: String,
-    val fallback: String, val captions: List<Caption>, val recommendations: List<Video>)
+    val fallback: String, val captions: List<Caption>, val recommendations: List<Video>, val formats: List<StreamFormat> = emptyList())
 data class Channel(val id: String, val name: String, val description: String = "", val subscribers: String = "", val image: String = "")
 data class Playlist(val id: String, val title: String, val count: Int, val privacy: String = "private", val description: String = "")
 data class Comment(val author: String, val text: String, val published: String, val likes: Long)
@@ -63,7 +67,20 @@ object ApiParser {
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",
         json.optJSONArray("captions")?.objects()?.map { Caption(it.text("label"), it.text("languageCode", it.text("language_code")), it.text("url")) } ?: emptyList(),
-        json.optJSONArray("recommendedVideos")?.let(::videos) ?: emptyList())
+        json.optJSONArray("recommendedVideos")?.let(::videos) ?: emptyList(),
+        (json.optJSONArray("adaptiveFormats")?.objects().orEmpty() + json.optJSONArray("formatStreams")?.objects().orEmpty()).map(::streamFormat))
+    fun streamFormat(j: JSONObject): StreamFormat {
+        val size = j.text("size").split('x')
+        val type = j.text("type", j.text("mimeType"))
+        val codec = Regex("codecs=\"?([^\";]+)").find(type)?.groupValues?.get(1) ?: j.text("encoding")
+        val audio = j.optJSONObject("audioTrack")?.let { AudioIdentity(it.text("id"), it.text("displayName"),
+            if (it.opt("audioIsDefault") is Boolean) it.getBoolean("audioIsDefault") else null) }
+        return StreamFormat(j.text("itag"), type.substringBefore(';').trim(), codec,
+            size.getOrNull(0)?.toIntOrNull() ?: j.optInt("width"), size.getOrNull(1)?.toIntOrNull() ?: j.optInt("height"),
+            j.optDouble("fps", 0.0).toFloat().takeIf { it.isFinite() && it > 0 } ?: 0f,
+            j.optLong("bitrate", 0).coerceAtLeast(0), j.optLong("clen", j.optLong("contentLength", 0)).coerceAtLeast(0),
+            audio, if (j.opt("isDrc") is Boolean) j.getBoolean("isDrc") else null)
+    }
     fun playlist(json: JSONObject) = Playlist(json.text("playlistId"), json.text("title"), json.optInt("videoCount"), json.text("privacy", "private"), json.text("description"))
     fun channel(json: JSONObject) = Channel(json.text("authorId"), json.text("author"), json.text("description"), json.text("subCountText", json.optLong("subCount").toString()),
         json.optJSONArray("authorThumbnails")?.objects()?.lastOrNull()?.text("url") ?: "")

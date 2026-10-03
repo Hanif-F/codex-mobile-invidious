@@ -5,6 +5,7 @@ Bind localhost only; ADB reverse exposes it to the emulator for instrumentation.
 """
 import argparse
 import json
+import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
@@ -13,6 +14,23 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=18080)
 parser.add_argument('--media-dir', type=Path, required=True)
 args = parser.parse_args()
+def rich_formats():
+    ns = {'d': 'urn:mpeg:dash:schema:mpd:2011'}
+    manifest = args.media_dir / 'rich' / 'dash.mpd'
+    if not manifest.exists(): return []
+    formats = []
+    for group in ET.parse(manifest).findall('.//d:AdaptationSet', ns):
+        for representation in group.findall('d:Representation', ns):
+            attr = representation.attrib
+            item = dict(itag=attr['id'], type=f"{attr['mimeType']}; codecs=\"{attr['codecs']}\"", bitrate=attr['bandwidth'])
+            if group.get('contentType') == 'video':
+                item.update(size=f"{attr['width']}x{attr['height']}", fps=24)
+            else:
+                label = group.findtext('d:Label', namespaces=ns)
+                role = group.find('d:Role', ns).get('value')
+                item.update(audioTrack=dict(id=group.get('lang') + '.1', displayName=label, audioIsDefault=role == 'main'), isDrc='Stable Volume' in label)
+            formats.append(item)
+    return formats
 video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', author='Mobivious Studio',
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
@@ -62,8 +80,9 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/media/'):
             state['mediaRequests'] += 1
-            file = args.media_dir / Path(p).name
-            if not file.is_file():
+            root = args.media_dir.resolve()
+            file = (root / p.removeprefix('/media/')).resolve()
+            if not file.is_relative_to(root) or not file.is_file():
                 return self.respond({}, 404)
             data = file.read_bytes()
             self.send_response(200)
@@ -83,7 +102,8 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[video]))
         elif p == '/api/v1/videos/testvideo01':
             self.respond(dict(**video, description='A generated test video. No YouTube access is involved.',
-                              dashUrl='/media/dash.mpd', hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
+                              dashUrl='/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd', adaptiveFormats=rich_formats() if state['stream'] == 'rich' else [],
+                              hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=[recommended], liveNow=state['liveNow']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]

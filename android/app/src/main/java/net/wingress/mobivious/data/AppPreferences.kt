@@ -71,7 +71,8 @@ data class AccountPreferences(
 
 object PreferenceRules {
     val homes = listOf("", "Popular", "Trending", "Subscriptions", "Playlists")
-    val qualities = listOf("auto", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p", "144p")
+    val qualities = listOf("auto", "best", "4320p", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p", "144p", "worst")
+    fun qualityLabel(value: String) = when (value) { "auto" -> "Auto"; "best" -> "Best"; "worst" -> "Worst"; else -> value }
     val speeds = listOf(.25f, .5f, .75f, 1f, 1.25f, 1.5f, 1.75f, 2f)
     val feedSorts = listOf("published", "published - reverse", "alphabetically", "alphabetically - reverse", "channel name", "channel name - reverse")
     fun destination(home: String, signedIn: Boolean): Pair<String, String> = when (home) {

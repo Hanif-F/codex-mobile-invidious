@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.ComponentName
 import android.net.Uri
 import android.os.Bundle
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -32,6 +33,10 @@ import net.wingress.mobivious.MobiviousApplication
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackRules
 import net.wingress.mobivious.player.PlaybackService
+import net.wingress.mobivious.player.SeekAccumulator
+import net.wingress.mobivious.player.PendingSeek
+import net.wingress.mobivious.player.StreamCatalog
+import net.wingress.mobivious.player.StreamKey
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
@@ -57,6 +62,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val browse = MutableStateFlow(BrowseState())
     val playback = MutableStateFlow(PlaybackState())
     val controller = MutableStateFlow<MediaController?>(null)
+    val pendingSeek = MutableStateFlow<PendingSeek?>(null)
+    private val seekAccumulator = SeekAccumulator()
+    private var seekJob: Job? = null
+    private var seekContext: ApiContext? = null
+    private data class SelectionSnapshot(val video: StreamKey?, val audio: StreamKey?, val text: StreamKey?,
+        val parameters: TrackSelectionParameters, val speed: Float, val playing: Boolean)
+    private data class SelectionRequest(val mediaId: String, val quality: String, val snapshot: SelectionSnapshot?)
+    private var selectionRequest: SelectionRequest? = null
     val channel = MutableStateFlow<Channel?>(null)
     val playlists = MutableStateFlow<List<Playlist>>(emptyList())
     val playlist = MutableStateFlow<Playlist?>(null)
@@ -105,14 +118,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 controller.value = future.get().apply {
                     addListener(object : Player.Listener {
-                        override fun onEvents(player: Player, events: Player.Events) { updatePlayback() }
-                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) { playback.value = playback.value.copy(error = "Playback failed. Retry to refresh the stream.", buffering = false) }
+                        override fun onEvents(player: Player, events: Player.Events) { applyRequestedSelection(); updatePlayback() }
+                        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) { cancelAccumulatedSeek() }
+                        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                            if (pendingSeek.value?.mediaId != mediaItem?.mediaId) cancelAccumulatedSeek(false)
+                        }
+                        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { if (playWhenReady) cancelAccumulatedSeek(false) }
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) { cancelAccumulatedSeek(false); playback.value = playback.value.copy(error = "Playback failed. Retry to refresh the stream.", buffering = false) }
                         override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) {
                             if (error == null) playback.value = playback.value.copy(error = null)
                         }
                     })
-                    setPlaybackSpeed(store.defaultSpeed)
-                    trackSelectionParameters = trackSelectionParameters.buildUpon().setMaxVideoSize(Int.MAX_VALUE, store.maxHeight).build()
+                    if (currentMediaItem == null) setPlaybackSpeed(store.defaultSpeed)
                     currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }?.let { id ->
                         requestedVideo = id
                         val restoreContext = api.context()
@@ -130,6 +147,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }, ContextCompat.getMainExecutor(application))
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
         viewModelScope.launch { account.collect {
+            cancelAccumulatedSeek(false)
             sponsorSettingsChannel.value = null
             sponsorBlock.value = SponsorBlockPlayback()
             preferenceGeneration++; identityGeneration++
@@ -162,6 +180,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (state.settings != settings) sponsorCommand(PlaybackService.SPONSOR_CONFIGURE, settings = settings)
     }
     fun sponsorCommand(action: String, segment: String? = null, settings: SponsorBlockSettings? = null) {
+        if (action == PlaybackService.SPONSOR_SKIP) cancelAccumulatedSeek()
         val state = sponsorBlock.value
         controller.value?.sendCustomCommand(SessionCommand(action, Bundle.EMPTY), Bundle().apply {
             putString("mediaId", state.mediaId); putString("token", state.token)
@@ -251,7 +270,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    fun play(id: String, explicit: Long? = null) {
+    fun play(id: String, explicit: Long? = null) = loadVideo(id, explicit)
+    private fun loadVideo(id: String, explicit: Long? = null, snapshot: SelectionSnapshot? = null) {
+        cancelAccumulatedSeek(false)
+        selectionRequest = null
         if (id == playback.value.details?.video?.id && explicit == null) { controller.value?.play(); return }
         requestedVideo = id
         if (id != dearrowContribution.value.videoId) { contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState() }
@@ -292,12 +314,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         .setSelectionFlags(if (track == caption) C.SELECTION_FLAG_DEFAULT else 0).build() }).build()
                 val p = controller.value ?: future.awaitController()
                 p.pause()
-                p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+                p.trackSelectionParameters = (snapshot?.parameters ?: p.trackSelectionParameters).buildUpon()
                     .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).clearOverridesOfType(C.TRACK_TYPE_VIDEO)
-                    .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, prefs.listen).setMaxVideoSize(Int.MAX_VALUE, prefs.maxHeight)
-                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, caption == null).setPreferredTextLanguage(caption?.language).build()
-                p.setPlaybackSpeed(prefs.speed)
-                p.setMediaItem(item, start * 1000); p.prepare(); p.playWhenReady = prefs.autoplay
+                    .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) ?: prefs.listen)
+                    .setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+                    .setPreferredAudioLanguage(snapshot?.parameters?.preferredAudioLanguages?.firstOrNull())
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) ?: (caption == null))
+                    .setPreferredTextLanguage(snapshot?.parameters?.preferredTextLanguages?.firstOrNull() ?: caption?.language).build()
+                p.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
+                p.setMediaItem(item, start * 1000)
+                selectionRequest = SelectionRequest(id, prefs.qualityDash, snapshot)
+                p.prepare(); p.playWhenReady = snapshot?.playing ?: prefs.autoplay
                 playback.value = PlaybackState(details = details)
                 ensureDeArrow(id); syncDeArrowMetadata()
                 updatePlayback()
@@ -305,19 +332,85 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: CancellationException) { throw e } catch (e: Exception) { playback.value = playback.value.copy(loading = false, error = friendly(e)) }
         }
     }
-    fun retryPlayback() { val id = requestedVideo ?: return; val at = if (playback.value.details?.video?.id == id) playback.value.position / 1000 else null; playback.value = playback.value.copy(details = null); play(id, at) }
-    fun closePlayer() { videoJob?.cancel(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); controller.value?.stop(); controller.value?.clearMediaItems(); playback.value = PlaybackState() }
-    fun togglePlay() { controller.value?.let {
+    private fun selectionSnapshot(): SelectionSnapshot? = controller.value?.let { p ->
+        fun selected(type: Int): StreamKey? = p.currentTracks.groups.filter { it.type == type }.firstNotNullOfOrNull { group ->
+            p.trackSelectionParameters.overrides[group.mediaTrackGroup]?.trackIndices?.singleOrNull()?.let { StreamKey.of(group.getTrackFormat(it)) }
+        }
+        SelectionSnapshot(selected(C.TRACK_TYPE_VIDEO), selected(C.TRACK_TYPE_AUDIO), selected(C.TRACK_TYPE_TEXT), p.trackSelectionParameters, p.playbackParameters.speed, p.playWhenReady)
+    }
+    private fun applyRequestedSelection() {
+        val request = selectionRequest ?: return
+        val p = controller.value ?: return
+        if (p.currentMediaItem?.mediaId != request.mediaId || p.playbackState != Player.STATE_READY || p.currentTracks.groups.isEmpty()) return
+        selectionRequest = null // Clear before setting parameters, which itself emits player events.
+        val builder = p.trackSelectionParameters.buildUpon()
+        for (type in listOf(C.TRACK_TYPE_VIDEO, C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_TEXT)) {
+            val choices = StreamCatalog.choices(p.currentTracks, type)
+            val key = when (type) { C.TRACK_TYPE_VIDEO -> request.snapshot?.video; C.TRACK_TYPE_AUDIO -> request.snapshot?.audio; else -> request.snapshot?.text }
+            val choice = if (request.snapshot != null) StreamCatalog.find(choices, key)
+                else if (type == C.TRACK_TYPE_VIDEO) StreamCatalog.defaultVideo(choices, request.quality) else null
+            if (choice != null) builder.setOverrideForType(TrackSelectionOverride(choice.group, choice.index))
+            else if (key != null && type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(null)
+        }
+        p.trackSelectionParameters = builder.build()
+    }
+    fun retryPlayback() {
+        cancelAccumulatedSeek()
+        val id = requestedVideo ?: return
+        val at = if (controller.value?.currentMediaItem?.mediaId == id) controller.value!!.currentPosition / 1000 else null
+        val snapshot = if (controller.value?.currentMediaItem?.mediaId == id) selectionSnapshot() else null
+        playback.value = playback.value.copy(details = null)
+        loadVideo(id, at, snapshot)
+    }
+    fun closePlayer() { cancelAccumulatedSeek(false); selectionRequest = null; videoJob?.cancel(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); controller.value?.stop(); controller.value?.clearMediaItems(); playback.value = PlaybackState() }
+    fun togglePlay() { cancelAccumulatedSeek(false); controller.value?.let {
         if (it.playbackState == Player.STATE_ENDED) { it.seekToDefaultPosition(); it.play() }
         else if (it.playWhenReady) it.pause() else it.play()
     } }
     fun seekTo(position: Long) { controller.value?.let { p ->
+        cancelAccumulatedSeek()
         if (p.isCurrentMediaItemSeekable && p.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
             p.seekTo(PlaybackRules.seek(position, p.duration)); updatePlayback()
         }
     } }
     fun seekBy(offset: Long) { controller.value?.let { seekTo(it.currentPosition + offset) } }
+    fun accumulateSeek(direction: Int) {
+        val p = controller.value ?: return
+        val state = playback.value
+        if (!state.seekable || !state.canPlay || state.loading || state.error != null) return
+        val id = p.currentMediaItem?.mediaId ?: return
+        val first = seekAccumulator.pending == null
+        val value = seekAccumulator.tap(direction, id, p.currentPosition, p.playWhenReady, SystemClock.elapsedRealtime())
+        seekContext = api.context()
+        pendingSeek.value = value
+        if (first) p.pause()
+        // A synchronous external discontinuity can cancel the batch during pause.
+        if (seekAccumulator.pending != value) return
+        seekJob?.cancel()
+        seekJob = viewModelScope.launch {
+            delay(SeekAccumulator.DELAY)
+            if (api.context() != seekContext || p.currentMediaItem?.mediaId != id || p.playerError != null || playback.value.error != null) { cancelAccumulatedSeek(false); return@launch }
+            val finished = seekAccumulator.finish(id, SystemClock.elapsedRealtime()) ?: return@launch
+            pendingSeek.value = null
+            seekContext = null
+            if (p.isCurrentMediaItemSeekable && p.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
+                p.seekTo(finished.target(p.duration))
+                p.playWhenReady = finished.resume
+            } else p.playWhenReady = finished.resume
+            updatePlayback()
+        }
+    }
+    fun cancelAccumulatedSeek(restore: Boolean = true) {
+        seekJob?.cancel(); seekJob = null
+        val value = seekAccumulator.cancel()
+        pendingSeek.value = null
+        val context = seekContext; seekContext = null
+        val p = controller.value
+        if (restore && value != null && p != null && p.currentMediaItem?.mediaId == value.mediaId && api.context() == context && p.playerError == null)
+            p.playWhenReady = value.resume
+    }
     fun refreshBuffer() {
+        cancelAccumulatedSeek()
         val p = controller.value ?: return
         if (!playback.value.canRefresh || playback.value.loading) return
         val position = p.currentPosition
@@ -336,7 +429,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         updatePlayback()
     }
     fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
-    fun quality(height: Int) { store.maxHeight = height; controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, height).build() }; updatePlayerDefault { it.copy(qualityDash = if (height == Int.MAX_VALUE) "auto" else "${height}p") } }
+    fun autoQuality() { selectionRequest = null; controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE).build() } }
+    // Resolution callers select one current-video representation; defaults are edited in Settings.
+    fun quality(height: Int) { if (height == Int.MAX_VALUE) autoQuality() else controller.value?.let { p ->
+        StreamCatalog.defaultVideo(StreamCatalog.choices(p.currentTracks, C.TRACK_TYPE_VIDEO), "${height}p")?.let { selectTrack(it.group, it.index) }
+    } }
     fun speed(value: Float) { store.defaultSpeed = value; controller.value?.setPlaybackSpeed(value); updatePlayerDefault { it.copy(speed = value) } }
     private fun updatePlayerDefault(change: (AccountPreferences) -> AccountPreferences) {
         val context = api.context()
@@ -352,6 +449,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun captions(language: String?) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, language == null).setPreferredTextLanguage(language).build() } }
     fun selectTrack(group: TrackGroup, index: Int) { controller.value?.let { p ->
+        val current = p.currentTracks.groups.firstOrNull { it.mediaTrackGroup == group } ?: return
+        if (index !in 0 until current.length || !current.isTrackSupported(index) || !p.isCommandAvailable(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS)) return
+        if (group.type == C.TRACK_TYPE_VIDEO) selectionRequest = null
         val builder = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(group.type, false)
             .setOverrideForType(TrackSelectionOverride(group, index))
         if (group.type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(group.getFormat(index).language)
@@ -459,7 +559,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun toggleSubscribe(id: String) = action { api.subscribe(id, subscriptions.value.none { it.id == id }); subscriptions.value = api.subscriptions() }
-    override fun onCleared() { MediaController.releaseFuture(future) }
+    override fun onCleared() { cancelAccumulatedSeek(); MediaController.releaseFuture(future) }
     private fun friendly(e: Exception) = if (e is ApiException || e is IllegalArgumentException) e.message ?: "Request failed." else "Cannot reach this instance. Check the address and connection, then retry."
 }
 private suspend fun com.google.common.util.concurrent.ListenableFuture<MediaController>.awaitController(): MediaController = withContext(Dispatchers.IO) { get() }

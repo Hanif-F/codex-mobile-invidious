@@ -106,7 +106,7 @@ class AppSmokeTest {
         compose.onNodeWithText("0.25×").performClick()
         waitFor { activity.model.playback.value.speed == .25f }
         compose.onNodeWithText("Quality").performClick()
-        compose.onNodeWithText("Up to 720p").performClick()
+        compose.onNodeWithText("360p · 24 FPS").performClick()
         compose.onNodeWithText("Captions").performClick()
         compose.onNodeWithText("English").performClick()
         waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
@@ -114,7 +114,7 @@ class AppSmokeTest {
         showControls()
         compose.onNodeWithContentDescription("Player settings").performClick()
         compose.onNodeWithText("0.25×").assertExists()
-        compose.onNodeWithText("Up to 720p").assertExists()
+        compose.onNodeWithText("360p · 24 FPS").assertExists()
         compose.onNodeWithText("English").assertExists()
         compose.onNodeWithText("Audio").performClick()
         compose.onNodeWithText("Auto").assertExists()
@@ -152,9 +152,9 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Exit full screen").assertExists()
         compose.runOnUiThread { activity.model.playback.value = activity.model.playback.value.copy(error = "Playback failed. Retry to refresh the stream.") }
         compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
-        waitFor(40_000) { activity.model.playback.value.playing && activity.model.playback.value.error == null }
+        waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.error == null }
+        compose.runOnUiThread { assertFalse(activity.model.controller.value!!.playWhenReady) }
         showControls()
-        compose.onNodeWithContentDescription("Pause").performClick()
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         waitFor { compose.onAllNodesWithText("Now playing").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Now playing").assertExists()
@@ -163,7 +163,8 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Full screen").assertExists()
         compose.runOnUiThread { activity.model.playback.value = activity.model.playback.value.copy(error = "Playback failed. Retry to refresh the stream.") }
         compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
-        waitFor(40_000) { activity.model.playback.value.playing && activity.model.playback.value.error == null }
+        waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.error == null }
+        compose.runOnUiThread { assertFalse(activity.model.controller.value!!.playWhenReady) }
     }
     @Test fun refreshPreservesPausedAndPlayingSettings() {
         openFixture()
@@ -187,7 +188,8 @@ class AppSmokeTest {
             val p = activity.model.controller.value!!
             assertFalse(p.playWhenReady); assertEquals(45_000L, p.currentPosition)
             assertEquals(1.5f, p.playbackParameters.speed)
-            assertEquals(720, p.trackSelectionParameters.maxVideoHeight)
+            val videoOverride = p.trackSelectionParameters.overrides.values.single { it.type == C.TRACK_TYPE_VIDEO }
+            assertEquals(360, videoOverride.mediaTrackGroup.getFormat(videoOverride.trackIndices.single()).height)
             assertEquals("en", p.trackSelectionParameters.preferredTextLanguages.first())
             assertTrue(p.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO))
             assertTrue(p.trackSelectionParameters.overrides.values.any { it.type == C.TRACK_TYPE_AUDIO })
