@@ -6,7 +6,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class Video(val id: String, val title: String, val author: String = "", val channelId: String = "",
     val thumbnail: String = "", val duration: Long = 0, val views: Long = 0, val published: String = "",
-    val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false)
+    val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false)
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,
@@ -70,7 +70,7 @@ object ApiParser {
         json.text("title", "Unavailable video"), json.text("author", json.text("channel_name")),
         json.text("authorId", json.text("channel_id")), thumbnail(json),
         json.optLong("lengthSeconds", json.optLong("length_seconds")), json.optLong("viewCount"),
-        json.text("publishedText", json.text("latest_watched")), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title"))
+        json.text("publishedText", json.text("latest_watched")), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title"), json.opt("isMember") == true)
     fun videos(array: JSONArray): List<Video> = array.objects().filter { it.text("videoId", it.text("video_id")).isNotBlank() }.map(::video)
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",

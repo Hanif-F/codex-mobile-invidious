@@ -123,8 +123,24 @@ include page size, sorting and filters. The default playlist appears first in Sa
 Background playback and PiP save immediately on the device. The expanded shared
 settings need the sibling settings PATCH API deployed; no migration or new scopes
 are required. Native runtime/layout checks remain pending a working emulator.
-Chat replay, clips, blocking, downloads, casting and upload notifications are
+Chat replay, clips, downloads, casting and upload notifications are
 outside this first release. Discovery uses Invidious popular/trending feeds.
+
+Browsing settings also controls members-only visibility, off by default. Signed-in
+users share this preference with the website; guests save it per instance. Search
+has a separate saved visibility override with Use browsing default, plus Include
+blocked channels for signed-in users. Members only labels appear on visible cards
+and watch metadata. These controls filter lists; they do not provide membership
+access. History and direct links remain available.
+
+Channel blocking requires sign-in and shares the website’s block list. Block or
+unblock from video-card actions, watch pages and channel headers, or use Settings →
+Browsing → Blocked channels. Blocks hide discovery, search and recommendations;
+subscriptions, playlists, history and direct channel/video access remain available.
+Confirmed block lists are saved per account/instance for offline filtering. Neither
+blocking nor visibility changes interrupt playback. Deploy the sibling metadata,
+preference and blocking API update; sign out and sign in again for the new blocking
+scopes. Native runtime/layout acceptance remains pending a working emulator.
 
 The native sign-in/history/settings extensions must be deployed before account
 features work against production. An APK alone does not update the Ubuntu server.

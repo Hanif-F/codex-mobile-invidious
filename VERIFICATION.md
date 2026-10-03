@@ -494,3 +494,61 @@ Native DeArrow contributions additionally need the updated DeArrow API routes
 and a renewed sign-in token. Public replacement-title reads use the existing route.
 Physical POCO X6 Pro behavior, OEM background restrictions, and authenticated
 account features after production rollout still need a device/server acceptance check.
+
+## Members-only visibility and channel blocking — 4 October 2026
+
+Rows 40–41 are implemented in source across Android and the sibling server. The
+native client keeps original public responses and filters them locally using member
+metadata, the shared account block list and separate device-local search overrides.
+Blocking applies to discovery/search/recommendations; membership visibility also
+applies to channels, subscription feeds and playlists. History and direct access
+remain available. Neither preference changes nor blocking stop current playback.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 93 passed, including 15 visibility/blocking scenarios |
+| Debug application and instrumentation APK builds | Passed |
+| Android debug lint | Passed: zero errors, 36 existing/style/dependency warnings; no warnings in new visibility files |
+| Focused Crystal visibility/search/preference specs | 34 Spectator examples and 3 standard examples passed |
+| Invidious normal and API-only executable builds | Passed, using existing assets and `-Dskip_videojs_download` |
+| Guarded disposable PostgreSQL account/API harness | Passed, including native/web blocking and member serialization |
+| Disposable visibility fixture HTTP checks | Passed |
+| Six new Compose scenarios | Compile; runtime, layout and screenshots unverified |
+
+Unit tests cover strict member booleans and unknown/Premium fallbacks, sparse
+shared preference deltas, filtering scope and combined search overrides/reset,
+original-page termination and playlist occurrence retention, bearer-only account
+calls, corrected `sort=views` search requests, old-server/token explanations,
+confirmed offline snapshots, failed writes, refresh coalescing, delayed reads after
+successful mutations, delayed mutation responses after account changes, account/
+instance/guest isolation and raw public-cache re-filtering. A successful block is
+saved even if the initial list refresh failed. Existing watched/progress tests pass.
+
+The server harness exercised real auth middleware and the existing database table:
+native/web shared state, account isolation, least-privilege and old-scope rejection,
+browser CSRF, private/no-store headers, idempotent writes, canonical IDs, bounded
+names/JSON, malformed-body rejection and unrelated preference preservation. It
+also serialized members-only search/channel/feed entries, full video metadata and
+recommendations from local mocks. The database was an isolated temporary PostgreSQL
+container bound to localhost; no production account or upstream content was used.
+
+Fixture HTTP checks verified raw public responses, member metadata, an entirely
+hidden first search page with a visible second page, playlist occurrence IDs and
+block/unblock endpoints. The six Compose scenarios cover guest settings and badges
+in compact/text-only/dark layouts; hidden-page navigation and search override reset;
+card/search/channel controls and retained library access; website block refresh,
+manager errors and retries; direct members-only playback with uninterrupted watch
+blocking and recommendation updates; and persisted account/instance/guest state.
+
+The installed Pixel_8_Pro emulator exited with SIGSEGV (139) before Android booted
+when launched without saved state using SwiftShader. No connected device was
+available. These new UI scenarios have **not executed**, and native screenshots,
+layout, accessibility interaction and runtime acceptance remain pending. Repeat
+with a working emulator/device using `scripts/test-android.sh`; screenshots are
+written under `/data/local/tmp/mobivious-visibility-screenshots/` on the device.
+
+Deploy the sibling metadata, preference and block-list API update before using
+these features against production. Blocking introduces `GET:blocked_channels` and
+`POST;DELETE:blocked_channels/*` mobile scopes, so existing native sessions must
+sign out and in. Members visibility uses existing preference scopes. No new database
+migration, secret, production deployment or release publication was performed.

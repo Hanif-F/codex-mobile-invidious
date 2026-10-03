@@ -12,7 +12,7 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONObject
 
-class SessionStore(context: Context) : LocalPlaybackPositions {
+class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
     private val storedAccount = readAccount()
     val account = MutableStateFlow(storedAccount?.takeIf { it.expiresAt > System.currentTimeMillis() / 1000 })
@@ -98,4 +98,22 @@ class SessionStore(context: Context) : LocalPlaybackPositions {
     }
     @Synchronized override fun clearPositions(context: ApiContext) { prefs.edit().remove(positionsKey(context)).apply() }
     fun clearPositions() = clearPositions(positionContext())
+    private fun visibilityKey(kind: String, context: ApiContext) = "visibility.$kind." +
+        org.json.JSONArray().put(context.server).put(context.account?.username ?: JSONObject.NULL).toString()
+    override fun searchVisibility(context: ApiContext) = runCatching {
+        SearchVisibility.parse(JSONObject(prefs.getString(visibilityKey("search", context), "{}")!!))
+    }.getOrDefault(SearchVisibility())
+    override fun saveSearchVisibility(context: ApiContext, value: SearchVisibility) {
+        prefs.edit().putString(visibilityKey("search", context), value.json().toString()).apply()
+    }
+    override fun blockedSnapshot(context: ApiContext): List<BlockedChannel>? {
+        if (context.account == null) return null
+        return prefs.getString(visibilityKey("blocks", context), null)?.let { raw ->
+            runCatching { BlockedChannel.parse(org.json.JSONArray(raw)) }.getOrNull()
+        }
+    }
+    override fun saveBlockedSnapshot(context: ApiContext, value: List<BlockedChannel>) {
+        if (context.account != null) prefs.edit().putString(visibilityKey("blocks", context), org.json.JSONArray(value.map { it.json() }).toString()).apply()
+    }
+    fun clearVisibilitySnapshot(context: ApiContext) { prefs.edit().remove(visibilityKey("blocks", context)).apply() }
 }

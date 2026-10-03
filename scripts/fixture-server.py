@@ -41,7 +41,7 @@ default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=F
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
                      related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
                      sort='published', latest_only=False, unseen_only=False, notifications_only=False,
-                     default_playlist=None, unrelated_setting='preserved')
+                     default_playlist=None, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
 state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
@@ -54,7 +54,14 @@ def reset_playback():
     state.update(positions={}, playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False)
 reset_playback()
 
+visibility_member = dict(recommended, videoId='membervid01', title='Members-only fixture video', isMember=True, authorId='UC' + 'b' * 22)
+visibility_other = dict(video, videoId='othervideo1', title='Other channel video', authorId='UC' + 'c' * 22)
+def reset_visibility():
+    state.update(visibilityVideos=False, hiddenFirstPage=False, blockedChannels={}, failBlockedRead=False, failBlockedWrite=False, visibilityReads=[], memberCurrent=False)
+reset_visibility()
+
 def browse_videos():
+    if state['visibilityVideos']: return [video, visibility_member, visibility_other]
     return [video, recommended, unknown_video, live_video] if state['indicatorVideos'] else [video]
 
 sponsor_categories = ('sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'preview', 'music_offtopic', 'filler')
@@ -115,6 +122,7 @@ class Handler(BaseHTTPRequestHandler):
                 item = video if token is None else dict(video, videoId='testvideo02', title='Another channel upload')
             else:
                 item = dict(video, videoId='streamvid01' if token is None else 'streamvid02', title='Channel stream one' if token is None else 'Channel stream two', liveNow=token is None)
+            if state['visibilityVideos'] and token is None: return self.respond(dict(videos=[video, visibility_member], continuation=next_token))
             return self.respond(dict(videos=[item], continuation=next_token) if token is None else dict(videos=[item]))
         finally:
             event['completed'] = True
@@ -122,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
-        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history')) and self.headers.get('Authorization') != 'Bearer fixture-token':
+        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/media/'):
             state['mediaRequests'] += 1
@@ -144,13 +152,23 @@ class Handler(BaseHTTPRequestHandler):
             state['sponsorRequests'] += 1
             state['sponsorAuthorized'] = bool(self.headers.get('Authorization') or self.headers.get('Cookie'))
             self.respond(dict(error='Segments unavailable') if state['failSponsor'] else dict(segments=state['sponsorSegments']), 503 if state['failSponsor'] else 200)
-        elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'): self.respond(browse_videos())
+        elif p == '/api/v1/auth/blocked_channels':
+            self.respond(dict(error='Fixture block list unavailable') if state['failBlockedRead'] else
+                         [dict(authorId=id, author=name) for id, name in sorted(state['blockedChannels'].items(), key=lambda x: (x[1], x[0]))],
+                         503 if state['failBlockedRead'] else 200)
+        elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'):
+            if state['visibilityVideos']:
+                state['visibilityReads'].append(dict(path=p, query=parse_qs(url.query), authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
+            items = browse_videos()
+            if p == '/api/v1/search' and state['hiddenFirstPage']:
+                items = {1: [visibility_member], 2: [video]}.get(int(parse_qs(url.query).get('page', ['1'])[0]), [])
+            self.respond(items)
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
         elif p == '/api/v1/videos/testvideo01':
             self.respond(dict(**video, description='A generated test video. No YouTube access is involved.',
                               dashUrl='/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd', adaptiveFormats=rich_formats() if state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
-                              recommendedVideos=[recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended], liveNow=state['liveNow']))
+                              recommendedVideos=[recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended]), liveNow=state['liveNow'], isMember=state['memberCurrent']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]
             state['titleLookups'][video_id] = state['titleLookups'].get(video_id, 0) + 1
@@ -194,6 +212,7 @@ class Handler(BaseHTTPRequestHandler):
             reset_sponsorblock()
             reset_channels()
             reset_playback()
+            reset_visibility()
             return self.respond({})
         if p == '/test/watched':
             for key in ('watched', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
@@ -202,6 +221,14 @@ class Handler(BaseHTTPRequestHandler):
             if data.get('seedPlaylist'):
                 state['playlists'] = [dict(playlistId='IVfixture', title='Indicator fixture playlist', privacy='private', videoCount=2,
                                           videos=[dict(video, indexId='A'), dict(recommended, indexId='B')])]
+            return self.respond({})
+        if p == '/test/visibility':
+            for key in ('visibilityVideos', 'hiddenFirstPage', 'blockedChannels', 'failBlockedRead', 'failBlockedWrite', 'memberCurrent'):
+                if key in data: state[key] = data[key]
+            if 'show_member_videos' in data: prefs['show_member_videos'] = data['show_member_videos']
+            if data.get('seedPlaylist'):
+                state['playlists'] = [dict(playlistId='IVfixture', title='Visibility fixture playlist', privacy='private', videoCount=2,
+                                          videos=[dict(video, indexId='A'), dict(visibility_member, indexId='B')])]
             return self.respond({})
         if p == '/test/channel':
             for key in ('channelTabs', 'channelFailNext', 'channelDelayNext'):
@@ -226,8 +253,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))
-        if p.startswith(('/api/v1/auth/playback', '/api/v1/auth/history')) and self.headers.get('Authorization') != 'Bearer fixture-token':
+        if p.startswith(('/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
+        if p.startswith('/api/v1/auth/blocked_channels/'):
+            if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
+            if state['failBlockedWrite']: return self.respond(dict(error='Fixture channel update failed'), 503)
+            id = p.rsplit('/', 1)[-1]
+            if self.command == 'POST': state['blockedChannels'].setdefault(id, data.get('name', '').strip()[:200] or id)
+            elif self.command == 'DELETE': state['blockedChannels'].pop(id, None)
+            return self.respond(None, 204)
         if p.startswith('/api/v1/auth/dearrow/'):
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
             if not state['identityReady']: return self.respond(dict(error='The instance administrator must configure DeArrow contribution storage.'), 503)

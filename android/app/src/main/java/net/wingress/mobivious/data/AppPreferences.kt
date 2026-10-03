@@ -15,7 +15,7 @@ data class AccountPreferences(
     val region: String = "US", val relatedVideos: Boolean = true, val extendDescription: Boolean = false,
     val comments: List<String> = listOf("youtube", ""), val maxResults: Int = 40,
     val feedSort: String = "published", val latestOnly: Boolean = false, val unseenOnly: Boolean = false,
-    val notificationsOnly: Boolean = false, val defaultPlaylist: String = ""
+    val notificationsOnly: Boolean = false, val defaultPlaylist: String = "", val showMemberVideos: Boolean = false
 ) {
     fun json() = sponsorBlock.json().apply {
         put("watch_history", watchHistory); put("save_player_pos", savePosition)
@@ -28,6 +28,7 @@ data class AccountPreferences(
         put("max_results", maxResults); put("sort", feedSort); put("latest_only", latestOnly)
         put("unseen_only", unseenOnly); put("notifications_only", notificationsOnly)
         put("default_playlist", defaultPlaylist.ifBlank { null } ?: JSONObject.NULL)
+        put("show_member_videos", showMemberVideos)
     }
     fun changesFrom(before: AccountPreferences) = JSONObject().apply {
         val old = before.json(); val current = json()
@@ -64,7 +65,7 @@ data class AccountPreferences(
                 defaultHome = j.text("default_home", "Popular"), feedMenu = strings("feed_menu", defaults.feedMenu), region = j.text("region", "US"),
                 relatedVideos = j.optBoolean("related_videos", true), extendDescription = j.optBoolean("extend_desc"), comments = strings("comments", defaults.comments),
                 maxResults = j.optInt("max_results", 40).coerceIn(0, 1500), feedSort = j.text("sort", "published"),
-                latestOnly = j.optBoolean("latest_only"), unseenOnly = j.optBoolean("unseen_only"), notificationsOnly = j.optBoolean("notifications_only"), defaultPlaylist = j.text("default_playlist"))
+                latestOnly = j.optBoolean("latest_only"), unseenOnly = j.optBoolean("unseen_only"), notificationsOnly = j.optBoolean("notifications_only"), defaultPlaylist = j.text("default_playlist"), showMemberVideos = j.optBoolean("show_member_videos"))
         }
     }
 }

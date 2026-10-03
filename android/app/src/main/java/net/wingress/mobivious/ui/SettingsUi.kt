@@ -29,7 +29,7 @@ import org.json.JSONObject
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -> Unit, back: () -> Unit, signIn: () -> Unit) {
+internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -> Unit, back: () -> Unit, signIn: () -> Unit, openChannel: (String) -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val context = vm.api.context()
@@ -62,7 +62,8 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                 }
                 "Server" -> ServerSettingsScreen(vm, Modifier.padding(padding), back)
                 "About" -> AboutSettingsScreen(Modifier.padding(padding))
-                else -> PreferenceSettingsScreen(vm, page, prefs, Modifier.padding(padding), back, signIn) { saving = it }
+                "Blocked channels" -> BlockedChannelsScreen(vm, Modifier.padding(padding), signIn, openChannel)
+                else -> PreferenceSettingsScreen(vm, page, prefs, Modifier.padding(padding), back, signIn, navigate) { saving = it }
             }
         }
     }
@@ -76,7 +77,7 @@ private fun SettingsLink(title: String, detail: String, icon: ImageVector, navig
 }
 
 @Composable
-private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: AccountPreferences, modifier: Modifier, back: () -> Unit, signIn: () -> Unit, onBusy: (Boolean) -> Unit) {
+private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: AccountPreferences, modifier: Modifier, back: () -> Unit, signIn: () -> Unit, navigate: (String) -> Unit, onBusy: (Boolean) -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val context = remember { vm.api.context() }
@@ -130,6 +131,10 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode, !busy) { update(value.copy(thinMode = it)) }
                 }
                 "Browsing" -> {
+                    item {
+                        SettingsToggle("Show members-only videos", "Include members-only content in video lists. This does not grant membership access.", value.showMemberVideos, !busy) { update(value.copy(showMemberVideos = it)) }
+                        SettingsLink("Blocked channels", "Manage channels hidden from discovery and recommendations", Icons.Default.Block, navigate)
+                    }
                     item {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
                         SettingsChoice("Default homepage", homes.map { it to it.ifBlank { "Search" } }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }

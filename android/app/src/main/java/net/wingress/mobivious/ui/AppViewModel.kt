@@ -60,6 +60,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val account = store.account
     val offline = app.offline
     val watched = app.watched.state
+    val blocked = app.blocked.state
+    val searchVisibility = MutableStateFlow(store.searchVisibility(api.context()))
     val browse = MutableStateFlow(BrowseState())
     val playback = MutableStateFlow(PlaybackState())
     val controller = MutableStateFlow<MediaController?>(null)
@@ -149,6 +151,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }, ContextCompat.getMainExecutor(application))
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
         viewModelScope.launch { account.collect {
+            browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
+            app.blocked.reset(); searchVisibility.value = store.searchVisibility(api.context())
             cancelAccumulatedSeek(false)
             sponsorSettingsChannel.value = null
             sponsorBlock.value = SponsorBlockPlayback()
@@ -158,6 +162,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             preferencesContext = if (it == null) api.context() else null
             preferences.value = if (it == null) store.guestDeArrow() else AccountPreferences()
             if (it != null) refreshAccount() else { subscriptions.value = emptyList(); playlists.value = emptyList() }
+            refresh()
         } }
         viewModelScope.launch { combine(preferences, dearrowTitles.titles) { prefs, _ -> prefs }.collect {
             if (it.dearrowEnabled) playback.value.details?.video?.id?.let(::ensureDeArrow)
@@ -210,14 +215,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun refreshSharedSettings() {
         val context = api.context()
+        refreshBlockedChannels()
         refreshWatched()
         if (context.account == null) { preferencesContext = context; preferences.value = store.guestDeArrow(); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return }
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
         action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
+            val membersChanged = value.showMemberVideos != preferences.value.showMemberVideos
             preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
             if (homeAppliedContext != context) { homeAppliedContext = context; openDefaultHome() }
-            else if (tab == "Subscriptions" || route == "history") refresh()
+            else if (tab == "Subscriptions" || route == "history" || membersChanged && route.startsWith("playlist:")) refresh()
         } }
         viewModelScope.launch {
             try { val identity = api.dearrowIdentity(context); if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = identity; dearrowIdentityError.value = null } }
@@ -226,6 +233,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun ensureDeArrow(id: String) { if (preferences.value.dearrowEnabled) dearrowTitles.ensure(id) }
+    fun refreshBlockedChannels() { viewModelScope.launch { app.blocked.refresh() } }
+    fun toggleBlocked(id: String, name: String) {
+        val context = api.context()
+        val block = id !in blocked.value.ids
+        action {
+            app.blocked.setBlocked(context, id, name, block)
+            if (api.context() == context) { message.value = if (block) "Channel blocked" else "Channel unblocked"; refreshBlockedChannels() }
+        }
+    }
+    fun saveSearchVisibility(value: SearchVisibility) {
+        store.saveSearchVisibility(api.context(), value); searchVisibility.value = value
+    }
+    fun contentSurface(): ContentSurface = when {
+        route == "history" -> ContentSurface.HISTORY
+        route.startsWith("channel:") -> ContentSurface.CHANNEL
+        route.startsWith("playlist:") -> ContentSurface.PLAYLIST
+        tab == "Search" -> ContentSurface.SEARCH
+        tab == "Subscriptions" -> ContentSurface.SUBSCRIPTIONS
+        else -> ContentSurface.DISCOVERY
+    }
+    fun visibleVideos(videos: List<Video>, surface: ContentSurface = contentSurface()): List<Video> =
+        ContentVisibility.filter(videos, surface, preferences.value.showMemberVideos, searchVisibility.value,
+            blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
     fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
     private fun syncDeArrowMetadata() {
         val video = playback.value.details?.video ?: return
@@ -265,6 +295,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val old = if (more) browse.value else BrowseState()
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
+        val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else selectedTab)
         browseJob = viewModelScope.launch {
@@ -274,7 +305,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     selectedRoute.startsWith("channel:") -> {
                         val id = selectedRoute.substringAfter(':')
                         val info = if (selectedChannel == null || !more && refreshChannel) api.channel(id) else selectedChannel
-                        if (generation != browseGeneration) throw CancellationException("Channel request superseded")
+                        if (generation != browseGeneration || context != api.context()) throw CancellationException("Channel request superseded")
                         val contentTab = info.preferredTab(selectedChannelTab)
                         channel.value = info; channelTab.value = contentTab
                         val token = if (more) old.continuation else ""
@@ -284,19 +315,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         }
                         continuation = response.continuation; response.items
                     }
-                    selectedRoute.startsWith("playlist:") -> api.playlist(selectedRoute.substringAfter(':'), page).let { playlist.value = it.first; it.second }
+                    selectedRoute.startsWith("playlist:") -> api.playlist(selectedRoute.substringAfter(':'), page).let { if (generation == browseGeneration && context == api.context()) playlist.value = it.first; it.second }
                     selectedRoute == "history" -> api.history(page)
                     selectedTab == "Search" -> if (selectedQuery.isBlank()) emptyList() else api.search(selectedQuery, page, sort, date, durationFilter)
                     selectedTab == "Subscriptions" -> if (account.value == null) emptyList() else api.feed(page, preferences.value.notificationsOnly)
                     selectedTab == "Library" -> { if (account.value != null) playlists.value = api.playlists(); emptyList() }
                     else -> api.discovery(discovery, region)
                 }
-                if (generation == browseGeneration) browse.value = browse.value.copy(videos = (old.videos + videos).distinctBy { it.id + it.indexId }, loading = false, page = page,
-                    continuation = continuation, end = videos.isEmpty() || more && videos.all { video -> old.videos.any { it.id == video.id && it.indexId == video.indexId } } ||
+                if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
+                    continuation = continuation, end = videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                         selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                if (generation == browseGeneration) browse.value = browse.value.copy(loading = false, error = friendly(e))
+                if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(loading = false, error = friendly(e))
             }
         }
     }
@@ -499,8 +530,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
-    fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.save(null); app.cache.clear(); navigate("Home") } }
-    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null); app.cache.clear(); navigate("Home") } }
+    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
@@ -516,7 +547,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (api.context() == context) {
             preferenceGeneration++; preferencesContext = context; preferences.value = saved; region = saved.region
             syncSponsorSettings(); syncHistorySettings(); if (!saved.savePosition) store.clearPositions()
-            if (changes.keys().asSequence().any { it in listOf("region", "max_results", "sort", "latest_only", "unseen_only", "notifications_only") }) refresh()
+            if (changes.keys().asSequence().any { it in listOf("region", "max_results", "sort", "latest_only", "unseen_only", "notifications_only", "show_member_videos") }) refresh()
             message.value = if (context.account == null) "Settings saved" else "Account settings saved"
         }
     }
