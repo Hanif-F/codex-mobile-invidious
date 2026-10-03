@@ -292,6 +292,23 @@ generic labels; all options remain limited to supported manifest tracks. This AP
 change needs no database migration, new key, token scope or sign-in renewal. No
 production rollout or signed release was performed.
 
+## Mobivious 0.2.0 release — 3 October 2026
+
+The release APK uses application ID `net.wingress.mobivious`, version name `0.2.0`
+and version code `3`. Package inspection confirmed minimum SDK 26, target SDK 37
+and arm64-v8a/armeabi-v7a/x86/x86_64 support. The existing signing key was reused;
+the verified APK certificate matches the published 0.1.1 asset. Its local copy's
+SHA-256 matches GitHub's asset digest, establishing signing continuity against the
+published release rather than an unrelated local build.
+
+`scripts/build-release.sh` passed all 52 Android unit/MockWebServer tests,
+`assembleRelease` and `lintRelease`. APK signature verification, package/version
+inspection and the generated checksum passed. The versioned APK and matching
+`.apk.sha256` are prepared for the GitHub `v0.2.0` release; signing material remains
+local and ignored. Native runtime/layout acceptance limitations in the preceding
+section still apply. Building and publishing this APK does not deploy the sibling
+Invidious server APIs or change production services.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:

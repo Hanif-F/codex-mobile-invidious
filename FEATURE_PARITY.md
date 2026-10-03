@@ -3,7 +3,7 @@
 Reviewed on **3 October 2026** against the local source checkouts:
 
 - Web: `../invidious`, reviewed commit `a21a5513` plus the expanded native settings API changes in the working tree — includes this fork's custom features.
-- Android: this repository, reviewed commit `13d2695`, app version `0.1.1`, plus the settings overhaul in the working tree.
+- Android: this repository, source commit `c43eb76`, app version `0.2.0`, including the release-version changes in the working tree.
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
