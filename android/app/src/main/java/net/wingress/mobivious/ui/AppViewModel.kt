@@ -59,6 +59,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val api = app.api
     val account = store.account
     val offline = app.offline
+    val watched = app.watched.state
     val browse = MutableStateFlow(BrowseState())
     val playback = MutableStateFlow(PlaybackState())
     val controller = MutableStateFlow<MediaController?>(null)
@@ -209,11 +210,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun refreshSharedSettings() {
         val context = api.context()
-        if (context.account == null) { preferencesContext = context; preferences.value = store.guestDeArrow(); syncSponsorSettings(); return }
+        refreshWatched()
+        if (context.account == null) { preferencesContext = context; preferences.value = store.guestDeArrow(); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return }
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
         action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
-            preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings()
+            preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
             if (homeAppliedContext != context) { homeAppliedContext = context; openDefaultHome() }
             else if (tab == "Subscriptions" || route == "history") refresh()
         } }
@@ -235,7 +237,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; channel.value = null; channelTab.value = null; playlist.value = null; refresh() }
     fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery = target.second; navigate(target.first) }
-    fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow) }
+    fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow); refreshWatched() }
+    private fun refreshWatched() {
+        if (preferencesContext == api.context()) app.watched.configure(api.context(), preferences.value.savePosition)
+        viewModelScope.launch { app.watched.refresh() }
+    }
+    fun removeHistory(id: String) {
+        val context = api.context()
+        action { app.watched.removeHistory(context, id); if (api.context() == context) refresh() }
+    }
+    fun clearHistory() {
+        val context = api.context()
+        action { app.watched.clearHistory(context); if (api.context() == context) refresh() }
+    }
     fun more() = load(true)
     fun selectChannelTab(value: ChannelTab) {
         val info = channel.value ?: return
@@ -306,9 +320,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val details = api.video(id, prefs.local)
                 if (api.context() != context) throw CancellationException("Account or instance changed")
                 if (prefsGeneration == preferenceGeneration) { preferencesContext = context; preferences.value = prefs }
-                val saved = if (prefs.savePosition && account.value != null) try { api.position(id) }
-                    catch (e: CancellationException) { throw e } catch (_: Exception) { store.position(id) }
-                    else if (prefs.savePosition) store.position(id) else 0
+                app.watched.configure(context, prefs.savePosition)
+                val saved = if (prefs.savePosition && account.value != null) try { api.position(id, context) }
+                    catch (e: CancellationException) { throw e } catch (_: Exception) { store.position(id, context) }
+                    else if (prefs.savePosition) store.position(id, context) else 0
                 if (api.context() != context) throw CancellationException("Account or instance changed")
                 val start = PlaybackRules.resume(saved, details.video.duration, explicit)
                 val base = store.server.toHttpUrlOrNull()!!
@@ -457,8 +472,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     private fun syncHistorySettings() {
         if (preferencesContext != api.context()) return
-        val id = controller.value?.currentMediaItem?.mediaId ?: return
         val prefs = preferences.value
+        app.watched.configure(api.context(), prefs.savePosition)
+        val id = controller.value?.currentMediaItem?.mediaId ?: return
         controller.value?.sendCustomCommand(SessionCommand(PlaybackService.SET_HISTORY_SETTINGS, Bundle.EMPTY), Bundle().apply {
             putString("mediaId", id); putBoolean("history", account.value != null && prefs.watchHistory); putBoolean("savePosition", prefs.savePosition)
         })
@@ -483,7 +499,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
-    fun logout() = action { try { api.logout() } finally { closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); navigate("Home") } }
+    fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.save(null); app.cache.clear(); navigate("Home") } }
     fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")

@@ -48,6 +48,15 @@ state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', med
              originalMode='unlocked', titleLookups={}, contributions=[])
 replacement = 'A calm scene'
 recommended = dict(video, videoId='testvideo02', title='Another original title')
+unknown_video = dict(video, videoId='unknownvid1', title='Unknown duration fixture', lengthSeconds=0)
+live_video = dict(video, videoId='streamvid01', title='Live indicator fixture', liveNow=True)
+def reset_playback():
+    state.update(positions={}, playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False)
+reset_playback()
+
+def browse_videos():
+    return [video, recommended, unknown_video, live_video] if state['indicatorVideos'] else [video]
+
 sponsor_categories = ('sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'preview', 'music_offtopic', 'filler')
 sponsor_colors = dict(zip(sponsor_categories, ('#4caf50', '#ffeb3b', '#e91e63', '#00bcd4', '#2196f3', '#3f51b5', '#ff9800', '#9c27b0')))
 def reset_sponsorblock():
@@ -113,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
-        if p.startswith('/api/v1/auth/dearrow/') and self.headers.get('Authorization') != 'Bearer fixture-token':
+        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/media/'):
             state['mediaRequests'] += 1
@@ -135,13 +144,13 @@ class Handler(BaseHTTPRequestHandler):
             state['sponsorRequests'] += 1
             state['sponsorAuthorized'] = bool(self.headers.get('Authorization') or self.headers.get('Cookie'))
             self.respond(dict(error='Segments unavailable') if state['failSponsor'] else dict(segments=state['sponsorSegments']), 503 if state['failSponsor'] else 200)
-        elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'): self.respond([video])
-        elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[video]))
+        elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'): self.respond(browse_videos())
+        elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
         elif p == '/api/v1/videos/testvideo01':
             self.respond(dict(**video, description='A generated test video. No YouTube access is involved.',
                               dashUrl='/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd', adaptiveFormats=rich_formats() if state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
-                              recommendedVideos=[recommended], liveNow=state['liveNow']))
+                              recommendedVideos=[recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended], liveNow=state['liveNow']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]
             state['titleLookups'][video_id] = state['titleLookups'].get(video_id, 0) + 1
@@ -156,9 +165,18 @@ class Handler(BaseHTTPRequestHandler):
         elif p.startswith('/api/v1/auth/playlists/'):
             pl = next((x for x in state['playlists'] if x['playlistId'] == p.split('/')[-1]), None)
             self.respond(pl or {}, 200 if pl else 404)
-        elif p == '/api/v1/auth/history': self.respond([dict(video_id=video['videoId'], title=video['title'], channel_name=video['author'], channel_id=video['authorId'], length_seconds=120)] if state['watched'] else [])
+        elif p == '/api/v1/auth/history':
+            catalog = {v['videoId']: v for v in [video, recommended, unknown_video, live_video]}
+            self.respond([dict(video_id=id, title=catalog.get(id, {}).get('title'), channel_name=video['author'], channel_id=video['authorId'], length_seconds=catalog.get(id, {}).get('lengthSeconds', 0)) for id in reversed(state['watched'])])
+        elif p == '/api/v1/auth/playback':
+            state['playbackRequests'] += 1
+            payload = dict(positions=dict(state['positions']), watched=list(state['watched']))
+            delay = state['playbackDelayNext']; state['playbackDelayNext'] = 0
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            self.respond(dict(error='Fixture indicators unavailable') if state['failPlayback'] else payload, 503 if state['failPlayback'] else 200)
         elif p.startswith('/api/v1/auth/playback/'):
-            self.respond(dict(position=state['position'], videoId='testvideo01'))
+            id = p.rsplit('/', 1)[-1]
+            self.respond(dict(position=state['positions'][id], videoId=id) if id in state['positions'] else dict(error='Playback position does not exist.'), 200 if id in state['positions'] else 404)
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
         elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams'): self.channel(p.rsplit('/', 1)[-1], url.query)
         elif p == '/api/v1/comments/testvideo01': self.respond(dict(comments=[dict(author='Viewer', content='A test comment.', likeCount=3, publishedText='today')]))
@@ -175,6 +193,15 @@ class Handler(BaseHTTPRequestHandler):
             prefs.update(default_prefs)
             reset_sponsorblock()
             reset_channels()
+            reset_playback()
+            return self.respond({})
+        if p == '/test/watched':
+            for key in ('watched', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
+                if key in data: state[key] = data[key]
+            state['position'] = state['positions'].get('testvideo01', 0)
+            if data.get('seedPlaylist'):
+                state['playlists'] = [dict(playlistId='IVfixture', title='Indicator fixture playlist', privacy='private', videoCount=2,
+                                          videos=[dict(video, indexId='A'), dict(recommended, indexId='B')])]
             return self.respond({})
         if p == '/test/channel':
             for key in ('channelTabs', 'channelFailNext', 'channelDelayNext'):
@@ -199,6 +226,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))
+        if p.startswith(('/api/v1/auth/playback', '/api/v1/auth/history')) and self.headers.get('Authorization') != 'Bearer fixture-token':
+            return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/api/v1/auth/dearrow/'):
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
             if not state['identityReady']: return self.respond(dict(error='The instance administrator must configure DeArrow contribution storage.'), 503)
@@ -221,12 +250,24 @@ class Handler(BaseHTTPRequestHandler):
                         if entry is None or (entry.get('enabled') is None and not entry.get('modes')): prefs[key].pop(channel, None)
                         else: prefs[key][channel] = dict(entry, name=prefs[key].get(channel, {}).get('name', 'Mobivious Studio'))
                 else: prefs[key] = value
+            if not prefs['save_player_pos']: state['positions'].clear(); state['position'] = 0
             self.respond(prefs)
         elif p.startswith('/api/v1/auth/playback/'):
-            state['position'] = data.get('position', 0) if self.command != 'DELETE' else 0
+            id = p.rsplit('/', 1)[-1]
+            if self.command == 'DELETE': state['positions'].pop(id, None)
+            else:
+                if not prefs['save_player_pos']: return self.respond(dict(error='Saving playback position is disabled in preferences.'), 409)
+                state['positions'][id] = data.get('position', 0)
+            state['position'] = state['positions'].get('testvideo01', 0)
             self.respond(status=204)
         elif p.startswith('/api/v1/auth/history'):
-            state['watched'] = [] if self.command == 'DELETE' else ['testvideo01']
+            if p == '/api/v1/auth/history' and self.command == 'DELETE':
+                state['watched'] = []; state['positions'].clear(); state['position'] = 0
+            else:
+                if not prefs['watch_history']: return self.respond(dict(error='Watch history is disabled in preferences.'), 409)
+                id = p.rsplit('/', 1)[-1]
+                state['watched'] = [entry for entry in state['watched'] if entry != id]
+                if self.command != 'DELETE': state['watched'].append(id)
             self.respond(status=204)
         elif p == '/api/v1/auth/playlists' and self.command == 'POST':
             state['playlists'].append(dict(playlistId='IVfixture', title=data['title'], privacy=data['privacy'], videoCount=0, videos=[]))

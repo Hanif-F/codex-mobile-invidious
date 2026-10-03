@@ -427,6 +427,63 @@ build/test scripts were unchanged and both shell scripts passed syntax checks.
 No server image or APK rebuild was needed for that location change. The subsequent
 DeArrow source changes and validation are described above.
 
+## Watched/progress indicators — 4 October 2026
+
+The native cards now use the existing authenticated bulk playback endpoint for
+watched history and saved positions. The shared repository is owned by the
+Application and updated by the playback service, including background/audio/PiP
+playback. Guests use device-local resume positions only when enabled. This change
+adds no manual watched-state controls or new server/API permissions.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 78 passed, including 20 new watched/progress scenarios |
+| Android debug and instrumentation APK builds | Passed |
+| Android debug lint | Passed; 0 errors, 33 dependency/style warnings |
+| Disposable localhost watched/progress HTTP fixture | Passed |
+| Python fixture syntax and diff whitespace | Passed |
+| Android connected/runtime/layout/screenshots | Unverified: emulator terminated with exit 139 before Android booted; no connected devices |
+
+Unit checks cover the bulk bearer-only API contract, malformed snapshot entries,
+web percentage rounding/minimum/full-bar thresholds, separate history and progress
+accessibility descriptions, unknown durations and active-live exclusion, guest
+completion, account completion, coalesced reads, retained state on failures and
+retry. Delayed-response cases verify account/instance isolation, newer service
+writes surviving an older read while other videos still refresh, reads during
+pending writes, history removal/clearing surviving older bulk snapshots,
+clear-history invalidation of queued saves,
+disabled-resume invalidation, history removal preserving progress, failed history
+mutations retaining state and failed position writes retaining device fallback.
+
+Local positions are now keyed by instance and account username, with a separate
+guest namespace. Legacy unscoped positions are attributed to the saved session
+(including an expired session) when present, otherwise to the guest namespace.
+Cleared/completed positions are removed rather than stored as zero. These device
+fallback values are never replayed to the server outside current playback.
+
+The isolated fixture check used a generated media directory, an ephemeral loopback
+port and a disposable fixture process that was terminated afterwards. It verified
+authentication, multiple watched/progress entries, discovery/recommendation cards,
+independent history deletion, position writes/deletion, clearing history and
+positions together, disabled resume and injected bulk-read failure. No production
+account, server or upstream content was changed.
+
+Six new Compose scenarios compile for indicators across discovery/search/feed,
+channel/playlist/history/recommendation cards, compact and thumbnail-free layouts,
+light/dark screenshots, accessible descriptions, guest preferences, unknown/live
+durations, history removal/clearing, background playback/completion, failed refresh
+and sign-out isolation. They have **not run**. Android Emulator 37.2.12 exited with
+SIGSEGV during a read-only headless SwiftShader startup with Vulkan and cameras
+disabled. Native layout, screenshot, accessibility and Media3/service acceptance
+remain unverified.
+
+When a working emulator or device is available, run `scripts/test-android.sh` and
+repeat `WatchedIndicatorsSmokeTest` at 320dp and 390dp widths in light/dark mode.
+The scenarios save screenshots under
+`/data/local/tmp/mobivious-watched-screenshots/`. The existing mobile/account API
+deployment requirement still applies; this revision needs no additional server
+patch, migration or token renewal.
+
 ## Production work still required
 
 The mobile hostname, TLS alias, Docker rollout and new account APIs have **not**

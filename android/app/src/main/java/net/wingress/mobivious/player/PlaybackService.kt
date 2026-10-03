@@ -19,8 +19,6 @@ import androidx.media3.session.SessionError
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import net.wingress.mobivious.MainActivity
 import net.wingress.mobivious.MobiviousApplication
 import net.wingress.mobivious.data.*
@@ -41,7 +39,6 @@ class PlaybackService : MediaSessionService() {
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val writes = Mutex()
     private val app get() = application as MobiviousApplication
     private var owner: Account? = null
     private var ownerContext: ApiContext? = null
@@ -49,6 +46,7 @@ class PlaybackService : MediaSessionService() {
     private var savePosition = false
     private var started = false
     private var marked = false
+    private var playbackGeneration = 0L
     private var current: MediaItem? = null
     private val sponsor = SponsorBlockEngine()
     private var sponsorState = SponsorBlockPlayback()
@@ -84,6 +82,7 @@ class PlaybackService : MediaSessionService() {
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
                         history = args.getBoolean("history") && owner != null
                         savePosition = args.getBoolean("savePosition")
+                        app.watched.configure(ownerContext!!, savePosition)
                         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                     }
                     if (customCommand.customAction != SET_DISPLAY_TITLE) return Futures.immediateFuture(sponsorCommand(customCommand.customAction, args))
@@ -109,16 +108,14 @@ class PlaybackService : MediaSessionService() {
                 savePosition = mediaItem?.mediaMetadata?.extras?.getBoolean("savePosition") ?: false
                 started = false
                 marked = false
+                playbackGeneration++
+                if (mediaItem != null) app.watched.configure(ownerContext!!, savePosition)
                 resetSponsor(mediaItem)
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 if (isPlaying) {
                     started = true
-                    if (!marked && history) {
-                        marked = true
-                        val item = current; val account = owner
-                        scope.launch { if (item != null && sameOwner(account)) runCatching { app.api.watched(item.mediaId) } }
-                    }
+                    recordHistory()
                 } else persist()
             }
             override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) persist(ended = true) }
@@ -128,7 +125,7 @@ class PlaybackService : MediaSessionService() {
             }
             override fun onEvents(player: Player, events: Player.Events) { evaluateSponsor() }
         })
-        scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) persist() } }
+        scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
         scope.launch { while (isActive) { delay(100); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
     }
@@ -207,13 +204,28 @@ class PlaybackService : MediaSessionService() {
         return SessionResult(SessionResult.RESULT_SUCCESS)
     }
     private fun sameOwner(account: Account?): Boolean = account != null && account == app.store.account.value && account.server == app.store.server
+    private fun recordHistory() {
+        if (marked || !history || !sameOwner(owner) || ownerContext != app.api.context()) return
+        val item = current ?: return
+        val context = ownerContext ?: return
+        val generation = playbackGeneration
+        marked = true
+        scope.launch {
+            try { app.watched.recordWatched(context, item.mediaId) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { if (generation == playbackGeneration && context == ownerContext) marked = false }
+        }
+    }
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {
         if (!started || !savePosition || item == null || ownerContext != app.api.context()) return
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: 0
         val value = PlaybackRules.save(position / 1000, duration, ended)
-        app.store.position(item.mediaId, value)
-        val account = owner
-        scope.launch { writes.withLock { if (savePosition && sameOwner(account)) runCatching { app.api.position(item.mediaId, value) } } }
+        val context = ownerContext ?: return
+        scope.launch {
+            try { app.watched.savePosition(context, item.mediaId, value) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* Device resume and indicators retain the local save. */ }
+        }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

@@ -3,7 +3,7 @@
 Reviewed on **3 October 2026** against the local source checkouts:
 
 - Web: `../invidious`, baseline audit at `a21a5513` plus the expanded native settings API changes; channel routes/API rechecked at `68e51ac2`. Includes this fork's custom features.
-- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`. Current release version: `0.2.1` (version code 4).
+- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; row 34 updated against the watched/progress implementation on 4 October 2026. Current release version: `0.2.1` (version code 4).
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
@@ -13,7 +13,7 @@ Reviewed on **3 October 2026** against the local source checkouts:
 
 This is a source audit, not a new native runtime or production acceptance test. Features can depend on instance configuration, upstream content availability, and device capabilities. Validation is recorded in [VERIFICATION.md](VERIFICATION.md). That file reports the production mobile sign-in/account API rollout as still pending; account features below are implemented in source, but need the server patch deployed before production use. The channel revision additionally checks public channel endpoints on the existing live instance; it does not validate the production account rollout.
 
-**Summary: 45 broad feature areas — 13 implemented, 15 partial, 17 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
+**Summary: 45 broad feature areas — 13 implemented, 16 partial, 16 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
 
 ## Discovery and channels
 
@@ -66,11 +66,11 @@ Evidence: [web watch page][w-watch], [web player component][w-player], [web play
 | 31 | Public/YouTube playlists, saved external playlists and mixes | Partial | The library API can return external playlists already saved on the web; the common playlist API can read their contents when reached through Library. | Discover/open arbitrary public or YouTube playlist links without signing in, save/unsave external playlists in Android, and browse/play mixes. The app does not follow the playlist endpoint's redirect to a mix. |
 | 32 | Video-card/context-menu library actions | Partial | Save from the watch page; remove items in playlist/history lists; open a video's channel. | Save directly from browse/search/feed cards, inline create-and-save, quick audio/source/instance actions and undo feedback available in the web context-menu flows. |
 | 33 | Watch history and history organization | Partial | Record watched videos, paginated history, keep unavailable entries, remove one entry, clear all with confirmation and shared enable/disable setting. | Search/filter history, timezone-aware date groups and fuller archived metadata presentation. |
-| 34 | Watched/progress indicators and manual watched state | Not implemented | Automatic history recording exists (row 33). | Thumbnail progress bars/watched indicators and explicit mark-watched/mark-unwatched actions from browsing cards. Removing a history entry exists, but there is no general watched-state action. |
+| 34 | Watched/progress indicators and manual watched state | Partial | Shared watched badges/thumbnail overlays and saved-progress bars across native video cards, including recommendations; compact and thumbnail-free presentation; accessible history/progress descriptions. Account state uses the shared playback API; guests see device-local progress when resume is enabled. Service-owned playback updates indicators in background/audio/PiP. Existing history removal preserves progress; clearing history clears both. | Explicit mark-watched/mark-unwatched actions are intentionally excluded from the Android UX. Native runtime/layout acceptance remains unverified. |
 | 35 | Data import/export and migration | Not implemented | — | Invidious data import/export; YouTube subscription/playlist/history imports; NewPipe/FreeTube imports and subscription exports/OPML. The native login token also lacks export/import scopes. |
 | 36 | Shared account preferences | Partial | Dedicated Settings and submenu screens; shared history/resume, playback defaults (autoplay, audio only, proxy, speed, ranked quality, caption priorities), color mode/density/thumbnails, homepage/feed order, region, comments/recommendations/description visibility, feed filters/sort/page size, default playlist, DeArrow and SponsorBlock. Sparse patches preserve unrelated server values; refresh on sign-in, settings opening and foreground return. | Preferences for capabilities outside the implemented native scope, including web theme registry/randomization, interface locale, annotations, VR, chat replay and next-video queues. Background/PiP stay device-local. The expanded shared settings require the sibling settings API update. |
 
-Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed rules][w-users], [web playlist routes][w-playlists], [web common playlist/mix API][w-playlist-api], [web history][w-history], [web watched indicators][w-indicator], [web data control][w-data], [web preferences][w-prefs]; [Android account/library UI][a-ui], [Android API][a-api], [Android session/local settings][a-store], [mobile API contract][w-mobile].
+Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed rules][w-users], [web playlist routes][w-playlists], [web common playlist/mix API][w-playlist-api], [web history][w-history], [web watched indicators][w-indicator], [web data control][w-data], [web preferences][w-prefs]; [Android account/library UI][a-ui], [Android API][a-api], [Android watched/progress state][a-watched], [Android session/local settings][a-store], [mobile API contract][w-mobile].
 
 ## Enhancements, appearance and instances
 
@@ -120,6 +120,7 @@ Links are repository-relative so this checklist works with the documented siblin
 [a-api]: android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt
 [a-models]: android/app/src/main/java/net/wingress/mobivious/data/Models.kt
 [a-store]: android/app/src/main/java/net/wingress/mobivious/data/SessionStore.kt
+[a-watched]: android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt
 [a-service]: android/app/src/main/java/net/wingress/mobivious/player/PlaybackService.kt
 [a-activity]: android/app/src/main/java/net/wingress/mobivious/MainActivity.kt
 [a-manifest]: android/app/src/main/AndroidManifest.xml
@@ -165,3 +166,9 @@ Rows 03, 11, 13, 14, 16, 28, 36, 42 and 44 were updated against the current sour
 ## Channel loading and Streams tabs — 3 October 2026
 
 Rows 05 and 10 now include native Streams browsing and automatic selection for streams-only channels. Row 05 remains Partial and the summary counts are unchanged. All 58 Android unit/API tests, debug/instrumentation APK builds, lint and disposable channel fixture checks passed. Public live API checks returned 15 WAN Show streams and two 60-video pages of regular uploads. Four new Compose channel scenarios compile but have not run because no device is connected; native runtime/layout acceptance remains pending. See `VERIFICATION.md` for the checks and repeat commands.
+
+## Watched/progress indicators — 4 October 2026
+
+Row 34 now includes automatic watched indicators and saved-progress bars throughout the shared native video cards, with guest progress, account/instance isolation, background service updates and existing history-control synchronization. It remains Partial because manual mark-watched/mark-unwatched actions are intentionally outside the requested Android behavior. No new server API, token scope or database migration is needed.
+
+All 78 Android unit/API tests, debug/instrumentation APK builds, lint and disposable watched/progress fixture HTTP checks passed. Six new Compose scenarios compile but have not run: the installed emulator exited with SIGSEGV before Android booted. Runtime, layout and screenshot acceptance remain pending; see `VERIFICATION.md`.

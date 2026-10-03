@@ -117,10 +117,11 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) { request("api/v1/auth/dearrow/identity", "PUT", JSONObject().put("privateId", privateId), true, context = context) }
     suspend fun dearrowSubmissions(id: String, context: ApiContext) = ApiParser.dearrowSubmissions(JSONObject(request("api/v1/auth/dearrow/$id/submissions", auth = true, context = context)))
     suspend fun contributeDeArrow(id: String, fields: JSONObject, context: ApiContext) { request("api/v1/auth/dearrow/$id", "POST", fields, true, context = context) }
-    suspend fun position(id: String): Long = try { JSONObject(request("api/v1/auth/playback/$id", auth = true)).optLong("position") } catch (e: ApiException) { if (e.status == 404) 0 else throw e }
-    suspend fun position(id: String, seconds: Long) { if (seconds == 0L) request("api/v1/auth/playback/$id", "DELETE", auth = true) else request("api/v1/auth/playback/$id", "PUT", JSONObject().put("position", seconds.coerceAtMost(Int.MAX_VALUE.toLong())), true) }
-    suspend fun watched(id: String) { request("api/v1/auth/history/$id", "POST", auth = true) }
-    suspend fun removeHistory(id: String) { request("api/v1/auth/history/$id", "DELETE", auth = true) }
-    suspend fun clearHistory() { request("api/v1/auth/history", "DELETE", auth = true) }
+    suspend fun playback(context: ApiContext = context()) = PlaybackSnapshot.parse(JSONObject(request("api/v1/auth/playback", auth = true, context = context)))
+    suspend fun position(id: String, context: ApiContext = context()): Long = try { JSONObject(request("api/v1/auth/playback/$id", auth = true, context = context)).optLong("position") } catch (e: ApiException) { if (e.status == 404) 0 else throw e }
+    suspend fun position(id: String, seconds: Long, context: ApiContext = context()) { if (seconds == 0L) request("api/v1/auth/playback/$id", "DELETE", auth = true, context = context) else request("api/v1/auth/playback/$id", "PUT", JSONObject().put("position", seconds.coerceAtMost(Int.MAX_VALUE.toLong())), true, context = context) }
+    suspend fun watched(id: String, context: ApiContext = context()) { request("api/v1/auth/history/$id", "POST", auth = true, context = context) }
+    suspend fun removeHistory(id: String, context: ApiContext = context()) { request("api/v1/auth/history/$id", "DELETE", auth = true, context = context) }
+    suspend fun clearHistory(context: ApiContext = context()) { request("api/v1/auth/history", "DELETE", auth = true, context = context) }
     suspend fun logout() { request("api/v1/auth/tokens/unregister", "POST", auth = true) }
 }

@@ -12,12 +12,14 @@ import javax.crypto.spec.GCMParameterSpec
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONObject
 
-class SessionStore(context: Context) {
+class SessionStore(context: Context) : LocalPlaybackPositions {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
-    val account = MutableStateFlow(readAccount())
+    private val storedAccount = readAccount()
+    val account = MutableStateFlow(storedAccount?.takeIf { it.expiresAt > System.currentTimeMillis() / 1000 })
+    var onContextChanged: (ApiContext) -> Unit = {}
     var server: String
         get() = prefs.getString("server", "https://invidious.wingress.net")!!
-        set(value) { prefs.edit().putString("server", value).apply() }
+        set(value) { prefs.edit().putString("server", value).apply(); onContextChanged(positionContext()) }
     var background: Boolean
         get() = prefs.getBoolean("background", true)
         set(value) { prefs.edit().putBoolean("background", value).apply() }
@@ -58,7 +60,6 @@ class SessionStore(context: Context) {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12))) }
         val json = JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8))
         Account(json.getString("token"), json.getString("username"), json.getLong("expires"), json.getString("server"))
-            .takeIf { it.expiresAt > System.currentTimeMillis() / 1000 }
     }.getOrNull()
     fun save(value: Account?) {
         if (value == null) prefs.edit().remove("session").apply() else {
@@ -67,9 +68,34 @@ class SessionStore(context: Context) {
             prefs.edit().putString("session", Base64.encodeToString(cipher.iv + cipher.doFinal(json.toByteArray()), Base64.NO_WRAP)).apply()
         }
         account.value = value
+        onContextChanged(positionContext())
     }
     // A local fallback is never replayed to the server; only current playback is uploaded.
-    fun position(id: String): Long = prefs.getLong("position.$id", 0)
-    fun position(id: String, value: Long) { prefs.edit().putLong("position.$id", value).apply() }
-    fun clearPositions() { prefs.edit().apply { prefs.all.keys.filter { it.startsWith("position.") }.forEach(::remove) }.apply() }
+    private fun positionContext() = ApiContext(server, account.value)
+    private fun positionsKey(context: ApiContext) = "playback.positions." +
+        org.json.JSONArray().put(context.server).put(context.account?.username ?: JSONObject.NULL).toString()
+    init {
+        // Attribute legacy positions to their saved session, including an expired session,
+        // rather than exposing that account's fallback to a guest on the next launch.
+        val legacy = prefs.all.filterKeys { it.startsWith("position.") }
+        if (legacy.isNotEmpty()) {
+            val owner = ApiContext(storedAccount?.server ?: server, storedAccount)
+            val values = JSONObject(prefs.getString(positionsKey(owner), "{}")!!)
+            legacy.forEach { (key, value) -> if (value is Long && value > 0) values.put(key.removePrefix("position."), value) }
+            prefs.edit().apply { putString(positionsKey(owner), values.toString()); legacy.keys.forEach(::remove) }.apply()
+        }
+    }
+    override fun positions(context: ApiContext): Map<String, Long> = runCatching {
+        val values = JSONObject(prefs.getString(positionsKey(context), "{}")!!)
+        values.keys().asSequence().mapNotNull { id -> values.optLong(id).takeIf { it > 0 }?.let { id to it } }.toMap()
+    }.getOrDefault(emptyMap())
+    fun position(id: String, context: ApiContext = positionContext()): Long = positions(context)[id] ?: 0
+    fun position(id: String, value: Long) = setPosition(positionContext(), id, value)
+    @Synchronized override fun setPosition(context: ApiContext, id: String, seconds: Long) {
+        val values = JSONObject(positions(context))
+        if (seconds <= 0) values.remove(id) else values.put(id, seconds)
+        prefs.edit().putString(positionsKey(context), values.toString()).apply()
+    }
+    @Synchronized override fun clearPositions(context: ApiContext) { prefs.edit().remove(positionsKey(context)).apply() }
+    fun clearPositions() = clearPositions(positionContext())
 }
