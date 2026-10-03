@@ -20,8 +20,20 @@ PY
     -storepass:file keystore/storepass -keypass:file keystore/storepass \
     -keyalg RSA -keysize 4096 -validity 10000 -dname 'CN=Mobivious Personal, O=Mobivious' >/dev/null
 fi
-./gradlew :app:testDebugUnitTest :app:assembleRelease --console=plain
+./gradlew :app:testDebugUnitTest :app:assembleRelease :app:lintRelease --console=plain
+apk_name="$(python3 - <<'PY'
+import json
+from pathlib import Path
+metadata = json.loads(Path('app/build/outputs/apk/release/output-metadata.json').read_text())
+version = metadata['elements'][0]['versionName']
+print(f'Mobivious-{version}.apk')
+PY
+)"
 mkdir -p ../artifacts
-cp app/build/outputs/apk/release/app-release.apk ../artifacts/Mobivious-0.1.0.apk
-sha256sum ../artifacts/Mobivious-0.1.0.apk
+cp app/build/outputs/apk/release/app-release.apk "../artifacts/$apk_name"
+(
+  cd ../artifacts
+  sha256sum "$apk_name" > "$apk_name.sha256"
+  cat "$apk_name.sha256"
+)
 printf '%s\n' 'Preserve android/keystore and android/signing.properties securely for future updates.'

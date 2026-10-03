@@ -37,6 +37,45 @@ future APK updates must use the same signing key. See `deploy/README.md` for ser
 installation. The default app URL is `https://mobivious.wingress.net`; set another
 HTTPS address through Settings → Server while the new hostname is being configured.
 
+## APK releases
+
+Download the signed APK from the
+[latest GitHub release](https://github.com/Hanif-F/codex-mobile-invidious/releases/latest).
+Release APKs include all supported CPU architectures and work on Android 8+.
+The matching `.apk.sha256` file lets you check the download with `sha256sum -c`.
+
+Releases are built and published manually from this computer. Signing keys stay
+local. For each release, update `versionName` and increment `versionCode` in
+`android/app/build.gradle.kts`, then run from the repository root:
+
+```sh
+# Match versionName for this release.
+release_version=0.1.1
+scripts/build-release.sh
+
+# Confirm the APK's signature before publishing.
+JAVA_HOME=/opt/android-studio/jbr "$HOME/Android/Sdk/build-tools/36.0.0/apksigner" \
+  verify --print-certs "artifacts/Mobivious-$release_version.apk"
+
+# Commit only the intended release changes, then publish that exact commit.
+git add android/app/build.gradle.kts scripts/build-release.sh README.md
+git commit -m "Prepare Mobivious $release_version release"
+git push origin HEAD:main
+git tag -a "v$release_version" -m "Mobivious $release_version"
+git push origin "v$release_version"
+
+# Write a short changelog and any server requirements into artifacts/release-notes.md.
+gh release create "v$release_version" \
+  "artifacts/Mobivious-$release_version.apk" \
+  "artifacts/Mobivious-$release_version.apk.sha256" \
+  --repo Hanif-F/codex-mobile-invidious --verify-tag --latest \
+  --title "Mobivious $release_version" --notes-file artifacts/release-notes.md
+```
+
+The build script runs unit tests and release lint, then writes the versioned APK
+and checksum into `artifacts/`. Preserve the existing signing key for every update.
+Account features require the server extensions described in `deploy/README.md`.
+
 ## Features
 
 Home popular/trending, filtered search and shared video links; channel browsing;
