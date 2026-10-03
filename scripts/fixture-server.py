@@ -16,7 +16,14 @@ args = parser.parse_args()
 video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', author='Mobivious Studio',
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
-prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True, unrelated_setting='preserved')
+default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
+                     autoplay=True, listen=False, local=True, speed=1.0, quality_dash='auto', captions=['', '', ''],
+                     dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
+                     feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
+                     related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
+                     sort='published', latest_only=False, unseen_only=False, notifications_only=False,
+                     default_playlist=None, unrelated_setting='preserved')
+prefs = default_prefs.copy()
 state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[])
@@ -107,7 +114,8 @@ class Handler(BaseHTTPRequestHandler):
             state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[])
-            prefs.update(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True)
+            prefs.clear()
+            prefs.update(default_prefs)
             reset_sponsorblock()
             return self.respond({})
         if p == '/test/sponsorblock':

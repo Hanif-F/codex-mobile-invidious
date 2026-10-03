@@ -42,10 +42,10 @@ class DeArrowSmokeTest {
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
-    private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().onParent().onChildAt(1).performClick() }
-    private fun settings() { compose.onNodeWithContentDescription("App settings").performClick() }
+    private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
+    private fun settings() { compose.onNodeWithContentDescription("App settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
-    private fun save() { compose.onNode(hasText("Save") and hasAnyAncestor(isDialog())).performClick(); until { compose.onAllNodesWithText("Settings").fetchSemanticsNodes().isEmpty() } }
+    private fun save() { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null }
@@ -155,7 +155,7 @@ class DeArrowSmokeTest {
         until { activity.model.dearrowIdentity.value?.configured == true && compose.onAllNodesWithText("Importing…").fetchSemanticsNodes().isEmpty() }
         assertEquals("", compose.onNodeWithTag("dearrow-private-id").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         assertFalse(state().toString().contains("c".repeat(64)))
-        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithContentDescription("Back from DeArrow").performClick(); compose.onNodeWithContentDescription("Back from Settings").performClick()
         command("dearrow", """{"originalMode":"missing"}""")
         compose.runOnUiThread { activity.model.openDeArrow("testvideo01"); activity.model.refreshDeArrow() }
         until { !activity.model.dearrowContribution.value.busy && activity.model.dearrowContribution.value.titles.none { it.original } }

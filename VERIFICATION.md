@@ -178,6 +178,57 @@ modes. Guests save global settings per instance, while channel overrides require
 sign-in. Active livestreams do not fetch segments. An older preference API receives
 an update explanation without discarding the settings draft.
 
+## Dedicated settings screens and supported web preferences — 3 October 2026
+
+Settings now uses a full screen with dedicated Playback, Appearance, Browsing,
+Subscriptions, History & library, SponsorBlock, DeArrow, Server and About screens.
+SponsorBlock channel submenus use the full-screen container when opened from App
+Settings; the player retains its sheet. Regular category drafts and the current
+settings route survive Activity recreation. Back returns to the settings index and
+then the previous browse/watch screen. Failed shared saves retain the draft and
+show an inline error. Background/PiP settings save immediately on the device.
+
+The native preference model and sibling PATCH API now cover supported playback,
+caption, appearance, browsing, feed and library values. Sparse patches preserve
+unknown account settings and SponsorBlock map entries. Guest preferences are saved
+per instance, including local resume. Feed/history requests no longer override
+account page size with 30. The active playback service accepts history/resume
+changes, and default speed/quality writes are serialized. Fresh installs use
+`https://invidious.wingress.net`; explicit saved addresses are retained.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 37 passed, including 7 new preference scenarios |
+| Android debug and instrumentation APK builds | Passed |
+| Android debug lint | Passed; no errors; 32 existing/style/dependency warnings |
+| Focused native-preference and SponsorBlock Crystal specs | 14 passed |
+| Guarded disposable PostgreSQL account/API harness | Passed, including expanded native preference checks |
+| Normal and API-only Invidious compiler checks (`--no-codegen`) | Passed |
+| Android runtime, screenshots and layout acceptance | Unverified: emulator exited with SIGSEGV before Android booted |
+
+Unit/API checks cover shared preference parsing/round trips, sparse writes,
+concurrent local merge preservation, language priority/availability, navigation
+fallbacks, malformed value defaults, server page-size requests, notification-only
+filtering and the stream proxy parameter. The database harness verifies the actual
+account transaction and middleware: expanded typed values, shared reads, invalid
+patch atomicity, unrelated/unknown preservation and browser CSRF checks. It used a
+fresh `invidious_accounts_test` database in a temporary PostgreSQL container, which
+was removed after the run. No production accounts or services were changed.
+
+Three new Compose scenarios compile for screen/back navigation, draft recreation,
+guest autoplay/audio/resume defaults and failed shared-save retries. Existing
+DeArrow and SponsorBlock tests were adapted to the full-screen settings entry.
+They have not run in this revision: Android Emulator 37.2.12 again terminated with
+exit 139 during startup in read-only, headless software-graphics mode with Vulkan
+and cameras disabled. Native narrow/landscape layout, keyboard, light/dark and
+accessibility acceptance remain pending a working emulator or device. Run
+`scripts/test-android.sh` when one is available.
+
+The expanded shared preference API must be deployed from the sibling Invidious
+checkout before the newly added account settings can be saved on production. It
+requires no migration, new key or token scope. Guests can use the local settings
+without that API update. No release APK was signed or production deployment made.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:

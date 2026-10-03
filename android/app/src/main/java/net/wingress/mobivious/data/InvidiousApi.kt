@@ -78,7 +78,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     }
     suspend fun discovery(kind: String, region: String = "US") = ApiParser.videos(JSONArray(request("api/v1/$kind", query = if (kind == "trending") mapOf("region" to region) else emptyMap())))
     suspend fun search(q: String, page: Int, sort: String, date: String, duration: String): List<Video> = ApiParser.videos(JSONArray(request("api/v1/search", query = mapOf("q" to q, "page" to page.toString(), "sort_by" to sort, "date" to date, "duration" to duration, "type" to "video"))))
-    suspend fun video(id: String) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to "true"))))
+    suspend fun video(id: String, local: Boolean = true) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to local.toString()))))
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
     suspend fun channel(id: String) = ApiParser.channel(JSONObject(request("api/v1/channels/$id")))
     suspend fun channelVideos(id: String, continuation: String = ""): Page<Video> {
@@ -89,13 +89,14 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val j = JSONObject(request("api/v1/comments/$id", query = mapOf("continuation" to continuation)))
         return Page(j.optJSONArray("comments")?.objects()?.map { Comment(it.text("author"), it.text("content"), it.text("publishedText"), it.optLong("likeCount")) } ?: emptyList(), j.text("continuation"))
     }
-    suspend fun feed(page: Int): List<Video> {
-        val j = JSONObject(request("api/v1/auth/feed", auth = true, query = mapOf("page" to "$page", "max_results" to "30")))
-        return ApiParser.videos(j.optJSONArray("notifications") ?: JSONArray()) + ApiParser.videos(j.optJSONArray("videos") ?: JSONArray())
+    suspend fun feed(page: Int, notificationsOnly: Boolean = false): List<Video> {
+        val j = JSONObject(request("api/v1/auth/feed", auth = true, query = mapOf("page" to "$page")))
+        val notifications = ApiParser.videos(j.optJSONArray("notifications") ?: JSONArray())
+        return if (notificationsOnly) notifications else notifications + ApiParser.videos(j.optJSONArray("videos") ?: JSONArray())
     }
     suspend fun subscriptions() = JSONArray(request("api/v1/auth/subscriptions", auth = true)).objects().map(ApiParser::channel)
     suspend fun subscribe(id: String, subscribe: Boolean) { request("api/v1/auth/subscriptions/$id", if (subscribe) "POST" else "DELETE", auth = true) }
-    suspend fun history(page: Int) = ApiParser.videos(JSONArray(request("api/v1/auth/history", auth = true, query = mapOf("details" to "true", "page" to "$page", "max_results" to "30"))))
+    suspend fun history(page: Int) = ApiParser.videos(JSONArray(request("api/v1/auth/history", auth = true, query = mapOf("details" to "true", "page" to "$page"))))
     suspend fun playlists() = JSONArray(request("api/v1/auth/playlists", auth = true)).objects().map(ApiParser::playlist)
     suspend fun playlist(id: String, page: Int = 1): Pair<Playlist, List<Video>> {
         val j = JSONObject(request("api/v1/auth/playlists/$id", auth = true, query = mapOf("page" to "$page")))

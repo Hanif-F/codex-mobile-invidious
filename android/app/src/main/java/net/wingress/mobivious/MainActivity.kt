@@ -25,6 +25,7 @@ import net.wingress.mobivious.ui.MobiviousApp
 class MainActivity : ComponentActivity() {
     val model: AppViewModel by viewModels()
     private val pipMode = mutableStateOf(false)
+    private var pipWatching = false
     val sharedVideo = mutableStateOf(false)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     fun updatePip(watching: Boolean) {
+        pipWatching = watching
         if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
         val active = watching && model.playback.value.details != null && model.playback.value.error == null && model.store.pip
         val playing = model.controller.value?.playWhenReady == true
@@ -63,7 +65,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     fun enterPip() { if (model.playback.value.details != null && supportsPip()) enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
-    override fun onUserLeaveHint() { super.onUserLeaveHint(); if (Build.VERSION.SDK_INT < 31 && model.store.pip && model.playback.value.playing) enterPip() }
+    override fun onUserLeaveHint() { super.onUserLeaveHint(); if (Build.VERSION.SDK_INT < 31 && pipWatching && model.store.pip && model.playback.value.playing) enterPip() }
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) { super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig); pipMode.value = isInPictureInPictureMode }
     override fun onStop() { super.onStop(); if (!isInPictureInPictureMode && !model.store.background) model.controller.value?.pause() }
 }

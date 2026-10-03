@@ -5,6 +5,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -41,7 +43,7 @@ private fun SponsorChoice(label: String, choices: List<Pair<String, String>>, se
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn: () -> Unit, dismiss: () -> Unit) {
+internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn: () -> Unit, dismiss: () -> Unit, fullScreen: Boolean = false) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
     val context = remember { vm.api.context() }
@@ -93,16 +95,16 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
             finally { busy = false }
         }
     }
-    ModalBottomSheet(onDismissRequest = { if (!busy) dismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) {
+    val content: @Composable () -> Unit = {
         BackHandler { back() }
-        Column(Modifier.fillMaxWidth().heightIn(max = height).imePadding().testTag("sponsorblock-sheet")) {
+        Column((if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.fillMaxWidth().heightIn(max = height)).imePadding().testTag("sponsorblock-sheet")) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (page != "Global SponsorBlock settings") IconButton(onClick = ::back, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to SponsorBlock settings") }
+                if (fullScreen || page != "Global SponsorBlock settings") IconButton(onClick = ::back, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to SponsorBlock settings") }
                 Text(page, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                IconButton(onClick = dismiss, enabled = !busy) { Icon(Icons.Default.Close, "Close SponsorBlock settings") }
+                if (!fullScreen) IconButton(onClick = dismiss, enabled = !busy) { Icon(Icons.Default.Close, "Close SponsorBlock settings") }
             }
             HorizontalDivider()
-            LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth().testTag("sponsorblock-settings-list"), contentPadding = PaddingValues(16.dp)) {
+            LazyColumn(Modifier.weight(1f, fill = fullScreen).fillMaxWidth().testTag("sponsorblock-settings-list"), contentPadding = PaddingValues(16.dp)) {
                 when (page) {
                     "Global SponsorBlock settings" -> {
                         item {
@@ -174,4 +176,6 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
             }
         }
     }
+    if (fullScreen) Surface { content() }
+    else ModalBottomSheet(onDismissRequest = { if (!busy) dismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) { content() }
 }

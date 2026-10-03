@@ -34,8 +34,8 @@ the emulator's `10.0.2.2` for testing. Release builds require HTTPS.
 The signed personal release is produced with `scripts/build-release.sh`; preserve
 the ignored `android/keystore/` and `android/signing.properties` securely because
 future APK updates must use the same signing key. See `deploy/README.md` for server
-installation. The default app URL is `https://mobivious.wingress.net`; set another
-HTTPS address through Settings → Server while the new hostname is being configured.
+installation. The default app URL is `https://invidious.wingress.net`; set another
+HTTPS address through Settings → Server. Previously saved instance addresses are preserved.
 
 ## APK releases
 
@@ -94,15 +94,25 @@ SponsorBlock matches this fork's eight categories, automatic/manual skipping,
 marker-only and disabled modes, custom colors and per-channel inheritance. Colored
 timeline ranges and scrub labels complement Skip/Dismiss prompts. The playback
 service handles skipping during background, audio-only and PiP playback, and offers
-manual controls when replaying an automatically skipped segment. App Settings and
-the player gear open the native settings sheet; watch/channel screens link to the
-channel editor. Signed-in settings are shared with the website through the updated
+manual controls when replaying an automatically skipped segment. App Settings opens
+a full SponsorBlock screen with channel submenus. The player gear opens a settings
+sheet; watch/channel screens link to the channel editor. Signed-in settings are shared with the website through the updated
 preference API; guests save global settings locally per instance. SponsorBlock is
 off by default, with manual modes. Active livestreams are excluded. Native runtime
 and layout checks remain unverified because the installed emulator crashes before
 Android boots; see `VERIFICATION.md`.
 
-One consistent appearance follows system light/dark mode.
+Settings has its own screen, with dedicated Playback, Appearance, Browsing, Subscriptions,
+History & library, SponsorBlock, DeArrow, Server and About screens. Supported web
+preferences sync with the account using sparse updates. Guests save preferences per
+instance, including local resume. Playback defaults include autoplay, audio only,
+proxy streams, speed, resolution ceiling and three caption-language priorities.
+Appearance supports light/dark/system, compact lists and hidden thumbnails. Browsing
+includes homepage/navigation priorities, region and video-page visibility; feeds
+include page size, sorting and filters. The default playlist appears first in Save.
+Background playback and PiP save immediately on the device. The expanded shared
+settings need the sibling settings PATCH API deployed; no migration or new scopes
+are required. Native runtime/layout checks remain pending a working emulator.
 Chat replay, clips, blocking, downloads, casting and upload notifications are
 outside this first release. Discovery uses Invidious popular/trending feeds.
 

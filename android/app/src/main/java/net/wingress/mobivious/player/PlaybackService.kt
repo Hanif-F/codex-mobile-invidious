@@ -32,6 +32,7 @@ import org.json.JSONObject
 class PlaybackService : MediaSessionService() {
     companion object {
         const val SET_DISPLAY_TITLE = "mobivious.dearrow.title"
+        const val SET_HISTORY_SETTINGS = "mobivious.history.settings"
         const val SPONSOR_STATE = "mobivious.sponsorblock.state"
         const val SPONSOR_CONFIGURE = "mobivious.sponsorblock.configure"
         const val SPONSOR_SKIP = "mobivious.sponsorblock.skip"
@@ -43,6 +44,7 @@ class PlaybackService : MediaSessionService() {
     private val writes = Mutex()
     private val app get() = application as MobiviousApplication
     private var owner: Account? = null
+    private var ownerContext: ApiContext? = null
     private var history = false
     private var savePosition = false
     private var started = false
@@ -72,11 +74,18 @@ class PlaybackService : MediaSessionService() {
                 override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
                     if (controller.isTrusted || controller.packageName == packageName) MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().apply {
-                            listOf(SET_DISPLAY_TITLE, SPONSOR_STATE, SPONSOR_CONFIGURE, SPONSOR_SKIP, SPONSOR_DISMISS).forEach { add(SessionCommand(it, Bundle.EMPTY)) }
+                            listOf(SET_DISPLAY_TITLE, SET_HISTORY_SETTINGS, SPONSOR_STATE, SPONSOR_CONFIGURE, SPONSOR_SKIP, SPONSOR_DISMISS).forEach { add(SessionCommand(it, Bundle.EMPTY)) }
                         }.build()).build()
                     else MediaSession.ConnectionResult.reject()
                 override fun onCustomCommand(session: MediaSession, controller: MediaSession.ControllerInfo, customCommand: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
                     if (controller.packageName != packageName) return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+                    if (customCommand.customAction == SET_HISTORY_SETTINGS) {
+                        if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
+                            return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
+                        history = args.getBoolean("history") && owner != null
+                        savePosition = args.getBoolean("savePosition")
+                        return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                    }
                     if (customCommand.customAction != SET_DISPLAY_TITLE) return Futures.immediateFuture(sponsorCommand(customCommand.customAction, args))
                     val item = player.currentMediaItem
                     val title = args.getString("title")
@@ -95,6 +104,7 @@ class PlaybackService : MediaSessionService() {
                 current = mediaItem
                 if (metadataOnly) return
                 owner = app.store.account.value
+                ownerContext = app.api.context()
                 history = mediaItem?.mediaMetadata?.extras?.getBoolean("history") ?: false
                 savePosition = mediaItem?.mediaMetadata?.extras?.getBoolean("savePosition") ?: false
                 started = false
@@ -198,12 +208,12 @@ class PlaybackService : MediaSessionService() {
     }
     private fun sameOwner(account: Account?): Boolean = account != null && account == app.store.account.value && account.server == app.store.server
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {
-        if (!started || !savePosition || item == null) return
+        if (!started || !savePosition || item == null || ownerContext != app.api.context()) return
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: 0
         val value = PlaybackRules.save(position / 1000, duration, ended)
         app.store.position(item.mediaId, value)
         val account = owner
-        scope.launch { writes.withLock { if (sameOwner(account)) runCatching { app.api.position(item.mediaId, value) } } }
+        scope.launch { writes.withLock { if (savePosition && sameOwner(account)) runCatching { app.api.position(item.mediaId, value) } } }
     }
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

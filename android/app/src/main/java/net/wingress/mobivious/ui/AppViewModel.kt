@@ -26,6 +26,8 @@ import org.json.JSONObject
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import net.wingress.mobivious.MobiviousApplication
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackRules
@@ -61,7 +63,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val subscriptions = MutableStateFlow<List<Channel>>(emptyList())
     val comments = MutableStateFlow(Page<Comment>(emptyList()))
     val commentError = MutableStateFlow<String?>(null)
-    val preferences = MutableStateFlow(AccountPreferences())
+    val preferences = MutableStateFlow(store.guestDeArrow())
     val sponsorBlock = MutableStateFlow(SponsorBlockPlayback())
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
     fun openSponsorBlock(channelId: String = "") { sponsorSettingsChannel.value = channelId; refreshSharedSettings() }
@@ -70,11 +72,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val dearrowIdentityError = MutableStateFlow<String?>(null)
     val dearrowContribution = MutableStateFlow(DeArrowContributionState())
     val message = MutableStateFlow<String?>(null)
-    var tab = "Home"
+    var tab = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).first
+    val navigation = MutableStateFlow(tab to "")
     var route = ""
     var query = ""
-    var discovery = "popular"
-    var region = store.region
+    var discovery = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).second
+    var region = preferences.value.region
     var sort = "relevance"
     var date = ""
     var durationFilter = ""
@@ -83,10 +86,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var commentJob: Job? = null
     private var contributionJob: Job? = null
     private var preferenceGeneration = 0L
+    private val preferenceWrites = Mutex()
+    private val playerDefaultWrites = Mutex()
     private var preferencesContext: ApiContext? = null
     private var identityGeneration = 0L
     private var browseGeneration = 0
     private var requestedVideo: String? = null
+    private var homeAppliedContext: ApiContext? = null
     private val future = MediaController.Builder(application, SessionToken(application, ComponentName(application, PlaybackService::class.java)))
         .setListener(object : MediaController.Listener {
             override fun onCustomCommand(controller: MediaController, command: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
@@ -138,7 +144,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             else dearrowTitles.clear()
             syncDeArrowMetadata()
         } }
-        viewModelScope.launch { preferences.collect { syncSponsorSettings() } }
+        viewModelScope.launch { preferences.collect { syncSponsorSettings(); syncHistorySettings() } }
         refresh()
     }
     private fun receiveSponsorState(args: Bundle) {
@@ -186,7 +192,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (context.account == null) { preferencesContext = context; preferences.value = store.guestDeArrow(); syncSponsorSettings(); return }
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
-        action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) { preferencesContext = context; preferences.value = value; syncSponsorSettings() } }
+        action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
+            preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings()
+            if (homeAppliedContext != context) { homeAppliedContext = context; openDefaultHome() }
+            else if (tab == "Subscriptions" || route == "history") refresh()
+        } }
         viewModelScope.launch {
             try { val identity = api.dearrowIdentity(context); if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = identity; dearrowIdentityError.value = null } }
             catch (e: CancellationException) { throw e }
@@ -203,7 +213,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "") { this.tab = tab; this.route = route; channel.value = null; playlist.value = null; refresh() }
+    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; channel.value = null; playlist.value = null; refresh() }
+    fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery = target.second; navigate(target.first) }
     fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow) }
     fun more() = load(true)
     private fun load(more: Boolean) {
@@ -227,12 +238,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     selectedRoute.startsWith("playlist:") -> api.playlist(selectedRoute.substringAfter(':'), page).let { playlist.value = it.first; it.second }
                     selectedRoute == "history" -> api.history(page)
                     selectedTab == "Search" -> if (selectedQuery.isBlank()) emptyList() else api.search(selectedQuery, page, sort, date, durationFilter)
-                    selectedTab == "Subscriptions" -> if (account.value == null) emptyList() else api.feed(page)
+                    selectedTab == "Subscriptions" -> if (account.value == null) emptyList() else api.feed(page, preferences.value.notificationsOnly)
                     selectedTab == "Library" -> { if (account.value != null) playlists.value = api.playlists(); emptyList() }
                     else -> api.discovery(discovery, region)
                 }
                 if (generation == browseGeneration) browse.value = browse.value.copy(videos = (old.videos + videos).distinctBy { it.id + it.indexId }, loading = false, page = page,
-                    continuation = continuation, end = videos.isEmpty() || selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isEmpty())
+                    continuation = continuation, end = videos.isEmpty() || more && videos.all { video -> old.videos.any { it.id == video.id && it.indexId == video.indexId } } ||
+                        selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isEmpty() ||
+                        selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 if (generation == browseGeneration) browse.value = browse.value.copy(loading = false, error = friendly(e))
             }
@@ -247,38 +260,44 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         videoJob = viewModelScope.launch {
             try {
                 val context = api.context()
-                val details = api.video(id)
-                if (api.context() != context) throw CancellationException("Account or instance changed")
-                val prefs = if (context.account != null) try { api.preferences(context) }
+                val prefsGeneration = preferenceGeneration
+                val fetched = if (context.account != null) try { api.preferences(context) }
                     catch (e: CancellationException) { throw e } catch (_: Exception) { preferences.value }
-                    else store.guestDeArrow().copy(watchHistory = false, savePosition = false)
+                    else store.guestDeArrow().copy(watchHistory = false)
+                val prefs = if (prefsGeneration != preferenceGeneration && preferencesContext == context) preferences.value else fetched
+                val details = api.video(id, prefs.local)
                 if (api.context() != context) throw CancellationException("Account or instance changed")
-                preferencesContext = context
-                preferences.value = prefs
+                if (prefsGeneration == preferenceGeneration) { preferencesContext = context; preferences.value = prefs }
                 val saved = if (prefs.savePosition && account.value != null) try { api.position(id) }
-                    catch (e: CancellationException) { throw e } catch (_: Exception) { store.position(id) } else 0
+                    catch (e: CancellationException) { throw e } catch (_: Exception) { store.position(id) }
+                    else if (prefs.savePosition) store.position(id) else 0
                 if (api.context() != context) throw CancellationException("Account or instance changed")
                 val start = PlaybackRules.resume(saved, details.video.duration, explicit)
                 val base = store.server.toHttpUrlOrNull()!!
                 fun resolve(url: String) = base.resolve(url)?.takeIf { it.isHttps || net.wingress.mobivious.BuildConfig.DEBUG && it.host in listOf("10.0.2.2", "127.0.0.1", "localhost") }?.toString().orEmpty()
                 val raw = details.hls.ifBlank { details.dash }.ifBlank { details.fallback }
-                val stream = resolve(raw).ifBlank { if (details.dash.isNotBlank() || !details.video.live) api.url("api/manifest/dash/id/$id", mapOf("local" to "true")).toString() else "" }
+                val stream = resolve(raw).ifBlank { if (details.dash.isNotBlank() || !details.video.live) api.url("api/manifest/dash/id/$id", mapOf("local" to prefs.local.toString())).toString() else "" }
                 require(stream.isNotBlank()) { "No playable stream is available." }
-                val uri = stream.toHttpUrlOrNull()!!.newBuilder().setQueryParameter("local", "true").build().toString()
+                val uri = stream.toHttpUrlOrNull()!!.newBuilder().setQueryParameter("local", prefs.local.toString()).build().toString()
                 val metadata = MediaMetadata.Builder().setTitle(details.video.title).setArtist(details.video.author)
                     .setArtworkUri(Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
                         putBoolean("history", prefs.watchHistory); putBoolean("savePosition", prefs.savePosition)
                         putString("channelId", details.video.channelId); putBoolean("liveNow", details.video.live)
                         putString("sponsorblock", prefs.sponsorBlock.effective(details.video.channelId, account.value != null).json().toString())
                     }).build()
+                val caption = PreferenceRules.caption(prefs.captions, details.captions)
                 val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(metadata)
                     .setMimeType(if (details.hls.isNotBlank()) MimeTypes.APPLICATION_M3U8 else if (details.dash.isNotBlank() || details.fallback.isBlank()) MimeTypes.APPLICATION_MPD else MimeTypes.VIDEO_MP4)
-                    .setSubtitleConfigurations(details.captions.map { caption -> MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(caption.url))).setMimeType(MimeTypes.TEXT_VTT).setLanguage(caption.language).setLabel(caption.label).build() }).build()
+                    .setSubtitleConfigurations(details.captions.map { track -> MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(track.url))).setMimeType(MimeTypes.TEXT_VTT).setLanguage(track.language).setLabel(track.label)
+                        .setSelectionFlags(if (track == caption) C.SELECTION_FLAG_DEFAULT else 0).build() }).build()
                 val p = controller.value ?: future.awaitController()
                 p.pause()
                 p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).build()
-                p.setMediaItem(item, start * 1000); p.prepare(); p.play()
+                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).clearOverridesOfType(C.TRACK_TYPE_VIDEO)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, prefs.listen).setMaxVideoSize(Int.MAX_VALUE, prefs.maxHeight)
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, caption == null).setPreferredTextLanguage(caption?.language).build()
+                p.setPlaybackSpeed(prefs.speed)
+                p.setMediaItem(item, start * 1000); p.prepare(); p.playWhenReady = prefs.autoplay
                 playback.value = PlaybackState(details = details)
                 ensureDeArrow(id); syncDeArrowMetadata()
                 updatePlayback()
@@ -317,8 +336,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         updatePlayback()
     }
     fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
-    fun quality(height: Int) { store.maxHeight = height; controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, height).build() } }
-    fun speed(value: Float) { store.defaultSpeed = value; controller.value?.setPlaybackSpeed(value) }
+    fun quality(height: Int) { store.maxHeight = height; controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, height).build() }; updatePlayerDefault { it.copy(qualityDash = if (height == Int.MAX_VALUE) "auto" else "${height}p") } }
+    fun speed(value: Float) { store.defaultSpeed = value; controller.value?.setPlaybackSpeed(value); updatePlayerDefault { it.copy(speed = value) } }
+    private fun updatePlayerDefault(change: (AccountPreferences) -> AccountPreferences) {
+        val context = api.context()
+        action { playerDefaultWrites.withLock { val before = preferences.value; savePreferences(change(before), before, context) } }
+    }
+    private fun syncHistorySettings() {
+        if (preferencesContext != api.context()) return
+        val id = controller.value?.currentMediaItem?.mediaId ?: return
+        val prefs = preferences.value
+        controller.value?.sendCustomCommand(SessionCommand(PlaybackService.SET_HISTORY_SETTINGS, Bundle.EMPTY), Bundle().apply {
+            putString("mediaId", id); putBoolean("history", account.value != null && prefs.watchHistory); putBoolean("savePosition", prefs.savePosition)
+        })
+    }
     fun captions(language: String?) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_TEXT).setTrackTypeDisabled(C.TRACK_TYPE_TEXT, language == null).setPreferredTextLanguage(language).build() } }
     fun selectTrack(group: TrackGroup, index: Int) { controller.value?.let { p ->
         val builder = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(group.type, false)
@@ -337,31 +368,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
     fun logout() = action { try { api.logout() } finally { closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); navigate("Home") } }
-    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; preferences.value = store.guestDeArrow(); navigate("Home") }
-    suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext) {
+    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
         val changes = value.changesFrom(before)
         val saved = if (context.account == null) {
-            val current = preferences.value
-            val local = current.sponsorBlock.json()
-            changes.keys().forEach { key ->
-                if (key in listOf("sponsorblock_modes", "sponsorblock_colors")) {
-                    val map = local.getJSONObject(key); val patch = changes.getJSONObject(key)
-                    patch.keys().forEach { map.put(it, patch.get(it)) }
-                } else if (key.startsWith("sponsorblock_")) local.put(key, changes.get(key))
-            }
-            current.copy(dearrowEnabled = if (changes.has("dearrow_enabled")) value.dearrowEnabled else current.dearrowEnabled,
-                dearrowShowOriginal = if (changes.has("dearrow_show_original")) value.dearrowShowOriginal else current.dearrowShowOriginal,
-                sponsorBlock = SponsorBlockSettings.parse(local).copy(channels = emptyMap())).also { store.guestDeArrow(it) }
+            preferences.value.merge(changes).let { it.copy(watchHistory = false, sponsorBlock = it.sponsorBlock.copy(channels = emptyMap())) }.also { store.guestDeArrow(it) }
         } else if (changes.length() > 0) try { api.preferences(changes, context) }
             catch (e: ApiException) {
-                if (changes.keys().asSequence().any { it.startsWith("sponsorblock_") } &&
-                    (e.status in listOf(404, 405) || e.status == 400 && e.message?.contains("Only boolean") == true))
-                    throw ApiException(400, "This server needs the Mobivious SponsorBlock API update before shared settings can be saved.")
+                if (e.status in listOf(404, 405) || e.status == 400 && (e.message?.contains("preference", true) == true || e.message?.contains("Only boolean") == true))
+                    throw ApiException(400, "This server needs the Mobivious settings API update before these shared settings can be saved.")
                 throw e
             } else preferences.value
-        if (api.context() == context) { preferenceGeneration++; preferencesContext = context; preferences.value = saved; syncSponsorSettings(); if (!saved.savePosition) store.clearPositions(); message.value = if (context.account == null) "Settings saved" else "Account settings saved" }
+        if (api.context() == context) {
+            preferenceGeneration++; preferencesContext = context; preferences.value = saved; region = saved.region
+            syncSponsorSettings(); syncHistorySettings(); if (!saved.savePosition) store.clearPositions()
+            if (changes.keys().asSequence().any { it in listOf("region", "max_results", "sort", "latest_only", "unseen_only", "notifications_only") }) refresh()
+            message.value = if (context.account == null) "Settings saved" else "Account settings saved"
+        }
     }
     suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) {
         require(DeArrowRules.validPrivateId(privateId)) { "Enter a private user ID of 30–256 letters, numbers, underscores or hyphens." }

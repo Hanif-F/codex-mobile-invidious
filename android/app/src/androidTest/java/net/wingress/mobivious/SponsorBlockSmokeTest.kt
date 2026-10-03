@@ -74,8 +74,8 @@ class SponsorBlockSmokeTest {
         color.performTextReplacement("#123456")
         screenshot("guest-colors")
         saveSheet()
-        // The parent Settings dialog remains open, preserving its unrelated drafts.
-        compose.onNodeWithText("Close").performClick()
+        // Fullscreen SponsorBlock returns to the Settings screen.
+        compose.onNodeWithContentDescription("Back from Settings").performClick()
         until { activity.model.sponsorBlock.value.segments.size == 1 }
         assertFalse(fixture().getBoolean("sponsorAuthorized"))
         compose.runOnUiThread { activity.model.refreshSharedSettings() }

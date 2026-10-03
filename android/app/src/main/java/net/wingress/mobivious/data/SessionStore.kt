@@ -16,7 +16,7 @@ class SessionStore(context: Context) {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
     val account = MutableStateFlow(readAccount())
     var server: String
-        get() = prefs.getString("server", "https://mobivious.wingress.net")!!
+        get() = prefs.getString("server", "https://invidious.wingress.net")!!
         set(value) { prefs.edit().putString("server", value).apply() }
     var background: Boolean
         get() = prefs.getBoolean("background", true)
@@ -33,12 +33,16 @@ class SessionStore(context: Context) {
     var region: String
         get() = prefs.getString("region", "US")!!
         set(value) { prefs.edit().putString("region", value).apply() }
-    fun guestDeArrow(): AccountPreferences = AccountPreferences(dearrowEnabled = prefs.getBoolean("dearrow.enabled.$server", false),
+    fun guestDeArrow(): AccountPreferences = prefs.getString("preferences.$server", null)?.let {
+        runCatching { AccountPreferences.parse(JSONObject(it)) }.getOrNull()
+    } ?: AccountPreferences(watchHistory = false, speed = defaultSpeed, qualityDash = if (maxHeight == Int.MAX_VALUE) "auto" else "${maxHeight}p", region = region,
+        dearrowEnabled = prefs.getBoolean("dearrow.enabled.$server", false),
         dearrowShowOriginal = prefs.getBoolean("dearrow.original.$server", true), sponsorBlock = runCatching {
             SponsorBlockSettings.parse(JSONObject(prefs.getString("sponsorblock.$server", "{}")!!))
         }.getOrDefault(SponsorBlockSettings()))
     fun guestDeArrow(value: AccountPreferences) {
-        prefs.edit().putBoolean("dearrow.enabled.$server", value.dearrowEnabled)
+        prefs.edit().putString("preferences.$server", value.copy(watchHistory = false, sponsorBlock = value.sponsorBlock.copy(channels = emptyMap())).json().toString())
+            .putBoolean("dearrow.enabled.$server", value.dearrowEnabled)
             .putBoolean("dearrow.original.$server", value.dearrowShowOriginal)
             .putString("sponsorblock.$server", value.sponsorBlock.copy(channels = emptyMap()).json().toString()).apply()
     }
