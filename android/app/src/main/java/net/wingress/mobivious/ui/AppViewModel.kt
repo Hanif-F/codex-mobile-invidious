@@ -18,8 +18,10 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.media3.session.SessionCommand
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import net.wingress.mobivious.MobiviousApplication
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackRules
@@ -35,6 +37,9 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val speed: Float = 1f, val tracks: Tracks = Tracks.EMPTY, val selection: TrackSelectionParameters? = null,
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
     val canRefresh: Boolean = false)
+data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
+    val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
+    val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -53,6 +58,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val comments = MutableStateFlow(Page<Comment>(emptyList()))
     val commentError = MutableStateFlow<String?>(null)
     val preferences = MutableStateFlow(AccountPreferences())
+    val dearrowTitles = DeArrowTitles(viewModelScope, { store.server }) { api.dearrowTitle(it) }
+    val dearrowIdentity = MutableStateFlow<DeArrowIdentity?>(null)
+    val dearrowIdentityError = MutableStateFlow<String?>(null)
+    val dearrowContribution = MutableStateFlow(DeArrowContributionState())
     val message = MutableStateFlow<String?>(null)
     var tab = "Home"
     var route = ""
@@ -65,6 +74,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var browseJob: Job? = null
     private var videoJob: Job? = null
     private var commentJob: Job? = null
+    private var contributionJob: Job? = null
+    private var preferenceGeneration = 0L
+    private var identityGeneration = 0L
     private var browseGeneration = 0
     private var requestedVideo: String? = null
     private val future = MediaController.Builder(application, SessionToken(application, ComponentName(application, PlaybackService::class.java))).buildAsync()
@@ -83,13 +95,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     trackSelectionParameters = trackSelectionParameters.buildUpon().setMaxVideoSize(Int.MAX_VALUE, store.maxHeight).build()
                     currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }?.let { id ->
                         requestedVideo = id
-                        viewModelScope.launch { runCatching { api.video(id) }.onSuccess { playback.value = playback.value.copy(details = it) } }
+                        viewModelScope.launch { runCatching { api.video(id) }.onSuccess { playback.value = playback.value.copy(details = it); ensureDeArrow(id); syncDeArrowMetadata() } }
                     }
                 }
             }.onFailure { message.value = "Unable to connect to the player." }
         }, ContextCompat.getMainExecutor(application))
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
-        viewModelScope.launch { account.collect { if (it != null) refreshAccount() else { subscriptions.value = emptyList(); playlists.value = emptyList(); preferences.value = AccountPreferences() } } }
+        viewModelScope.launch { account.collect {
+            preferenceGeneration++; identityGeneration++
+            dearrowTitles.clear(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
+            dearrowIdentity.value = null; dearrowIdentityError.value = null
+            preferences.value = if (it == null) store.guestDeArrow() else AccountPreferences()
+            if (it != null) refreshAccount() else { subscriptions.value = emptyList(); playlists.value = emptyList() }
+        } }
+        viewModelScope.launch { combine(preferences, dearrowTitles.titles) { prefs, _ -> prefs }.collect {
+            if (it.dearrowEnabled) playback.value.details?.video?.id?.let(::ensureDeArrow)
+            else dearrowTitles.clear()
+            syncDeArrowMetadata()
+        } }
         refresh()
     }
     private fun updatePlayback() {
@@ -106,9 +129,35 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             canSelectTracks = p.isCommandAvailable(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS),
             canRefresh = p.mediaItemCount > 0 && p.isCommandAvailable(Player.COMMAND_STOP) && p.isCommandAvailable(Player.COMMAND_PREPARE))
     }
-    fun refreshAccount() { action { preferences.value = api.preferences(); subscriptions.value = api.subscriptions(); playlists.value = api.playlists() } }
+    fun refreshAccount() {
+        refreshSharedSettings()
+        val context = api.context()
+        action { val channels = api.subscriptions(); val lists = api.playlists(); if (api.context() == context) { subscriptions.value = channels; playlists.value = lists } }
+    }
+    fun refreshSharedSettings() {
+        val context = api.context()
+        if (context.account == null) { preferences.value = store.guestDeArrow(); return }
+        val prefsGeneration = ++preferenceGeneration
+        val identityVersion = ++identityGeneration
+        action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) preferences.value = value }
+        viewModelScope.launch {
+            try { val identity = api.dearrowIdentity(context); if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = identity; dearrowIdentityError.value = null } }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = null; dearrowIdentityError.value = friendly(e) } }
+        }
+    }
+    fun ensureDeArrow(id: String) { if (preferences.value.dearrowEnabled) dearrowTitles.ensure(id) }
+    fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
+    private fun syncDeArrowMetadata() {
+        val video = playback.value.details?.video ?: return
+        val p = controller.value ?: return
+        val title = displayTitle(video)
+        if (p.currentMediaItem?.mediaId == video.id && p.mediaMetadata.title?.toString() != title) {
+            p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
+        }
+    }
     fun navigate(tab: String, route: String = "") { this.tab = tab; this.route = route; channel.value = null; playlist.value = null; refresh() }
-    fun refresh() = load(false)
+    fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow) }
     fun more() = load(true)
     private fun load(more: Boolean) {
         if (more && (browse.value.loading || browse.value.end)) return
@@ -145,12 +194,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun play(id: String, explicit: Long? = null) {
         if (id == playback.value.details?.video?.id && explicit == null) { controller.value?.play(); return }
         requestedVideo = id
+        if (id != dearrowContribution.value.videoId) { contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState() }
         videoJob?.cancel(); commentJob?.cancel(); comments.value = Page(emptyList()); commentError.value = null
         playback.value = playback.value.copy(loading = true, error = null)
         videoJob = viewModelScope.launch {
             try {
                 val details = api.video(id)
-                val prefs = if (account.value != null) runCatching { api.preferences() }.getOrDefault(preferences.value) else AccountPreferences(false, false)
+                val prefs = if (account.value != null) runCatching { api.preferences() }.getOrDefault(preferences.value) else store.guestDeArrow().copy(watchHistory = false, savePosition = false)
                 preferences.value = prefs
                 val saved = if (prefs.savePosition && account.value != null) runCatching { api.position(id) }.getOrElse { store.position(id) } else 0
                 val start = PlaybackRules.resume(saved, details.video.duration, explicit)
@@ -171,12 +221,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).build()
                 p.setMediaItem(item, start * 1000); p.prepare(); p.play()
                 playback.value = PlaybackState(details = details)
+                ensureDeArrow(id); syncDeArrowMetadata()
                 updatePlayback()
             } catch (e: CancellationException) { throw e } catch (e: Exception) { playback.value = playback.value.copy(loading = false, error = friendly(e)) }
         }
     }
     fun retryPlayback() { val id = requestedVideo ?: return; val at = if (playback.value.details?.video?.id == id) playback.value.position / 1000 else null; playback.value = playback.value.copy(details = null); play(id, at) }
-    fun closePlayer() { videoJob?.cancel(); controller.value?.stop(); controller.value?.clearMediaItems(); playback.value = PlaybackState() }
+    fun closePlayer() { videoJob?.cancel(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); controller.value?.stop(); controller.value?.clearMediaItems(); playback.value = PlaybackState() }
     fun togglePlay() { controller.value?.let {
         if (it.playbackState == Player.STATE_ENDED) { it.seekToDefaultPosition(); it.play() }
         else if (it.playWhenReady) it.pause() else it.play()
@@ -226,8 +277,84 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
     fun logout() = action { try { api.logout() } finally { closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); navigate("Home") } }
-    fun switchServer(value: String) { val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); store.server = address; navigate("Home") }
-    fun savePreferences(value: AccountPreferences) = action { api.preferences(value); preferences.value = value; if (!value.savePosition) store.clearPositions(); message.value = "Account settings saved" }
+    fun switchServer(value: String) { val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; preferences.value = store.guestDeArrow(); navigate("Home") }
+    suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext) {
+        if (api.context() != context) throw CancellationException("Account or instance changed")
+        preferenceGeneration++
+        val changes = value.changesFrom(before)
+        val saved = if (context.account == null) { store.guestDeArrow(value); value } else if (changes.length() > 0) api.preferences(changes, context) else preferences.value
+        if (api.context() == context) { preferenceGeneration++; preferences.value = saved; if (!saved.savePosition) store.clearPositions(); message.value = if (context.account == null) "Settings saved" else "Account settings saved" }
+    }
+    suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) {
+        require(DeArrowRules.validPrivateId(privateId)) { "Enter a private user ID of 30–256 letters, numbers, underscores or hyphens." }
+        api.importDeArrowIdentity(privateId.trim(), context)
+        if (api.context() != context) return
+        val identityVersion = ++identityGeneration
+        message.value = "Private identity settings saved"
+        try { val identity = api.dearrowIdentity(context); if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = identity; dearrowIdentityError.value = null } }
+        catch (e: CancellationException) { throw e }
+        catch (_: Exception) { if (api.context() == context && identityVersion == identityGeneration) dearrowIdentityError.value = "Identity settings were saved, but the status could not be refreshed." }
+    }
+    fun openDeArrow(id: String) {
+        if (account.value == null) { message.value = "Sign in to suggest titles and vote."; return }
+        val context = api.context()
+        val old = dearrowContribution.value
+        dearrowContribution.value = if (old.videoId == id && old.context == context) old.copy(open = true) else DeArrowContributionState(open = true, videoId = id, context = context)
+        if (!dearrowContribution.value.loaded && !dearrowContribution.value.busy) refreshDeArrow()
+    }
+    fun closeDeArrow() { dearrowContribution.value = dearrowContribution.value.copy(open = false) }
+    fun editDeArrowDraft(value: String) { dearrowContribution.value = dearrowContribution.value.copy(draft = value, review = false, acknowledgements = emptySet()) }
+    fun reviewDeArrow(review: Boolean) { if (!review || DeArrowRules.validTitle(dearrowContribution.value.draft)) dearrowContribution.value = dearrowContribution.value.copy(review = review, acknowledgements = emptySet()) }
+    fun acknowledgeDeArrow(index: Int, checked: Boolean) { val state = dearrowContribution.value; if (index !in 0..3 || state.busy || !state.review) return; dearrowContribution.value = state.copy(acknowledgements = if (checked) state.acknowledgements + index else state.acknowledgements - index) }
+    private fun sameContribution(state: DeArrowContributionState) = api.context() == state.context && dearrowContribution.value.context == state.context && dearrowContribution.value.videoId == state.videoId
+    fun refreshDeArrow() {
+        val state = dearrowContribution.value
+        val context = state.context ?: return
+        if (state.busy) return
+        dearrowContribution.value = state.copy(busy = true, status = "Loading submissions…")
+        val identityVersion = ++identityGeneration
+        contributionJob = viewModelScope.launch {
+            try {
+                val identity = api.dearrowIdentity(context)
+                if (!sameContribution(state)) return@launch
+                if (identityVersion == identityGeneration) { dearrowIdentity.value = identity; dearrowIdentityError.value = null }
+                if (!identity.ready) { dearrowContribution.value = dearrowContribution.value.copy(status = "The instance administrator must configure DeArrow contribution storage."); return@launch }
+                val titles = api.dearrowSubmissions(state.videoId, context)
+                if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(titles = titles, loaded = true, status = null)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(status = friendly(e)) }
+            finally { if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(busy = false) }
+        }
+    }
+    fun contributeDeArrow(action: String, item: DeArrowSubmission? = null, original: Boolean = false) {
+        val state = dearrowContribution.value
+        val context = state.context ?: return
+        if (state.busy || dearrowIdentity.value?.ready != true || !sameContribution(state)) return
+        if (action == "submit" && (!DeArrowRules.validTitle(state.draft) || state.acknowledgements.size != 4)) return
+        if (action == "downvote" && !DeArrowRules.canDownvote(item)) return
+        val fields = org.json.JSONObject().put("action", action)
+        if (action == "submit") fields.put("title", state.draft.trim()).put("confirmed", true)
+        else fields.put("original", original).put("uuid", item?.uuid.orEmpty())
+        dearrowContribution.value = state.copy(busy = true, status = "Sending…")
+        contributionJob = viewModelScope.launch {
+            try {
+                api.contributeDeArrow(state.videoId, fields, context)
+                if (!sameContribution(state)) return@launch
+                val identityVersion = ++identityGeneration
+                dearrowTitles.invalidate(state.videoId); ensureDeArrow(state.videoId)
+                dearrowContribution.value = dearrowContribution.value.copy(status = "Accepted by DeArrow. Rankings may take time to update.",
+                    draft = if (action == "submit") "" else state.draft, review = false, acknowledgements = emptySet())
+                try {
+                    val titles = api.dearrowSubmissions(state.videoId, context)
+                    val identity = api.dearrowIdentity(context)
+                    if (sameContribution(state)) { dearrowContribution.value = dearrowContribution.value.copy(titles = titles, loaded = true); if (identityVersion == identityGeneration) dearrowIdentity.value = identity }
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(status = "Your action was accepted, but the list could not be refreshed.") }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(status = if (e is ApiException) friendly(e) else "DeArrow did not confirm this action. Refresh submissions before trying again.") }
+            finally { if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(busy = false) }
+        }
+    }
     fun toggleSubscribe(id: String) = action { api.subscribe(id, subscriptions.value.none { it.id == id }); subscriptions.value = api.subscriptions() }
     override fun onCleared() { MediaController.releaseFuture(future) }
     private fun friendly(e: Exception) = if (e is ApiException || e is IllegalArgumentException) e.message ?: "Request failed." else "Cannot reach this instance. Check the address and connection, then retry."

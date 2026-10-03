@@ -88,7 +88,9 @@ controls, double-tap ten-second seeking, and one gear menu for quality, audio,
 captions, speed, audio only, picture in picture and Refresh buffer. Explicit URL timestamps override saved resume
 positions. History and resume settings are shared with the website.
 
-One consistent appearance follows system light/dark mode. SponsorBlock, DeArrow,
+Optional DeArrow titles appear throughout browsing and playback, with an original-title toggle. A native watch-page sheet supports title suggestions, all four guideline acknowledgements, voting and refresh. Signed-in settings and the encrypted contribution identity are shared with the website; Settings also supports private-ID import. Guests keep local title settings per instance. Contributions require the server API update and a fresh sign-in token.
+
+One consistent appearance follows system light/dark mode. SponsorBlock,
 chat replay, clips, blocking, downloads, casting and upload notifications are
 outside this first release. Discovery uses Invidious popular/trending feeds.
 

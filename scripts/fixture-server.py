@@ -16,8 +16,20 @@ args = parser.parse_args()
 video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', author='Mobivious Studio',
              authorId='UCfixture', lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
-prefs = dict(watch_history=True, save_player_pos=True, unrelated_setting='preserved')
-state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0)
+prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True, unrelated_setting='preserved')
+state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
+             identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
+             originalMode='unlocked', titleLookups={}, contributions=[])
+replacement = 'A calm scene'
+recommended = dict(video, videoId='testvideo02', title='Another original title')
+
+def submissions():
+    titles = [dict(title=replacement, original=False, votes=3, locked=False, UUID='proposal'),
+              dict(title='Locked community title', original=False, votes=5, locked=True, UUID='locked')]
+    if state['originalMode'] != 'missing':
+        titles.insert(0, dict(title=video['title'], original=True, votes=1,
+                             locked=state['originalMode'] == 'locked', UUID='original'))
+    return titles
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
@@ -33,6 +45,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
+        if p.startswith('/api/v1/auth/dearrow/') and self.headers.get('Authorization') != 'Bearer fixture-token':
+            return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/media/'):
             state['mediaRequests'] += 1
             file = args.media_dir / Path(p).name
@@ -53,7 +67,15 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/videos/testvideo01':
             self.respond(dict(**video, description='A generated test video. No YouTube access is involved.',
                               dashUrl='/media/dash.mpd', hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
-                              recommendedVideos=[]))
+                              recommendedVideos=[recommended]))
+        elif p.startswith('/api/v1/dearrow/'):
+            video_id = p.rsplit('/', 1)[-1]
+            state['titleLookups'][video_id] = state['titleLookups'].get(video_id, 0) + 1
+            self.respond(dict(title={'testvideo01': replacement, 'testvideo02': 'Another calm scene'}.get(video_id)))
+        elif p == '/api/v1/auth/dearrow/identity':
+            self.respond(dict(ready=state['identityReady'], configured=state['identityConfigured']))
+        elif p.endswith('/submissions') and p.startswith('/api/v1/auth/dearrow/'):
+            self.respond(dict(error='Fixture submissions unavailable') if state['failSubmissions'] else dict(titles=submissions()), 502 if state['failSubmissions'] else 200)
         elif p == '/api/v1/auth/preferences': self.respond(prefs)
         elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId='UCfixture')])
         elif p == '/api/v1/auth/playlists': self.respond(state['playlists'])
@@ -72,14 +94,35 @@ class Handler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0)
-            prefs.update(watch_history=True, save_player_pos=True)
+            state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
+                         identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
+                         originalMode='unlocked', titleLookups={}, contributions=[])
+            prefs.update(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True)
+            return self.respond({})
+        if p == '/test/dearrow':
+            for key in ('identityReady', 'failContribution', 'failSubmissions', 'originalMode'):
+                if key in data: state[key] = data[key]
+            for key in ('dearrow_enabled', 'dearrow_show_original'):
+                if key in data: prefs[key] = data[key]
+            if data.get('seedPlaylist'):
+                state['playlists'] = [dict(playlistId='IVfixture', title='DeArrow fixture playlist', privacy='private', videoCount=1, videos=[dict(video, indexId='A')])]
             return self.respond({})
         if p == '/test/stream':
             state['stream'] = data['type']
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))
+        if p.startswith('/api/v1/auth/dearrow/'):
+            if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
+            if not state['identityReady']: return self.respond(dict(error='The instance administrator must configure DeArrow contribution storage.'), 503)
+            if p.endswith('/identity'):
+                # Retain only configured status; never retain or expose an imported private ID.
+                if data.get('privateId', '').strip(): state['identityConfigured'] = True
+                return self.respond(dict(ok=True))
+            if state['failContribution']: return self.respond(dict(error='DeArrow did not confirm this action. Refresh submissions before trying again.'), 502)
+            state['contributions'].append(data)
+            state['identityConfigured'] = True
+            return self.respond(dict(ok=True))
         if p == '/api/v1/mobile/login':
             self.respond(dict(accessToken='fixture-token', username=data.get('username', 'Viewer'), expiresAt=9999999999))
         elif p == '/api/v1/auth/preferences': prefs.update(data); self.respond(prefs)

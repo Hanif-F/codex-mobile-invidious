@@ -48,7 +48,7 @@ class AppSmokeTest {
     }
     private fun openFixture() {
         command("reset")
-        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080") }
+        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences()); activity.model.refreshSharedSettings() }
         waitFor { activity.model.browse.value.videos.isNotEmpty() }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }

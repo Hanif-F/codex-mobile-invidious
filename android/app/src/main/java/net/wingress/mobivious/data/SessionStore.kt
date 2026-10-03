@@ -33,6 +33,12 @@ class SessionStore(context: Context) {
     var region: String
         get() = prefs.getString("region", "US")!!
         set(value) { prefs.edit().putString("region", value).apply() }
+    fun guestDeArrow(): AccountPreferences = AccountPreferences(dearrowEnabled = prefs.getBoolean("dearrow.enabled.$server", false),
+        dearrowShowOriginal = prefs.getBoolean("dearrow.original.$server", true))
+    fun guestDeArrow(value: AccountPreferences) {
+        prefs.edit().putBoolean("dearrow.enabled.$server", value.dearrowEnabled)
+            .putBoolean("dearrow.original.$server", value.dearrowShowOriginal).apply()
+    }
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         return (store.getKey("mobivious.session", null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {

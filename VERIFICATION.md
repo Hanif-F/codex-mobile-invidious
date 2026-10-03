@@ -70,6 +70,58 @@ broad counts are unchanged. No server tests or production rollout were performed
 as part of this player revision. The earlier server/release results above remain
 historical checks of the original build, rather than a new signed-release test.
 
+## DeArrow titles and contributions — 3 October 2026
+
+The native DeArrow implementation and matching sibling server API were checked
+with local fixtures and mocked upstream writes. No real titles or votes were
+submitted, and no production deployment or signed release was performed.
+
+| Check | Result |
+|---|---|
+| Android debug app and instrumentation APK build | Passed |
+| Android unit/MockWebServer tests | 17 passed, including 9 DeArrow scenarios |
+| Android debug lint | Passed; dependency and existing code-style warnings remain |
+| Crystal DeArrow specs | 13 passed |
+| Guarded disposable PostgreSQL account/API harness | Passed, including native DeArrow checks |
+| Rendered web fixtures | Passed |
+| Focused Chromium DeArrow browser tests | 11 passed, including web widths 320px/390px/1440px |
+| Invidious normal and API-only executable builds | Passed |
+| Native emulator instrumentation/runtime/screenshots | Unverified: emulator startup crashes before Android boots |
+
+Unit tests cover opt-in defaults, title/identity validation, upstream proposal
+order, sparse preference PATCH requests, deduplicated lookups with at most four
+concurrent requests, null/error fallbacks, stale-response isolation, bearer-only
+authenticated calls, JSON booleans, old-server/token explanations, a timeout with
+exactly one write attempt, and identity-import redirect refusal. The database
+harness exercises real auth middleware, scope and CSRF checks, encrypted identity
+import/blank preservation, shared web/native identity use, server-resolved votes,
+locked/stale rejection, bounded JSON, guideline confirmation and preservation of
+unrelated preferences. Upstream transports are injected mocks.
+
+Three new Compose scenarios compile alongside the four existing emulator tests.
+They cover guest settings/original-title controls, shared titles across lists and
+the mini-player, playback metadata without resetting position/speed/quality or
+duplicating history, voting restrictions, all four acknowledgements, failed draft
+preservation, identity import/clearing and logout isolation. These scenarios have
+**not run successfully in this revision**. Android Emulator 37.2.12 repeatedly
+terminated with SIGSEGV during startup, including a fresh disposable AVD and
+alternative graphics/CPU configurations. Narrow native layouts, keyboard behavior,
+light/dark screenshots, accessibility interaction and the Media3 metadata update
+still need runtime acceptance. The connected-test task could not execute because
+there were no connected devices. Earlier player results above are historical.
+
+Once a working emulator is available, run `scripts/test-android.sh`. Repeat the
+DeArrow scenarios at 320dp and 390dp widths in light/dark mode, with the keyboard
+visible; the contribution test records screenshots under
+`/data/local/tmp/mobivious-dearrow-screenshots/`. The app defaults to DeArrow off
+and original-title controls on. Signed-in flags use the account, while guests use
+per-instance local settings.
+
+Production contributions require deployment of the sibling API update, the
+existing migration 13 identity table/key, and sign-out/sign-in to obtain the
+added token permissions. This revision adds no schema migration. Public trusted
+title reads remain independent of contribution storage.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:
@@ -101,7 +153,7 @@ These commands use the default sibling checkout layout; adjust the path for a
 custom server location. The account harness instructions are in
 `../invidious/docs/mobile-api.md`. Run it only
 against an empty disposable `invidious_accounts_test` database. Its schema is
-recreated during the test. Server specs need local loopback networking for proxy
+created during the test; start with an empty schema for every run. Server specs need local loopback networking for proxy
 tests. The normal build downloads the existing web player's dependencies; an
 interrupted download may leave empty asset directories that need to be removed
 before retrying the existing dependency script.
@@ -114,11 +166,12 @@ both SQL initialization mount sources exist in each case. Compared with the
 previous Compose configuration, only the three source paths changed; the project
 name, database, volumes, account settings and service configuration are identical.
 
-All nine mobile API patch files match the previously tested server commit byte
-for byte, including the documentation exception. The original `source/.git` remains
-at `644443ef` as a recovery copy. Android source and build/test scripts are unchanged;
-both shell scripts passed syntax checks. No server image or APK rebuild was needed
-for this location change.
+At the time of relocation, all nine mobile API patch files matched the previously
+tested server commit byte for byte, including the documentation exception. The
+original `source/.git` remained at `644443ef` as a recovery copy. Android source and
+build/test scripts were unchanged and both shell scripts passed syntax checks.
+No server image or APK rebuild was needed for that location change. The subsequent
+DeArrow source changes and validation are described above.
 
 ## Production work still required
 
@@ -126,5 +179,7 @@ The mobile hostname, TLS alias, Docker rollout and new account APIs have **not**
 been deployed on the Ubuntu server. Follow `deploy/README.md` and preserve the
 existing keys, project name and volumes. Account operations in the release app
 need that server patch; anonymous browsing can use the existing HTTPS instance.
+Native DeArrow contributions additionally need the updated DeArrow API routes
+and a renewed sign-in token. Public replacement-title reads use the existing route.
 Physical POCO X6 Pro behavior, OEM background restrictions, and authenticated
 account features after production rollout still need a device/server acceptance check.

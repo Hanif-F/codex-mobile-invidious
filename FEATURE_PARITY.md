@@ -2,8 +2,8 @@
 
 Reviewed on **3 October 2026** against the local source checkouts:
 
-- Web: `../invidious`, commit `e7e24917` — includes this fork's custom features.
-- Android: this repository, commit `473eb54`, app version `0.1.0`.
+- Web: `../invidious`, release base `e7e24917` plus the native DeArrow API changes in the working tree — includes this fork's custom features.
+- Android: this repository, release base `348b57f`, app version `0.1.1`, plus the DeArrow changes in the working tree.
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
@@ -13,7 +13,7 @@ Reviewed on **3 October 2026** against the local source checkouts:
 
 This is a source audit, not a new runtime or production acceptance test. Features can depend on instance configuration, upstream content availability, and device capabilities. Existing validation is recorded in [VERIFICATION.md](VERIFICATION.md). That file reports the production mobile sign-in/account API rollout as still pending; account features below are implemented in source, but need the server patch deployed before production use. No live deployment was checked for this audit.
 
-**Summary: 45 broad feature areas — 8 implemented, 17 partial, 20 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
+**Summary: 45 broad feature areas — 9 implemented, 17 partial, 19 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
 
 ## Discovery and channels
 
@@ -68,7 +68,7 @@ Evidence: [web watch page][w-watch], [web player component][w-player], [web play
 | 33 | Watch history and history organization | Partial | Record watched videos, paginated history, keep unavailable entries, remove one entry, clear all with confirmation and shared enable/disable setting. | Search/filter history, timezone-aware date groups and fuller archived metadata presentation. |
 | 34 | Watched/progress indicators and manual watched state | Not implemented | Automatic history recording exists (row 33). | Thumbnail progress bars/watched indicators and explicit mark-watched/mark-unwatched actions from browsing cards. Removing a history entry exists, but there is no general watched-state action. |
 | 35 | Data import/export and migration | Not implemented | — | Invidious data import/export; YouTube subscription/playlist/history imports; NewPipe/FreeTube imports and subscription exports/OPML. The native login token also lacks export/import scopes. |
-| 36 | Shared account preferences | Partial | Read/update `watch_history` and `save_player_pos` while preserving other server preferences. | Native editing/synchronization of appearance, homepage, feeds, captions, comments, default playlist, SponsorBlock/DeArrow and other web settings. Trending region, playback speed and resolution ceiling are app-local settings, not shared web preference updates. |
+| 36 | Shared account preferences | Partial | Read/update `watch_history`, `save_player_pos`, `dearrow_enabled` and `dearrow_show_original` with sparse patches preserving other server preferences; refresh shared settings on sign-in, settings opening and foreground return. | Native editing/synchronization of appearance, homepage, feeds, captions, comments, default playlist, SponsorBlock and other web settings. Trending region, playback speed and resolution ceiling are app-local settings, not shared web preference updates. |
 
 Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed rules][w-users], [web playlist routes][w-playlists], [web common playlist/mix API][w-playlist-api], [web history][w-history], [web watched indicators][w-indicator], [web data control][w-data], [web preferences][w-prefs]; [Android account/library UI][a-ui], [Android API][a-api], [Android session/local settings][a-store], [mobile API contract][w-mobile].
 
@@ -77,7 +77,7 @@ Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed 
 | ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
 | --- | --- | --- | --- | --- |
 | 37 | SponsorBlock | Not implemented | — | Fetch/display segments, auto/manual skipping, category modes/colors and per-channel overrides. |
-| 38 | DeArrow titles and contributions | Not implemented | — | Replacement titles and original-title display; suggestion/voting dialog and contribution identity management. This fork implements title replacement/contributions; thumbnail replacement is not counted as an existing web capability. |
+| 38 | DeArrow titles and contributions | Implemented | Optional replacement titles throughout video lists, watch/mini-player and system playback metadata; accessible original-title toggle; native suggestion/voting sheet with all four guideline acknowledgements, locked/original vote restrictions, refresh and preserved failed drafts; shared account settings and encrypted contribution identity, including private-ID import. Guests keep per-instance local title settings. | — for the web capability; requires the native DeArrow API server update and an updated sign-in token. This fork does not implement thumbnail replacement. |
 | 39 | Clips | Not implemented | — | Resolve/play YouTube or native clips; create/preview/share bounded native clips; My Clips/channel Clips lists, loop control and deletion. Existing web native clips are public, immutable, 5–120 seconds; active-live clipping/editing/clip embeds are excluded there too. |
 | 40 | Channel blocking | Not implemented | — | Block/unblock/manage channels and personalized filtering of browse/search/recommendation content. Most Android public reads do not send account authorization, so web account filtering should not be assumed to carry over. |
 | 41 | Members-only content visibility controls | Not implemented | — | Member-video filtering preferences and per-search visibility override. Android does not model member status or expose these controls; this is visibility filtering, not membership authentication/access. |
@@ -86,14 +86,14 @@ Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed 
 | 44 | Instance selection/switching and proxy preference | Partial | Manually configure an HTTPS instance; clear local session/cache/player when switching; playback requests use local/proxied streams. | Instance discovery/automatic redirection, per-content switch-instance flow and a user control for the web's proxy preference. Switching servers does not migrate account data. |
 | 45 | RSS subscriptions | Not implemented | — | Open/share channel, playlist and private subscription RSS feeds from Android. These routes already exist on the server. |
 
-Evidence: [web preferences][w-prefs], [web player/SponsorBlock integration][w-player], [DeArrow implementation][w-dearrow], [DeArrow contribution contract][w-dearrow-doc], [native clip contract][w-clips], [web blocking][w-blocked], [web theme registry][w-themes], [web routing/RSS][w-routing]; [Android settings/appearance][a-ui], [Android API][a-api], [Android models][a-models], [Android instance/session switching][a-vm].
+Evidence: [web preferences][w-prefs], [web player/SponsorBlock integration][w-player], [DeArrow implementation][w-dearrow], [DeArrow contribution contract][w-dearrow-doc], [native clip contract][w-clips], [web blocking][w-blocked], [web theme registry][w-themes], [web routing/RSS][w-routing]; [Android settings/appearance][a-ui], [Android DeArrow UI][a-dearrow-ui], [Android title resolver][a-dearrow], [Android API][a-api], [Android models][a-models], [Android instance/session switching][a-vm].
 
 ## Integration details affecting the checklist
 
 1. **Search sorting mismatch:** [Android API][a-api] sends `sort_by` with `relevance`, `rating`, `upload_date` or `view_count`. [This fork's search parser][w-search] reads `sort` and supports `relevance` or `views`. The [search route][w-search-api] passes query parameters directly to that parser, with no `sort_by` translation. The menu exists, but selecting a different sort leaves the default relevance sort. Date and duration are separate, correctly named parameters. This finding was established from source, not a live result-order test.
 2. **External playlists are only partly reachable:** [authenticated playlist listing][w-auth] includes account-stored playlists; Android reads them through its authenticated playlist method. It has no public playlist/deep-link flow or external-playlist subscription method, and exposes edit/delete controls without distinguishing an external saved playlist from an owned native playlist. The server limits what those mutations can do. Mix IDs redirect in [the common API][w-playlist-api], while Android's HTTP client disables redirects and has no mix API method.
 3. **Existing website feed settings can still affect Android:** [shared server feed rules][w-users] are applied by the authenticated feed endpoint. Their absence from the Android Settings dialog does not mean every effect is absent. Android does, however, override `max_results` with 30 and merge notification/feed items into one list.
-4. **Account preferences are deliberately narrow:** [the mobile PATCH endpoint][w-mobile] only accepts `watch_history` and `save_player_pos`. Exposing all web preferences would require an expanded safe API contract as well as Android UI. Clip scopes and data import/export scopes are not included in the native login token; existing web routes do not make these ready to use from Android.
+4. **Account preferences remain deliberately narrow:** [the mobile PATCH endpoint][w-mobile] accepts only boolean `watch_history`, `save_player_pos`, `dearrow_enabled` and `dearrow_show_original` fields. Android sends changed fields only. Other web preferences still need a safe API contract and native UI. Private DeArrow IDs use a separate authenticated identity endpoint and are never preference fields. Clip scopes and data import/export scopes are not included in the native login token; existing web routes do not make these ready to use from Android.
 
 ## Platform-specific context
 
@@ -103,11 +103,15 @@ Android already adds native conveniences: a mini-player, MediaSession/system con
 
 The original checklist was a documentation-only source audit. The subsequent Android player overhaul consolidates playback settings under one in-player gear, removes the persistent fullscreen/back overlays, and adds touch seeking and Refresh buffer. Row 11 also corrects an audit omission: the old Media3 gear already exposed 0.25× speed; the new unified sheet retains it. Rows 09, 11, 13 and 20 reflect the overhaul; their broad statuses and summary counts are unchanged. Detailed statistics remain missing. Runtime validation for this revision is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 
+The DeArrow revision implements row 38 and the DeArrow portion of row 36. Titles retain their canonical original metadata, contributions use the web account's encrypted identity, and write requests are never automatically retried. The server API update needs deployment; existing native tokens must be renewed by signing in again. The broad totals now contain 9 implemented, 17 partial and 19 not implemented areas. Validation and production limitations are recorded in [VERIFICATION.md](VERIFICATION.md).
+
 ## Source references
 
 Links are repository-relative so this checklist works with the documented sibling-checkout layout. The listed commits identify the reviewed snapshot.
 
 [a-ui]: android/app/src/main/java/net/wingress/mobivious/ui/MobiviousApp.kt
+[a-dearrow-ui]: android/app/src/main/java/net/wingress/mobivious/ui/DeArrowUi.kt
+[a-dearrow]: android/app/src/main/java/net/wingress/mobivious/data/DeArrow.kt
 [a-player]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerUi.kt
 [a-vm]: android/app/src/main/java/net/wingress/mobivious/ui/AppViewModel.kt
 [a-api]: android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt

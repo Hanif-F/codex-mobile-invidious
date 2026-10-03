@@ -62,3 +62,9 @@ app and website. DNS and this production deployment were not performed locally.
 
 Rollback uses the preserved previous source/image and the same volumes/secrets.
 Never delete the database volume to fix a failed startup.
+
+## Native DeArrow support
+
+Deploy the updated sibling Invidious source to enable bearer-authenticated title contributions and private-ID import. The preference PATCH allowlist now includes `dearrow_enabled` and `dearrow_show_original`. Reuse the existing migration 13 identity table and persistent DeArrow identity key; this update adds no migration and requires no key rotation. See `../invidious/docs/dearrow-contributions.md` and `../invidious/docs/mobile-api.md` for the endpoint contract.
+
+After the server update, sign out and sign in again in Mobivious to obtain the added DeArrow token permissions. Old tokens retain their previous permissions. Public replacement-title reads continue to work without contribution storage. Missing API endpoints, unavailable storage and old-token permissions have separate app messages. Neither building the APK nor this source change deploys the server automatically.

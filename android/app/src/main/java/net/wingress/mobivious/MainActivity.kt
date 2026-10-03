@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
         handleLink(intent)
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleLink(intent) }
+    override fun onStart() { super.onStart(); model.refreshSharedSettings() }
     private fun handleLink(intent: Intent) {
         val text = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else intent.dataString
         if (text != null) {

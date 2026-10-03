@@ -3,6 +3,7 @@ package net.wingress.mobivious.player
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.PowerManager
+import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -12,6 +13,9 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
+import androidx.media3.session.SessionError
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import kotlinx.coroutines.*
@@ -23,6 +27,7 @@ import net.wingress.mobivious.data.Account
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackService : MediaSessionService() {
+    companion object { const val SET_DISPLAY_TITLE = "mobivious.dearrow.title" }
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -47,14 +52,27 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
-                    if (controller.isTrusted || controller.packageName == packageName) MediaSession.ConnectionResult.AcceptedResultBuilder(session).build()
+                    if (controller.isTrusted || controller.packageName == packageName) MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                        .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().add(SessionCommand(SET_DISPLAY_TITLE, Bundle.EMPTY)).build()).build()
                     else MediaSession.ConnectionResult.reject()
+                override fun onCustomCommand(session: MediaSession, controller: MediaSession.ControllerInfo, customCommand: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
+                    if (controller.packageName != packageName || customCommand.customAction != SET_DISPLAY_TITLE) return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+                    val item = player.currentMediaItem
+                    val title = args.getString("title")
+                    if (item != null && item.mediaId == args.getString("mediaId") && !title.isNullOrBlank()) {
+                        val extras = Bundle(item.mediaMetadata.extras ?: Bundle.EMPTY).apply { putBoolean("dearrowMetadataOnly", true) }
+                        player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setTitle(title).setExtras(extras).build()).build())
+                    }
+                    return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+                }
                 override fun onAddMediaItems(session: MediaSession, controller: MediaSession.ControllerInfo, mediaItems: List<MediaItem>): ListenableFuture<List<MediaItem>> =
                     Futures.immediateFuture(mediaItems.filter { it.localConfiguration?.uri?.scheme in listOf("https", "http") })
             }).build()
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                val metadataOnly = current?.mediaId == mediaItem?.mediaId && mediaItem?.mediaMetadata?.extras?.getBoolean("dearrowMetadataOnly") == true && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
                 current = mediaItem
+                if (metadataOnly) return
                 owner = app.store.account.value
                 history = mediaItem?.mediaMetadata?.extras?.getBoolean("history") ?: false
                 savePosition = mediaItem?.mediaMetadata?.extras?.getBoolean("savePosition") ?: false
