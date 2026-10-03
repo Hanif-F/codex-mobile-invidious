@@ -71,6 +71,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private data class SelectionRequest(val mediaId: String, val quality: String, val snapshot: SelectionSnapshot?)
     private var selectionRequest: SelectionRequest? = null
     val channel = MutableStateFlow<Channel?>(null)
+    val channelTab = MutableStateFlow<ChannelTab?>(null)
     val playlists = MutableStateFlow<List<Playlist>>(emptyList())
     val playlist = MutableStateFlow<Playlist?>(null)
     val subscriptions = MutableStateFlow<List<Channel>>(emptyList())
@@ -232,17 +233,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; channel.value = null; playlist.value = null; refresh() }
+    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; channel.value = null; channelTab.value = null; playlist.value = null; refresh() }
     fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery = target.second; navigate(target.first) }
     fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow) }
     fun more() = load(true)
-    private fun load(more: Boolean) {
+    fun selectChannelTab(value: ChannelTab) {
+        val info = channel.value ?: return
+        if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value) return
+        channelTab.value = value
+        dearrowTitles.clear()
+        load(false, refreshChannel = false)
+    }
+    private fun load(more: Boolean, refreshChannel: Boolean = true) {
         if (more && (browse.value.loading || browse.value.end)) return
         browseJob?.cancel()
         val generation = ++browseGeneration
         val old = if (more) browse.value else BrowseState()
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
+        val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
@@ -250,8 +259,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val videos = when {
                     selectedRoute.startsWith("channel:") -> {
                         val id = selectedRoute.substringAfter(':')
-                        if (!more) channel.value = api.channel(id)
-                        val response = api.channelVideos(id, if (more) old.continuation else "")
+                        val info = if (selectedChannel == null || !more && refreshChannel) api.channel(id) else selectedChannel
+                        if (generation != browseGeneration) throw CancellationException("Channel request superseded")
+                        val contentTab = info.preferredTab(selectedChannelTab)
+                        channel.value = info; channelTab.value = contentTab
+                        val token = if (more) old.continuation else ""
+                        val response = when (contentTab) {
+                            ChannelTab.VIDEOS -> api.channelVideos(id, token)
+                            ChannelTab.STREAMS -> api.channelStreams(id, token)
+                        }
                         continuation = response.continuation; response.items
                     }
                     selectedRoute.startsWith("playlist:") -> api.playlist(selectedRoute.substringAfter(':'), page).let { playlist.value = it.first; it.second }
@@ -263,7 +279,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 if (generation == browseGeneration) browse.value = browse.value.copy(videos = (old.videos + videos).distinctBy { it.id + it.indexId }, loading = false, page = page,
                     continuation = continuation, end = videos.isEmpty() || more && videos.all { video -> old.videos.any { it.id == video.id && it.indexId == video.indexId } } ||
-                        selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isEmpty() ||
+                        selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 if (generation == browseGeneration) browse.value = browse.value.copy(loading = false, error = friendly(e))

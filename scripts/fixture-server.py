@@ -5,6 +5,7 @@ Bind localhost only; ADB reverse exposes it to the emulator for instrumentation.
 """
 import argparse
 import json
+import time
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -54,6 +55,10 @@ def reset_sponsorblock():
     prefs.update(sponsorblock_enabled=False, sponsorblock_modes=dict.fromkeys(sponsor_categories, 'manual'), sponsorblock_colors=sponsor_colors.copy(), sponsorblock_channel_overrides={})
 reset_sponsorblock()
 
+def reset_channels():
+    state.update(channelTabs=['videos', 'streams'], channelRequests=[], channelFailNext=False, channelDelayNext=None)
+reset_channels()
+
 def submissions():
     titles = [dict(title=replacement, original=False, votes=3, locked=False, UUID='proposal'),
               dict(title='Locked community title', original=False, votes=5, locked=True, UUID='locked')]
@@ -72,6 +77,38 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         if data is not None:
             self.wfile.write(json.dumps(data).encode())
+
+    def channel(self, tab, query):
+        # Keep blank values: continuation= must fail just as it does on Invidious.
+        params = parse_qs(query, keep_blank_values=True)
+        token = params.get('continuation', [None])[0]
+        event = dict(tab=tab, continuation=token, completed=False)
+        state['channelRequests'].append(event)
+        tabs = list(state['channelTabs'])
+        delay = state['channelDelayNext']
+        if delay and delay['tab'] == tab:
+            state['channelDelayNext'] = None
+            time.sleep(min(5000, max(0, delay['millis'])) / 1000)
+        try:
+            if tab == 'metadata':
+                return self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description='Fixture channel', subCount=42, tabs=tabs))
+            if token is not None and not token.strip():
+                return self.respond(dict(error='Error: non 200 status code. Youtube API returned status code 400.'), 500)
+            if state['channelFailNext']:
+                state['channelFailNext'] = False
+                return self.respond(dict(error='Fixture channel temporarily unavailable'), 503)
+            if tab not in tabs:
+                return self.respond(dict(videos=[]))
+            next_token = tab + '+/page=2%&'
+            if token not in (None, next_token):
+                return self.respond(dict(error='Invalid channel continuation'), 400)
+            if tab == 'videos':
+                item = video if token is None else dict(video, videoId='testvideo02', title='Another channel upload')
+            else:
+                item = dict(video, videoId='streamvid01' if token is None else 'streamvid02', title='Channel stream one' if token is None else 'Channel stream two', liveNow=token is None)
+            return self.respond(dict(videos=[item], continuation=next_token) if token is None else dict(videos=[item]))
+        finally:
+            event['completed'] = True
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -122,8 +159,8 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/auth/history': self.respond([dict(video_id=video['videoId'], title=video['title'], channel_name=video['author'], channel_id=video['authorId'], length_seconds=120)] if state['watched'] else [])
         elif p.startswith('/api/v1/auth/playback/'):
             self.respond(dict(position=state['position'], videoId='testvideo01'))
-        elif p == '/api/v1/channels/' + video['authorId']: self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description='Fixture channel', subCount=42))
-        elif p == '/api/v1/channels/' + video['authorId'] + '/videos': self.respond(dict(videos=[video]))
+        elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
+        elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams'): self.channel(p.rsplit('/', 1)[-1], url.query)
         elif p == '/api/v1/comments/testvideo01': self.respond(dict(comments=[dict(author='Viewer', content='A test comment.', likeCount=3, publishedText='today')]))
         else: self.respond({'error': 'Fixture endpoint not found'}, 404)
 
@@ -137,6 +174,11 @@ class Handler(BaseHTTPRequestHandler):
             prefs.clear()
             prefs.update(default_prefs)
             reset_sponsorblock()
+            reset_channels()
+            return self.respond({})
+        if p == '/test/channel':
+            for key in ('channelTabs', 'channelFailNext', 'channelDelayNext'):
+                if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/sponsorblock':
             for key in ('sponsorSegments', 'failSponsor', 'failPreferences', 'liveNow'):

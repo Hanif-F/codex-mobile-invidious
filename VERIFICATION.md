@@ -309,6 +309,52 @@ local and ignored. Native runtime/layout acceptance limitations in the preceding
 section still apply. Building and publishing this APK does not deploy the sibling
 Invidious server APIs or change production services.
 
+## Channel loading and Streams tabs — 3 October 2026
+
+Android now omits empty/blank continuation parameters on the first Videos or
+Streams request and preserves nonblank tokens through URL encoding. Channel
+metadata supplies the available tabs; Videos is preferred when advertised,
+otherwise Streams is selected, with Videos as the compatibility fallback. Switching
+tabs cancels the previous load, resets the list/token and starts the selected
+endpoint. Refresh/Retry preserve a still-available selection, and stale metadata or
+pages cannot replace a newer channel route or tab.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 58 passed, including 6 new channel scenarios; no failures or skips |
+| Android debug and instrumentation APK builds | Passed |
+| Android debug lint | Passed; zero errors, 32 existing/style/dependency warnings; none reference the channel changes |
+| Disposable channel fixture HTTP checks | Passed: separate pagination, exact token decoding, blank-token failure, wrong-tab token rejection, one-shot failure, streams-only metadata and concurrent delayed metadata |
+| Existing live instance public channel APIs | Passed: WAN Show Streams returned 15 videos; Just For Laughs Gags Videos returned 60 videos on each of two pages |
+| Native channel runtime/layout acceptance | Unverified: `adb devices` lists no connected emulator or device |
+
+Unit/API checks cover advertised and malformed tab metadata, stable tab ordering,
+uploads/streams-only and missing-metadata defaults, retaining or replacing a selected
+tab after metadata changes, omitted initial/default/whitespace tokens on both
+endpoints, exact opaque tokens containing reserved characters and Unicode,
+credential-free public reads, parsed videos/live flags, end-of-list responses and
+temporary errors followed by successful retries.
+
+Four new `ChannelSmokeTest` Compose scenarios compile. They cover tapping a video's
+channel, Videos/Streams switching and independent pagination, automatic Streams
+selection, Refresh/Retry retention and fallback when a tab disappears, delayed
+pages after switching or leaving a channel, and delayed metadata after navigation.
+The stricter fixture rejects `continuation=` instead of silently accepting it.
+These native scenarios have **not run**. With a working device connected, run
+`scripts/test-android.sh`; narrow/landscape layouts, light/dark appearance and
+accessibility acceptance remain pending device verification.
+
+Read-only checks on `https://invidious.wingress.net` reproduced the original failure:
+`/api/v1/channels/:id/videos?continuation=` returned HTTP 500 containing the reported
+upstream YouTube 400 message, while the same request without the parameter and the
+channel's web page returned 200. WAN Show (`UCVlfe3MRSCZSeIWByrWHhkg`) advertises
+Streams, Podcasts and Posts, with no regular uploads; its Streams endpoint returned
+15 videos. Just For Laughs Gags (`UCpsSadsgX_Qk9i6i_bJoUwQ`) confirmed normal uploads
+and follow-up pagination. These are API checks, not acceptance of the Android UI
+against production. The feature uses existing server APIs and needs no server
+deployment, migration or new token scope. No signed release or production rollout
+was performed.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:

@@ -55,6 +55,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val account by vm.account.collectAsStateWithLifecycle()
     val controller by vm.controller.collectAsStateWithLifecycle()
     val channel by vm.channel.collectAsStateWithLifecycle()
+    val channelTab by vm.channelTab.collectAsStateWithLifecycle()
     val playlist by vm.playlist.collectAsStateWithLifecycle()
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
@@ -139,6 +140,14 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), contentPadding = PaddingValues(bottom = 12.dp)) {
                         if (channel != null) item { Column(Modifier.padding(16.dp)) { Text(channel!!.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("${channel!!.subscribers} subscribers", style = MaterialTheme.typography.bodyMedium); if (channel!!.description.isNotBlank()) Text(channel!!.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp)); Button(onClick = { if (account == null) dialog = "login" else vm.toggleSubscribe(channel!!.id) }) { Text(if (subscriptions.any { it.id == channel!!.id }) "Subscribed" else "Subscribe") } } }
+                        channel?.let { info -> item {
+                            Row(Modifier.padding(horizontal = 16.dp).testTag("channel-tabs"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                info.contentTabs.forEach { contentTab ->
+                                    FilterChip(selected = channelTab == contentTab, onClick = { vm.selectChannelTab(contentTab) },
+                                        label = { Text(contentTab.label) }, modifier = Modifier.testTag("channel-tab-${contentTab.path}"))
+                                }
+                            }
+                        } }
                         if (channel != null) item { TextButton(onClick = { vm.openSponsorBlock(channel!!.id) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Channel SponsorBlock settings") } }
                         if (playlist != null) item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("${playlist!!.count} videos", Modifier.weight(1f)); TextButton(onClick = { dialog = "edit" }) { Text("Edit playlist") }; IconButton(onClick = { dialog = "deletePlaylist" }) { Icon(Icons.Default.DeleteOutline, "Delete playlist") } } }
                         if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); TextButton(onClick = { dialog = "clearHistory" }) { Text("Clear") } } }

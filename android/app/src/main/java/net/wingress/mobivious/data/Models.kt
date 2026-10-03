@@ -14,7 +14,15 @@ data class StreamFormat(val id: String, val mimeType: String, val codec: String,
     val audio: AudioIdentity? = null, val drc: Boolean? = null)
 data class VideoDetails(val video: Video, val description: String, val dash: String, val hls: String,
     val fallback: String, val captions: List<Caption>, val recommendations: List<Video>, val formats: List<StreamFormat> = emptyList())
-data class Channel(val id: String, val name: String, val description: String = "", val subscribers: String = "", val image: String = "")
+enum class ChannelTab(val path: String, val label: String) {
+    VIDEOS("videos", "Videos"), STREAMS("streams", "Streams")
+}
+data class Channel(val id: String, val name: String, val description: String = "", val subscribers: String = "", val image: String = "",
+    val tabs: List<String> = emptyList()) {
+    val contentTabs: List<ChannelTab>
+        get() = ChannelTab.entries.filter { it.path in tabs }.ifEmpty { listOf(ChannelTab.VIDEOS) }
+    fun preferredTab(current: ChannelTab? = null): ChannelTab = current?.takeIf { it in contentTabs } ?: contentTabs.first()
+}
 data class Playlist(val id: String, val title: String, val count: Int, val privacy: String = "private", val description: String = "")
 data class Comment(val author: String, val text: String, val published: String, val likes: Long)
 data class Page<T>(val items: List<T>, val continuation: String = "")
@@ -83,5 +91,6 @@ object ApiParser {
     }
     fun playlist(json: JSONObject) = Playlist(json.text("playlistId"), json.text("title"), json.optInt("videoCount"), json.text("privacy", "private"), json.text("description"))
     fun channel(json: JSONObject) = Channel(json.text("authorId"), json.text("author"), json.text("description"), json.text("subCountText", json.optLong("subCount").toString()),
-        json.optJSONArray("authorThumbnails")?.objects()?.lastOrNull()?.text("url") ?: "")
+        json.optJSONArray("authorThumbnails")?.objects()?.lastOrNull()?.text("url") ?: "",
+        json.optJSONArray("tabs")?.let { tabs -> (0 until tabs.length()).mapNotNull { tabs.opt(it) as? String } } ?: emptyList())
 }

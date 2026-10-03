@@ -81,8 +81,11 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun video(id: String, local: Boolean = true) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to local.toString()))))
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
     suspend fun channel(id: String) = ApiParser.channel(JSONObject(request("api/v1/channels/$id")))
-    suspend fun channelVideos(id: String, continuation: String = ""): Page<Video> {
-        val j = JSONObject(request("api/v1/channels/$id/videos", query = mapOf("continuation" to continuation)))
+    suspend fun channelVideos(id: String, continuation: String = "") = channelPage(id, ChannelTab.VIDEOS, continuation)
+    suspend fun channelStreams(id: String, continuation: String = "") = channelPage(id, ChannelTab.STREAMS, continuation)
+    private suspend fun channelPage(id: String, tab: ChannelTab, continuation: String): Page<Video> {
+        val query = if (continuation.isBlank()) emptyMap() else mapOf("continuation" to continuation)
+        val j = JSONObject(request("api/v1/channels/$id/${tab.path}", query = query))
         return Page(ApiParser.videos(j.optJSONArray("videos") ?: JSONArray()), j.text("continuation"))
     }
     suspend fun comments(id: String, continuation: String = ""): Page<Comment> {
