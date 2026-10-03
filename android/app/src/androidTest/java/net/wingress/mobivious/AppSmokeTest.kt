@@ -1,6 +1,10 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.media3.common.C
+import androidx.media3.common.Player
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -22,14 +26,178 @@ class AppSmokeTest {
     @Before fun launchActivity() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
+        compose.runOnUiThread { activity.model.store.defaultSpeed = 1f; activity.model.store.maxHeight = Int.MAX_VALUE; activity.model.store.pip = true }
     }
     @After fun closeActivity() {
-        if (::activity.isInitialized) InstrumentationRegistry.getInstrumentation().runOnMainSync { activity.model.closePlayer(); activity.updatePip(false); activity.finishAndRemoveTask() }
+        if (::activity.isInitialized) InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            activity.model.audioOnly(false); activity.model.captions(null); activity.model.speed(1f)
+            activity.model.closePlayer(); activity.updatePip(false); activity.finishAndRemoveTask()
+        }
     }
     private fun waitFor(timeout: Long = 20_000, condition: () -> Boolean) = compose.waitUntil(timeout, condition)
     private fun fixture(): JSONObject = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
     private fun command(path: String, body: String = "{}") {
         (URL("http://127.0.0.1:18080/test/$path").openConnection() as java.net.HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) }; inputStream.close(); disconnect() }
+    }
+    private fun showControls() {
+        if (compose.onAllNodesWithContentDescription("Player settings").fetchSemanticsNodes().isEmpty()) {
+            compose.onNodeWithTag("player-surface").performTouchInput { click(Offset(width * .5f, height * .15f)) }
+        }
+        waitFor(2500) { compose.onAllNodesWithContentDescription("Player settings").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Player settings").assertExists()
+    }
+    private fun openFixture() {
+        command("reset")
+        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080") }
+        waitFor { activity.model.browse.value.videos.isNotEmpty() }
+        compose.onNodeWithText("A quiet moment · playback fixture").performClick()
+        waitFor(40_000) { activity.model.playback.value.playing }
+    }
+    private fun screenshot(name: String) {
+        compose.waitForIdle()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val mode = if (activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES) "dark" else "light"
+        // UTP uninstalls the debug app after tests; keep QA captures in the shell's temporary directory.
+        instrumentation.uiAutomation.executeShellCommand("mkdir -p /data/local/tmp/mobivious-player-screenshots").let { descriptor ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+        instrumentation.uiAutomation.executeShellCommand("screencap -p /data/local/tmp/mobivious-player-screenshots/$name-$mode.png").let { descriptor ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
+        }
+    }
+    @Test fun unifiedControlsGesturesAndFullscreen() {
+        openFixture()
+        // Let real playback idle: every control, including fullscreen, must disappear.
+        compose.mainClock.advanceTimeBy(3800)
+        waitFor(8000) { compose.onAllNodesWithTag("player-controls").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("player-controls").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Full screen").assertDoesNotExist()
+        compose.onNodeWithText("Player", useUnmergedTree = true).assertDoesNotExist()
+        showControls()
+        compose.onNodeWithContentDescription("Pause").performClick()
+        compose.runOnUiThread { activity.model.seekTo(40_000) }
+        waitFor { activity.model.playback.value.position == 40_000L }
+        screenshot("player-portrait")
+        compose.onNodeWithTag("player-surface").performTouchInput { doubleClick(Offset(width * .15f, height * .25f)) }
+        waitFor { activity.model.playback.value.position == 30_000L }
+        compose.onNodeWithTag("player-surface").performTouchInput { doubleClick(Offset(width * .85f, height * .25f)) }
+        waitFor { activity.model.playback.value.position == 40_000L }
+        val accessibleSeek = compose.onNodeWithTag("player-gestures").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+        assertEquals(listOf("Back 10 seconds", "Forward 10 seconds"), accessibleSeek.map { it.label })
+        compose.runOnUiThread { assertTrue(accessibleSeek[1].action()) }
+        waitFor { activity.model.playback.value.position == 50_000L }
+        compose.runOnUiThread { assertTrue(accessibleSeek[0].action()) }
+        waitFor { activity.model.playback.value.position == 40_000L }
+        compose.runOnUiThread { activity.model.seekTo(2000) }
+        compose.onNodeWithTag("player-surface").performTouchInput { doubleClick(Offset(width * .15f, height * .25f)) }
+        waitFor { activity.model.playback.value.position == 0L }
+        compose.runOnUiThread { activity.model.seekTo(115_000) }
+        compose.onNodeWithTag("player-surface").performTouchInput { doubleClick(Offset(width * .85f, height * .25f)) }
+        waitFor { activity.model.playback.value.position in 119_000L..120_000L }
+        compose.runOnUiThread { activity.model.seekTo(30_000) }
+        compose.onNodeWithTag("player-timeline").performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(60_000f)) }
+        waitFor { activity.model.playback.value.position == 60_000L }
+        compose.onNodeWithTag("player-timeline").performTouchInput { swipe(Offset(width * .4f, height / 2f), Offset(width * .65f, height / 2f), 600) }
+        waitFor { activity.model.playback.value.position in 70_000L..90_000L }
+        showControls()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        screenshot("player-settings-portrait")
+        compose.onNodeWithText("Playback speed").performClick()
+        compose.onNodeWithText("0.25×").performClick()
+        waitFor { activity.model.playback.value.speed == .25f }
+        compose.onNodeWithText("Quality").performClick()
+        compose.onNodeWithText("Up to 720p").performClick()
+        compose.onNodeWithText("Captions").performClick()
+        compose.onNodeWithText("English").performClick()
+        waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
+        compose.onNodeWithContentDescription("Close player settings").performClick()
+        showControls()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("0.25×").assertExists()
+        compose.onNodeWithText("Up to 720p").assertExists()
+        compose.onNodeWithText("English").assertExists()
+        compose.onNodeWithText("Audio").performClick()
+        compose.onNodeWithText("Auto").assertExists()
+        // The fixture's audio has no language tag and must still have a selectable row.
+        compose.onNodeWithText("Audio track 1").performClick()
+        compose.runOnUiThread { assertTrue(activity.model.controller.value!!.trackSelectionParameters.overrides.values.any { it.type == C.TRACK_TYPE_AUDIO }) }
+        compose.onNodeWithText("Quality").performClick()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.onNodeWithText("Refresh buffer").assertExists()
+        compose.onNodeWithContentDescription("Close player settings").performClick()
+        showControls()
+        compose.onNodeWithContentDescription("Full screen").performClick()
+        waitFor { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+        // A clean emulator may show Android's own first-use immersive tutorial.
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        repeat(20) {
+            automation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Got it")?.forEach { node -> node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK) }
+            Thread.sleep(100)
+        }
+        showControls()
+        screenshot("player-fullscreen")
+        compose.onNodeWithContentDescription("Back").assertDoesNotExist()
+        // An ordinary video tap hides controls; it must never leave fullscreen.
+        compose.onNodeWithTag("player-surface").performTouchInput { click(Offset(width * .5f, height * .15f)) }
+        waitFor(2500) { compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithContentDescription("Exit full screen").assertDoesNotExist()
+        showControls()
+        compose.onNodeWithContentDescription("Exit full screen").assertExists()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        screenshot("player-settings-landscape")
+        compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Picture in picture"))
+        compose.onNodeWithText("Picture in picture").assertIsDisplayed()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        waitFor { compose.onAllNodesWithContentDescription("Close player settings").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithContentDescription("Exit full screen").assertExists()
+        compose.runOnUiThread { activity.model.playback.value = activity.model.playback.value.copy(error = "Playback failed. Retry to refresh the stream.") }
+        compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        waitFor(40_000) { activity.model.playback.value.playing && activity.model.playback.value.error == null }
+        showControls()
+        compose.onNodeWithContentDescription("Pause").performClick()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        waitFor { compose.onAllNodesWithText("Now playing").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Now playing").assertExists()
+        compose.onNodeWithContentDescription("Exit full screen").assertDoesNotExist()
+        showControls()
+        compose.onNodeWithContentDescription("Full screen").assertExists()
+        compose.runOnUiThread { activity.model.playback.value = activity.model.playback.value.copy(error = "Playback failed. Retry to refresh the stream.") }
+        compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        waitFor(40_000) { activity.model.playback.value.playing && activity.model.playback.value.error == null }
+    }
+    @Test fun refreshPreservesPausedAndPlayingSettings() {
+        openFixture()
+        compose.runOnUiThread {
+            activity.model.controller.value!!.pause()
+            activity.model.seekTo(45_000)
+            activity.model.speed(1.5f)
+            activity.model.quality(720)
+            activity.model.captions("en")
+            activity.model.audioOnly(true)
+            val audioGroup = activity.model.controller.value!!.currentTracks.groups.first { it.type == C.TRACK_TYPE_AUDIO }
+            activity.model.selectTrack(audioGroup.mediaTrackGroup, 0)
+        }
+        waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
+        val requests = fixture().getInt("mediaRequests")
+        showControls()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("Refresh buffer").performClick()
+        waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY && fixture().getInt("mediaRequests") > requests }
+        compose.runOnUiThread {
+            val p = activity.model.controller.value!!
+            assertFalse(p.playWhenReady); assertEquals(45_000L, p.currentPosition)
+            assertEquals(1.5f, p.playbackParameters.speed)
+            assertEquals(720, p.trackSelectionParameters.maxVideoHeight)
+            assertEquals("en", p.trackSelectionParameters.preferredTextLanguages.first())
+            assertTrue(p.trackSelectionParameters.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO))
+            assertTrue(p.trackSelectionParameters.overrides.values.any { it.type == C.TRACK_TYPE_AUDIO })
+            p.play()
+        }
+        waitFor { activity.model.playback.value.playing }
+        val playingRequests = fixture().getInt("mediaRequests")
+        compose.runOnUiThread { activity.model.refreshBuffer() }
+        waitFor(40_000) { activity.model.playback.value.playing && fixture().getInt("mediaRequests") > playingRequests }
+        compose.runOnUiThread { assertTrue(activity.model.controller.value!!.currentPosition in 45_000..65_000) }
     }
     @Test fun hlsExplicitResumeCaptionsAndAudioOnly() {
         command("reset"); command("stream", "{\"type\":\"hls\"}")
@@ -65,10 +233,11 @@ class AppSmokeTest {
         waitFor { fixture().getJSONArray("watched").length() == 1 }
         compose.runOnUiThread { activity.model.controller.value!!.seekTo(30_000) }
         waitFor { fixture().getLong("position") >= 29 }
-        compose.onNodeWithText("Player", useUnmergedTree = true).performClick()
-        compose.onNodeWithText("Speed: 1.0").performClick()
-        compose.onNodeWithText("1.5").performClick()
-        compose.onNodeWithText("Done").performClick()
+        showControls()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("Playback speed").performClick()
+        compose.onNodeWithText("1.5×").performClick()
+        compose.onNodeWithContentDescription("Close player settings").performClick()
         compose.runOnUiThread { assertEquals(1.5f, activity.model.controller.value!!.playbackParameters.speed) }
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Pause").assertExists()
@@ -87,8 +256,12 @@ class AppSmokeTest {
         assertTrue(fixture().getLong("position") >= 29)
         compose.runOnUiThread { activity.model.controller.value!!.play() }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
-        compose.runOnUiThread { activity.enterPip() }
+        showControls()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Picture in picture"))
+        compose.onNodeWithText("Picture in picture").performClick()
         waitFor { activity.isInPictureInPictureMode }
+        compose.onNodeWithTag("player-controls").assertDoesNotExist()
         Thread.sleep(1500) // Allow the system PiP enter animation to finish before reopening.
         compose.runOnUiThread { assertTrue(activity.model.controller.value!!.playWhenReady) }
         val instrumentation = InstrumentationRegistry.getInstrumentation()

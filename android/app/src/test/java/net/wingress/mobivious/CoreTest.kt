@@ -12,6 +12,12 @@ import org.junit.Test
 import java.nio.file.Files
 
 class CoreTest {
+    @Test fun playerSeekingStaysWithinAvailableDuration() {
+        assertEquals(0L, PlaybackRules.seek(-10_000, 120_000))
+        assertEquals(120_000L, PlaybackRules.seek(130_000, 120_000))
+        assertEquals(45_000L, PlaybackRules.seek(45_000, 120_000))
+        assertEquals(45_000L, PlaybackRules.seek(45_000, -1))
+    }
     @Test fun offlineSnapshotsExpireAndNeverCrossAccountKeys() {
         val directory = Files.createTempDirectory("mobivious-cache").toFile()
         try {

@@ -17,7 +17,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              authorId='UCfixture', lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
 prefs = dict(watch_history=True, save_player_pos=True, unrelated_setting='preserved')
-state = dict(position=0, watched=[], playlists=[], events=[], stream='dash')
+state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0)
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
@@ -34,6 +34,7 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         p = url.path
         if p.startswith('/media/'):
+            state['mediaRequests'] += 1
             file = args.media_dir / Path(p).name
             if not file.is_file():
                 return self.respond({}, 404)
@@ -71,7 +72,7 @@ class Handler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], events=[], stream='dash')
+            state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0)
             prefs.update(watch_history=True, save_player_pos=True)
             return self.respond({})
         if p == '/test/stream':

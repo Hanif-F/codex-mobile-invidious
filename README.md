@@ -44,7 +44,9 @@ native account sign-in; subscription feed and subscribe/unsubscribe; playlists a
 watch history; descriptions, captions, read-only comments and recommendations.
 The service-owned player supports adaptive streams, seeking, speed/quality/audio
 selection, background playback, system media controls, mini-player, fullscreen,
-audio only and picture in picture. Explicit URL timestamps override saved resume
+audio only and picture in picture. The embedded and fullscreen player share fading
+controls, double-tap ten-second seeking, and one gear menu for quality, audio,
+captions, speed, audio only, picture in picture and Refresh buffer. Explicit URL timestamps override saved resume
 positions. History and resume settings are shared with the website.
 
 One consistent appearance follows system light/dark mode. SponsorBlock, DeArrow,

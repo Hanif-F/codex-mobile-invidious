@@ -1,6 +1,7 @@
 package net.wingress.mobivious.player
 
 object PlaybackRules {
+    fun seek(position: Long, duration: Long): Long = if (duration > 0) position.coerceIn(0, duration) else position.coerceAtLeast(0)
     fun resume(saved: Long, duration: Long, explicit: Long?): Long {
         val start = explicit ?: saved.takeIf { it > 0 && (duration <= 0 || it < duration - 20) } ?: 0
         return if (duration > 0) start.coerceIn(0, duration) else start.coerceAtLeast(0)

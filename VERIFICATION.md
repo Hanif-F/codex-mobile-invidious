@@ -10,8 +10,8 @@ app targets API 37 and supports API 26+. No physical phone was needed.
 | Crystal parser/core specs | 215 passed |
 | Crystal standard specs | 38 passed |
 | Account and mobile API database harness | Passed |
-| Android unit tests | 7 passed |
-| Android emulator integration | 2 passed |
+| Android unit tests | 8 passed |
+| Android emulator integration | 4 passed; player UI scenario also passed in dark mode |
 | Android lint | No errors; dependency update/style warnings remain |
 | Docker Compose validation | Passed with dummy keys |
 | Docker server image build | Passed |
@@ -33,6 +33,42 @@ native sign-in, real DASH/HLS decoding, seeking and timestamp precedence, histor
 and position writes, speed, captions, audio only, playlist creation/editing,
 mini-player, PiP entry/return and playback continuing in the background. They use
 a custom activity host so Android's previously pinned task is cleaned up explicitly.
+
+## Android player overhaul — 3 October 2026
+
+The updated debug build passed `testDebugUnitTest`, `assembleDebug`, `lintDebug`
+and all four fixture-backed `connectedDebugAndroidTest` scenarios on the Pixel 8 Pro
+emulator. Lint has no errors and no warnings in the new player UI file; existing
+project dependency/style warnings remain. The complete player UI scenario was also
+run separately with Android dark mode enabled and passed.
+
+The new checks cover the entire controller fading, tap-to-show/hide, double-tap
+±10-second seeking and bounds, accessible seek actions, timeline scrubbing, removal
+of the external Player chip/back overlay, gear settings and active values after
+reopening, 0.25× speed, quality ceilings, captions, unlabeled audio-track selection,
+landscape menu scrolling, submenu/sheet/fullscreen Back navigation, and injected
+error/Retry interactions in both embedded and fullscreen layouts. The other
+scenarios retain real DASH/HLS decoding, account/history/position writes,
+mini-player, playlist actions, background playback and PiP entry/return; PiP is now
+entered through the unified gear menu in the account scenario.
+
+Refresh buffer verification observes fresh media requests and ready/playing state
+from the real Media3 player. It preserves the paused position, playing intent,
+1.5× speed, 720p ceiling, caption preference, selected audio-track override and
+audio-only mode. The source implements live-edge refresh, but the generated
+fixtures are VOD and do not provide a real moving live-window acceptance test.
+
+Portrait and fullscreen player/settings screenshots were inspected in light and
+dark mode. The timeline uses a thin track and round handle; the settings header
+stays fixed while the landscape list scrolls. QA screenshots are generated under
+`/data/local/tmp/mobivious-player-screenshots/` on the emulator so Android test
+package cleanup does not erase them. Accessibility actions were exercised;
+physical-phone and TalkBack/OEM behavior still need device acceptance checks.
+
+The source audit updates in `FEATURE_PARITY.md` cover rows 09, 11, 13 and 20; its
+broad counts are unchanged. No server tests or production rollout were performed
+as part of this player revision. The earlier server/release results above remain
+historical checks of the original build, rather than a new signed-release test.
 
 ## Repeat Android checks
 

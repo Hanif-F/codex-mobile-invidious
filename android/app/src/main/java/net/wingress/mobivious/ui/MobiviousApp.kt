@@ -31,10 +31,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.C
-import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import net.wingress.mobivious.MainActivity
@@ -73,21 +70,27 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     fun play(video: Video) { watch = true; vm.play(video.id) }
     LaunchedEffect(shared.value) { if (shared.value) { watch = true; shared.value = false } }
     LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.message.value = null } }
-    LaunchedEffect(watch, playback.playing, prefs, vm.store.pip) { activity.updatePip(watch) }
-    LaunchedEffect(fullscreen) { activity.requestedOrientation = if (fullscreen) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    LaunchedEffect(watch, playback.playWhenReady, playback.error, playback.details, prefs, vm.store.pip) { activity.updatePip(watch) }
+    DisposableEffect(fullscreen, pip) {
+        activity.requestedOrientation = if (fullscreen && !pip) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        activity.setFullscreen(fullscreen && !pip)
+        onDispose { activity.setFullscreen(false) }
+    }
+    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) dialog = "" }
     BackHandler(fullscreen || watch || route.isNotBlank()) { when { fullscreen -> fullscreen = false; watch -> watch = false; else -> navigate(tab) } }
     MaterialTheme(colorScheme = if (isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
             if (pip || fullscreen) {
-                VideoPlayer(controller, Modifier.fillMaxSize(), !pip)
-                if (fullscreen && !pip) IconButton(onClick = { fullscreen = false }, modifier = Modifier.statusBarsPadding().padding(8.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Exit full screen", tint = Color.White) }
+                VideoPlayer(vm, playback, controller, Modifier.fillMaxSize(), fullscreen = fullscreen,
+                    controls = !pip, settingsOpen = dialog == "player", onFullscreen = { fullscreen = !fullscreen },
+                    onSettings = { dialog = "player" })
             } else Scaffold(
                 topBar = { TopAppBar(title = {
                     if (watch) Text("Now playing", style = MaterialTheme.typography.titleMedium)
                     else if (route.isNotEmpty()) Text(channel?.name ?: playlist?.title ?: state.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("Mobivious", fontWeight = FontWeight.Bold) }
                 }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { if (watch) watch = false else navigate(tab) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
-                    IconButton(onClick = { dialog = "settings" }) { Icon(Icons.Default.Settings, "Settings") }
+                    IconButton(onClick = { dialog = "settings" }) { Icon(Icons.Default.Settings, "App settings") }
                     IconButton(onClick = { dialog = if (account == null) "login" else "account" }) { Icon(if (account == null) Icons.Default.AccountCircle else Icons.Default.VerifiedUser, "Account") }
                 }) },
                 snackbarHost = { SnackbarHost(snackbar) },
@@ -98,7 +101,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     } }
                 } }
             ) { padding ->
-                if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, { addVideo = it }, { id -> navigate("Home", "channel:$id") }, ::play)
+                if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, dialog == "player", { addVideo = it }, { id -> navigate("Home", "channel:$id") }, ::play)
                 else Column(Modifier.padding(padding).fillMaxSize()) {
                     if(offline) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (route.isEmpty() && tab == "Search") {
@@ -145,7 +148,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 "account" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(account?.username.orEmpty()) }, text = { Text("Signed in to ${vm.store.server}") }, confirmButton = { TextButton(onClick = { vm.logout(); dialog = "" }) { Text("Sign out") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Close") } })
                 "settings" -> SettingsDialog(vm, prefs, account != null, { dialog = "" }, { dialog = "server" })
                 "filters" -> FiltersDialog(vm, { dialog = "" })
-                "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip)
+                "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip())
                 "create", "edit" -> PlaylistDialog(if(dialog == "edit") playlist else null, { dialog = "" }) { title, privacy, description -> val editing = if (dialog == "edit") playlist else null; vm.action { if (editing != null) vm.api.editPlaylist(editing.id, title, privacy, description) else vm.api.createPlaylist(title, privacy); vm.refreshAccount(); vm.refresh() }; dialog = "" }
                 "deletePlaylist", "clearHistory" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(if (dialog == "clearHistory") "Clear watch history?" else "Delete playlist?") }, text = { Text("This also changes your account on the website.") }, confirmButton = { TextButton(onClick = { val clear = dialog == "clearHistory"; val id = playlist?.id; vm.action { if (clear) vm.api.clearHistory() else if (id != null) vm.api.deletePlaylist(id); if (clear) vm.refresh() else { vm.refreshAccount(); navigate("Library") } }; dialog = "" }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Cancel") } })
             }
@@ -172,16 +175,14 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
     }
 }
 @Composable private fun MiniPlayer(playback: PlaybackState, open: () -> Unit, toggle: () -> Unit, close: () -> Unit) { Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 3.dp) { Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClick = open).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Column(Modifier.weight(1f).padding(12.dp)) { Text(playback.details?.video?.title.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge); Text(playback.details?.video?.author.orEmpty(), maxLines = 1, style = MaterialTheme.typography.bodySmall) }; IconButton(onClick = toggle) { Icon(if(playback.playing) Icons.Default.Pause else Icons.Default.PlayArrow, if(playback.playing) "Pause" else "Play") }; IconButton(onClick = close) { Icon(Icons.Default.Close, "Close player") } } } }
-@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@Composable private fun VideoPlayer(controller: androidx.media3.session.MediaController?, modifier: Modifier, controls: Boolean = true) { AndroidView(factory = { PlayerView(it).apply { useController = controls; player = controller; setShowSubtitleButton(true); setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING) } }, update = { it.player = controller; it.useController = controls }, onRelease = { it.player = null }, modifier = modifier.background(Color.Black)) }
-@Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, controller: androidx.media3.session.MediaController?, modifier: Modifier, fullscreen: () -> Unit, settings: () -> Unit, add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit) {
+@Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, controller: androidx.media3.session.MediaController?, modifier: Modifier, fullscreen: () -> Unit, settings: () -> Unit, settingsOpen: Boolean, add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit) {
     val comments by vm.comments.collectAsStateWithLifecycle(); val error by vm.commentError.collectAsStateWithLifecycle(); val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     var description by remember { mutableStateOf(false) }; var showingComments by remember { mutableStateOf(false) }
     val context = LocalContext.current
     Column(modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxWidth().aspectRatio(16f/9f)) { VideoPlayer(controller, Modifier.fillMaxSize()); if(playback.loading) CircularProgressIndicator(Modifier.align(Alignment.Center)); IconButton(onClick = fullscreen, modifier = Modifier.align(Alignment.BottomEnd)) { Icon(Icons.Default.Fullscreen, "Full screen", tint = Color.White) } }
+        VideoPlayer(vm, playback, controller, Modifier.fillMaxWidth().padding(horizontal = 8.dp).aspectRatio(16f/9f).clip(RoundedCornerShape(16.dp)),
+            settingsOpen = settingsOpen, onFullscreen = fullscreen, onSettings = settings)
         LazyColumn {
-            if(playback.error != null) item { ErrorCard(playback.error, vm::retryPlayback) }
             playback.details?.let { details ->
                 item { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(details.video.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -190,7 +191,6 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) })
                         AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
-                        AssistChip(onClick = settings, label = { Text("Player") }, leadingIcon = { Icon(Icons.Default.Tune, null) })
                     }
                     TextButton(onClick = { description = !description }) { Text(if(description) "Hide description" else "Show description") }
                     if(description) Text(details.description, style = MaterialTheme.typography.bodyMedium)
@@ -234,16 +234,3 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
 @Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit) { var sort by remember { mutableStateOf(vm.sort) }; var date by remember { mutableStateOf(vm.date) }; var duration by remember { mutableStateOf(vm.durationFilter) }; AlertDialog(onDismissRequest = dismiss, title = { Text("Search filters") }, text = { Column { Choice("Sort", listOf("relevance", "rating", "upload_date", "view_count"), sort) { sort = it }; Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }; Choice("Duration", listOf("", "short", "long"), duration) { duration = it } } }, confirmButton = { TextButton(onClick = { vm.sort = sort; vm.date = date; vm.durationFilter = duration; vm.refresh(); dismiss() }) { Text("Apply") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } }) }
 @Composable private fun Choice(label: String, values: List<String>, selected: String, update: (String) -> Unit) { var expanded by remember { mutableStateOf(false) }; Box { TextButton(onClick = { expanded = true }) { Text("$label: ${selected.ifBlank { "Any" }.replace('_', ' ')}") }; DropdownMenu(expanded, { expanded = false }) { values.forEach { value -> DropdownMenuItem(text = { Text(value.ifBlank { "Any" }.replace('_', ' ')) }, onClick = { update(value); expanded = false }) } } } }
 @Composable private fun PlaylistDialog(playlist: Playlist?, dismiss: () -> Unit, save: (String, String, String) -> Unit) { var title by remember { mutableStateOf(playlist?.title ?: "") }; var privacy by remember { mutableStateOf(playlist?.privacy ?: "private") }; var description by remember { mutableStateOf(playlist?.description ?: "") }; AlertDialog(onDismissRequest = dismiss, title = { Text(if(playlist == null) "New playlist" else "Edit playlist") }, text = { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { OutlinedTextField(title, { title = it.take(150) }, label = { Text("Title") }, singleLine = true); Choice("Privacy", listOf("private", "unlisted", "public"), privacy) { privacy = it }; if(playlist != null) OutlinedTextField(description, { description = it }, label = { Text("Description") }) } }, confirmButton = { TextButton(enabled = title.isNotBlank(), onClick = { save(title.trim(), privacy, description) }) { Text("Save") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } }) }
-@Composable private fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit) {
-    val mediaController by vm.controller.collectAsStateWithLifecycle()
-    var audio by remember { mutableStateOf(mediaController?.trackSelectionParameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true) }; var speed by remember { mutableStateOf(vm.store.defaultSpeed.toString()) }; var quality by remember { mutableStateOf(if(vm.store.maxHeight == Int.MAX_VALUE) "Auto" else "${vm.store.maxHeight}p") }; var caption by remember { mutableStateOf("Off") }; var audioLanguage by remember { mutableStateOf("Auto") }
-    val languages = mediaController?.currentTracks?.groups?.filter { it.type == C.TRACK_TYPE_AUDIO }?.flatMap { group -> (0 until group.length).mapNotNull { group.getTrackFormat(it).language } }?.distinct().orEmpty()
-    AlertDialog(onDismissRequest = dismiss, title = { Text("Player controls") }, text = { Column {
-        Choice("Quality", listOf("Auto", "2160p", "1440p", "1080p", "720p", "480p", "360p"), quality) { quality = it; vm.quality(it.removeSuffix("p").toIntOrNull() ?: Int.MAX_VALUE) }
-        Choice("Speed", listOf("0.5", "0.75", "1.0", "1.25", "1.5", "1.75", "2.0"), speed) { speed = it; vm.speed(it.toFloat()) }
-        Choice("Captions", listOf("Off") + playback.details?.captions.orEmpty().map { it.label }, caption) { caption = it; vm.captions(playback.details?.captions?.firstOrNull { c -> c.label == it }?.language) }
-        if(languages.isNotEmpty()) Choice("Audio language", listOf("Auto") + languages, audioLanguage) { audioLanguage = it; vm.controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setPreferredAudioLanguage(it.takeUnless { s -> s == "Auto" }).build() } }
-        ToggleRow("Audio only", audio) { audio = it; vm.audioOnly(it) }
-        TextButton(onClick = { dismiss(); pip() }) { Icon(Icons.Default.PictureInPictureAlt, null); Text("Picture in picture") }
-    } }, confirmButton = { TextButton(onClick = dismiss) { Text("Done") } })
-}
