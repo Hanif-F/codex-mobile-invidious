@@ -59,6 +59,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
+    val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableStateOf(vm.tab) }
@@ -80,7 +81,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         activity.setFullscreen(fullscreen && !pip)
         onDispose { activity.setFullscreen(false) }
     }
-    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { dialog = ""; vm.closeDeArrow() } }
+    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
     LaunchedEffect(dialog) { if (dialog == "settings") vm.refreshSharedSettings() }
     BackHandler(fullscreen || watch || route.isNotBlank()) { when { fullscreen -> fullscreen = false; watch -> watch = false; else -> navigate(tab) } }
@@ -88,7 +89,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         Surface(Modifier.fillMaxSize()) {
             if (pip || fullscreen) {
                 VideoPlayer(vm, playback, controller, Modifier.fillMaxSize(), fullscreen = fullscreen,
-                    controls = !pip, settingsOpen = dialog == "player", onFullscreen = { fullscreen = !fullscreen },
+                    controls = !pip, settingsOpen = dialog == "player" || sponsorEditor != null, onFullscreen = { fullscreen = !fullscreen },
                     onSettings = { dialog = "player" })
             } else Scaffold(
                 topBar = { TopAppBar(title = {
@@ -107,7 +108,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     } }
                 } }
             ) { padding ->
-                if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, dialog == "player", { addVideo = it }, { id -> navigate("Home", "channel:$id") }, ::play)
+                if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, dialog == "player" || sponsorEditor != null, { addVideo = it }, { id -> navigate("Home", "channel:$id") }, ::play)
                 else Column(Modifier.padding(padding).fillMaxSize()) {
                     if(offline) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (route.isEmpty() && tab == "Search") {
@@ -134,6 +135,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), contentPadding = PaddingValues(bottom = 12.dp)) {
                         if (channel != null) item { Column(Modifier.padding(16.dp)) { Text(channel!!.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("${channel!!.subscribers} subscribers", style = MaterialTheme.typography.bodyMedium); if (channel!!.description.isNotBlank()) Text(channel!!.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp)); Button(onClick = { if (account == null) dialog = "login" else vm.toggleSubscribe(channel!!.id) }) { Text(if (subscriptions.any { it.id == channel!!.id }) "Subscribed" else "Subscribe") } } }
+                        if (channel != null) item { TextButton(onClick = { vm.openSponsorBlock(channel!!.id) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Channel SponsorBlock settings") } }
                         if (playlist != null) item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("${playlist!!.count} videos", Modifier.weight(1f)); TextButton(onClick = { dialog = "edit" }) { Text("Edit playlist") }; IconButton(onClick = { dialog = "deletePlaylist" }) { Icon(Icons.Default.DeleteOutline, "Delete playlist") } } }
                         if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); TextButton(onClick = { dialog = "clearHistory" }) { Text("Clear") } } }
                         if (tab == "Subscriptions" && subscriptions.isNotEmpty()) item { androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(subscriptions) { c -> AssistChip(onClick = { navigate("Subscriptions", "channel:${c.id}") }, label = { Text(c.name) }) } } }
@@ -152,13 +154,14 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 "login" -> LoginDialog(vm, { dialog = "" }, { dialog = "server" })
                 "server" -> ServerDialog(vm, { dialog = "" })
                 "account" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(account?.username.orEmpty()) }, text = { Text("Signed in to ${vm.store.server}") }, confirmButton = { TextButton(onClick = { vm.logout(); dialog = "" }) { Text("Sign out") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Close") } })
-                "settings" -> SettingsDialog(vm, prefs, account != null, { dialog = "" }, { dialog = "server" })
+                "settings" -> SettingsDialog(vm, prefs, account != null, { dialog = "" }, { dialog = "server" }, { vm.openSponsorBlock() })
                 "filters" -> FiltersDialog(vm, { dialog = "" })
-                "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip())
+                "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip(), { dialog = ""; vm.openSponsorBlock() })
                 "create", "edit" -> PlaylistDialog(if(dialog == "edit") playlist else null, { dialog = "" }) { title, privacy, description -> val editing = if (dialog == "edit") playlist else null; vm.action { if (editing != null) vm.api.editPlaylist(editing.id, title, privacy, description) else vm.api.createPlaylist(title, privacy); vm.refreshAccount(); vm.refresh() }; dialog = "" }
                 "deletePlaylist", "clearHistory" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(if (dialog == "clearHistory") "Clear watch history?" else "Delete playlist?") }, text = { Text("This also changes your account on the website.") }, confirmButton = { TextButton(onClick = { val clear = dialog == "clearHistory"; val id = playlist?.id; vm.action { if (clear) vm.api.clearHistory() else if (id != null) vm.api.deletePlaylist(id); if (clear) vm.refresh() else { vm.refreshAccount(); navigate("Library") } }; dialog = "" }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Cancel") } })
             }
             val dearrow by vm.dearrowContribution.collectAsStateWithLifecycle()
+            if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; dialog = "login" }) { vm.sponsorSettingsChannel.value = null }
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
             addVideo?.let { video -> AlertDialog(onDismissRequest = { addVideo = null }, title = { Text("Save to playlist") }, text = { Column { if (account == null) TextButton(onClick = { addVideo = null; dialog = "login" }) { Text("Sign in") } else if (playlists.isEmpty()) TextButton(onClick = { addVideo = null; dialog = "create" }) { Text("Create your first playlist") }; playlists.forEach { list -> TextButton(onClick = { vm.action { vm.api.addToPlaylist(list.id, video.id); vm.refreshAccount(); vm.message.value = "Saved to ${list.title}" }; addVideo = null }) { Text(list.title) } } } }, confirmButton = { TextButton(onClick = { addVideo = null }) { Text("Cancel") } }) }
         }
@@ -202,6 +205,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                         AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
                     }
                     TextButton(onClick = { vm.openDeArrow(details.video.id) }) { Text("Suggest / vote on titles") }
+                    TextButton(onClick = { vm.openSponsorBlock(details.video.channelId) }) { Text("Channel SponsorBlock settings") }
                     if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { description = !description }) { Text(if(description) "Hide description" else "Show description") }
                     if(description) Text(details.description, style = MaterialTheme.typography.bodyMedium)
@@ -231,7 +235,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
     } }, confirmButton = { TextButton(enabled = !busy && username.isNotBlank() && password.isNotEmpty(), onClick = { busy = true; error = null; scope.launch { try { vm.login(username.trim(), password); password = ""; dismiss() } catch(e: Exception) { error = e.message ?: "Unable to sign in." } finally { busy = false } } }) { Text("Sign in") } }, dismissButton = { TextButton(enabled = !busy, onClick = dismiss) { Text("Cancel") } })
 }
 @Composable private fun ServerDialog(vm: AppViewModel, dismiss: () -> Unit) { var address by remember { mutableStateOf(vm.store.server) }; var error by remember { mutableStateOf<String?>(null) }; AlertDialog(onDismissRequest = dismiss, title = { Text("Invidious server") }, text = { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { Text("Your app and website share the same server and account. Changing servers signs you out."); OutlinedTextField(address, { address = it }, label = { Text("HTTPS address") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)); if(error != null) Text(error!!, color = MaterialTheme.colorScheme.error) } }, confirmButton = { TextButton(onClick = { try { val value = InvidiousApi.normalizeServer(address, net.wingress.mobivious.BuildConfig.DEBUG); vm.switchServer(value); dismiss() } catch(e: Exception) { error = e.message } }) { Text("Connect") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } }) }
-@Composable private fun SettingsDialog(vm: AppViewModel, prefs: AccountPreferences, signedIn: Boolean, dismiss: () -> Unit, server: () -> Unit) {
+@Composable private fun SettingsDialog(vm: AppViewModel, prefs: AccountPreferences, signedIn: Boolean, dismiss: () -> Unit, server: () -> Unit, sponsorBlock: () -> Unit) {
     var background by remember { mutableStateOf(vm.store.background) }; var pip by remember { mutableStateOf(vm.store.pip) }; var history by remember { mutableStateOf(prefs.watchHistory) }; var positions by remember { mutableStateOf(prefs.savePosition) }; var region by remember { mutableStateOf(vm.region) }
     var enabled by remember { mutableStateOf(prefs.dearrowEnabled) }; var original by remember { mutableStateOf(prefs.dearrowShowOriginal) }
     var before by remember { mutableStateOf(prefs) }; var edited by remember { mutableStateOf(false) }
@@ -239,6 +243,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
     var busy by remember { mutableStateOf(false) }; var error by remember { mutableStateOf<String?>(null) }; val scope = rememberCoroutineScope(); val uri = LocalUriHandler.current
     AlertDialog(onDismissRequest = { if (!busy) dismiss() }, title = { Text("Settings") }, text = { Column(Modifier.verticalScroll(rememberScrollState())) {
         Text("Playback", style = MaterialTheme.typography.titleMedium); ToggleRow("Background playback", background) { background = it; vm.store.background = it }; ToggleRow("Picture in picture", pip) { pip = it; vm.store.pip = it }
+        TextButton(onClick = sponsorBlock, enabled = !busy) { Text("SponsorBlock") }
         if(signedIn) { HorizontalDivider(Modifier.padding(vertical = 12.dp)); Text("Shared account settings", style = MaterialTheme.typography.titleMedium); ToggleRow("Watch history", history) { history = it; edited = true }; ToggleRow("Remember playback position", positions) { positions = it; edited = true } }
         HorizontalDivider(Modifier.padding(vertical = 12.dp)); Text("DeArrow", style = MaterialTheme.typography.titleMedium)
         ToggleRow("Replace video titles with DeArrow", enabled) { enabled = it; edited = true }

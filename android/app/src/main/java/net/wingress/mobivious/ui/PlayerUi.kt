@@ -11,6 +11,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.LocalContext
@@ -46,6 +48,9 @@ import androidx.media3.session.MediaController
 import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import java.util.Locale
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.wingress.mobivious.data.SponsorBlockPlayback
+import net.wingress.mobivious.player.PlaybackService
 
 private fun playerTime(ms: Long): String {
     val seconds = ms.coerceAtLeast(0) / 1000
@@ -63,6 +68,9 @@ internal fun VideoPlayer(
     onFullscreen: () -> Unit, onSettings: () -> Unit,
 ) {
     val current by rememberUpdatedState(playback)
+    val sponsorState by vm.sponsorBlock.collectAsStateWithLifecycle()
+    val sponsor = sponsorState.takeIf { it.mediaId == playback.mediaId } ?: SponsorBlockPlayback()
+    val compactPlay = !fullscreen && !settingsOpen && sponsor.active != null
     var visible by remember(playback.mediaId, controls) { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
     var scrub by remember(playback.mediaId, controls) { mutableStateOf<Float?>(null) }
@@ -117,13 +125,20 @@ internal fun VideoPlayer(
                 },
             )
         }
-        .semantics {
+        .onKeyEvent { event ->
+            if (controls && !settingsOpen && sponsor.active != null && event.key == Key.Enter && event.type == KeyEventType.KeyUp &&
+                !event.isAltPressed && !event.isCtrlPressed && !event.isMetaPressed && !event.isShiftPressed) {
+                vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, sponsor.active.id); true
+            } else false
+        }.focusable(enabled = controls).semantics {
             if (controls) {
                 onClick(label = if (visible) "Hide player controls" else "Show player controls") { visible = !visible; interaction++; true }
                 customActions = listOf(
                     CustomAccessibilityAction("Back 10 seconds") { if (current.seekable) { seek(-10_000); true } else false },
                     CustomAccessibilityAction("Forward 10 seconds") { if (current.seekable) { seek(10_000); true } else false },
-                )
+                ) + if (sponsor.active != null) listOf(CustomAccessibilityAction("Skip ${sponsor.active.category.label}") {
+                    vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, sponsor.active.id); true
+                }) else emptyList()
             }
         })
         if (controls) {
@@ -133,11 +148,12 @@ internal fun VideoPlayer(
                     if (!playback.loading && playback.error == null) {
                         IconButton(
                             onClick = { vm.togglePlay(); interact() }, enabled = playback.canPlay,
-                            modifier = Modifier.align(Alignment.Center).offset(y = if (fullscreen) 0.dp else (-24).dp).size(64.dp).clip(CircleShape).background(Color.Black.copy(alpha = .35f)),
+                            modifier = Modifier.align(Alignment.Center).offset(y = if (fullscreen) 0.dp else if (compactPlay) (-12).dp else (-24).dp)
+                                .size(if (compactPlay) 48.dp else 64.dp).clip(CircleShape).background(Color.Black.copy(alpha = .35f)),
                         ) {
                             val ended = playback.playerState == Player.STATE_ENDED
                             Icon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play", Modifier.size(40.dp), tint = Color.White)
+                                if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play", Modifier.size(if (compactPlay) 32.dp else 40.dp), tint = Color.White)
                         }
                     }
                     Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
@@ -163,10 +179,23 @@ internal fun VideoPlayer(
                                         line(1f, Color.White.copy(alpha = .22f))
                                         line(playback.bufferedPosition / end, Color.White.copy(alpha = .45f))
                                         line(slider.value / end, Color.White)
+                                        sponsor.segments.forEach { segment ->
+                                            drawLine(sponsorColor(sponsor.settings.colors[segment.category] ?: segment.category.color),
+                                                Offset(size.width * segment.start / end, size.height / 2),
+                                                Offset(size.width * minOf(segment.end, playback.duration) / end, size.height / 2), size.height, StrokeCap.Butt)
+                                        }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("player-timeline").semantics { contentDescription = "Playback position" },
+                                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("player-timeline").semantics {
+                                    contentDescription = "Playback position"
+                                    stateDescription = sponsor.segments.filter { it.start <= (scrub?.toLong() ?: playback.position) && (scrub?.toLong() ?: playback.position) < it.end }
+                                        .map { it.category.label }.distinct().joinToString(", ")
+                                },
                             )
+                            if (scrub != null) {
+                                val labels = sponsor.segments.filter { it.start <= scrub!!.toLong() && scrub!!.toLong() < it.end }.map { it.category.label }.distinct()
+                                if (labels.isNotEmpty()) Text(labels.joinToString(", "), Modifier.align(Alignment.TopCenter).offset(y = (-20).dp).background(Color.Black.copy(alpha = .85f)).padding(4.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text("${playerTime(scrub?.toLong() ?: playback.position)} / ${if (playback.live) "LIVE" else if (playback.duration > 0) playerTime(playback.duration) else "—"}",
@@ -189,6 +218,25 @@ internal fun VideoPlayer(
             }
             feedback?.let { Text(it, Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = .8f), CircleShape).padding(16.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White) }
+            if (!settingsOpen && playback.error == null && !playback.loading) {
+                Column(Modifier.align(Alignment.TopStart)
+                    .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)) else Modifier)
+                    .padding(8.dp).widthIn(max = 460.dp)) {
+                    sponsor.active?.let { active ->
+                        Row(Modifier.background(Color.Black.copy(alpha = .85f)).testTag("sponsorblock-prompt"), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                Text("${active.category.label} · ${sponsor.remaining}s", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                                if (sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.testTag("sponsorblock-notice").semantics { liveRegion = LiveRegionMode.Polite },
+                                    color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            TextButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, active.id) }) { Text("Skip", color = Color.White) }
+                            IconButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_DISMISS, active.id) }) { Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", tint = Color.White) }
+                        }
+                    }
+                    if (sponsor.active == null && sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.background(Color.Black.copy(alpha = .85f)).padding(8.dp).testTag("sponsorblock-notice")
+                        .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }
@@ -207,7 +255,7 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
+internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean, sponsorBlock: () -> Unit) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
     val audio = playback.trackChoices(C.TRACK_TYPE_AUDIO)
     val captions = playback.trackChoices(C.TRACK_TYPE_TEXT)
@@ -233,6 +281,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).testTag("player-settings-list"), contentPadding = PaddingValues(bottom = 16.dp)) {
                 if (page == "Player settings") {
                     item { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
+                    item { SettingRow("SponsorBlock") { sponsorBlock() } }
                     item { SettingRow("Quality", if (quality == Int.MAX_VALUE) "Auto" else "Up to ${quality}p", available && !audioOnly) { page = "Quality" } }
                     item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.label ?: "Default"}" else audio.firstOrNull { it.selected }?.label ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
                     item { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }

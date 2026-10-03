@@ -68,3 +68,14 @@ Never delete the database volume to fix a failed startup.
 Deploy the updated sibling Invidious source to enable bearer-authenticated title contributions and private-ID import. The preference PATCH allowlist now includes `dearrow_enabled` and `dearrow_show_original`. Reuse the existing migration 13 identity table and persistent DeArrow identity key; this update adds no migration and requires no key rotation. See `../invidious/docs/dearrow-contributions.md` and `../invidious/docs/mobile-api.md` for the endpoint contract.
 
 After the server update, sign out and sign in again in Mobivious to obtain the added DeArrow token permissions. Old tokens retain their previous permissions. Public replacement-title reads continue to work without contribution storage. Missing API endpoints, unavailable storage and old-token permissions have separate app messages. Neither building the APK nor this source change deploys the server automatically.
+
+## Native SponsorBlock support
+
+Deploy the updated sibling Invidious preference PATCH implementation to synchronize
+SponsorBlock enablement, category modes/colors and channel overrides with the web
+account. Segment reads use the existing public `/api/v1/sponsorblock/:id` proxy.
+The API preserves unrelated preferences/categories/channels and validates sparse
+updates; see `../invidious/docs/mobile-api.md`. Existing native preference tokens
+remain valid: this change adds no scopes, database migration or key requirements.
+Guest global settings remain local to the selected instance. No production rollout
+or signed APK release was performed for this revision.

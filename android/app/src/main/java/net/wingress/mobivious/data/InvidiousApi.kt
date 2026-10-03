@@ -79,6 +79,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun discovery(kind: String, region: String = "US") = ApiParser.videos(JSONArray(request("api/v1/$kind", query = if (kind == "trending") mapOf("region" to region) else emptyMap())))
     suspend fun search(q: String, page: Int, sort: String, date: String, duration: String): List<Video> = ApiParser.videos(JSONArray(request("api/v1/search", query = mapOf("q" to q, "page" to page.toString(), "sort_by" to sort, "date" to date, "duration" to duration, "type" to "video"))))
     suspend fun video(id: String) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to "true"))))
+    suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
     suspend fun channel(id: String) = ApiParser.channel(JSONObject(request("api/v1/channels/$id")))
     suspend fun channelVideos(id: String, continuation: String = ""): Page<Video> {
         val j = JSONObject(request("api/v1/channels/$id/videos", query = mapOf("continuation" to continuation)))

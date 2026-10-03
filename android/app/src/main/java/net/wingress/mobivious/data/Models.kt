@@ -16,12 +16,14 @@ data class Comment(val author: String, val text: String, val published: String, 
 data class Page<T>(val items: List<T>, val continuation: String = "")
 data class Account(val token: String, val username: String, val expiresAt: Long, val server: String)
 data class AccountPreferences(val watchHistory: Boolean = true, val savePosition: Boolean = false,
-    val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true) {
+    val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true,
+    val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings()) {
     fun changesFrom(before: AccountPreferences) = JSONObject().apply {
         if (watchHistory != before.watchHistory) put("watch_history", watchHistory)
         if (savePosition != before.savePosition) put("save_player_pos", savePosition)
         if (dearrowEnabled != before.dearrowEnabled) put("dearrow_enabled", dearrowEnabled)
         if (dearrowShowOriginal != before.dearrowShowOriginal) put("dearrow_show_original", dearrowShowOriginal)
+        sponsorBlock.patch(before.sponsorBlock, this)
     }
 }
 data class ApiContext(val server: String, val account: Account?)
@@ -57,7 +59,7 @@ fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull { optJ
 fun JSONObject.text(key: String, fallback: String = ""): String = if (isNull(key)) fallback else optString(key, fallback)
 object ApiParser {
     fun preferences(json: JSONObject) = AccountPreferences(json.optBoolean("watch_history", true), json.optBoolean("save_player_pos", false),
-        json.optBoolean("dearrow_enabled", false), json.optBoolean("dearrow_show_original", true))
+        json.optBoolean("dearrow_enabled", false), json.optBoolean("dearrow_show_original", true), SponsorBlockSettings.parse(json))
     fun dearrowSubmissions(json: JSONObject) = json.getJSONArray("titles").objects().map {
         DeArrowSubmission(it.getString("title"), it.getBoolean("original"), it.getInt("votes"), it.getBoolean("locked"), it.getString("UUID"))
     }

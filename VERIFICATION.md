@@ -122,6 +122,62 @@ existing migration 13 identity table/key, and sign-out/sign-in to obtain the
 added token permissions. This revision adds no schema migration. Public trusted
 title reads remain independent of contribution storage.
 
+## SponsorBlock parity — 3 October 2026
+
+SponsorBlock was implemented against the local web fork's categories, colors,
+settings inheritance and playback behavior. Public segment data uses the configured
+Invidious instance. No production rollout, live account mutation, upstream
+contribution or signed release was performed.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 30 passed, including 13 SponsorBlock scenarios |
+| Android debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed; no errors; existing dependency/style warnings remain |
+| Crystal parser/core specs | 215 passed |
+| Crystal standard specs | 41 passed, including 11 SponsorBlock scenarios |
+| Guarded disposable PostgreSQL account/API harness | Passed, including SponsorBlock preference checks |
+| Rendered web fixtures and focused Chromium SponsorBlock regressions | Passed; 10 browser scenarios |
+| Invidious normal and API-only executable builds | Passed |
+| Android connected/runtime/layout checks | Unverified: emulator startup crashes; no connected devices |
+
+Unit checks cover opt-in defaults, category/color normalization, malformed ranges,
+deduplication, canonical channel input, nullable inheritance, sparse category/channel
+patches, overlapping/touching auto ranges, manual replay, earliest-ending manual
+prompts, dismissal/re-entry, marker/disabled modes, duration bounds, session reset,
+state serialization, credential-free public requests and stale account contexts.
+The database harness uses real authentication middleware and account transactions:
+shared web/native values, unrelated/unknown preference preservation, independent
+channels, resets, invalid and oversized JSON, CSRF, existing token scopes, lookup
+failure atomicity and concurrent deltas all passed. Browser tests exercise the
+existing web baseline with generated videos and intercepted requests. An initial
+browser run lacked its synthetic video fixtures; generating the documented media
+resolved the playback timeouts and all ten scenarios passed.
+
+Five new Compose scenarios compile. They cover guest/color settings, manual
+Skip/Dismiss, replay and merged automatic skipping, fullscreen/buffer refresh,
+shared channel overrides and failed drafts, background/audio/PiP service behavior,
+stale commands, failed segment reads and active-live exclusion. They have **not run
+successfully**: Android Emulator 37.2.12 exited with SIGSEGV before Android booted
+in both read-only configurations attempted, including Vulkan/camera-disabled
+software graphics. `connectedDebugAndroidTest` reported no connected devices.
+Native 320dp/390dp layouts, keyboard and accessibility interactions, light/dark
+screenshots, and actual Media3/MediaSession integration remain unverified. Existing
+player acceptance results above are historical, not new SponsorBlock runtime checks.
+
+Once a working emulator or device is connected, run `scripts/test-android.sh`.
+Repeat SponsorBlock checks at 320dp and 390dp in light/dark mode and landscape, with
+the keyboard visible. The new scenarios save screenshots under
+`/data/local/tmp/mobivious-sponsorblock-screenshots/`. The localhost fixture now uses
+a canonical channel ID and models category-map merges and individual channel resets.
+
+Shared SponsorBlock writes require deploying the preference PATCH extension in the
+sibling repository. It introduces no migration, key or additional token permissions;
+existing native preference tokens suffice. SponsorBlock defaults off with manual
+modes. Guests save global settings per instance, while channel overrides require
+sign-in. Active livestreams do not fetch segments. An older preference API receives
+an update explanation without discarding the settings draft.
+
 ## Repeat Android checks
 
 Start an emulator in Android Studio, install FFmpeg and Python 3, then:

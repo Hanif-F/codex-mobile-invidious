@@ -34,10 +34,13 @@ class SessionStore(context: Context) {
         get() = prefs.getString("region", "US")!!
         set(value) { prefs.edit().putString("region", value).apply() }
     fun guestDeArrow(): AccountPreferences = AccountPreferences(dearrowEnabled = prefs.getBoolean("dearrow.enabled.$server", false),
-        dearrowShowOriginal = prefs.getBoolean("dearrow.original.$server", true))
+        dearrowShowOriginal = prefs.getBoolean("dearrow.original.$server", true), sponsorBlock = runCatching {
+            SponsorBlockSettings.parse(JSONObject(prefs.getString("sponsorblock.$server", "{}")!!))
+        }.getOrDefault(SponsorBlockSettings()))
     fun guestDeArrow(value: AccountPreferences) {
         prefs.edit().putBoolean("dearrow.enabled.$server", value.dearrowEnabled)
-            .putBoolean("dearrow.original.$server", value.dearrowShowOriginal).apply()
+            .putBoolean("dearrow.original.$server", value.dearrowShowOriginal)
+            .putString("sponsorblock.$server", value.sponsorBlock.copy(channels = emptyMap()).json().toString()).apply()
     }
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

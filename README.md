@@ -90,8 +90,20 @@ positions. History and resume settings are shared with the website.
 
 Optional DeArrow titles appear throughout browsing and playback, with an original-title toggle. A native watch-page sheet supports title suggestions, all four guideline acknowledgements, voting and refresh. Signed-in settings and the encrypted contribution identity are shared with the website; Settings also supports private-ID import. Guests keep local title settings per instance. Contributions require the server API update and a fresh sign-in token.
 
-One consistent appearance follows system light/dark mode. SponsorBlock,
-chat replay, clips, blocking, downloads, casting and upload notifications are
+SponsorBlock matches this fork's eight categories, automatic/manual skipping,
+marker-only and disabled modes, custom colors and per-channel inheritance. Colored
+timeline ranges and scrub labels complement Skip/Dismiss prompts. The playback
+service handles skipping during background, audio-only and PiP playback, and offers
+manual controls when replaying an automatically skipped segment. App Settings and
+the player gear open the native settings sheet; watch/channel screens link to the
+channel editor. Signed-in settings are shared with the website through the updated
+preference API; guests save global settings locally per instance. SponsorBlock is
+off by default, with manual modes. Active livestreams are excluded. Native runtime
+and layout checks remain unverified because the installed emulator crashes before
+Android boots; see `VERIFICATION.md`.
+
+One consistent appearance follows system light/dark mode.
+Chat replay, clips, blocking, downloads, casting and upload notifications are
 outside this first release. Discovery uses Invidious popular/trending feeds.
 
 The native sign-in/history/settings extensions must be deployed before account
