@@ -4,10 +4,15 @@ A native Android client for your Invidious instance, built with Kotlin, Compose
 and Media3. Invidious and Companion own all YouTube extraction and stream
 resolution. The app uses their JSON APIs and server-proxied DASH/HLS streams.
 
-`android/` contains the client. `source/` is your independent Invidious Git checkout;
-its small mobile API patch is documented in `source/docs/mobile-api.md`. Keep its
-origin/upstream remotes. Commit server changes inside that repository; commit app
+`android/` contains the client. The sibling `../invidious/` directory is your
+independent Invidious Git checkout; its small mobile API patch is documented in
+`../invidious/docs/mobile-api.md`. Keep its origin/upstream remotes. Commit server
+changes inside that repository; commit app
 and deployment changes here. No remote pushes or production deployment are automatic.
+Docker uses `../invidious` by default; set `INVIDIOUS_SOURCE_DIR` in `.env` for a
+different checkout location. Android build and test scripts do not depend on it.
+The old ignored `source/.git` is retained as a recovery copy of the original server
+commits and is no longer used for builds.
 
 ## Build
 
@@ -51,8 +56,9 @@ features work against production. An APK alone does not update the Ubuntu server
 
 ## Upstream maintenance
 
-Merge upstream into `source/` as you do now, run its account/API checks, rebuild the
-Docker image and pull Companion updates. The client contains no YouTube scraping
+Merge upstream into the sibling `invidious` repository as you do now, run its
+account/API checks, rebuild the Docker image and pull Companion updates.
+The client contains no YouTube scraping
 or signature deciphering. Upstream fixes can be adopted without rebuilding the APK
 while API contracts remain compatible; changes to those contracts may require a
 small client update. The server's existing custom extraction features remain your

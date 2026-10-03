@@ -2,7 +2,7 @@ name: invidious-codex-v3
 services:
   invidious:
     build:
-      context: ./source
+      context: ${INVIDIOUS_SOURCE_DIR:-../invidious}
       dockerfile: docker/Dockerfile
       network: host
       entitlements: [network.host]
@@ -56,8 +56,8 @@ services:
     restart: unless-stopped
     volumes:
       - postgresdata:/var/lib/postgresql/data
-      - ./source/config/sql:/config/sql:ro
-      - ./source/docker/init-invidious-db.sh:/docker-entrypoint-initdb.d/init-invidious-db.sh:ro
+      - "${INVIDIOUS_SOURCE_DIR:-../invidious}/config/sql:/config/sql:ro"
+      - "${INVIDIOUS_SOURCE_DIR:-../invidious}/docker/init-invidious-db.sh:/docker-entrypoint-initdb.d/init-invidious-db.sh:ro"
     environment:
       POSTGRES_DB: invidious
       POSTGRES_USER: kemal

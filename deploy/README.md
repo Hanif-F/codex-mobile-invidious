@@ -2,15 +2,32 @@
 
 The root Compose file keeps the original project name `invidious-codex-v3`, services,
 Postgres 14, and `postgresdata` / `companioncache` volumes. Both hostnames serve
-the same backend and database. It builds the fork in `source/`; Android never
-connects directly to Postgres or Companion.
+the same backend and database. It builds the sibling fork in `../invidious` by
+default; Android never connects directly to Postgres or Companion.
+
+Keep the two Git projects side by side on both this device and the Ubuntu server:
+
+```text
+projects/
+├── androidInvidious/       # This project; run Docker Compose here
+│   ├── docker-compose.yml
+│   └── .env
+└── invidious/             # Server fork, including its .git directory
+```
+
+For a different server checkout location, set `INVIDIOUS_SOURCE_DIR` in this
+project's `.env`. Relative paths are resolved against `docker-compose.yml`;
+absolute paths such as `/srv/invidious` also work. The build context and both SQL
+initialization mounts use this same setting. The old local `source/.git` is a
+recovery copy only and does not need to be copied to the server.
 
 1. Back up the existing database and confirm its volume name with `docker volume ls`.
    Preserve the current deployment and secrets for rollback. Do not run two stacks
    against the same volume or run `docker compose down -v`.
-2. Copy this workspace to the server (including `source/` and its `.git`, required by
-   the existing Docker build). Pull app/deployment changes and the source fork
-   independently if using separate Git repositories.
+2. Copy or clone both projects to the server in the layout above. Include the
+   server checkout's `.git` directory, required by the existing Docker build.
+   Pull app/deployment changes and the source fork independently in their own
+   repositories. Run the commands below from `androidInvidious/`.
 3. Copy `.env.example` to `.env`, chmod it 600 and replace placeholders with the
    **existing** Companion, HMAC and DeArrow keys. Retain the existing database password.
    Rotating these values can invalidate sessions or encrypted identities.

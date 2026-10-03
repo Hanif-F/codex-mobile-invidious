@@ -54,19 +54,35 @@ Initialize the existing mocks submodule from upstream if your fork's relative
 submodule URL points to a repository you do not have:
 
 ```sh
-git -C source -c submodule.mocks.url=https://github.com/iv-org/mocks.git \
+git -C ../invidious -c submodule.mocks.url=https://github.com/iv-org/mocks.git \
   submodule update --init mocks
-cd source
+cd ../invidious
 shards install
 crystal spec
 ```
 
-The account harness instructions are in `source/docs/mobile-api.md`. Run it only
+These commands use the default sibling checkout layout; adjust the path for a
+custom server location. The account harness instructions are in
+`../invidious/docs/mobile-api.md`. Run it only
 against an empty disposable `invidious_accounts_test` database. Its schema is
 recreated during the test. Server specs need local loopback networking for proxy
 tests. The normal build downloads the existing web player's dependencies; an
 interrupted download may leave empty asset directories that need to be removed
 before retrying the existing dependency script.
+
+## Relocated server checkout
+
+Compose configuration passed with the default `../invidious` checkout, an explicit
+absolute path, and a custom checkout path containing spaces. The Dockerfile and
+both SQL initialization mount sources exist in each case. Compared with the
+previous Compose configuration, only the three source paths changed; the project
+name, database, volumes, account settings and service configuration are identical.
+
+All nine mobile API patch files match the previously tested server commit byte
+for byte, including the documentation exception. The original `source/.git` remains
+at `644443ef` as a recovery copy. Android source and build/test scripts are unchanged;
+both shell scripts passed syntax checks. No server image or APK rebuild was needed
+for this location change.
 
 ## Production work still required
 
