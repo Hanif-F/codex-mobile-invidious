@@ -60,6 +60,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/dearrow/") -> "Sign out and sign in again to enable DeArrow contributions with an updated token."
                     response.code in listOf(404, 405) && path.startsWith("api/v1/auth/blocked_channels") -> "This server needs the Mobivious channel-blocking API update."
                     response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/blocked_channels") -> "Sign out and sign in again to enable channel blocking with an updated token."
+                    response.code in listOf(404, 405) && path == "api/v1/auth/subscriptions/search" -> "This server needs the Mobivious subscription-search API update."
+                    response.code == 403 && error == "Invalid scope" && path == "api/v1/auth/subscriptions/search" -> "Sign out and sign in again to enable subscription search with an updated token."
                     error.isNotBlank() -> error.take(300)
                     response.code >= 500 -> "The server could not complete this request. Try again."
                     else -> "Request failed (${response.code})."
@@ -83,6 +85,14 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val order = if (sort in listOf("views", "view_count")) "views" else "relevance"
         return ApiParser.videos(JSONArray(request("api/v1/search", query = mapOf("q" to q, "page" to page.toString(), "sort" to order, "date" to date, "duration" to duration, "type" to "video"))))
     }
+    suspend fun channelSearch(id: String, q: String, page: Int, context: ApiContext = context()) =
+        SearchPage.parse(scopedRead("api/v1/channels/$id/search", mapOf("q" to q, "page" to "$page"), false, context))
+    suspend fun subscriptionSearch(q: String, page: Int, context: ApiContext = context()) =
+        SearchPage.parse(scopedRead("api/v1/auth/subscriptions/search", mapOf("q" to q, "page" to "$page"), true, context))
+    private suspend fun scopedRead(path: String, query: Map<String, String>, auth: Boolean, context: ApiContext): String =
+        request(path, query = query, auth = auth, context = context).also {
+            if (context != this.context()) throw CancellationException("Account or instance changed")
+        }
     suspend fun video(id: String, local: Boolean = true) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to local.toString()))))
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
     suspend fun channel(id: String) = ApiParser.channel(JSONObject(request("api/v1/channels/$id")))
@@ -110,7 +120,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
             if (blocked) JSONObject().put("name", name) else null, auth = true, context = context)
     }
     suspend fun subscribe(id: String, subscribe: Boolean) { request("api/v1/auth/subscriptions/$id", if (subscribe) "POST" else "DELETE", auth = true) }
-    suspend fun history(page: Int) = ApiParser.videos(JSONArray(request("api/v1/auth/history", auth = true, query = mapOf("details" to "true", "page" to "$page"))))
+    suspend fun history(page: Int, q: String = "", context: ApiContext = context()) = History.parse(scopedRead("api/v1/auth/history",
+        mapOf("details" to "true", "organized" to "true", "q" to q, "page" to "$page"), true, context))
     suspend fun playlists() = JSONArray(request("api/v1/auth/playlists", auth = true)).objects().map(ApiParser::playlist)
     suspend fun playlist(id: String, page: Int = 1): Pair<Playlist, List<Video>> {
         val j = JSONObject(request("api/v1/auth/playlists/$id", auth = true, query = mapOf("page" to "$page")))

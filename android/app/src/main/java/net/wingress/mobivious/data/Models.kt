@@ -6,7 +6,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class Video(val id: String, val title: String, val author: String = "", val channelId: String = "",
     val thumbnail: String = "", val duration: Long = 0, val views: Long = 0, val published: String = "",
-    val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false)
+    val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false,
+    val history: HistoryMetadata? = null)
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,

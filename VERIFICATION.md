@@ -552,3 +552,74 @@ these features against production. Blocking introduces `GET:blocked_channels` an
 `POST;DELETE:blocked_channels/*` mobile scopes, so existing native sessions must
 sign out and in. Members visibility uses existing preference scopes. No new database
 migration, secret, production deployment or release publication was performed.
+
+## Scoped search and organized history — 4 October 2026
+
+Rows 06 and 33 now implement native scoped search and the website's history
+organization. Channel search uses the existing public endpoint; subscription
+search uses a new authenticated endpoint and the website's full-text matching
+against current cached subscriptions. Organized history filters and sorts all
+entries before pagination using shared website helpers. Saved release/watch dates
+remain calendar dates; Android groups them against the API's account-timezone
+`today`, with UTC fallback and reload on a day change during pagination.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 105 passed, including 12 new search/history scenarios |
+| Debug application and instrumentation APK builds | Passed |
+| Android debug lint | Passed: zero errors, 36 existing/style/dependency warnings |
+| Crystal history specs | 5 examples passed, including large-page overflow regression |
+| Crystal search/filter/preference specs | 51 examples passed |
+| Normal and API-only server executable builds | Passed with existing assets and `-Dskip_videojs_download` |
+| Guarded disposable PostgreSQL account/API harness | Passed, including new search/history and existing account/security checks |
+| Disposable search/history fixture HTTP checks | Passed |
+| Nine new Compose scenarios | Compile; runtime, layout and screenshots unverified |
+
+Unit/API checks cover query encoding, bearer scope, original mixed-result page
+counts, strict calendar dates, disjoint date boundaries across years/leap days,
+unknown/unavailable metadata, server-calendar grouping, old detailed and ID-only
+history responses, missing-route/old-token messages, and captured contexts before
+and during delayed responses after an account change. Existing watched/progress
+and visibility tests also pass.
+
+The real database harness verified title/channel matching over the entire history
+and subscription library before pagination, account page size, counts/end flags,
+stable subscription ordering, cached member/duration metadata, unavailable history
+retention, account isolation, exact token scopes, private/no-store headers,
+unchanged legacy history formats and very large page numbers. It caught an
+`Array#skip` Int32 subtraction overflow; shared web/native history pagination now
+bounds offsets before slicing. The login-lifetime assertion uses the timestamp at
+login so the expanded harness's execution time does not change its meaning.
+Validation used a new PostgreSQL 14 container bound only to localhost and the
+guarded `invidious_accounts_test` database; no production account or upstream
+content was used. Temporary services were removed after validation.
+
+Fixture HTTP checks verified scope/authentication, raw and entirely hidden search
+pages, subsequent visible results, full-history matching, saved metadata and
+legacy-array fallback. The nine Compose scenarios cover icon/IME/physical Enter
+submission, pasted timestamps, channel tab restoration, subscription hidden-page
+pagination despite feed-only filters, history search/groups/unknown entries,
+remove/progress and clear confirmation, old-server viewing, delayed responses
+after tab/account changes, and calendar-day reloads. These scenarios have **not
+executed**. `adb devices` showed no connected device, and the installed Pixel_8_Pro
+emulator exited with SIGSEGV (139) before boot when started without snapshots using
+SwiftShader. Native keyboard interaction, layout, accessibility and screenshot
+acceptance remain pending a working emulator/device.
+
+Repeat Android validation with:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+```
+
+With a working emulator/device, run `scripts/test-android.sh`. Server checks use
+`crystal spec spec/history_spec.cr`, the search query/IV-filter/search-preference
+specs, both normal and `-Dapi_only` builds, and the guarded database harness in
+`../invidious/docs/mobile-api.md`. Use a fresh disposable database for each run.
+
+Production use needs the sibling API update. Sign out/sign in for the new exact
+`GET:subscriptions/search` token scope; history retains `GET:history`. No database
+migration, new secret, signed release, production deployment or publication was
+performed.

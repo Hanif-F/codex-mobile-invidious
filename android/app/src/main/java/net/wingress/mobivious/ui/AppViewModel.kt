@@ -40,7 +40,8 @@ import net.wingress.mobivious.player.StreamKey
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
-    val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false)
+    val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
+    val history: HistoryPage? = null)
 data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean = false, val error: String? = null,
     val playing: Boolean = false, val position: Long = 0, val duration: Long = 0, val buffering: Boolean = false,
     val mediaId: String = "", val playWhenReady: Boolean = false, val playerState: Int = Player.STATE_IDLE,
@@ -63,6 +64,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val blocked = app.blocked.state
     val searchVisibility = MutableStateFlow(store.searchVisibility(api.context()))
     val browse = MutableStateFlow(BrowseState())
+    val searchInput = MutableStateFlow(SearchInput())
+    val scopedSearch = MutableStateFlow(SearchInput())
+    val browseReset = MutableStateFlow(0L)
     val playback = MutableStateFlow(PlaybackState())
     val controller = MutableStateFlow<MediaController?>(null)
     val pendingSeek = MutableStateFlow<PendingSeek?>(null)
@@ -92,7 +96,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var tab = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).first
     val navigation = MutableStateFlow(tab to "")
     var route = ""
-    var query = ""
+    var query: String
+        get() = searchInput.value.submitted
+        set(value) { searchInput.value = SearchInput(value, value) }
     var discovery = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).second
     var region = preferences.value.region
     var sort = "relevance"
@@ -153,6 +159,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { account.collect {
             browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
             app.blocked.reset(); searchVisibility.value = store.searchVisibility(api.context())
+            searchInput.value = SearchInput(); scopedSearch.value = SearchInput()
             cancelAccumulatedSeek(false)
             sponsorSettingsChannel.value = null
             sponsorBlock.value = SponsorBlockPlayback()
@@ -250,6 +257,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         route.startsWith("channel:") -> ContentSurface.CHANNEL
         route.startsWith("playlist:") -> ContentSurface.PLAYLIST
         tab == "Search" -> ContentSurface.SEARCH
+        tab == "Subscriptions" && scopedSearch.value.submitted.isNotBlank() -> ContentSurface.SEARCH
         tab == "Subscriptions" -> ContentSurface.SUBSCRIPTIONS
         else -> ContentSurface.DISCOVERY
     }
@@ -265,7 +273,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; channel.value = null; channelTab.value = null; playlist.value = null; refresh() }
+    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; scopedSearch.value = SearchInput(); channel.value = null; channelTab.value = null; playlist.value = null; refresh() }
+    fun editSearch(value: String, scoped: Boolean) {
+        val input = if (scoped) scopedSearch else searchInput
+        input.value = input.value.copy(draft = value)
+    }
+    fun submitSearch(scoped: Boolean) {
+        val input = if (scoped) scopedSearch else searchInput
+        input.value = input.value.copy(submitted = input.value.draft.trim())
+        refresh()
+    }
+    fun clearScopedSearch() { scopedSearch.value = SearchInput(); refresh() }
     fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery = target.second; navigate(target.first) }
     fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow); refreshWatched() }
     private fun refreshWatched() {
@@ -283,7 +301,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun more() = load(true)
     fun selectChannelTab(value: ChannelTab) {
         val info = channel.value ?: return
-        if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value) return
+        if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value && scopedSearch.value.submitted.isBlank()) return
+        scopedSearch.value = SearchInput()
         channelTab.value = value
         dearrowTitles.clear()
         load(false, refreshChannel = false)
@@ -293,14 +312,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browseJob?.cancel()
         val generation = ++browseGeneration
         val old = if (more) browse.value else BrowseState()
+        if (!more) browseReset.value++
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
+        val scopedQuery = scopedSearch.value.submitted
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
                 var continuation = ""
+                var hasMore: Boolean? = null
+                var history: HistoryPage? = null
                 val videos = when {
                     selectedRoute.startsWith("channel:") -> {
                         val id = selectedRoute.substringAfter(':')
@@ -308,22 +331,40 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         if (generation != browseGeneration || context != api.context()) throw CancellationException("Channel request superseded")
                         val contentTab = info.preferredTab(selectedChannelTab)
                         channel.value = info; channelTab.value = contentTab
-                        val token = if (more) old.continuation else ""
-                        val response = when (contentTab) {
-                            ChannelTab.VIDEOS -> api.channelVideos(id, token)
-                            ChannelTab.STREAMS -> api.channelStreams(id, token)
+                        if (scopedQuery.isNotBlank()) {
+                            val response = api.channelSearch(id, scopedQuery, page, context)
+                            hasMore = response.hasMore
+                            response.items
+                        } else {
+                            val token = if (more) old.continuation else ""
+                            val response = when (contentTab) {
+                                ChannelTab.VIDEOS -> api.channelVideos(id, token)
+                                ChannelTab.STREAMS -> api.channelStreams(id, token)
+                            }
+                            continuation = response.continuation; response.items
                         }
-                        continuation = response.continuation; response.items
                     }
                     selectedRoute.startsWith("playlist:") -> api.playlist(selectedRoute.substringAfter(':'), page).let { if (generation == browseGeneration && context == api.context()) playlist.value = it.first; it.second }
-                    selectedRoute == "history" -> api.history(page)
+                    selectedRoute == "history" -> {
+                        val response = api.history(page, scopedQuery, context)
+                        if (generation != browseGeneration || context != api.context()) throw CancellationException("History request superseded")
+                        if (more && response.organized && old.history?.today != null && response.today != old.history.today) {
+                            load(false); return@launch
+                        }
+                        if (!response.organized) scopedSearch.value = SearchInput()
+                        history = response; hasMore = response.hasMore
+                        response.entries
+                    }
                     selectedTab == "Search" -> if (selectedQuery.isBlank()) emptyList() else api.search(selectedQuery, page, sort, date, durationFilter)
-                    selectedTab == "Subscriptions" -> if (account.value == null) emptyList() else api.feed(page, preferences.value.notificationsOnly)
+                    selectedTab == "Subscriptions" -> if (context.account == null) emptyList() else if (scopedQuery.isNotBlank()) {
+                        val response = api.subscriptionSearch(scopedQuery, page, context)
+                        hasMore = response.hasMore; response.items
+                    } else api.feed(page, preferences.value.notificationsOnly)
                     selectedTab == "Library" -> { if (account.value != null) playlists.value = api.playlists(); emptyList() }
                     else -> api.discovery(discovery, region)
                 }
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
-                    continuation = continuation, end = videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
+                    continuation = continuation, history = history, end = if (hasMore != null) !hasMore || more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                         selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {

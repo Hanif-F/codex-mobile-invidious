@@ -11,6 +11,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -69,6 +70,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val offline by vm.offline.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
     val searchVisibility by vm.searchVisibility.collectAsStateWithLifecycle()
+    val search by vm.searchInput.collectAsStateWithLifecycle()
+    val scopedSearch by vm.scopedSearch.collectAsStateWithLifecycle()
+    val browseReset by vm.browseReset.collectAsStateWithLifecycle()
+    val browseList = rememberLazyListState()
+    LaunchedEffect(browseReset) { browseList.scrollToItem(0) }
     val visibleVideos = ContentVisibility.filter(state.videos, vm.contentSurface(), prefs.showMemberVideos, searchVisibility, blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty())
     var tab by rememberSaveable { mutableStateOf(vm.tab) }
     var route by rememberSaveable { mutableStateOf(vm.route) }
@@ -79,7 +85,6 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val selectedTab by vm.navigation.collectAsStateWithLifecycle()
     LaunchedEffect(selectedTab) { tab = selectedTab.first; route = selectedTab.second }
     var addVideo by remember { mutableStateOf<Video?>(null) }
-    var search by rememberSaveable { mutableStateOf(vm.query) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     fun navigate(selected: String, path: String = "") { vm.cancelAccumulatedSeek(); tab = selected; route = path; watch = false; vm.navigate(selected, path) }
@@ -131,12 +136,22 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     }
                     if (route.isEmpty() && tab == "Search") {
                         Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            OutlinedTextField(search, { search = it }, label = { Text("Search videos or paste a link") }, singleLine = true, modifier = Modifier.weight(1f), trailingIcon = { IconButton(onClick = {
-                                val link = VideoLinks.parse(search, vm.store.server)
-                                if (link != null) { watch = true; vm.play(link.id, link.seconds) } else { vm.query = search; vm.refresh() }
-                            }) { Icon(Icons.Default.Search, "Search") } })
+                            SearchField(search.draft, { vm.editSearch(it, false) }, "Search videos or paste a link", "main-search", Modifier.weight(1f)) {
+                                val link = VideoLinks.parse(search.draft, vm.store.server)
+                                if (link != null) { watch = true; vm.play(link.id, link.seconds) } else vm.submitSearch(false)
+                            }
                             IconButton(onClick = { dialog = "filters" }) { Icon(Icons.Default.Tune, "Search filters") }
                         }
+                    }
+                    if (route == "history" && account != null || route.isEmpty() && tab == "Subscriptions" && account != null) {
+                        val historyScreen = route == "history"
+                        Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            SearchField(scopedSearch.draft, { vm.editSearch(it, true) }, if (historyScreen) "Search history by title or channel" else "Search subscriptions",
+                                if (historyScreen) "history-search" else "subscription-search", Modifier.weight(1f), enabled = !historyScreen || state.history?.organized != false) { vm.submitSearch(true) }
+                            if (!historyScreen && scopedSearch.submitted.isNotBlank()) IconButton(onClick = { dialog = "visibilityFilters" }) { Icon(Icons.Default.Tune, "Search visibility") }
+                        }
+                        if (scopedSearch.submitted.isNotBlank() || scopedSearch.draft.isNotBlank()) TextButton(onClick = vm::clearScopedSearch, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Clear search") }
+                        if (historyScreen && state.history?.organized == false) Text("Update this server to enable organized history and history search.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
                     }
                     if (route.isEmpty() && tab == "Home") Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         (prefs.feedMenu.filter { it in listOf("Popular", "Trending") } + listOf("Popular", "Trending")).distinct().forEach { name -> val key = name.lowercase(); FilterChip(selected = vm.discovery == key, onClick = { vm.discovery = key; vm.refresh() }, label = { Text(name) }) }
@@ -151,12 +166,19 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (playlists.isEmpty()) item { Text("Save videos to a playlist from the watch screen.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh) }
                     }
-                    else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), contentPadding = PaddingValues(bottom = 12.dp)) {
+                    else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(bottom = 12.dp)) {
                         if (channel != null) item { Column(Modifier.padding(16.dp)) { Text(channel!!.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold); Text("${channel!!.subscribers} subscribers", style = MaterialTheme.typography.bodyMedium); if (channel!!.description.isNotBlank()) Text(channel!!.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp)); Button(onClick = { if (account == null) dialog = "login" else vm.toggleSubscribe(channel!!.id) }) { Text(if (subscriptions.any { it.id == channel!!.id }) "Subscribed" else "Subscribe") } } }
+                        channel?.let { info -> item {
+                            Column(Modifier.padding(horizontal = 16.dp)) {
+                                SearchField(scopedSearch.draft, { vm.editSearch(it, true) }, "Search this channel", "channel-search", Modifier.fillMaxWidth()) { vm.submitSearch(true) }
+                                if (scopedSearch.submitted.isNotBlank()) Text("Results in ${info.name}", style = MaterialTheme.typography.labelMedium)
+                                if (scopedSearch.submitted.isNotBlank() || scopedSearch.draft.isNotBlank()) TextButton(onClick = vm::clearScopedSearch) { Text("Clear search") }
+                            }
+                        } }
                         channel?.let { info -> item {
                             Row(Modifier.padding(horizontal = 16.dp).testTag("channel-tabs"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 info.contentTabs.forEach { contentTab ->
-                                    FilterChip(selected = channelTab == contentTab, onClick = { vm.selectChannelTab(contentTab) },
+                                    FilterChip(selected = scopedSearch.submitted.isBlank() && channelTab == contentTab, onClick = { vm.selectChannelTab(contentTab) },
                                         label = { Text(contentTab.label) }, modifier = Modifier.testTag("channel-tab-${contentTab.path}"))
                                 }
                             }
@@ -164,24 +186,30 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         channel?.let { info -> item { ChannelBlockingButton(vm, info.id, info.name, { dialog = "login" }) } }
                         if (channel != null) item { TextButton(onClick = { vm.openSponsorBlock(channel!!.id) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Channel SponsorBlock settings") } }
                         if (playlist != null) item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("${playlist!!.count} videos", Modifier.weight(1f)); TextButton(onClick = { dialog = "edit" }) { Text("Edit playlist") }; IconButton(onClick = { dialog = "deletePlaylist" }) { Icon(Icons.Default.DeleteOutline, "Delete playlist") } } }
-                        if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); TextButton(onClick = { dialog = "clearHistory" }) { Text("Clear") } } }
+                        if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { "$it videos" } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); TextButton(onClick = { dialog = "clearHistory" }) { Text("Clear") } } }
                         if (tab == "Subscriptions" && subscriptions.isNotEmpty()) item { androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(subscriptions) { c -> AssistChip(onClick = { navigate("Subscriptions", "channel:${c.id}") }, label = { Text(c.name) }) } } }
-                        items(visibleVideos, key = { it.id + it.indexId }) { video -> VideoCard(vm, video, vm.store.server, { play(video) }, { id -> navigate(tab, "channel:$id") }, { dialog = "login" }, if (playlist != null || route == "history") ({
-                            val list = playlist
-                            if (list != null) vm.action { vm.api.removeFromPlaylist(list.id, video.indexId); vm.refresh() }
-                            else vm.removeHistory(video.id)
-                        }) else null) }
+                        val groups = if (route == "history" && state.history?.organized == true) visibleVideos.groupBy { History.group(it.history?.watched, state.history?.today) } else mapOf(null to visibleVideos)
+                        groups.forEach { (group, videos) ->
+                            if (group != null) item(key = "history-group-$group") { Text(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
+                            items(videos, key = { it.id + it.indexId }) { video -> VideoCard(vm, video, vm.store.server, { play(video) }, { id -> navigate(tab, "channel:$id") }, { dialog = "login" }, if (playlist != null || route == "history") ({
+                                val list = playlist
+                                if (list != null) vm.action { vm.api.removeFromPlaylist(list.id, video.indexId); vm.refresh() }
+                                else vm.removeHistory(video.id)
+                            }) else null) }
+                        }
                         if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh); if (state.videos.isEmpty()) TextButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
                         if (!state.loading && visibleVideos.isEmpty() && state.videos.isNotEmpty()) item {
                             Column(Modifier.padding(16.dp)) {
                                 Text("Videos hidden by your visibility settings")
                                 Text("Change the filters or load another page to find visible videos.", style = MaterialTheme.typography.bodySmall)
-                                TextButton(onClick = { if (vm.contentSurface() == ContentSurface.SEARCH) dialog = "filters" else settingsPage = "Browsing" }) { Text("Visibility controls") }
+                                TextButton(onClick = { if (vm.contentSurface() == ContentSurface.SEARCH) dialog = if (tab == "Subscriptions") "visibilityFilters" else "filters" else settingsPage = "Browsing" }) { Text("Visibility controls") }
                             }
                         }
-                        if (!state.loading && state.error == null && state.videos.isEmpty()) item { EmptyState(if (tab == "Search") "Find something to watch" else "Nothing here yet", if (tab == "Search") "Search by title, channel, or paste a video link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
-                        if (!state.end && !state.loading && state.videos.isNotEmpty()) item { TextButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
+                        if (!state.loading && state.error == null && state.videos.isEmpty()) item { EmptyState(
+                            if (scopedSearch.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
+                            if (scopedSearch.submitted.isNotBlank()) "Try another title or channel, or clear the search." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search by title, channel, or paste a video link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
+                        if (!state.end && !state.loading) item { TextButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
                     }
                 }
             }
@@ -189,6 +217,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 "login" -> LoginDialog(vm, { dialog = "" }, { dialog = ""; settingsPage = "Server" })
                 "account" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(account?.username.orEmpty()) }, text = { Text("Signed in to ${vm.store.server}") }, confirmButton = { TextButton(onClick = { vm.logout(); dialog = "" }) { Text("Sign out") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Close") } })
                 "filters" -> FiltersDialog(vm, { dialog = "" })
+                "visibilityFilters" -> FiltersDialog(vm, { dialog = "" }, visibilityOnly = true)
                 "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip(), { dialog = ""; vm.openSponsorBlock() })
                 "create", "edit" -> PlaylistDialog(if(dialog == "edit") playlist else null, { dialog = "" }) { title, privacy, description -> val editing = if (dialog == "edit") playlist else null; vm.action { if (editing != null) vm.api.editPlaylist(editing.id, title, privacy, description) else vm.api.createPlaylist(title, privacy); vm.refreshAccount(); vm.refresh() }; dialog = "" }
                 "deletePlaylist", "clearHistory" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(if (dialog == "clearHistory") "Clear watch history?" else "Delete playlist?") }, text = { Text("This also changes your account on the website.") }, confirmButton = { TextButton(onClick = { val clear = dialog == "clearHistory"; val id = playlist?.id; if (clear) vm.clearHistory() else vm.action { if (id != null) vm.api.deletePlaylist(id); vm.refreshAccount(); navigate("Library") }; dialog = "" }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Cancel") } })
@@ -223,7 +252,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     .background(Color.Black.copy(alpha = .8f)).padding(horizontal = 8.dp, vertical = 4.dp)
                     .testTag("video-watched-${video.id}"), color = Color.White, style = MaterialTheme.typography.labelMedium)
             }
-            Text(if(video.live) "LIVE" else time(video.duration), Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .8f)).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, fontSize = 12.sp)
+            Text(if(video.live) "LIVE" else if (video.history != null && video.duration <= 0) "Unknown duration" else time(video.duration), Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .8f)).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, fontSize = 12.sp)
             indicator.bar?.let { fraction ->
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp)
                     .testTag("video-progress-${video.id}").semantics {
@@ -240,6 +269,13 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     indicator.percent?.let { Text("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
                 }
                 Text(listOf(video.author, if(video.views > 0) "${count(video.views)} views" else "", video.published).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp).clickable(enabled = video.channelId.isNotEmpty()) { channel(video.channelId) })
+                video.history?.let { history ->
+                    Text("Released: ${history.released ?: "Unknown date"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Watched: ${history.watched ?: "Unknown watch date"}", style = MaterialTheme.typography.bodySmall)
+                    if (video.unavailable) Text("Video ID: ${video.id}", style = MaterialTheme.typography.bodySmall)
+                    if (video.duration <= 0) Text("Duration: Unknown", style = MaterialTheme.typography.bodySmall)
+                    else if (prefs.thinMode) Text("Duration: ${time(video.duration)}", style = MaterialTheme.typography.bodySmall)
+                }
             }
             VideoBlockingMenu(vm, video, signIn)
             if(remove != null) IconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${video.title}") }
@@ -302,7 +338,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
         TextButton(onClick = server, enabled = !busy) { Text("Change server") }
     } }, confirmButton = { TextButton(enabled = !busy && username.isNotBlank() && password.isNotEmpty(), onClick = { busy = true; error = null; scope.launch { try { vm.login(username.trim(), password); password = ""; dismiss() } catch(e: Exception) { error = e.message ?: "Unable to sign in." } finally { busy = false } } }) { Text("Sign in") } }, dismissButton = { TextButton(enabled = !busy, onClick = dismiss) { Text("Cancel") } })
 }
-@Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit) {
+@Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit, visibilityOnly: Boolean = false) {
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     var sort by remember { mutableStateOf(vm.sort) }
@@ -311,9 +347,11 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
     var visibility by remember(vm.api.context()) { mutableStateOf(vm.searchVisibility.value) }
     AlertDialog(onDismissRequest = dismiss, title = { Text("Search filters") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            Choice("Sort", listOf("relevance", "views"), sort) { sort = it }
-            Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }
-            Choice("Duration", listOf("", "short", "long"), duration) { duration = it }
+            if (!visibilityOnly) {
+                Choice("Sort", listOf("relevance", "views"), sort) { sort = it }
+                Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }
+                Choice("Duration", listOf("", "short", "long"), duration) { duration = it }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(visibility.showMembers ?: prefs.showMemberVideos, { visibility = visibility.copy(showMembers = it) }, modifier = Modifier.testTag("search-show-members"))
                 Text("Show members-only videos", Modifier.weight(1f))

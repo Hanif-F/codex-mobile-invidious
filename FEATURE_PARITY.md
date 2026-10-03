@@ -1,9 +1,9 @@
 # Invidious web → Mobivious Android feature checklist
 
-Reviewed on **3 October 2026** against the local source checkouts:
+Reviewed on **4 October 2026** against the local source checkouts:
 
 - Web: `../invidious`, baseline audit at `a21a5513` plus the expanded native settings API changes; channel routes/API rechecked at `68e51ac2`. Includes this fork's custom features.
-- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; row 34 updated against the watched/progress implementation and rows 40–41 against content visibility on 4 October 2026. Current release version: `0.2.1` (version code 4).
+- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; rows 06 and 33 now include scoped search and organized history; row 34 includes watched/progress and rows 40–41 content visibility, reviewed on 4 October 2026. Current release version: `0.2.1` (version code 4).
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
@@ -13,7 +13,7 @@ Reviewed on **3 October 2026** against the local source checkouts:
 
 This is a source audit, not a new native runtime or production acceptance test. Features can depend on instance configuration, upstream content availability, and device capabilities. Validation is recorded in [VERIFICATION.md](VERIFICATION.md). That file reports the production mobile sign-in/account API rollout as still pending; account features below are implemented in source, but need the server patch deployed before production use. The channel revision additionally checks public channel endpoints on the existing live instance; it does not validate the production account rollout.
 
-**Summary: 45 broad feature areas — 15 implemented, 16 partial, 14 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
+**Summary: 45 broad feature areas — 17 implemented, 15 partial, 13 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
 
 ## Discovery and channels
 
@@ -24,7 +24,7 @@ This is a source audit, not a new native runtime or production acceptance test. 
 | 03 | Custom homepage and configurable feed navigation | Partial | Default homepage selection across existing Popular, Trending, Search, Subscriptions and Playlists destinations; shared feed-menu priorities order native navigation and Home discovery chips. Guests fall back to public browsing for account-only homepages. | Full web menu visibility/removal: native core navigation destinations remain reachable and Popular/Trending share Home. |
 | 04 | Search across videos, channels and playlists, with filters | Partial | Video search, pagination, working relevance/views sorting, upload-date filter, short/long duration filters, pasted video links and saved members-only/blocked-channel search visibility controls. | Channel/playlist result types, medium-duration and feature filters such as live/HD/4K/subtitles. |
 | 05 | Channel browsing and specialized tabs | Partial | Name, subscriber count, truncated plain-text description, paginated Videos/Streams tabs based on channel availability, automatic Streams selection for channels without uploads, subscribe/unsubscribe. Tab changes reset pagination; Refresh/Retry preserve an available selection. | Shorts, Podcasts, Releases, Courses, Playlists, Clips, Posts and related Channels tabs; channel sorting; banner/avatar/verification/pronoun presentation and expandable rich description. Tabs on the web depend on channel availability. |
-| 06 | Search within a channel or the subscription library | Not implemented | — | Dedicated channel search and authenticated subscription search flows. Android's general video search is not scoped to the currently open channel. |
+| 06 | Search within a channel or the subscription library | Implemented | Search fields on channel and Subscriptions screens; public paginated channel video search independent of Videos/Streams; authenticated full-library title/channel subscription search, original-page pagination and saved search visibility controls. Clear restores the selected channel tab or configured feed. Icon, keyboard Search and physical Enter share submission, including pasted links on general Search. | — for the core capability; subscription search requires the sibling API update and renewed native tokens. Native runtime/layout acceptance remains unverified. |
 | 07 | Community posts and post comments | Not implemented | — | Community/post pages, media/polls and their read-only comment threads. |
 | 08 | Hashtag browsing | Not implemented | — | Hashtag result pages and navigable hashtag links. |
 
@@ -65,7 +65,7 @@ Evidence: [web watch page][w-watch], [web player component][w-player], [web play
 | 30 | Personal Invidious playlist management | Implemented | List/create/edit/delete playlists; public/unlisted/private privacy; edit title/description; add the watched video; remove items; paginated playlist contents. | — for core management; shortcuts, external playlists, sharing and queue behavior are tracked in rows 17, 24, 31, 32 and 36. |
 | 31 | Public/YouTube playlists, saved external playlists and mixes | Partial | The library API can return external playlists already saved on the web; the common playlist API can read their contents when reached through Library. | Discover/open arbitrary public or YouTube playlist links without signing in, save/unsave external playlists in Android, and browse/play mixes. The app does not follow the playlist endpoint's redirect to a mix. |
 | 32 | Video-card/context-menu library actions | Partial | Save from the watch page; remove items in playlist/history lists; open a video's channel. | Save directly from browse/search/feed cards, inline create-and-save, quick audio/source/instance actions and undo feedback available in the web context-menu flows. |
-| 33 | Watch history and history organization | Partial | Record watched videos, paginated history, keep unavailable entries, remove one entry, clear all with confirmation and shared enable/disable setting. | Search/filter history, timezone-aware date groups and fuller archived metadata presentation. |
+| 33 | Watch history and history organization | Implemented | Record watched videos; full-history title/channel search before pagination; account-timezone Today/Yesterday/Last 7 days/Last 30 days/Older groups; saved title/channel/duration/release/latest-watch metadata and unknown-value fallbacks; unavailable entries, single removal, clear confirmation and shared enable/disable setting. Basic viewing remains on older servers with a search update explanation. | — for website parity; organized history requires the sibling API update, using existing scopes. Archived-date expansion and date-range filters are outside the requested scope. Native runtime/layout acceptance remains unverified. |
 | 34 | Watched/progress indicators and manual watched state | Partial | Shared watched badges/thumbnail overlays and saved-progress bars across native video cards, including recommendations; compact and thumbnail-free presentation; accessible history/progress descriptions. Account state uses the shared playback API; guests see device-local progress when resume is enabled. Service-owned playback updates indicators in background/audio/PiP. Existing history removal preserves progress; clearing history clears both. | Explicit mark-watched/mark-unwatched actions are intentionally excluded from the Android UX. Native runtime/layout acceptance remains unverified. |
 | 35 | Data import/export and migration | Not implemented | — | Invidious data import/export; YouTube subscription/playlist/history imports; NewPipe/FreeTube imports and subscription exports/OPML. The native login token also lacks export/import scopes. |
 | 36 | Shared account preferences | Partial | Dedicated Settings and submenu screens; shared history/resume, playback defaults (autoplay, audio only, proxy, speed, ranked quality, caption priorities), color mode/density/thumbnails, homepage/feed order, region, members-only and comments/recommendations/description visibility, feed filters/sort/page size, default playlist, DeArrow and SponsorBlock. Sparse patches preserve unrelated server values; refresh on sign-in, settings opening and foreground return. | Preferences for capabilities outside the implemented native scope, including web theme registry/randomization, interface locale, annotations, VR, chat replay and next-video queues. Background/PiP stay device-local. The expanded shared settings require the sibling settings API update. |
@@ -183,3 +183,39 @@ All 93 Android unit/API tests, debug/instrumentation APK builds and lint passed,
 
 [a-visibility]: android/app/src/main/java/net/wingress/mobivious/data/ContentVisibility.kt
 [a-visibility-ui]: android/app/src/main/java/net/wingress/mobivious/ui/VisibilityUi.kt
+
+## Scoped search and organized history — 4 October 2026
+
+Rows 06 and 33 now implement the requested website capabilities. Search fields on
+channel, subscription and history screens keep submitted queries separate from
+drafts; clear restores the underlying tab/feed. Shared icon, keyboard Search and
+physical Enter submission also fixes the main Search screen, retaining pasted-link
+timestamps. Pagination uses original search pages, and account/instance changes
+discard stale scoped responses. Channel search follows channel visibility;
+subscription search uses the saved search visibility overrides.
+
+Organized history shares website matching and ordering before pagination, groups
+saved calendar dates against the account-timezone server date, and presents saved
+title/channel/duration/release/latest-watch metadata. Unknown and future dates
+remain in Older; missing videos remain accessible. Older servers retain basic
+history viewing and explain the organized-history update. Archived-date expansion
+and date-range filters were explicitly excluded from the requested scope.
+
+All 105 Android unit/API tests, debug/instrumentation APK builds and lint passed.
+Five standard Crystal history examples and 51 search/preference examples passed,
+along with normal/API-only server builds, the guarded disposable PostgreSQL
+account/API harness and local fixture HTTP checks. Nine new Compose scenarios
+compile but have not executed: the installed emulator crashed with SIGSEGV before
+Android booted. Native interactions, layout and screenshots remain unverified;
+see `VERIFICATION.md`.
+
+Deploy the sibling subscription-search and organized-history API update. New
+native sign-ins include exact `GET:subscriptions/search` permission, so existing
+sessions need sign-out/sign-in for subscription search. History uses existing
+permissions. No migration, secret, production deployment or release publication
+was introduced. Implementation: [history metadata and grouping][a-history],
+[shared search submission][a-search-ui], [Android view model][a-vm],
+[mobile API contract][w-mobile].
+
+[a-history]: android/app/src/main/java/net/wingress/mobivious/data/History.kt
+[a-search-ui]: android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt

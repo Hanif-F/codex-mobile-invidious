@@ -79,3 +79,18 @@ updates; see `../invidious/docs/mobile-api.md`. Existing native preference token
 remain valid: this change adds no scopes, database migration or key requirements.
 Guest global settings remain local to the selected instance. No production rollout
 or signed APK release was performed for this revision.
+
+## Scoped search and organized history
+
+Deploy the updated sibling Invidious source for authenticated subscription search
+and organized history. Channel search uses the existing public channel endpoint.
+The new subscription endpoint reads the account's current cached subscription
+library; organized history shares website matching/date ordering and local archive
+metadata. Both use authenticated private/no-store responses; the legacy history
+formats remain compatible. See `../invidious/docs/mobile-api.md` for the contract.
+
+Sign out and sign in after the server update to obtain the exact
+`GET:subscriptions/search` native scope. History uses the existing `GET:history`
+scope. This update adds no database migration, secret, or key rotation. On older
+servers the app retains basic history viewing and explains why history search or
+subscription search needs an update. Building the APK does not deploy the server.

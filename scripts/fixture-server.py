@@ -4,6 +4,7 @@ Run with --media-dir containing fixture.mp4, dash.mpd, hls.m3u8 and segments.
 Bind localhost only; ADB reverse exposes it to the emulator for instrumentation.
 """
 import argparse
+from datetime import date
 import json
 import time
 import xml.etree.ElementTree as ET
@@ -75,6 +76,16 @@ def reset_channels():
     state.update(channelTabs=['videos', 'streams'], channelRequests=[], channelFailNext=False, channelDelayNext=None)
 reset_channels()
 
+def reset_search_history():
+    state.update(searchTest=False, searchRequests=[], searchDelayNext=0, searchFailNext=False,
+                 historyRequests=[], historyEntries=[], historyToday='2026-10-04', historyLegacy=False)
+reset_search_history()
+
+def history_group(watched):
+    if not watched: return 4
+    days = (date.fromisoformat(state['historyToday']) - date.fromisoformat(watched)).days
+    return 0 if days == 0 else 1 if days == 1 else 2 if 2 <= days <= 6 else 3 if 7 <= days <= 29 else 4
+
 def submissions():
     titles = [dict(title=replacement, original=False, votes=3, locked=False, UUID='proposal'),
               dict(title='Locked community title', original=False, votes=5, locked=True, UUID='locked')]
@@ -127,10 +138,29 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             event['completed'] = True
 
+    def search(self, scope, query):
+        params = parse_qs(query, keep_blank_values=True)
+        q = params.get('q', [''])[0]
+        page = int(params.get('page', ['1'])[0])
+        event = dict(scope=scope, q=q, page=page, authorized=bool(self.headers.get('Authorization')), completed=False)
+        state['searchRequests'].append(event)
+        delay = state['searchDelayNext']; state['searchDelayNext'] = 0
+        items = []
+        if q.strip() and q != 'missing':
+            if q == 'hidden':
+                items = [dict(visibility_member, videoId=f'member{i:05d}') for i in range(20)] if page == 1 else [video] if page == 2 else []
+            elif q == 'many':
+                items = [dict(video, videoId=f'scope{i:06d}', title=f'Search result {i}') for i in range(20)] if page == 1 else [recommended] if page == 2 else []
+            else: items = [recommended if q == 'second' else video] if page == 1 else []
+        fail = state['searchFailNext']; state['searchFailNext'] = False
+        if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+        self.respond(dict(error='Fixture search temporarily unavailable') if fail else items, 503 if fail else 200)
+        event['completed'] = True
+
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
-        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels')) and self.headers.get('Authorization') != 'Bearer fixture-token':
+        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels', '/api/v1/auth/subscriptions/search')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/media/'):
             state['mediaRequests'] += 1
@@ -157,6 +187,7 @@ class Handler(BaseHTTPRequestHandler):
                          [dict(authorId=id, author=name) for id, name in sorted(state['blockedChannels'].items(), key=lambda x: (x[1], x[0]))],
                          503 if state['failBlockedRead'] else 200)
         elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'):
+            if p == '/api/v1/search' and state['searchTest']: return self.search('global', url.query)
             if state['visibilityVideos']:
                 state['visibilityReads'].append(dict(path=p, query=parse_qs(url.query), authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
             items = browse_videos()
@@ -179,13 +210,27 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(error='Fixture submissions unavailable') if state['failSubmissions'] else dict(titles=submissions()), 502 if state['failSubmissions'] else 200)
         elif p == '/api/v1/auth/preferences': self.respond(prefs)
         elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId=video['authorId'])])
+        elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
         elif p == '/api/v1/auth/playlists': self.respond(state['playlists'])
         elif p.startswith('/api/v1/auth/playlists/'):
             pl = next((x for x in state['playlists'] if x['playlistId'] == p.split('/')[-1]), None)
             self.respond(pl or {}, 200 if pl else 404)
         elif p == '/api/v1/auth/history':
+            params = parse_qs(url.query, keep_blank_values=True)
+            q = params.get('q', [''])[0].strip().lower()
+            page = max(1, int(params.get('page', ['1'])[0]))
+            state['historyRequests'].append(dict(q=q, page=page))
             catalog = {v['videoId']: v for v in [video, recommended, unknown_video, live_video]}
-            self.respond([dict(video_id=id, title=catalog.get(id, {}).get('title'), channel_name=video['author'], channel_id=video['authorId'], length_seconds=catalog.get(id, {}).get('lengthSeconds', 0)) for id in reversed(state['watched'])])
+            saved = {e['video_id']: e for e in state['historyEntries']}
+            entries = [saved.get(id, dict(video_id=id, title=catalog.get(id, {}).get('title'), channel_name=video['author'], channel_id=video['authorId'], length_seconds=catalog.get(id, {}).get('lengthSeconds', 0))) for id in reversed(state['watched'])]
+            organized = params.get('organized') == ['true'] and not state['historyLegacy']
+            if organized:
+                entries = [e for e in entries if not q or q in (e.get('title') or '').lower() or q in (e.get('channel_name') or '').lower()]
+                entries.sort(key=lambda e: (history_group(e.get('latest_watched')), e.get('latest_watched') is None, -date.fromisoformat(e.get('latest_watched') or '0001-01-01').toordinal()))
+            total = len(entries)
+            size = int(params.get('max_results', [prefs['max_results']])[0])
+            entries = entries[(page-1)*size:page*size]
+            self.respond(dict(entries=entries, total=total, hasMore=size > 0 and page*size < total, today=state['historyToday'], timezone='Asia/Jakarta') if organized else entries)
         elif p == '/api/v1/auth/playback':
             state['playbackRequests'] += 1
             payload = dict(positions=dict(state['positions']), watched=list(state['watched']))
@@ -197,6 +242,7 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(position=state['positions'][id], videoId=id) if id in state['positions'] else dict(error='Playback position does not exist.'), 200 if id in state['positions'] else 404)
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
         elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams'): self.channel(p.rsplit('/', 1)[-1], url.query)
+        elif p == '/api/v1/channels/' + video['authorId'] + '/search': self.search('channel', url.query)
         elif p == '/api/v1/comments/testvideo01': self.respond(dict(comments=[dict(author='Viewer', content='A test comment.', likeCount=3, publishedText='today')]))
         else: self.respond({'error': 'Fixture endpoint not found'}, 404)
 
@@ -213,6 +259,7 @@ class Handler(BaseHTTPRequestHandler):
             reset_channels()
             reset_playback()
             reset_visibility()
+            reset_search_history()
             return self.respond({})
         if p == '/test/watched':
             for key in ('watched', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
@@ -233,6 +280,12 @@ class Handler(BaseHTTPRequestHandler):
         if p == '/test/channel':
             for key in ('channelTabs', 'channelFailNext', 'channelDelayNext'):
                 if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/search-history':
+            for key in ('searchTest', 'searchDelayNext', 'searchFailNext', 'historyEntries', 'historyToday', 'historyLegacy'):
+                if key in data: state[key] = data[key]
+            if 'historyEntries' in data: state['watched'] = [entry['video_id'] for entry in data['historyEntries']]
+            if 'max_results' in data: prefs['max_results'] = data['max_results']
             return self.respond({})
         if p == '/test/sponsorblock':
             for key in ('sponsorSegments', 'failSponsor', 'failPreferences', 'liveNow'):

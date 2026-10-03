@@ -82,6 +82,15 @@ Home popular/trending, filtered search and shared video links; channel browsing 
 paginated Videos/Streams tabs and automatic Streams selection for channels without uploads;
 native account sign-in; subscription feed and subscribe/unsubscribe; playlists and
 watch history; descriptions, captions, read-only comments and recommendations.
+Channel pages and Subscriptions each have their own search field. Channel search
+keeps the selected Videos/Streams tab available; clearing search restores it.
+Subscription search matches titles/channels across the cached subscription library.
+History supports title/channel search, account-timezone date groups and saved
+release/watch metadata, including unavailable videos. Search icons, the keyboard
+Search action and physical Enter submit through the same handler; general Search
+also retains pasted-link timestamp handling. Subscription search and organized
+history require the sibling API update. After deployment, sign out and sign in for
+the new subscription-search token scope; history needs no new scope or migration.
 The service-owned player supports adaptive streams, seeking, speed/quality/audio
 selection, background playback, system media controls, mini-player, fullscreen,
 audio only and picture in picture. The embedded and fullscreen player share fading
