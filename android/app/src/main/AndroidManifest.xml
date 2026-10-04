@@ -17,6 +17,10 @@
                 <action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/watch" />
                 <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/watch" />
+                <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/playlist" />
+                <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/playlist" />
+                <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/mix" />
+                <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/mix" />
             </intent-filter>
         </activity>
         <service android:name=".player.PlaybackService" android:foregroundServiceType="mediaPlayback" android:exported="true">

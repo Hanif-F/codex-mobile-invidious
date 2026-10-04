@@ -39,8 +39,8 @@ class MainActivity : ComponentActivity() {
         val text = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else intent.dataString
         if (text != null) {
             val link = VideoLinks.parse(text, model.store.server)
-            if (link != null) { model.play(link.id, link.seconds); sharedVideo.value = true }
-            else model.message.value = "Share a YouTube or configured Invidious video link."
+            if (link != null) { sharedVideo.value = model.openLink(link) }
+            else model.message.value = "Share a YouTube or configured Invidious video, playlist or mix link."
         }
     }
     fun updatePip(watching: Boolean) {

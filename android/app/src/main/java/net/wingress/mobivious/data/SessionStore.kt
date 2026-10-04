@@ -16,10 +16,16 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
     private val storedAccount = readAccount()
     val account = MutableStateFlow(storedAccount?.takeIf { it.expiresAt > System.currentTimeMillis() / 1000 })
+    @Volatile var contextGeneration: Long = 0
+        private set
     var onContextChanged: (ApiContext) -> Unit = {}
     var server: String
         get() = prefs.getString("server", "https://invidious.wingress.net")!!
-        set(value) { prefs.edit().putString("server", value).apply(); onContextChanged(positionContext()) }
+        set(value) {
+            if (value == server) return
+            contextGeneration++
+            prefs.edit().putString("server", value).apply(); onContextChanged(positionContext())
+        }
     var background: Boolean
         get() = prefs.getBoolean("background", true)
         set(value) { prefs.edit().putBoolean("background", value).apply() }
@@ -62,6 +68,7 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
         Account(json.getString("token"), json.getString("username"), json.getLong("expires"), json.getString("server"))
     }.getOrNull()
     fun save(value: Account?) {
+        if (value != account.value) contextGeneration++
         if (value == null) prefs.edit().remove("session").apply() else {
             val json = JSONObject().put("token", value.token).put("username", value.username).put("expires", value.expiresAt).put("server", value.server).toString()
             val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
@@ -71,7 +78,7 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
         onContextChanged(positionContext())
     }
     // A local fallback is never replayed to the server; only current playback is uploaded.
-    private fun positionContext() = ApiContext(server, account.value)
+    private fun positionContext() = ApiContext(server, account.value, contextGeneration)
     private fun positionsKey(context: ApiContext) = "playback.positions." +
         org.json.JSONArray().put(context.server).put(context.account?.username ?: JSONObject.NULL).toString()
     init {

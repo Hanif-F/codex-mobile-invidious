@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -83,14 +84,21 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     var dialog by remember { mutableStateOf("") }
     var settingsPage by rememberSaveable { mutableStateOf("") }
     val selectedTab by vm.navigation.collectAsStateWithLifecycle()
-    LaunchedEffect(selectedTab) { tab = selectedTab.first; route = selectedTab.second }
-    var addVideo by remember { mutableStateOf<Video?>(null) }
+    LaunchedEffect(selectedTab) { tab = selectedTab.first; route = selectedTab.second; watch = false }
+    val saveSheet by vm.saveSheet.collectAsStateWithLifecycle()
+    val queueOpen by vm.queueOpen.collectAsStateWithLifecycle()
+    val blockUndo by vm.blockUndo.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     fun navigate(selected: String, path: String = "") { vm.cancelAccumulatedSeek(); tab = selected; route = path; watch = false; vm.navigate(selected, path) }
-    fun play(video: Video) { watch = true; vm.play(video.id) }
+    fun play(video: Video, source: Playlist? = null) { watch = true; vm.playVideo(video, source) }
     LaunchedEffect(shared.value) { if (shared.value) { watch = true; settingsPage = ""; shared.value = false } }
-    LaunchedEffect(message) { message?.let { snackbar.showSnackbar(it); vm.message.value = null } }
+    LaunchedEffect(message, blockUndo) { message?.let {
+        val undo = blockUndo.takeIf { _ -> it == "Channel blocked" }
+        val result = snackbar.showSnackbar(it, actionLabel = undo?.let { "Undo" }, duration = SnackbarDuration.Short)
+        if (result == SnackbarResult.ActionPerformed && undo != null) vm.undoBlock(undo)
+        if (vm.message.value == it) vm.message.value = null
+    } }
     LaunchedEffect(watch, playback.playWhenReady, playback.error, playback.details, prefs, vm.store.pip, settingsPage) { activity.updatePip(watch && settingsPage.isEmpty()) }
     DisposableEffect(fullscreen, pip) {
         activity.requestedOrientation = if (fullscreen && !pip) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -125,7 +133,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     } }
                 } }
             ) { padding ->
-                if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, dialog == "player" || sponsorEditor != null, { addVideo = it }, { id -> navigate("Home", "channel:$id") }, ::play, { dialog = "login" })
+                if (watch) WatchScreen(vm, playback, controller, Modifier.padding(padding), { fullscreen = true }, { dialog = "player" }, dialog == "player" || sponsorEditor != null, vm::openSave, { id -> navigate("Home", "channel:$id") }, { play(it) }, { dialog = "login" })
                 else Column(Modifier.padding(padding).fillMaxSize()) {
                     if(offline) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (account != null && blocked.error != null && vm.contentSurface() in listOf(ContentSurface.DISCOVERY, ContentSurface.SEARCH)) {
@@ -138,7 +146,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                             SearchField(search.draft, { vm.editSearch(it, false) }, "Search videos or paste a link", "main-search", Modifier.weight(1f)) {
                                 val link = VideoLinks.parse(search.draft, vm.store.server)
-                                if (link != null) { watch = true; vm.play(link.id, link.seconds) } else vm.submitSearch(false)
+                                if (link != null) { watch = vm.openLink(link) } else vm.submitSearch(false)
                             }
                             IconButton(onClick = { dialog = "filters" }) { Icon(Icons.Default.Tune, "Search filters") }
                         }
@@ -157,13 +165,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         (prefs.feedMenu.filter { it in listOf("Popular", "Trending") } + listOf("Popular", "Trending")).distinct().forEach { name -> val key = name.lowercase(); FilterChip(selected = vm.discovery == key, onClick = { vm.discovery = key; vm.refresh() }, label = { Text(name) }) }
                         Spacer(Modifier.weight(1f)); IconButton(onClick = vm::refresh) { Icon(Icons.Default.Refresh, "Refresh") }
                     }
-                    if ((tab == "Library" || tab == "Subscriptions") && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { dialog = "login" }
+                    if (route.isEmpty() && (tab == "Library" || tab == "Subscriptions") && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { dialog = "login" }
                     else if (tab == "Library" && route.isEmpty()) LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item { Text("Your library", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
                         item { Card(onClick = { navigate("Library", "history") }, modifier = Modifier.fillMaxWidth()) { Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null); Spacer(Modifier.width(16.dp)); Text("Watch history", Modifier.weight(1f)); Icon(Icons.Default.ChevronRight, null) } } }
                         item { Row(verticalAlignment = Alignment.CenterVertically) { Text("Playlists", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); TextButton(onClick = { dialog = "create" }) { Icon(Icons.Default.Add, null); Text("New") } } }
                         items(playlists, key = { it.id }) { list -> Card(onClick = { navigate("Library", "playlist:${list.id}") }, modifier = Modifier.fillMaxWidth()) { Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(16.dp)); Column { Text(list.title, fontWeight = FontWeight.SemiBold); Text("${list.count} videos · ${list.privacy}", style = MaterialTheme.typography.bodySmall) } } } }
-                        if (playlists.isEmpty()) item { Text("Save videos to a playlist from the watch screen.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        if (playlists.isEmpty()) item { Text("Save videos from their actions menu or the watch screen.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh) }
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(bottom = 12.dp)) {
@@ -185,17 +193,27 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         } }
                         channel?.let { info -> item { ChannelBlockingButton(vm, info.id, info.name, { dialog = "login" }) } }
                         if (channel != null) item { TextButton(onClick = { vm.openSponsorBlock(channel!!.id) }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Channel SponsorBlock settings") } }
-                        if (playlist != null) item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text("${playlist!!.count} videos", Modifier.weight(1f)); TextButton(onClick = { dialog = "edit" }) { Text("Edit playlist") }; IconButton(onClick = { dialog = "deletePlaylist" }) { Icon(Icons.Default.DeleteOutline, "Delete playlist") } } }
+                        playlist?.let { list -> item {
+                            val owned = list.id.startsWith("IV") && playlists.any { it.id == list.id }
+                            Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(if (list.id.startsWith("RD")) "Mix" else "${list.count} videos", Modifier.weight(1f))
+                                TextButton(onClick = { watch = true; vm.play("", source = list.id) }) { Text("Play") }
+                                if (owned) {
+                                    TextButton(onClick = { dialog = "edit" }) { Text("Edit playlist") }
+                                    IconButton(onClick = { dialog = "deletePlaylist" }) { Icon(Icons.Default.DeleteOutline, "Delete playlist") }
+                                }
+                            }
+                        } }
                         if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { "$it videos" } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge); TextButton(onClick = { dialog = "clearHistory" }) { Text("Clear") } } }
                         if (tab == "Subscriptions" && subscriptions.isNotEmpty()) item { androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) { items(subscriptions) { c -> AssistChip(onClick = { navigate("Subscriptions", "channel:${c.id}") }, label = { Text(c.name) }) } } }
                         val groups = if (route == "history" && state.history?.organized == true) visibleVideos.groupBy { History.group(it.history?.watched, state.history?.today) } else mapOf(null to visibleVideos)
                         groups.forEach { (group, videos) ->
                             if (group != null) item(key = "history-group-$group") { Text(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
-                            items(videos, key = { it.id + it.indexId }) { video -> VideoCard(vm, video, vm.store.server, { play(video) }, { id -> navigate(tab, "channel:$id") }, { dialog = "login" }, if (playlist != null || route == "history") ({
+                            items(videos, key = { it.id + it.indexId + (it.playlistIndex?.toString() ?: "") }) { video -> VideoCard(vm, video, vm.store.server, { play(video, playlist) }, { id -> navigate(tab, "channel:$id") }, { dialog = "login" }, if (playlist?.let { list -> list.id.startsWith("IV") && playlists.any { it.id == list.id } } == true || route == "history") ({
                                 val list = playlist
-                                if (list != null) vm.action { vm.api.removeFromPlaylist(list.id, video.indexId); vm.refresh() }
+                                if (list != null) vm.removePlaylistVideo(list, video)
                                 else vm.removeHistory(video.id)
-                            }) else null) }
+                            }) else null, audioPlay = { watch = true; vm.playVideo(video, playlist, audio = true) }, removalLabel = if (playlist != null) "Remove from playlist" else "Remove from history") }
                         }
                         if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh); if (state.videos.isEmpty()) TextButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
@@ -225,7 +243,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             val dearrow by vm.dearrowContribution.collectAsStateWithLifecycle()
             if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; dialog = "login" }, dismiss = { vm.sponsorSettingsChannel.value = null })
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
-            addVideo?.let { video -> AlertDialog(onDismissRequest = { addVideo = null }, title = { Text("Save to playlist") }, text = { Column { if (account == null) TextButton(onClick = { addVideo = null; dialog = "login" }) { Text("Sign in") } else if (playlists.isEmpty()) TextButton(onClick = { addVideo = null; dialog = "create" }) { Text("Create your first playlist") }; playlists.sortedBy { it.id != prefs.defaultPlaylist }.forEach { list -> TextButton(onClick = { vm.action { vm.api.addToPlaylist(list.id, video.id); vm.refreshAccount(); vm.message.value = "Saved to ${list.title}" }; addVideo = null }) { Text(list.title + if (list.id == prefs.defaultPlaylist) " (Default)" else "") } } } }, confirmButton = { TextButton(onClick = { addVideo = null }) { Text("Cancel") } }) }
+            if (saveSheet.video != null && dialog != "login" && !pip) SavePlaylistSheet(vm) { dialog = "login" }
+            if (queueOpen && saveSheet.video == null && !pip) PlaybackQueueSheet(vm, { vm.queueOpen.value = false; dialog = "login" }, { id -> vm.queueOpen.value = false; navigate("Home", "channel:$id") })
         }
     }
 }
@@ -235,7 +254,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
 private fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
 private fun time(seconds: Long): String = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60) else "%d:%02d".format(seconds / 60, seconds % 60)
 private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0); value >= 1000 -> "%.1fK".format(value / 1000.0); else -> "$value" }
-@Composable private fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null) {
+@Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove") {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val watched by vm.watched.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
@@ -277,7 +296,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     else if (prefs.thinMode) Text("Duration: ${time(video.duration)}", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            VideoBlockingMenu(vm, video, signIn)
+            VideoActionsMenu(vm, video, signIn, channel, audioPlay ?: { vm.playVideo(video, audio = true) }, remove, removalLabel)
             if(remove != null) IconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${video.title}") }
         }
     }
@@ -301,9 +320,10 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     Text("${count(details.video.views)} views · ${details.video.published}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(details.video.author, Modifier.weight(1f).clickable { channel(details.video.channelId) }, fontWeight = FontWeight.SemiBold); FilledTonalButton(onClick = { if(vm.account.value == null) vm.message.value = "Sign in from the account button to subscribe." else vm.toggleSubscribe(details.video.channelId) }) { Text(if(subscriptions.any { it.id == details.video.channelId }) "Subscribed" else "Subscribe") } }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.Default.PlaylistAdd, null) })
+                        AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
                         AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
                     }
+                    TextButton(onClick = { vm.queueOpen.value = true }) { Text("Playback queue") }
                     ChannelBlockingButton(vm, details.video.channelId, details.video.author, signIn)
                     blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                     TextButton(onClick = { vm.openDeArrow(details.video.id) }) { Text("Suggest / vote on titles") }

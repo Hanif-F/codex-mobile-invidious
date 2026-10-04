@@ -35,9 +35,21 @@ class PlaybackService : MediaSessionService() {
         const val SPONSOR_CONFIGURE = "mobivious.sponsorblock.configure"
         const val SPONSOR_SKIP = "mobivious.sponsorblock.skip"
         const val SPONSOR_DISMISS = "mobivious.sponsorblock.dismiss"
+        const val QUEUE_START = "mobivious.queue.start"
+        const val QUEUE_INSERT = "mobivious.queue.insert"
+        const val QUEUE_REMOVE = "mobivious.queue.remove"
+        const val QUEUE_DELETE_SOURCE = "mobivious.queue.delete_source"
+        const val QUEUE_RETRY = "mobivious.queue.retry"
+        const val QUEUE_MORE = "mobivious.queue.more"
+        const val QUEUE_CLOSE = "mobivious.queue.close"
+        const val QUEUE_STATE = "mobivious.queue.state"
+        const val QUEUE_SETTINGS = "mobivious.queue.settings"
+        val QUEUE_COMMANDS = listOf(QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS)
     }
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
+    private lateinit var queue: QueueCoordinator
+    private lateinit var sessionPlayer: QueueSessionPlayer
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val app get() = application as MobiviousApplication
     private var owner: Account? = null
@@ -66,17 +78,21 @@ class PlaybackService : MediaSessionService() {
             setHandleAudioBecomingNoisy(true)
             setWakeMode(PowerManager.PARTIAL_WAKE_LOCK)
         }
-        session = MediaSession.Builder(this, player)
+        queue = QueueCoordinator(app, player, scope) { persist() }
+        sessionPlayer = QueueSessionPlayer(player, queue) { app.playbackQueue.value }
+        queue.changed = { sessionPlayer.refresh() }
+        session = MediaSession.Builder(this, sessionPlayer)
             .setSessionActivity(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .setCallback(object : MediaSession.Callback {
                 override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult =
                     if (controller.isTrusted || controller.packageName == packageName) MediaSession.ConnectionResult.AcceptedResultBuilder(session)
                         .setAvailableSessionCommands(MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().apply {
-                            listOf(SET_DISPLAY_TITLE, SET_HISTORY_SETTINGS, SPONSOR_STATE, SPONSOR_CONFIGURE, SPONSOR_SKIP, SPONSOR_DISMISS).forEach { add(SessionCommand(it, Bundle.EMPTY)) }
+                            (listOf(SET_DISPLAY_TITLE, SET_HISTORY_SETTINGS, SPONSOR_STATE, SPONSOR_CONFIGURE, SPONSOR_SKIP, SPONSOR_DISMISS) + QUEUE_COMMANDS).forEach { add(SessionCommand(it, Bundle.EMPTY)) }
                         }.build()).build()
                     else MediaSession.ConnectionResult.reject()
                 override fun onCustomCommand(session: MediaSession, controller: MediaSession.ControllerInfo, customCommand: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
                     if (controller.packageName != packageName) return Futures.immediateFuture(SessionResult(SessionError.ERROR_PERMISSION_DENIED))
+                    if (customCommand.customAction in QUEUE_COMMANDS) return Futures.immediateFuture(queueCommand(customCommand.customAction, args))
                     if (customCommand.customAction == SET_HISTORY_SETTINGS) {
                         if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
@@ -99,7 +115,7 @@ class PlaybackService : MediaSessionService() {
             }).build()
         player.addListener(object : Player.Listener {
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                val metadataOnly = current?.mediaId == mediaItem?.mediaId && mediaItem?.mediaMetadata?.extras?.getBoolean("dearrowMetadataOnly") == true && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
+                val metadataOnly = current?.mediaMetadata?.extras?.getString("occurrence") == mediaItem?.mediaMetadata?.extras?.getString("occurrence") && current?.mediaId == mediaItem?.mediaId && mediaItem?.mediaMetadata?.extras?.getBoolean("dearrowMetadataOnly") == true && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
                 current = mediaItem
                 if (metadataOnly) return
                 owner = app.store.account.value
@@ -118,16 +134,49 @@ class PlaybackService : MediaSessionService() {
                     recordHistory()
                 } else persist()
             }
-            override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) persist(ended = true) }
+            override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { persist(ended = true); queue.advance(automatic = true) } }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) { queue.playerError("Playback failed. Retry to refresh the stream.") }
+            override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) { if (error == null) queue.playerError(null) }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
                 if (reason == Player.DISCONTINUITY_REASON_REMOVE) persist(item = oldPosition.mediaItem, position = oldPosition.positionMs)
                 else if (reason == Player.DISCONTINUITY_REASON_SEEK) persist()
             }
-            override fun onEvents(player: Player, events: Player.Events) { evaluateSponsor() }
+            override fun onEvents(player: Player, events: Player.Events) { queue.applySelection(); evaluateSponsor() }
         })
         scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
         scope.launch { while (isActive) { delay(100); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
+        scope.launch { app.playbackContext.collect { if (app.playbackQueue.value.context != null && app.playbackQueue.value.context != it) queue.close() } }
+        scope.launch { app.dearrowTitles.titles.collect { queue.syncDisplayTitle() } }
+    }
+    private fun queueCommand(action: String, args: Bundle): SessionResult {
+        if (args.getString("server") != app.store.server || args.getString("account") != app.store.account.value?.username || args.getLong("generation") != app.store.contextGeneration)
+            return SessionResult(SessionError.ERROR_INVALID_STATE)
+        if (action == QUEUE_STATE) return SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply { putString("state", app.playbackQueue.value.json().toString()) })
+        if (action !in listOf(QUEUE_START, QUEUE_INSERT, QUEUE_SETTINGS) && args.getString("token") != app.playbackQueue.value.token)
+            return SessionResult(SessionError.ERROR_INVALID_STATE)
+        when (action) {
+            QUEUE_START -> {
+                val id = args.getString("id").orEmpty(); val source = args.getString("source")
+                if ((id.isNotEmpty() && !SponsorBlockRules.validVideo(id)) || (source != null && !source.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) || id.isEmpty() && source == null)
+                    return SessionResult(SessionError.ERROR_BAD_VALUE)
+                queue.start(id, source, if (args.containsKey("index")) args.getInt("index") else null,
+                    if (args.containsKey("seconds")) args.getLong("seconds") else null, args.getBoolean("audio"))
+            }
+            QUEUE_INSERT -> {
+                val video = runCatching { ApiParser.video(JSONObject(args.getString("video") ?: "{}")) }.getOrNull()
+                    ?: return SessionResult(SessionError.ERROR_BAD_VALUE)
+                if (!SponsorBlockRules.validVideo(video.id)) return SessionResult(SessionError.ERROR_BAD_VALUE)
+                queue.insert(video, args.getBoolean("next"))
+            }
+            QUEUE_REMOVE -> queue.remove(args.getString("key").orEmpty())
+            QUEUE_DELETE_SOURCE -> queue.removeFromPlaylist(args.getString("key").orEmpty())
+            QUEUE_RETRY -> queue.retry()
+            QUEUE_MORE -> queue.more()
+            QUEUE_CLOSE -> queue.close()
+            QUEUE_SETTINGS -> queue.settings(AccountPreferences.parse(JSONObject(args.getString("settings") ?: "{}")))
+        }
+        return SessionResult(SessionResult.RESULT_SUCCESS)
     }
     private fun resetSponsor(item: MediaItem?, readSettings: Boolean = true) {
         segmentJob?.cancel(); segmentJob = null; segmentsRequested = false
@@ -238,5 +287,5 @@ class PlaybackService : MediaSessionService() {
         return START_NOT_STICKY
     }
     override fun onTaskRemoved(rootIntent: Intent?) { if (!player.playWhenReady || !app.store.background) { player.pause(); stopSelf() } }
-    override fun onDestroy() { scope.cancel(); session.release(); player.release(); super.onDestroy() }
+    override fun onDestroy() { queue.close(); scope.cancel(); session.release(); sessionPlayer.release(); player.release(); super.onDestroy() }
 }

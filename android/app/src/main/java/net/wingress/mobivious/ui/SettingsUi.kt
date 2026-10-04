@@ -102,6 +102,9 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     item {
                         SettingsHeading("Playback defaults")
                         SettingsToggle("Autoplay opened videos", "Start playing when you open a video", value.autoplay, !busy) { update(value.copy(autoplay = it)) }
+                        SettingsToggle("Next recommendation", "Select the next eligible recommendation when a standalone video ends", value.continueNext, !busy) { update(value.copy(continueNext = it)) }
+                        SettingsToggle("Autoplay next video", "Start successors automatically; opened-video autoplay also enables this", value.continueAutoplay, !busy) { update(value.copy(continueAutoplay = it)) }
+                        SettingsToggle("Loop videos by default", "Start playback sessions with Repeat One", value.videoLoop, !busy) { update(value.copy(videoLoop = it)) }
                         SettingsToggle("Audio only by default", "Disable video tracks when opening a video", value.listen, !busy) { update(value.copy(listen = it)) }
                         SettingsToggle("Proxy video streams", "Route streams through your Invidious instance", value.local, !busy) { update(value.copy(local = it)) }
                         SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString(), !busy) { update(value.copy(speed = it.toFloat())) }

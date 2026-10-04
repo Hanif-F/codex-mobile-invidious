@@ -9,6 +9,7 @@ data class AccountPreferences(
     val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true,
     val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings(),
     val autoplay: Boolean = true, val listen: Boolean = false, val local: Boolean = true,
+    val continueNext: Boolean = false, val continueAutoplay: Boolean = true, val videoLoop: Boolean = false,
     val speed: Float = 1f, val qualityDash: String = "auto", val captions: List<String> = listOf("", "", ""),
     val darkMode: String = "", val uiDensity: String = "balanced", val thinMode: Boolean = false,
     val defaultHome: String = "Popular", val feedMenu: List<String> = listOf("Popular", "Trending", "Subscriptions", "Playlists"),
@@ -21,6 +22,7 @@ data class AccountPreferences(
         put("watch_history", watchHistory); put("save_player_pos", savePosition)
         put("dearrow_enabled", dearrowEnabled); put("dearrow_show_original", dearrowShowOriginal)
         put("autoplay", autoplay); put("listen", listen); put("local", local)
+        put("continue", continueNext); put("continue_autoplay", continueAutoplay); put("video_loop", videoLoop)
         put("speed", speed); put("quality_dash", qualityDash); put("captions", JSONArray(captions))
         put("dark_mode", darkMode); put("ui_density", uiDensity); put("thin_mode", thinMode)
         put("default_home", defaultHome); put("feed_menu", JSONArray(feedMenu)); put("region", region)
@@ -59,6 +61,7 @@ data class AccountPreferences(
                 watchHistory = j.optBoolean("watch_history", true), savePosition = j.optBoolean("save_player_pos", false),
                 dearrowEnabled = j.optBoolean("dearrow_enabled", false), dearrowShowOriginal = j.optBoolean("dearrow_show_original", true), sponsorBlock = SponsorBlockSettings.parse(j),
                 autoplay = j.optBoolean("autoplay", true), listen = j.optBoolean("listen", false), local = j.optBoolean("local", true),
+                continueNext = j.optBoolean("continue", false), continueAutoplay = j.optBoolean("continue_autoplay", true), videoLoop = j.optBoolean("video_loop", false),
                 speed = rawSpeed.takeIf { it.isFinite() && it in .25f..2f } ?: 1f, qualityDash = j.text("quality_dash", "auto"),
                 captions = strings("captions", defaults.captions), darkMode = j.text("dark_mode").takeIf { it in listOf("", "light", "dark") } ?: "",
                 uiDensity = j.text("ui_density", "balanced").takeIf { it == "compact" } ?: "balanced", thinMode = j.optBoolean("thin_mode"),

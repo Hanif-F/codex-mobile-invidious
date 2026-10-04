@@ -623,3 +623,68 @@ Production use needs the sibling API update. Sign out/sign in for the new exact
 `GET:subscriptions/search` token scope; history retains `GET:history`. No database
 migration, new secret, signed release, production deployment or publication was
 performed.
+
+## Video library actions and playback queues — 4 October 2026
+
+Rows 17 and 32 implement shared video actions, save/create recovery, channel-block
+Undo, session audio playback and service-owned playlist/mix/temporary queues.
+Watch on YouTube and Switch Invidious instance actions are intentionally excluded;
+Settings → Server remains. Queues survive navigation, background audio and PiP
+while the service exists, then clear on close, service stop or account/instance
+change. External-playlist save/unsave, shuffle and restart restoration are outside
+this change.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 121 passed, including 16 new queue/library/API scenarios |
+| Debug application and instrumentation APK builds | Passed |
+| Android debug lint | Passed: zero errors, 40 warnings |
+| Crystal native preference specs | 3 examples passed |
+| Normal and API-only server executable builds | Passed |
+| Guarded disposable PostgreSQL account/API harness | Passed, including new shared boolean settings and existing account/security checks |
+| Disposable queue/library fixture HTTP checks | Passed |
+| Nine new Compose scenarios | Compile; runtime, native controls, layout and screenshots unverified |
+
+Unit/API checks cover distinct duplicate occurrences, overlapping source pages,
+finite versus mix tail ordering, continuation growth and no-successor errors,
+Play next during initial source loading, current removal, unavailable/member
+eligibility, previous/missing-page navigation, repeat page boundaries, all four
+autoplay combinations, playlist/mix link indexes/timestamps, sparse preference
+deltas, guest/private/mix credentials, exact occurrence deletion, create-success/
+save-failure recovery and stale requests/responses. Context generations reject
+delayed responses even after returning to the same account and instance.
+
+Fixture HTTP checks used local generated media and verified all 103 original
+playlist positions across overlapping windows, duplicate IDs with distinct
+`indexId` values, deleting only the requested occurrence, mix continuation,
+one-shot save failure followed by a retry without another creation, and shared
+boolean settings preserving unrelated values. The database harness ran against a
+fresh PostgreSQL 16 container bound only to localhost and the guarded
+`invidious_accounts_test` database. Temporary services were removed after checking.
+
+The new Compose scenarios cover guest sign-in-and-save, inline create/save retry,
+audio mode carrying across advancement, duplicate-source playback and Repeat All,
+local removal, Repeat One and owned-source deletion, background/recreated activity
+state, mix links/continuation/disabled All, PiP advancement and snackbar block Undo
+with context invalidation. They have **not executed**. `adb devices` showed no
+connected device. The installed Pixel_8_Pro emulator exited with SIGSEGV (139)
+before boot when started without snapshots using SwiftShader. Native control,
+foreground/background/PiP, layout, accessibility and screenshot acceptance remain
+unverified. Repeat on a working emulator/device with `scripts/test-android.sh`.
+
+Repeat build validation with:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug
+```
+
+Server validation used `crystal spec spec/native_preferences_spec.cr`, normal and
+`-Dapi_only -Dskip_videojs_download` builds, and the disposable account/API harness
+documented in `../invidious/docs/mobile-api.md`. Deploy the sibling native sparse
+PATCH allowlist extension before saving `continue`, `continue_autoplay` and
+`video_loop` in production. Reading/playback remains available on older servers;
+unsupported setting writes explain the required server update. This extension
+uses existing preferences/scopes, with no migration or token renewal. No production
+deployment, signed release or publication was performed.

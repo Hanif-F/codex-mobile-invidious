@@ -37,12 +37,12 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
 default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
-                     autoplay=True, listen=False, local=True, speed=1.0, quality_dash='auto', captions=['', '', ''],
+                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
                      related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
                      sort='published', latest_only=False, unseen_only=False, notifications_only=False,
-                     default_playlist=None, show_member_videos=False, unrelated_setting='preserved')
+                     default_playlist=None, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
 state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
@@ -195,8 +195,9 @@ class Handler(BaseHTTPRequestHandler):
                 items = {1: [visibility_member], 2: [video]}.get(int(parse_qs(url.query).get('page', ['1'])[0]), [])
             self.respond(items)
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
-        elif p == '/api/v1/videos/testvideo01':
-            self.respond(dict(**video, description='A generated test video. No YouTube access is involved.',
+        elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03'):
+            selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
+            self.respond(dict(**selected, description='A generated test video. No YouTube access is involved.',
                               dashUrl='/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd', adaptiveFormats=rich_formats() if state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=[recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended]), liveNow=state['liveNow'], isMember=state['memberCurrent']))
@@ -212,9 +213,22 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId=video['authorId'])])
         elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
         elif p == '/api/v1/auth/playlists': self.respond(state['playlists'])
-        elif p.startswith('/api/v1/auth/playlists/'):
-            pl = next((x for x in state['playlists'] if x['playlistId'] == p.split('/')[-1]), None)
-            self.respond(pl or {}, 200 if pl else 404)
+        elif p.startswith('/api/v1/auth/playlists/') or p.startswith('/api/v1/playlists/'):
+            plid = p.rsplit('/', 1)[-1]
+            pl = next((x for x in state['playlists'] if x['playlistId'] == plid), None)
+            if plid == 'PLfixture':
+                pl = dict(playlistId=plid, title='Public queue', videoCount=103,
+                          videos=[dict(video if i % 2 == 0 else recommended, indexId='', index=i) for i in range(103)])
+            if pl:
+                params = parse_qs(url.query)
+                offset = int(params.get('index', ['0'])[0])
+                videos = [dict(v, index=i) for i, v in enumerate(pl['videos'])]
+                self.respond(dict(pl, videos=videos[max(0, offset - 50):max(0, offset - 50) + 100]))
+            else: self.respond(dict(error='Playlist does not exist.'), 404)
+        elif p.startswith('/api/v1/mixes/'):
+            continuation = parse_qs(url.query).get('continuation', ['testvideo01'])[0]
+            upcoming = 'testvideo02' if continuation == 'testvideo01' else 'testvideo03'
+            self.respond(dict(mixId=p.rsplit('/', 1)[-1], title='Fixture mix', videos=[dict(video, index=0, videoId=continuation), dict(recommended, index=1, videoId=upcoming)]))
         elif p == '/api/v1/auth/history':
             params = parse_qs(url.query, keep_blank_values=True)
             q = params.get('q', [''])[0].strip().lower()
@@ -249,8 +263,12 @@ class Handler(BaseHTTPRequestHandler):
     def mutate(self):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
-        if p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
+        if p == '/test/queue':
+            state['playlists'] = [dict(playlistId='IVqueue', title='Queue fixture', privacy='private', videoCount=3, videos=[dict(video, indexId='A', index=0), dict(video, indexId='B', index=1), dict(recommended, indexId='C', index=2)])]
+            state['failPlaylistSave'] = bool(data.get('failSave', False))
+            return self.respond(state)
+        elif p == '/test/reset':
+            state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0, failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[])
             prefs.clear()
@@ -357,15 +375,27 @@ class Handler(BaseHTTPRequestHandler):
                 if self.command != 'DELETE': state['watched'].append(id)
             self.respond(status=204)
         elif p == '/api/v1/auth/playlists' and self.command == 'POST':
-            state['playlists'].append(dict(playlistId='IVfixture', title=data['title'], privacy=data['privacy'], videoCount=0, videos=[]))
-            self.respond(dict(playlistId='IVfixture'), 201)
+            plid = 'IVfixture' if not state['playlists'] else f"IVfixture{len(state['playlists'])}"
+            state['playlists'].append(dict(playlistId=plid, title=data['title'], privacy=data['privacy'], videoCount=0, videos=[]))
+            state['events'].append(dict(action='playlist-create', playlist=plid))
+            self.respond(dict(playlistId=plid, title=data['title']), 201)
         elif p.startswith('/api/v1/auth/playlists/'):
-            pl = state['playlists'][0]
+            plid = p.split('/')[5]
+            pl = next((x for x in state['playlists'] if x['playlistId'] == plid), None)
+            if not pl: return self.respond(dict(error='Missing playlist'), 404)
             if p.endswith('/videos'):
-                pl['videos'].append(dict(**video, indexId='A')); pl['videoCount'] = len(pl['videos'])
-            elif '/videos/' in p: pl['videos'] = []; pl['videoCount'] = 0
+                if state.get('failPlaylistSave'):
+                    state['failPlaylistSave'] = False
+                    return self.respond(dict(error='One-shot save failure'), 502)
+                entry = dict(video if data['videoId'] == video['videoId'] else recommended, videoId=data['videoId'], indexId=f"{len(pl['videos']) + 10:X}", index=len(pl['videos']))
+                pl['videos'].append(entry); pl['videoCount'] = len(pl['videos'])
+                state['events'].append(dict(action='playlist-save', playlist=plid, video=data['videoId']))
+                return self.respond(entry, 201)
+            elif '/videos/' in p:
+                stable = p.rsplit('/', 1)[-1]
+                pl['videos'] = [v for v in pl['videos'] if v['indexId'] != stable]; pl['videoCount'] = len(pl['videos'])
             elif self.command == 'PATCH': pl.update(data)
-            elif self.command == 'DELETE': state['playlists'].clear()
+            elif self.command == 'DELETE': state['playlists'].remove(pl)
             self.respond(status=204)
         else: self.respond(status=204)
 

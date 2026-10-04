@@ -6,6 +6,12 @@ import net.wingress.mobivious.data.SessionStore
 import net.wingress.mobivious.data.ResponseCache
 import net.wingress.mobivious.data.WatchedRepository
 import net.wingress.mobivious.data.BlockedRepository
+import net.wingress.mobivious.data.PlaybackQueueSnapshot
+import net.wingress.mobivious.data.ApiContext
+import net.wingress.mobivious.data.DeArrowTitles
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 
@@ -15,15 +21,21 @@ class MobiviousApplication : Application() {
     lateinit var cache: ResponseCache
     lateinit var watched: WatchedRepository
     lateinit var blocked: BlockedRepository
+    lateinit var dearrowTitles: DeArrowTitles
+    private val titleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val offline = MutableStateFlow(false)
+    val playbackQueue = MutableStateFlow(PlaybackQueueSnapshot())
+    val playbackContext = MutableStateFlow<ApiContext?>(null)
     override fun onCreate() {
         super.onCreate()
         store = SessionStore(this)
         cache = ResponseCache(File(cacheDir, "feeds"))
-        api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it })
+        api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration })
+        dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }
         watched = WatchedRepository(api, store)
         blocked = BlockedRepository(api, store)
-        store.onContextChanged = { watched.reset(it); blocked.reset(it) }
+        store.onContextChanged = { watched.reset(it); blocked.reset(it); dearrowTitles.clear(); playbackContext.value = it }
+        playbackContext.value = api.context()
         blocked.reset()
         watched.reset()
         if (store.account.value == null) watched.configure(api.context(), store.guestDeArrow().savePosition)

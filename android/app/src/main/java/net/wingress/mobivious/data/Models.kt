@@ -7,7 +7,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 data class Video(val id: String, val title: String, val author: String = "", val channelId: String = "",
     val thumbnail: String = "", val duration: Long = 0, val views: Long = 0, val published: String = "",
     val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false,
-    val history: HistoryMetadata? = null)
+    val history: HistoryMetadata? = null, val playlistIndex: Int? = null)
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,
@@ -28,10 +28,10 @@ data class Playlist(val id: String, val title: String, val count: Int, val priva
 data class Comment(val author: String, val text: String, val published: String, val likes: Long)
 data class Page<T>(val items: List<T>, val continuation: String = "")
 data class Account(val token: String, val username: String, val expiresAt: Long, val server: String)
-data class ApiContext(val server: String, val account: Account?)
+data class ApiContext(val server: String, val account: Account?, val generation: Long = 0)
 data class DeArrowIdentity(val ready: Boolean, val configured: Boolean)
 data class DeArrowSubmission(val title: String, val original: Boolean, val votes: Int, val locked: Boolean, val uuid: String)
-data class VideoLink(val id: String, val seconds: Long? = null)
+data class VideoLink(val id: String, val seconds: Long? = null, val playlistId: String? = null, val index: Int? = null)
 
 object VideoLinks {
     private val idPattern = Regex("^[A-Za-z0-9_-]{11}$")
@@ -40,15 +40,20 @@ object VideoLinks {
         val url = candidate.toHttpUrlOrNull() ?: return null
         val host = url.host.removePrefix("www.").removePrefix("m.")
         val instanceHost = instance.toHttpUrlOrNull()?.host
+        if (host !in listOf("youtu.be", "youtube.com", "youtube-nocookie.com", instanceHost, "invidious.wingress.net", "mobivious.wingress.net")) return null
         val id = when {
             host == "youtu.be" -> url.pathSegments.firstOrNull()
             host == "youtube.com" || host == "youtube-nocookie.com" || host == instanceHost || host == "invidious.wingress.net" || host == "mobivious.wingress.net" ->
                 url.queryParameter("v") ?: if (url.pathSegments.firstOrNull() in listOf("shorts", "embed", "live")) url.pathSegments.getOrNull(1) else null
             else -> null
-        } ?: return null
-        if (!idPattern.matches(id)) return null
+        }
+        val list = url.queryParameter("list")?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) }
+        if (id == null && (list == null || url.pathSegments.firstOrNull() !in listOf("playlist", "mix", "watch"))) return null
+        if (id != null && !idPattern.matches(id)) return null
+        val youtube = host in listOf("youtu.be", "youtube.com", "youtube-nocookie.com")
+        val index = url.queryParameter("index")?.toIntOrNull()?.let { if (youtube) it - 1 else it }?.takeIf { it >= 0 }
         val timestamp = url.queryParameter("t") ?: url.queryParameter("start") ?: url.fragment?.removePrefix("t=")
-        return VideoLink(id, timestamp?.let(::timestampSeconds))
+        return VideoLink(id.orEmpty(), timestamp?.let(::timestampSeconds), list, index)
     }
     fun timestampSeconds(value: String): Long? {
         value.removeSuffix("s").toLongOrNull()?.let { return it.takeIf { seconds -> seconds >= 0 } }
@@ -71,7 +76,8 @@ object ApiParser {
         json.text("title", "Unavailable video"), json.text("author", json.text("channel_name")),
         json.text("authorId", json.text("channel_id")), thumbnail(json),
         json.optLong("lengthSeconds", json.optLong("length_seconds")), json.optLong("viewCount"),
-        json.text("publishedText", json.text("latest_watched")), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title"), json.opt("isMember") == true)
+        json.text("publishedText", json.text("latest_watched")), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title") || json.text("author") == "[Deleted video]" || json.text("title") in listOf("[Deleted video]", "[Private video]"), json.opt("isMember") == true,
+        playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null)
     fun videos(array: JSONArray): List<Video> = array.objects().filter { it.text("videoId", it.text("video_id")).isNotBlank() }.map(::video)
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",

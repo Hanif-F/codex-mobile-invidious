@@ -28,9 +28,9 @@ object ContentVisibility {
             (!filterBlocked || it.channelId !in blocked) }
     }
     // Pagination must operate on the original response, including hidden occurrences.
-    fun merge(old: List<Video>, next: List<Video>) = (old + next).distinctBy { it.id to it.indexId }
+    fun merge(old: List<Video>, next: List<Video>) = (old + next).distinctBy { Triple(it.id, it.indexId, it.playlistIndex) }
     fun exhausted(old: List<Video>, next: List<Video>): Boolean = next.isEmpty() ||
-        next.all { video -> old.any { it.id == video.id && it.indexId == video.indexId } }
+        next.all { video -> old.any { it.id == video.id && it.indexId == video.indexId && it.playlistIndex == video.playlistIndex } }
 }
 
 data class BlockedChannel(val id: String, val name: String) {

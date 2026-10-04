@@ -19,9 +19,9 @@ class ApiException(val status: Int, message: String, val retryAfter: String? = n
 class InvidiousApi(private val server: () -> String, private val account: () -> Account?,
     private val expired: () -> Unit = {}, private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build(),
-    private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}) {
+    private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}, private val generation: () -> Long = { 0 }) {
     private val contributionClient = client.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
-    fun context() = ApiContext(server(), account())
+    fun context() = ApiContext(server(), account(), generation())
     companion object {
         fun normalizeServer(input: String, debug: Boolean): String {
             val url = input.trim().trimEnd('/').toHttpUrl()
@@ -35,7 +35,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun request(path: String, method: String = "GET", data: JSONObject? = null, auth: Boolean = false,
         query: Map<String, String> = emptyMap(), context: ApiContext? = null): String = withContext(Dispatchers.IO) {
         val target = context ?: this@InvidiousApi.context()
-        if (context != null && (target.server != server() || target.account != account())) throw CancellationException("Account or instance changed")
+        if (context != null && target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
         val address = target.server.toHttpUrl().newBuilder().addPathSegments(path.removePrefix("/"))
             .apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
         val builder = Request.Builder().url(address).header("Accept", "application/json")
@@ -46,7 +46,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         }
         builder.method(method, if (method in listOf("POST", "PUT", "PATCH")) (data ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()) else null)
         val cacheKey = if (method == "GET" && path in listOf("api/v1/popular", "api/v1/trending", "api/v1/search", "api/v1/auth/feed")) "$address|${if (auth) target.account?.token else "public"}" else null
-        val transport = if (method != "GET" && path.startsWith("api/v1/auth/dearrow/")) contributionClient else client
+        val transport = if (method != "GET") contributionClient else client
         try { transport.newCall(builder.build()).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) {
@@ -93,6 +93,10 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         request(path, query = query, auth = auth, context = context).also {
             if (context != this.context()) throw CancellationException("Account or instance changed")
         }
+    private suspend fun scopedPlaylistWrite(path: String, method: String, context: ApiContext, data: JSONObject? = null): String =
+        request(path, method, data, auth = true, context = context).also {
+            if (context != this.context()) throw CancellationException("Account or instance changed")
+        }
     suspend fun video(id: String, local: Boolean = true) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to local.toString()))))
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
     suspend fun channel(id: String) = ApiParser.channel(JSONObject(request("api/v1/channels/$id")))
@@ -124,14 +128,28 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         mapOf("details" to "true", "organized" to "true", "q" to q, "page" to "$page"), true, context))
     suspend fun playlists() = JSONArray(request("api/v1/auth/playlists", auth = true)).objects().map(ApiParser::playlist)
     suspend fun playlist(id: String, page: Int = 1): Pair<Playlist, List<Video>> {
-        val j = JSONObject(request("api/v1/auth/playlists/$id", auth = true, query = mapOf("page" to "$page")))
-        return ApiParser.playlist(j) to ApiParser.videos(j.optJSONArray("videos") ?: JSONArray())
+        val result = queuePage(id, (page - 1) * 100)
+        return Playlist(result.source.id, result.source.title, result.source.count) to result.videos
     }
-    suspend fun createPlaylist(title: String, privacy: String) { request("api/v1/auth/playlists", "POST", JSONObject().put("title", title).put("privacy", privacy), true) }
+    suspend fun queuePage(id: String, index: Int = 0, continuation: String? = null, context: ApiContext = context()): QueuePage {
+        require(id.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) { "Invalid playlist ID." }
+        val mix = id.startsWith("RD")
+        val auth = !mix && context.account != null
+        val path = if (mix) "api/v1/mixes/$id" else "api/v1/${if (auth) "auth/" else ""}playlists/$id"
+        val query = if (mix) continuation?.let { mapOf("continuation" to it) }.orEmpty() else buildMap {
+            put("index", "$index"); if (continuation != null && index == 0) put("continuation", continuation)
+        }
+        val j = JSONObject(scopedRead(path, query, auth, context))
+        return QueuePage(QueueSource(id, j.text("title"), j.optInt("videoCount"), mix), ApiParser.videos(j.optJSONArray("videos") ?: JSONArray()))
+    }
+    suspend fun createPlaylist(title: String, privacy: String, context: ApiContext = context()): Playlist {
+        val j = JSONObject(scopedPlaylistWrite("api/v1/auth/playlists", "POST", context, JSONObject().put("title", title).put("privacy", privacy)))
+        return Playlist(j.getString("playlistId"), j.text("title", title), 0, privacy)
+    }
     suspend fun editPlaylist(id: String, title: String, privacy: String, description: String) { request("api/v1/auth/playlists/$id", "PATCH", JSONObject().put("title", title).put("privacy", privacy).put("description", description), true) }
     suspend fun deletePlaylist(id: String) { request("api/v1/auth/playlists/$id", "DELETE", auth = true) }
-    suspend fun addToPlaylist(id: String, video: String) { request("api/v1/auth/playlists/$id/videos", "POST", JSONObject().put("videoId", video), true) }
-    suspend fun removeFromPlaylist(id: String, index: String) { request("api/v1/auth/playlists/$id/videos/$index", "DELETE", auth = true) }
+    suspend fun addToPlaylist(id: String, video: String, context: ApiContext = context()): Video = ApiParser.video(JSONObject(scopedPlaylistWrite("api/v1/auth/playlists/$id/videos", "POST", context, JSONObject().put("videoId", video))))
+    suspend fun removeFromPlaylist(id: String, index: String, context: ApiContext = context()) { require(index.matches(Regex("^[A-Fa-f0-9]+$"))) { "Missing playlist occurrence ID." }; scopedPlaylistWrite("api/v1/auth/playlists/$id/videos/$index", "DELETE", context) }
     suspend fun preferences(context: ApiContext = context()): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context)))
     suspend fun preferences(changes: JSONObject, context: ApiContext): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", "PATCH", changes, true, context = context)))
     suspend fun dearrowTitle(id: String, context: ApiContext = context()): String? = JSONObject(request("api/v1/dearrow/$id", context = context)).text("title").trim().takeIf { it.isNotEmpty() }

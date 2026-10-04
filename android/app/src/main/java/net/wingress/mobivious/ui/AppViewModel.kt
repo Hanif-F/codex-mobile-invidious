@@ -73,10 +73,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val seekAccumulator = SeekAccumulator()
     private var seekJob: Job? = null
     private var seekContext: ApiContext? = null
-    private data class SelectionSnapshot(val video: StreamKey?, val audio: StreamKey?, val text: StreamKey?,
-        val parameters: TrackSelectionParameters, val speed: Float, val playing: Boolean)
-    private data class SelectionRequest(val mediaId: String, val quality: String, val snapshot: SelectionSnapshot?)
-    private var selectionRequest: SelectionRequest? = null
     val channel = MutableStateFlow<Channel?>(null)
     val channelTab = MutableStateFlow<ChannelTab?>(null)
     val playlists = MutableStateFlow<List<Playlist>>(emptyList())
@@ -88,11 +84,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val sponsorBlock = MutableStateFlow(SponsorBlockPlayback())
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
     fun openSponsorBlock(channelId: String = "") { sponsorSettingsChannel.value = channelId; refreshSharedSettings() }
-    val dearrowTitles = DeArrowTitles(viewModelScope, { store.server }) { api.dearrowTitle(it) }
+    val dearrowTitles = app.dearrowTitles
     val dearrowIdentity = MutableStateFlow<DeArrowIdentity?>(null)
     val dearrowIdentityError = MutableStateFlow<String?>(null)
     val dearrowContribution = MutableStateFlow(DeArrowContributionState())
     val message = MutableStateFlow<String?>(null)
+    val blockUndo = MutableStateFlow<BlockUndo?>(null)
+    val saveSheet = MutableStateFlow(PlaylistSaveState())
+    val queue = app.playbackQueue
+    val queueOpen = MutableStateFlow(false)
     var tab = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).first
     val navigation = MutableStateFlow(tab to "")
     var route = ""
@@ -128,7 +128,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             runCatching {
                 controller.value = future.get().apply {
                     addListener(object : Player.Listener {
-                        override fun onEvents(player: Player, events: Player.Events) { applyRequestedSelection(); updatePlayback() }
+                        override fun onEvents(player: Player, events: Player.Events) { updatePlayback() }
                         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) { cancelAccumulatedSeek() }
                         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                             if (pendingSeek.value?.mediaId != mediaItem?.mediaId) cancelAccumulatedSeek(false)
@@ -140,15 +140,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     })
                     if (currentMediaItem == null) setPlaybackSpeed(store.defaultSpeed)
-                    currentMediaItem?.mediaId?.takeIf { it.isNotBlank() }?.let { id ->
-                        requestedVideo = id
-                        val restoreContext = api.context()
-                        viewModelScope.launch { runCatching { api.video(id) }.onSuccess {
-                            if (api.context() == restoreContext && requestedVideo == id && controller.value?.currentMediaItem?.mediaId == id) {
-                                playback.value = playback.value.copy(details = it); ensureDeArrow(id); syncDeArrowMetadata(); syncSponsorSettings()
-                            }
-                        } }
-                    }
                     val stateContext = api.context()
                     val state = sendCustomCommand(SessionCommand(PlaybackService.SPONSOR_STATE, Bundle.EMPTY), Bundle.EMPTY)
                     state.addListener({ if (api.context() == stateContext && sponsorBlock.value.token.isEmpty()) runCatching { receiveSponsorState(state.get().extras) } }, ContextCompat.getMainExecutor(application))
@@ -156,8 +147,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }.onFailure { message.value = "Unable to connect to the player." }
         }, ContextCompat.getMainExecutor(application))
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
+        viewModelScope.launch { var previous = queue.value; queue.collect { state ->
+            if (previous.source?.id == state.source?.id && previous.source?.count != state.source?.count && state.source != null) {
+                if (route == "playlist:${state.source.id}") refresh()
+                if (account.value != null) refreshAccount()
+            }
+            previous = state
+            requestedVideo = state.current?.video?.id
+            val old = playback.value.details?.video?.id
+            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error)
+            if (old != state.details?.video?.id) {
+                cancelAccumulatedSeek(false); commentJob?.cancel(); comments.value = Page(emptyList()); commentError.value = null
+                contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
+            }
+            state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
+        } }
         viewModelScope.launch { account.collect {
             browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
+            blockUndo.value = null
+            val pendingSave = saveSheet.value
+            if (pendingSave.video != null) {
+                if (pendingSave.context?.server == api.context().server) { saveSheet.value = PlaylistSaveState(pendingSave.video, api.context()); if (it != null) loadSaveLists() }
+                else saveSheet.value = PlaylistSaveState()
+            }
             app.blocked.reset(); searchVisibility.value = store.searchVisibility(api.context())
             searchInput.value = SearchInput(); scopedSearch.value = SearchInput()
             cancelAccumulatedSeek(false)
@@ -176,7 +188,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             else dearrowTitles.clear()
             syncDeArrowMetadata()
         } }
-        viewModelScope.launch { preferences.collect { syncSponsorSettings(); syncHistorySettings() } }
+        viewModelScope.launch { preferences.collect { syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
         refresh()
     }
     private fun receiveSponsorState(args: Bundle) {
@@ -246,7 +258,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val block = id !in blocked.value.ids
         action {
             app.blocked.setBlocked(context, id, name, block)
-            if (api.context() == context) { message.value = if (block) "Channel blocked" else "Channel unblocked"; refreshBlockedChannels() }
+            if (api.context() == context) { message.value = if (block) "Channel blocked" else "Channel unblocked"
+                blockUndo.value = if (block) BlockUndo(id, name, context, SystemClock.elapsedRealtime() + 5000) else null
+                refreshBlockedChannels() }
         }
     }
     fun saveSearchVisibility(value: SearchVisibility) {
@@ -344,7 +358,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             continuation = response.continuation; response.items
                         }
                     }
-                    selectedRoute.startsWith("playlist:") -> api.playlist(selectedRoute.substringAfter(':'), page).let { if (generation == browseGeneration && context == api.context()) playlist.value = it.first; it.second }
+                    selectedRoute.startsWith("playlist:") -> {
+                        val id = selectedRoute.substringAfter(':'); val mix = id.startsWith("RD")
+                        val result = api.queuePage(id, if (more) (old.videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1 else 0,
+                            if (mix && more) old.videos.lastOrNull()?.id else null, context)
+                        if (generation == browseGeneration && context == api.context()) playlist.value = Playlist(id, result.source.title, result.source.count)
+                        hasMore = if (mix) result.videos.isNotEmpty() && !ContentVisibility.exhausted(old.videos, result.videos)
+                            else (result.videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1 < result.source.count && result.videos.isNotEmpty()
+                        result.videos
+                    }
                     selectedRoute == "history" -> {
                         val response = api.history(page, scopedQuery, context)
                         if (generation != browseGeneration || context != api.context()) throw CancellationException("History request superseded")
@@ -372,100 +394,83 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
-    fun play(id: String, explicit: Long? = null) = loadVideo(id, explicit)
-    private fun loadVideo(id: String, explicit: Long? = null, snapshot: SelectionSnapshot? = null) {
+    fun queueCommand(command: String, values: Bundle.() -> Unit = {}) {
+        val context = api.context()
+        val args = Bundle().apply {
+            putString("server", context.server); putString("account", context.account?.username); putLong("generation", context.generation); putString("token", queue.value.token); values()
+        }
+        viewModelScope.launch {
+            val p = controller.value ?: future.awaitController()
+            if (context != api.context()) return@launch
+            val result = p.sendCustomCommand(SessionCommand(command, Bundle.EMPTY), args)
+            result.addListener({ runCatching { if (result.get().resultCode != SessionResult.RESULT_SUCCESS) message.value = "Playback request expired. Try again." } }, ContextCompat.getMainExecutor(getApplication()))
+        }
+    }
+    fun play(id: String, explicit: Long? = null, source: String? = null, index: Int? = null, audio: Boolean = false) {
         cancelAccumulatedSeek(false)
-        selectionRequest = null
-        if (id == playback.value.details?.video?.id && explicit == null) { controller.value?.play(); return }
-        requestedVideo = id
-        if (id != dearrowContribution.value.videoId) { contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState() }
-        videoJob?.cancel(); commentJob?.cancel(); comments.value = Page(emptyList()); commentError.value = null
-        playback.value = playback.value.copy(loading = true, error = null)
-        videoJob = viewModelScope.launch {
+        queueCommand(PlaybackService.QUEUE_START) { putString("id", id); source?.let { putString("source", it) }; index?.let { putInt("index", it) }; explicit?.let { putLong("seconds", it) }; putBoolean("audio", audio) }
+    }
+    fun playVideo(video: Video, source: Playlist? = null, audio: Boolean = false) = play(video.id, source = source?.id, index = video.playlistIndex, audio = audio)
+    fun openLink(link: VideoLink): Boolean {
+        if (link.id.isEmpty()) { navigate("Library", "playlist:${link.playlistId}"); return false }
+        play(link.id, link.seconds, link.playlistId, link.index); return true
+    }
+    fun insertQueue(video: Video, next: Boolean) {
+        queueCommand(PlaybackService.QUEUE_INSERT) {
+            putBoolean("next", next); putString("video", JSONObject().put("videoId", video.id).put("title", video.title).put("author", video.author)
+                .put("authorId", video.channelId).put("lengthSeconds", video.duration).put("isMember", video.membersOnly).toString())
+        }
+        message.value = if (next) "Will play next" else "Added to queue"
+    }
+    fun removePlaylistVideo(list: Playlist, video: Video) {
+        val occurrence = queue.value.items.firstOrNull { it.video.indexId == video.indexId }
+        if (queue.value.source?.id == list.id && occurrence != null) queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", occurrence.key) }
+        else action { val context = api.context(); api.removeFromPlaylist(list.id, video.indexId, context); if (context == api.context()) { refresh(); refreshAccount(); message.value = "Removed from playlist" } }
+    }
+    fun selectQueue(key: String) { cancelAccumulatedSeek(false); val state = queue.value; val index = state.items.indexOfFirst { it.key == key }; val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0; if (index >= 0) controller.value?.seekTo(index + prefix, C.TIME_UNSET) }
+    fun nextQueue(direction: Int) { cancelAccumulatedSeek(false); if (direction > 0) controller.value?.seekToNextMediaItem() else controller.value?.seekToPreviousMediaItem() }
+    fun repeatQueue(value: QueueRepeat) { controller.value?.repeatMode = when(value) { QueueRepeat.ONE -> Player.REPEAT_MODE_ONE; QueueRepeat.ALL -> Player.REPEAT_MODE_ALL; else -> Player.REPEAT_MODE_OFF } }
+    fun retryPlayback() { cancelAccumulatedSeek(); queueCommand(PlaybackService.QUEUE_RETRY) }
+    fun closePlayer() { cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueOpen.value = false }
+    fun undoBlock(value: BlockUndo) {
+        if (value != blockUndo.value || value.context != api.context() || SystemClock.elapsedRealtime() > value.expires) return
+        blockUndo.value = null
+        action { app.blocked.setBlocked(value.context, value.id, value.name, false); if (api.context() == value.context) { message.value = "Channel unblocked"; refreshBlockedChannels() } }
+    }
+    fun openSave(video: Video) { saveSheet.value = PlaylistSaveState(video, api.context()); if (account.value != null) loadSaveLists() }
+    fun dismissSave() { if (!saveSheet.value.busy) saveSheet.value = PlaylistSaveState() }
+    fun editSave(title: String, privacy: String) { if (!saveSheet.value.busy) saveSheet.value = saveSheet.value.copy(title = title.take(150), privacy = privacy) }
+    fun loadSaveLists() {
+        val state = saveSheet.value; val context = state.context ?: return
+        if (state.loading || state.busy || context.account == null) return
+        saveSheet.value = state.copy(loading = true, error = null)
+        viewModelScope.launch {
+            try { val lists = api.playlists().filter { it.id.startsWith("IV") }; if (saveSheet.value.video == state.video && context == api.context()) saveSheet.value = saveSheet.value.copy(lists = lists.sortedBy { it.id != preferences.value.defaultPlaylist }, loading = false) }
+            catch (e: CancellationException) { throw e } catch (e: Exception) { if (saveSheet.value.video == state.video && context == api.context()) saveSheet.value = saveSheet.value.copy(loading = false, error = friendly(e)) }
+        }
+    }
+    fun saveVideo(list: Playlist? = null) {
+        val state = saveSheet.value; val context = state.context ?: return; val video = state.video ?: return
+        if (state.busy || state.loading || context != api.context() || context.account == null || list == null && state.created == null && state.title.isBlank()) return
+        saveSheet.value = state.copy(busy = true, error = null)
+        viewModelScope.launch {
             try {
-                val context = api.context()
-                val prefsGeneration = preferenceGeneration
-                val fetched = if (context.account != null) try { api.preferences(context) }
-                    catch (e: CancellationException) { throw e } catch (_: Exception) { preferences.value }
-                    else store.guestDeArrow().copy(watchHistory = false)
-                val prefs = if (prefsGeneration != preferenceGeneration && preferencesContext == context) preferences.value else fetched
-                val details = api.video(id, prefs.local)
-                if (api.context() != context) throw CancellationException("Account or instance changed")
-                if (prefsGeneration == preferenceGeneration) { preferencesContext = context; preferences.value = prefs }
-                app.watched.configure(context, prefs.savePosition)
-                val saved = if (prefs.savePosition && account.value != null) try { api.position(id, context) }
-                    catch (e: CancellationException) { throw e } catch (_: Exception) { store.position(id, context) }
-                    else if (prefs.savePosition) store.position(id, context) else 0
-                if (api.context() != context) throw CancellationException("Account or instance changed")
-                val start = PlaybackRules.resume(saved, details.video.duration, explicit)
-                val base = store.server.toHttpUrlOrNull()!!
-                fun resolve(url: String) = base.resolve(url)?.takeIf { it.isHttps || net.wingress.mobivious.BuildConfig.DEBUG && it.host in listOf("10.0.2.2", "127.0.0.1", "localhost") }?.toString().orEmpty()
-                val raw = details.hls.ifBlank { details.dash }.ifBlank { details.fallback }
-                val stream = resolve(raw).ifBlank { if (details.dash.isNotBlank() || !details.video.live) api.url("api/manifest/dash/id/$id", mapOf("local" to prefs.local.toString())).toString() else "" }
-                require(stream.isNotBlank()) { "No playable stream is available." }
-                val uri = stream.toHttpUrlOrNull()!!.newBuilder().setQueryParameter("local", prefs.local.toString()).build().toString()
-                val metadata = MediaMetadata.Builder().setTitle(details.video.title).setArtist(details.video.author)
-                    .setArtworkUri(Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
-                        putBoolean("history", prefs.watchHistory); putBoolean("savePosition", prefs.savePosition)
-                        putString("channelId", details.video.channelId); putBoolean("liveNow", details.video.live)
-                        putString("sponsorblock", prefs.sponsorBlock.effective(details.video.channelId, account.value != null).json().toString())
-                    }).build()
-                val caption = PreferenceRules.caption(prefs.captions, details.captions)
-                val item = MediaItem.Builder().setMediaId(id).setUri(uri).setMediaMetadata(metadata)
-                    .setMimeType(if (details.hls.isNotBlank()) MimeTypes.APPLICATION_M3U8 else if (details.dash.isNotBlank() || details.fallback.isBlank()) MimeTypes.APPLICATION_MPD else MimeTypes.VIDEO_MP4)
-                    .setSubtitleConfigurations(details.captions.map { track -> MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(track.url))).setMimeType(MimeTypes.TEXT_VTT).setLanguage(track.language).setLabel(track.label)
-                        .setSelectionFlags(if (track == caption) C.SELECTION_FLAG_DEFAULT else 0).build() }).build()
-                val p = controller.value ?: future.awaitController()
-                p.pause()
-                p.trackSelectionParameters = (snapshot?.parameters ?: p.trackSelectionParameters).buildUpon()
-                    .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).clearOverridesOfType(C.TRACK_TYPE_VIDEO)
-                    .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) ?: prefs.listen)
-                    .setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
-                    .setPreferredAudioLanguage(snapshot?.parameters?.preferredAudioLanguages?.firstOrNull())
-                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) ?: (caption == null))
-                    .setPreferredTextLanguage(snapshot?.parameters?.preferredTextLanguages?.firstOrNull() ?: caption?.language).build()
-                p.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
-                p.setMediaItem(item, start * 1000)
-                selectionRequest = SelectionRequest(id, prefs.qualityDash, snapshot)
-                p.prepare(); p.playWhenReady = snapshot?.playing ?: prefs.autoplay
-                playback.value = PlaybackState(details = details)
-                ensureDeArrow(id); syncDeArrowMetadata()
-                updatePlayback()
-                syncSponsorSettings()
-            } catch (e: CancellationException) { throw e } catch (e: Exception) { playback.value = playback.value.copy(loading = false, error = friendly(e)) }
+                val target = list ?: state.created ?: api.createPlaylist(state.title.trim(), state.privacy, context).also {
+                    if (context == api.context()) {
+                        saveSheet.value = saveSheet.value.copy(created = it, lists = saveSheet.value.lists + it)
+                        playlists.value = playlists.value.filterNot { list -> list.id == it.id } + it
+                        refreshAccount()
+                    }
+                }
+                if (context != api.context()) throw CancellationException()
+                api.addToPlaylist(target.id, video.id, context)
+                if (context == api.context()) { saveSheet.value = PlaylistSaveState(); message.value = "Saved to ${target.title}"; refreshAccount(); if (route == "playlist:${target.id}") refresh() }
+            } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                if (context == api.context() && saveSheet.value.video == video) saveSheet.value = saveSheet.value.copy(busy = false,
+                    error = if (saveSheet.value.created != null) "Playlist created. Saving failed: ${friendly(e)} Retry saving below." else friendly(e))
+            }
         }
     }
-    private fun selectionSnapshot(): SelectionSnapshot? = controller.value?.let { p ->
-        fun selected(type: Int): StreamKey? = p.currentTracks.groups.filter { it.type == type }.firstNotNullOfOrNull { group ->
-            p.trackSelectionParameters.overrides[group.mediaTrackGroup]?.trackIndices?.singleOrNull()?.let { StreamKey.of(group.getTrackFormat(it)) }
-        }
-        SelectionSnapshot(selected(C.TRACK_TYPE_VIDEO), selected(C.TRACK_TYPE_AUDIO), selected(C.TRACK_TYPE_TEXT), p.trackSelectionParameters, p.playbackParameters.speed, p.playWhenReady)
-    }
-    private fun applyRequestedSelection() {
-        val request = selectionRequest ?: return
-        val p = controller.value ?: return
-        if (p.currentMediaItem?.mediaId != request.mediaId || p.playbackState != Player.STATE_READY || p.currentTracks.groups.isEmpty()) return
-        selectionRequest = null // Clear before setting parameters, which itself emits player events.
-        val builder = p.trackSelectionParameters.buildUpon()
-        for (type in listOf(C.TRACK_TYPE_VIDEO, C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_TEXT)) {
-            val choices = StreamCatalog.choices(p.currentTracks, type)
-            val key = when (type) { C.TRACK_TYPE_VIDEO -> request.snapshot?.video; C.TRACK_TYPE_AUDIO -> request.snapshot?.audio; else -> request.snapshot?.text }
-            val choice = if (request.snapshot != null) StreamCatalog.find(choices, key)
-                else if (type == C.TRACK_TYPE_VIDEO) StreamCatalog.defaultVideo(choices, request.quality) else null
-            if (choice != null) builder.setOverrideForType(TrackSelectionOverride(choice.group, choice.index))
-            else if (key != null && type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(null)
-        }
-        p.trackSelectionParameters = builder.build()
-    }
-    fun retryPlayback() {
-        cancelAccumulatedSeek()
-        val id = requestedVideo ?: return
-        val at = if (controller.value?.currentMediaItem?.mediaId == id) controller.value!!.currentPosition / 1000 else null
-        val snapshot = if (controller.value?.currentMediaItem?.mediaId == id) selectionSnapshot() else null
-        playback.value = playback.value.copy(details = null)
-        loadVideo(id, at, snapshot)
-    }
-    fun closePlayer() { cancelAccumulatedSeek(false); selectionRequest = null; videoJob?.cancel(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); controller.value?.stop(); controller.value?.clearMediaItems(); playback.value = PlaybackState() }
     fun togglePlay() { cancelAccumulatedSeek(false); controller.value?.let {
         if (it.playbackState == Player.STATE_ENDED) { it.seekToDefaultPosition(); it.play() }
         else if (it.playWhenReady) it.pause() else it.play()
@@ -532,7 +537,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         updatePlayback()
     }
     fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
-    fun autoQuality() { selectionRequest = null; controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE).build() } }
+    fun autoQuality() { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE).build() } }
     // Resolution callers select one current-video representation; defaults are edited in Settings.
     fun quality(height: Int) { if (height == Int.MAX_VALUE) autoQuality() else controller.value?.let { p ->
         StreamCatalog.defaultVideo(StreamCatalog.choices(p.currentTracks, C.TRACK_TYPE_VIDEO), "${height}p")?.let { selectTrack(it.group, it.index) }
@@ -555,7 +560,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectTrack(group: TrackGroup, index: Int) { controller.value?.let { p ->
         val current = p.currentTracks.groups.firstOrNull { it.mediaTrackGroup == group } ?: return
         if (index !in 0 until current.length || !current.isTrackSupported(index) || !p.isCommandAvailable(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS)) return
-        if (group.type == C.TRACK_TYPE_VIDEO) selectionRequest = null
         val builder = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(group.type, false)
             .setOverrideForType(TrackSelectionOverride(group, index))
         if (group.type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(group.getFormat(index).language)
@@ -572,7 +576,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
     fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null); app.cache.clear(); navigate("Home") } }
-    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++

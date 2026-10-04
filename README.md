@@ -151,6 +151,24 @@ blocking nor visibility changes interrupt playback. Deploy the sibling metadata,
 preference and blocking API update; sign out and sign in again for the new blocking
 scopes. Native runtime/layout acceptance remains pending a working emulator.
 
+Video actions now include Save to playlist, inline Create and save, Audio mode,
+Play next, Add to queue, channel navigation and Block/Unblock with Undo. Save retains
+the selected video through sign-in and retries a failed add without recreating its
+playlist. Watch on YouTube and Switch Invidious instance actions are excluded;
+Settings → Server still configures the app's instance.
+
+Public playlist/mix links open for guests; watch links retain list, occurrence index
+and timestamp. The service owns sequential playback, paging and dynamic mix
+continuation, including background audio and PiP. Open Playback queue from the
+watch page or player controls to select items, navigate previous/next, remove local
+queue entries, delete an owned playlist occurrence separately, or select repeat
+Off/One/All. All applies to finite queues. Queues last until playback closes, the
+service stops, or the account/instance changes. Shared next-recommendation,
+autoplay-next and single-video-loop defaults require the sibling native preference
+PATCH allowlist update, using existing scopes and no migration. Runtime repeat
+selection is session-only. Native runtime/layout acceptance remains unverified
+because the installed emulator crashes before boot; see VERIFICATION.md.
+
 The native sign-in/history/settings extensions must be deployed before account
 features work against production. An APK alone does not update the Ubuntu server.
 
