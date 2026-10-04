@@ -157,7 +157,7 @@ class VisibilitySmokeTest {
         until { first !in activity.model.blocked.value.ids && !activity.model.blocked.value.loading }
         compose.onNodeWithText("No blocked channels").assertIsDisplayed()
     }
-    @Test fun directMemberPlaybackWatchBlockingAndRecommendationsKeepPlayerRunning() {
+    @Test fun directMemberPlaybackChannelBlockingAndRecommendationsKeepPlayerRunning() {
         login()
         command("""{"memberCurrent":true}""")
         compose.onNodeWithText("A quiet moment · playback fixture", substring = false).performClick()
@@ -165,19 +165,26 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("video-members-testvideo01", useUnmergedTree = true).assertExists()
         assertFalse(activity.model.preferences.value.showMemberVideos)
         val media = activity.model.controller.value!!.currentMediaItem!!.mediaId
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
+        compose.onNodeWithTag("watch-actions-menu").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Video actions").assertDoesNotExist()
+        compose.onNodeWithText("Playback queue").assertExists()
+        compose.onAllNodesWithText("Mobivious Studio", substring = false)[0].performClick()
+        until { activity.model.channel.value != null && !activity.model.browse.value.loading }
         command("""{"failBlockedWrite":true}""")
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions-menu"))
-        compose.onNodeWithTag("watch-actions-menu").performClick()
+        compose.onNodeWithTag("channel-actions-$first").performClick()
         compose.onNodeWithTag("channel-block-$first").performClick()
         until { activity.model.blocked.value.actionErrors[first] != null }
         compose.onNodeWithTag("channel-block-$first").assertDoesNotExist()
         compose.onNodeWithTag("channel-block-error-$first").performScrollTo().assertIsDisplayed()
         assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)
         command("""{"failBlockedWrite":false}""")
-        compose.onNodeWithTag("watch-actions-menu").performScrollTo().performClick()
+        compose.onNodeWithTag("channel-actions-$first").performScrollTo().performClick()
         compose.onNodeWithTag("channel-block-$first").performClick()
         until { first in activity.model.blocked.value.ids }
         assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)
+        compose.onNodeWithTag("mini-player-preview").performClick()
+        compose.onNodeWithTag("watch-details-list").assertExists()
         assertTrue(activity.model.visibleVideos(activity.model.playback.value.details!!.recommendations, ContentSurface.RECOMMENDATIONS).none { it.channelId == first || it.membersOnly })
         save(activity.model.preferences.value.copy(showMemberVideos = true))
         assertTrue(fixture().getJSONObject("preferences").getBoolean("show_member_videos"))

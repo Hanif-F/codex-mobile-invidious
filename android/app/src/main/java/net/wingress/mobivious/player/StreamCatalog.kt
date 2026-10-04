@@ -22,7 +22,7 @@ data class StreamKey(val id: String?, val language: String?, val label: String?,
 }
 data class StreamChoice(val group: TrackGroup, val index: Int, val key: StreamKey, val primary: String,
     val secondary: String, val selected: Boolean, val height: Int, val fps: Float, val bitrate: Long,
-    val section: AudioSection = AudioSection.OTHER, val identity: String = "", val codec: String = "") {
+    val section: AudioSection = AudioSection.OTHER, val identity: String = "", val codec: String = "", val originalIndex: Int = 0) {
     fun explicitlySelected(parameters: TrackSelectionParameters?) = parameters?.overrides?.get(group)?.trackIndices?.contains(index) == true
 }
 
@@ -45,7 +45,8 @@ object StreamCatalog {
         val drcHint = Regex("stable volume|\\bdrc\\b", RegexOption.IGNORE_CASE).containsMatchIn(label)
         val matching = pool.filter { f ->
             if (!audio) (format.height <= 0 || f.height == format.height || f.width == format.width) &&
-                (format.bitrate <= 0 || f.bitrate == format.bitrate.toLong())
+                (format.bitrate <= 0 || f.bitrate == format.bitrate.toLong()) &&
+                (format.codecs.isNullOrBlank() || codecLabel(format.codecs.orEmpty(), format.sampleMimeType.orEmpty()) == codecLabel(f.codec, f.mimeType))
             else (lang.isEmpty() || language(f).isEmpty() || language(f) == lang) &&
                 (name.isEmpty() || f.audio?.name.isNullOrBlank() || normalized(f.audio.name) == name) &&
                 (label.isEmpty() || stable(f) == drcHint) &&
@@ -58,7 +59,8 @@ object StreamCatalog {
 
     fun choices(tracks: Tracks, type: Int, formats: List<StreamFormat> = emptyList()): List<StreamChoice> {
         val raw = tracks.groups.filter { it.type == type }.flatMap { group ->
-            (0 until group.length).filter { group.isTrackSupported(it) }.map { index ->
+            (0 until group.length).filter { group.isTrackSupported(it) &&
+                (type != C.TRACK_TYPE_VIDEO || group.getTrackFormat(it).roleFlags and C.ROLE_FLAG_TRICK_PLAY == 0) }.map { index ->
                 val f = group.getTrackFormat(index)
                 val meta = metadata(f, formats)
                 val height = f.height.takeIf { it > 0 } ?: meta?.height ?: 0
@@ -74,15 +76,21 @@ object StreamCatalog {
                 val knownDub = meta?.audio?.default == false || f.roleFlags and C.ROLE_FLAG_ALTERNATE != 0
                 val section = when { isStable -> AudioSection.STABLE; original -> AudioSection.ORIGINAL; knownDub -> AudioSection.DUBBED; else -> AudioSection.OTHER }
                 val primary = if (type == C.TRACK_TYPE_VIDEO) {
-                    if (height > 0) "${height}p${if (fps > 0) " · ${decimal(fps.toDouble(), 2)} FPS" else ""}" else "Video track ${index + 1}"
+                    (if (height > 0) "${height}p${if (fps > 0) fps.roundToInt() else ""}" else "Video track ${index + 1}") + " · ${codec.ifBlank { "Unknown codec" }}"
                 } else if (type == C.TRACK_TYPE_AUDIO) name.replace(Regex("\\[\\s*\\d+(?:\\.\\d+)?k\\s*]"), "").trim() else name
-                val secondary = if (type == C.TRACK_TYPE_TEXT) "" else listOf(codec, bitrateLabel(bitrate), bytesLabel(meta?.bytes ?: 0)).filter { it.isNotEmpty() }.joinToString(" · ")
+                val secondary = when (type) {
+                    C.TRACK_TYPE_TEXT -> ""
+                    C.TRACK_TYPE_VIDEO -> listOf(bytesLabel(meta?.bytes ?: 0), bitrateLabel(bitrate)).filter { it.isNotEmpty() }.joinToString(" · ")
+                    else -> listOf(codec, bitrateLabel(bitrate), bytesLabel(meta?.bytes ?: 0)).filter { it.isNotEmpty() }.joinToString(" · ")
+                }
                 StreamChoice(group.mediaTrackGroup, index, StreamKey.of(f), primary, secondary, group.isTrackSelected(index),
                     height, fps, bitrate, section, meta?.audio?.id ?: f.language ?: name, codec)
             }
         }
-        val ordered = if (type == C.TRACK_TYPE_VIDEO) rank(raw) else if (type == C.TRACK_TYPE_AUDIO)
+        val indexed = raw.mapIndexed { index, entry -> entry.copy(originalIndex = index) }
+        val ordered = if (type == C.TRACK_TYPE_VIDEO) rank(indexed) else if (type == C.TRACK_TYPE_AUDIO)
             raw.sortedWith(compareBy<StreamChoice> { it.section.ordinal }.thenBy { it.identity }.thenByDescending { it.bitrate }) else raw
+        if (type == C.TRACK_TYPE_VIDEO) return ordered
         return ordered.map { entry ->
             val peers = ordered.filter { if (type == C.TRACK_TYPE_VIDEO) it.height == entry.height && it.fps.roundToInt() == entry.fps.roundToInt() && it.codec == entry.codec
                 else type == C.TRACK_TYPE_AUDIO && it.section == entry.section && it.identity == entry.identity && it.codec == entry.codec }
@@ -95,19 +103,74 @@ object StreamCatalog {
         }
     }
     fun rank(choices: List<StreamChoice>) = choices.sortedWith(compareByDescending<StreamChoice> { it.height }.thenByDescending { it.fps }.thenByDescending { it.bitrate })
-    fun defaultVideo(choices: List<StreamChoice>, preference: String): StreamChoice? {
+    /** Menu pruning never changes the representation catalog used by selection. */
+    fun qualityMenu(choices: List<StreamChoice>): List<StreamChoice> = choices.groupBy { it.height to it.fps.roundToInt() }
+        .entries.sortedWith(compareByDescending<Map.Entry<Pair<Int, Int>, List<StreamChoice>>> { it.key.first }.thenByDescending { it.key.second })
+        .flatMap { (_, entries) ->
+            val sorted = entries.sortedWith(compareByDescending<StreamChoice> { it.bitrate }.thenBy { it.originalIndex })
+            if (sorted.size <= 4) sorted else {
+                val families = sorted.groupBy { it.codec }
+                val others = families.keys.filter { it != "AV1" && it != "H.264" }.sortedWith(compareBy<String> { it.isEmpty() }.thenBy { it })
+                val kept = mutableListOf<StreamChoice>()
+                for (codec in listOf("AV1", "H.264") + others) {
+                    val variants = families[codec].orEmpty()
+                    val known = variants.filter { it.bitrate > 0 }
+                    val high = known.firstOrNull() ?: variants.firstOrNull() ?: continue
+                    if (kept.size == 4) break
+                    kept.add(high)
+                    val low = known.firstOrNull { it.bitrate == known.last().bitrate }
+                    if (low != null && low.bitrate != high.bitrate && kept.size < 4) kept.add(low)
+                }
+                kept.sortedWith(compareByDescending<StreamChoice> { it.bitrate }.thenBy { sorted.indexOf(it) })
+            }
+        }
+    fun preferredCodec(value: String) = when (value) { "av1" -> "AV1"; "h264" -> "H.264"; else -> "" }
+    fun automaticVideo(choices: List<StreamChoice>, codec: String): List<StreamChoice> =
+        choices.filter { preferredCodec(codec).isNotEmpty() && it.codec == preferredCodec(codec) }.ifEmpty { choices }
+    fun defaultVideo(choices: List<StreamChoice>, preference: String, codec: String = "auto"): StreamChoice? {
         val sorted = rank(choices)
-        return when (preference) { "auto" -> null; "best" -> sorted.firstOrNull(); "worst" -> sorted.lastOrNull()
-            else -> preference.removeSuffix("p").toIntOrNull()?.let { height -> sorted.firstOrNull { it.height <= height } ?: sorted.lastOrNull() } }
+        if (preference == "auto" || sorted.isEmpty()) return null
+        var lowest = preference == "worst"
+        val target = when (preference) { "best" -> sorted.first(); "worst" -> sorted.last()
+            else -> preference.removeSuffix("p").toIntOrNull()?.let { height ->
+                sorted.firstOrNull { it.height <= height } ?: sorted.last().also { lowest = true }
+            } ?: return null }
+        val family = preferredCodec(codec)
+        val preferred = sorted.filter { family.isNotEmpty() && it.height == target.height && it.codec == family }
+        return (if (lowest) preferred.lastOrNull() else preferred.firstOrNull()) ?: target
+    }
+    fun qualityText(choice: StreamChoice) = listOf(choice.primary, bitrateLabel(choice.bitrate)).filter { it.isNotEmpty() }.joinToString(" · ")
+    fun findVideo(choices: List<StreamChoice>, key: StreamKey?): StreamChoice? = key?.let { wanted ->
+        val ids = choices.filter { !wanted.id.isNullOrBlank() && it.key.id == wanted.id }
+        if (ids.isNotEmpty()) ids.singleOrNull() else choices.filter {
+            it.key.height == wanted.height && it.key.width == wanted.width && it.key.fps == wanted.fps &&
+                it.key.bitrate == wanted.bitrate && it.key.codec == wanted.codec
+        }.singleOrNull()
     }
     fun find(choices: List<StreamChoice>, key: StreamKey?) = key?.let { wanted -> choices.filter { it.key == wanted }.singleOrNull() }
     private fun decimal(value: Double, digits: Int) = String.format(Locale.US, "%.${digits}f", value).trimEnd('0').trimEnd('.')
     fun bitrateLabel(value: Long) = when { value >= 1_000_000 -> "${decimal(value / 1_000_000.0, 2)} Mbps"; value >= 1000 -> "${decimal(value / 1000.0, 1)} kbps"; value > 0 -> "$value bps"; else -> "" }
     fun bytesLabel(value: Long) = when { value >= 1_000_000_000 -> "${decimal(value / 1_000_000_000.0, 1)} GB"; value >= 1_000_000 -> "${decimal(value / 1_000_000.0, 1)} MB"; value >= 1000 -> "${decimal(value / 1000.0, 1)} kB"; value > 0 -> "$value B"; else -> "" }
-    private fun codecLabel(codec: String, mime: String): String = when {
-        codec.startsWith("avc") || mime == "video/avc" -> "H.264"; codec.startsWith("hev") || codec.startsWith("hvc") || mime == "video/hevc" -> "HEVC"
-        codec.startsWith("vp09") || mime == "video/x-vnd.on2.vp9" -> "VP9"; codec.startsWith("av01") || mime == "video/av01" -> "AV1"
-        codec.startsWith("mp4a") || mime == "audio/mp4a-latm" -> "AAC"; codec.contains("opus") || mime == "audio/opus" -> "Opus"
-        else -> codec.ifBlank { mime.substringAfter('/', "") }
+    fun codecLabel(codec: String, mime: String): String {
+        val tokens = codec.split(',').map { it.trim() }.filter { it.isNotBlank() }
+        val token = (if (mime.startsWith("video/")) tokens.firstOrNull { !Regex("^(mp4a|aac|ac-3|ec-3|opus|vorbis|flac)(\\.|$)", RegexOption.IGNORE_CASE).containsMatchIn(it) }
+            else tokens.firstOrNull()).orEmpty()
+        val value = token.lowercase(Locale.ROOT)
+        return when {
+            value.startsWith("avc") || value in listOf("h264", "h.264") -> "H.264"
+            value.startsWith("hev") || value.startsWith("hvc") || value == "hevc" -> "HEVC"
+            value.startsWith("vp09") || value == "vp9" -> "VP9"
+            value.startsWith("vp08") || value == "vp8" -> "VP8"
+            value.startsWith("av01") || value == "av1" -> "AV1"
+            value.startsWith("mp4a") -> "AAC"
+            value.contains("opus") -> "Opus"
+            token.isNotEmpty() -> token
+            else -> when (mime) {
+                "video/avc" -> "H.264"; "video/hevc" -> "HEVC"; "video/x-vnd.on2.vp9" -> "VP9"
+                "video/x-vnd.on2.vp8" -> "VP8"; "video/av01" -> "AV1"; "audio/mp4a-latm" -> "AAC"; "audio/opus" -> "Opus"
+                "video/mp4", "video/webm" -> ""
+                else -> mime.substringAfter('/', "")
+            }
+        }
     }
 }

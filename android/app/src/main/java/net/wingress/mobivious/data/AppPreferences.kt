@@ -10,7 +10,7 @@ data class AccountPreferences(
     val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings(),
     val autoplay: Boolean = true, val listen: Boolean = false, val local: Boolean = true,
     val continueNext: Boolean = false, val continueAutoplay: Boolean = true, val videoLoop: Boolean = false,
-    val speed: Float = 1f, val qualityDash: String = "auto", val captions: List<String> = listOf("", "", ""),
+    val speed: Float = 1f, val qualityDash: String = "auto", val videoCodec: String = "auto", val captions: List<String> = listOf("", "", ""),
     val darkMode: String = "", val uiDensity: String = "balanced", val thinMode: Boolean = false,
     val defaultHome: String = "Popular", val feedMenu: List<String> = listOf("Popular", "Trending", "Subscriptions", "Playlists"),
     val region: String = "US", val relatedVideos: Boolean = true, val extendDescription: Boolean = false,
@@ -23,7 +23,7 @@ data class AccountPreferences(
         put("dearrow_enabled", dearrowEnabled); put("dearrow_show_original", dearrowShowOriginal)
         put("autoplay", autoplay); put("listen", listen); put("local", local)
         put("continue", continueNext); put("continue_autoplay", continueAutoplay); put("video_loop", videoLoop)
-        put("speed", speed); put("quality_dash", qualityDash); put("captions", JSONArray(captions))
+        put("speed", speed); put("quality_dash", qualityDash); put("video_codec", PreferenceRules.videoCodec(videoCodec)); put("captions", JSONArray(captions))
         put("dark_mode", darkMode); put("ui_density", uiDensity); put("thin_mode", thinMode)
         put("default_home", defaultHome); put("feed_menu", JSONArray(feedMenu)); put("region", region)
         put("related_videos", relatedVideos); put("extend_desc", extendDescription); put("comments", JSONArray(comments))
@@ -62,7 +62,7 @@ data class AccountPreferences(
                 dearrowEnabled = j.optBoolean("dearrow_enabled", false), dearrowShowOriginal = j.optBoolean("dearrow_show_original", true), sponsorBlock = SponsorBlockSettings.parse(j),
                 autoplay = j.optBoolean("autoplay", true), listen = j.optBoolean("listen", false), local = j.optBoolean("local", true),
                 continueNext = j.optBoolean("continue", false), continueAutoplay = j.optBoolean("continue_autoplay", true), videoLoop = j.optBoolean("video_loop", false),
-                speed = rawSpeed.takeIf { it.isFinite() && it in .25f..2f } ?: 1f, qualityDash = j.text("quality_dash", "auto"),
+                speed = rawSpeed.takeIf { it.isFinite() && it in .25f..2f } ?: 1f, qualityDash = j.text("quality_dash", "auto"), videoCodec = PreferenceRules.videoCodec(j.opt("video_codec")),
                 captions = strings("captions", defaults.captions), darkMode = j.text("dark_mode").takeIf { it in listOf("", "light", "dark") } ?: "",
                 uiDensity = j.text("ui_density", "balanced").takeIf { it == "compact" } ?: "balanced", thinMode = j.optBoolean("thin_mode"),
                 defaultHome = j.text("default_home", "Popular"), feedMenu = strings("feed_menu", defaults.feedMenu), region = j.text("region", "US"),
@@ -74,6 +74,8 @@ data class AccountPreferences(
 }
 
 object PreferenceRules {
+    val videoCodecs = listOf("auto" to "Auto", "av1" to "AV1", "h264" to "H.264")
+    fun videoCodec(value: Any?) = (value as? String)?.takeIf { codec -> videoCodecs.any { it.first == codec } } ?: "auto"
     val homes = listOf("", "Popular", "Trending", "Subscriptions", "Playlists")
     val qualities = listOf("auto", "best", "4320p", "2160p", "1440p", "1080p", "720p", "480p", "360p", "240p", "144p", "worst")
     fun qualityLabel(value: String) = when (value) { "auto" -> "Auto"; "best" -> "Best"; "worst" -> "Worst"; else -> value }

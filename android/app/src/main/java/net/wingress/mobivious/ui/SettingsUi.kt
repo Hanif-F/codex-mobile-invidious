@@ -105,8 +105,9 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsToggle("Audio only by default", "Disable video tracks when opening a video", value.listen, !busy) { update(value.copy(listen = it)) }
                         SettingsToggle("Proxy video streams", "Route streams through your Invidious instance", value.local, !busy) { update(value.copy(local = it)) }
                         SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString(), !busy) { update(value.copy(speed = it.toFloat())) }
+                        SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec, !busy) { update(value.copy(videoCodec = it)) }
                         SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash, !busy) { update(value.copy(qualityDash = it)) }
-                        Text("Speed, quality and audio defaults apply to the next video. A resolution selects the best available stream at or below it.", style = MaterialTheme.typography.bodySmall)
+                        Text("Playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
                     }
                     item {
                         SettingsHeading("On this device")

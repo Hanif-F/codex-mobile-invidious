@@ -46,7 +46,7 @@ class SearchHistorySmokeTest {
     }
     private fun signIn() {
         compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)) }
-        until { vm.subscriptions.value.isNotEmpty() }
+        until { vm.subscriptionChannels.value.channels.isNotEmpty() }
     }
     private fun openHistory() {
         signIn(); compose.runOnUiThread { vm.navigate("Library", "history") }

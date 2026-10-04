@@ -85,6 +85,11 @@ watch history; descriptions, captions, read-only comments and recommendations.
 Channel pages and Subscriptions each have their own search field. Channel search
 keeps the selected Videos/Streams/Playlists tab available; clearing search restores it.
 Subscription search matches titles/channels across the cached subscription library.
+The Channels button stays above the Subscriptions feed and opens a separate
+Subscribed channels screen. Channels are sorted by name; Search channels filters
+names as you type. Opening a channel and going Back retains the directory's search
+and scroll position. Refresh and Retry reload the channel list independently of
+playlists and the video feed, using the existing subscriptions API.
 History supports title/channel search, account-timezone date groups and saved
 release/watch metadata, including unavailable videos. Search icons, the keyboard
 Search action and physical Enter submit through the same handler; general Search
@@ -113,10 +118,18 @@ when opening or leaving the watch screen. Visible video playback and buffering k
 the screen awake in the watch player, fullscreen, mini-player and PiP; paused,
 audio-only and hidden playback allow the normal screen timeout.
 
-The quality menu selects exact supported representations with codec/FPS/bitrate
-details. Audio choices distinguish original, stable-volume and dubbed streams
+The quality menu selects exact supported representations with codec/FPS labels,
+numeric bitrates and available file sizes. Each resolution/FPS group shows at most
+four choices, prioritizing the highest and lowest AV1 and H.264 bitrates; automatic
+playback still uses the full supported catalog. Audio choices distinguish original, stable-volume and dubbed streams
 where metadata is available. Saved quality defaults include Auto, Best, 4320p
-through 144p and Worst; player choices apply to the current video. Double tap
+through 144p and Worst. The shared preferred video codec offers Auto, AV1 and H.264.
+DASH playback applies the preference from its first video segment, choosing the
+resolution before the codec for fixed presets and falling back when unsupported
+or unavailable. Codec and quality defaults apply to the next video; manual choices
+survive refresh/retry and reconnection, and queue successors start from saved
+defaults. Deploy the sibling native `video_codec` PATCH extension for account
+synchronization; guests save the preference per instance. Double tap
 starts a ten-second skip, further taps add ten seconds, and opposite taps reset
 the direction. Playback pauses until a single jump 600 ms after the last tap,
 then restores its previous playing or paused state. Reliable audio labels use the
@@ -140,7 +153,7 @@ Settings has its own screen, with dedicated Playback, Appearance, Browsing, Subs
 History & library, SponsorBlock, DeArrow, Server and About screens. Supported web
 preferences sync with the account using sparse updates. Guests save preferences per
 instance, including local resume. Playback defaults include autoplay, audio only,
-proxy streams, speed, resolution ceiling and three caption-language priorities.
+proxy streams, speed, preferred DASH codec, resolution ceiling and three caption-language priorities.
 Appearance supports light/dark/system, compact lists and hidden thumbnails. Browsing
 includes homepage/navigation priorities, region and video-page visibility; feeds
 include page size, sorting and filters. The default playlist appears first in Save.
@@ -158,7 +171,7 @@ and watch metadata. These controls filter lists; they do not provide membership
 access. History and direct links remain available.
 
 Channel blocking requires sign-in and shares the website’s block list. Block or
-unblock from video-card actions, watch pages and channel headers, or use Settings →
+unblock from video-card actions and channel headers, or use Settings →
 Browsing → Blocked channels. Blocks hide discovery, search and recommendations;
 subscriptions, playlists, history and direct channel/video access remain available.
 Confirmed block lists are saved per account/instance for offline filtering. Neither
@@ -175,7 +188,7 @@ Settings → Server still configures the app's instance.
 Frequent actions use visible buttons and labeled chips. Channel menus group RSS,
 blocking and SponsorBlock settings; playlist menus group RSS, editing and deletion.
 Subscriptions has an RSS/OPML menu, and History has a Clear watch history menu.
-The watch action row includes Playback queue and a blocking menu. Queue item menus
+The watch action row includes Playback queue. Queue item menus
 distinguish Remove from queue from Remove from playlist. Settings selectors show
 their label and current value, and descriptions expand through an arrow row.
 

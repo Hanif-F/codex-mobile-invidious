@@ -69,7 +69,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val playlistSearch by vm.playlistSearch.collectAsStateWithLifecycle()
     val channelPlaylistSort by vm.channelPlaylistSort.collectAsStateWithLifecycle()
-    val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
+    val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
+    val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
+    val discovery by vm.discovery.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
@@ -80,6 +82,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val scopedSearch by vm.scopedSearch.collectAsStateWithLifecycle()
     val browseReset by vm.browseReset.collectAsStateWithLifecycle()
     val browseList = rememberLazyListState()
+    val subscriptionList = key(vm.api.context()) { rememberLazyListState() }
     LaunchedEffect(browseReset) { browseList.scrollToItem(0) }
     val visibleVideos = ContentVisibility.filter(state.videos, vm.contentSurface(), prefs.showMemberVideos, searchVisibility, blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty())
     var tab by rememberSaveable { mutableStateOf(vm.tab) }
@@ -113,7 +116,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
-    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank())) { when { fullscreen -> fullscreen = false; watch -> { if (!vm.backComments()) { vm.cancelAccumulatedSeek(); watch = false } }; else -> navigate(tab) } }
+    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank())) { when { fullscreen -> fullscreen = false; watch -> { if (!vm.backComments()) { vm.cancelAccumulatedSeek(); watch = false } }; else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
             if (pip || fullscreen) {
@@ -124,9 +127,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             else Scaffold(
                 topBar = { TopAppBar(title = {
                     if (watch) Text("Now playing", style = MaterialTheme.typography.titleMedium)
+                    else if (route == "subscription-channels") Text("Subscribed channels", maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else if (route.isNotEmpty()) Text(channel?.name ?: playlist?.title ?: state.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("Mobivious", fontWeight = FontWeight.Bold) }
-                }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { vm.cancelAccumulatedSeek(); if (watch) { if (!vm.backComments()) watch = false } else navigate(tab) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
+                }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { vm.cancelAccumulatedSeek(); if (watch) { if (!vm.backComments()) watch = false } else vm.backBrowse() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
                     if (!watch && account != null && route.isEmpty() && tab == "Subscriptions") {
                         OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
                             DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
@@ -171,6 +175,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         FilterChip(selected = !playlistSearch, onClick = { vm.setPlaylistSearch(false) }, label = { Text("Videos") })
                         FilterChip(selected = playlistSearch, onClick = { vm.setPlaylistSearch(true) }, label = { Text("Playlists & mixes") })
                     }
+                    if (route.isEmpty() && tab == "Subscriptions") Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Subscriptions", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                        FilledTonalButton(onClick = { navigate("Subscriptions", "subscription-channels") }, modifier = Modifier.testTag("subscription-channels-button")) {
+                            Icon(Icons.Default.Subscriptions, null); Spacer(Modifier.width(8.dp)); Text("Channels")
+                        }
+                    }
                     if (route == "history" && account != null || route.isEmpty() && tab == "Subscriptions" && account != null) {
                         val historyScreen = route == "history"
                         Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -182,10 +192,16 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (historyScreen && state.history?.organized == false) Text("Update this server to enable organized history and history search.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
                     }
                     if (route.isEmpty() && tab == "Home") Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        (prefs.feedMenu.filter { it in listOf("Popular", "Trending") } + listOf("Popular", "Trending")).distinct().forEach { name -> val key = name.lowercase(); FilterChip(selected = vm.discovery == key, onClick = { vm.discovery = key; vm.refresh() }, label = { Text(name) }) }
+                        (prefs.feedMenu.filter { it in listOf("Popular", "Trending") } + listOf("Popular", "Trending")).distinct().forEach { name -> val key = name.lowercase(); FilterChip(selected = discovery == key, onClick = { vm.selectDiscovery(key) }, label = { Text(name) }, modifier = Modifier.testTag("discovery-$key")) }
                         Spacer(Modifier.weight(1f)); IconButton(onClick = vm::refresh) { Icon(Icons.Default.Refresh, "Refresh") }
                     }
-                    if (route.isEmpty() && (tab == "Library" || tab == "Subscriptions") && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { dialog = "login" }
+                    if (route == "subscription-channels") {
+                        if (account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { dialog = "login" }
+                        else SubscriptionChannelsScreen(subscriptionChannels.takeIf { it.context == vm.api.context() } ?: SubscriptionChannelsState(), vm.store.server, prefs.thinMode,
+                            subscriptionList, { query -> vm.searchSubscriptionChannels(query); scope.launch { subscriptionList.scrollToItem(0) } }, vm::refreshSubscriptions,
+                            { id -> navigate("Subscriptions", "channel:$id") })
+                    }
+                    else if (route.isEmpty() && (tab == "Library" || tab == "Subscriptions") && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { dialog = "login" }
                     else if (tab == "Library" && route.isEmpty()) LazyColumn(Modifier.fillMaxSize().testTag("library-playlist-list"), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item { Text("Your library", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
                         item { Card(onClick = { navigate("Library", "history") }, modifier = Modifier.fillMaxWidth()) { Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.History, null); Spacer(Modifier.width(16.dp)); Text("Watch history", Modifier.weight(1f)); Icon(Icons.Default.ChevronRight, null) } } }
@@ -383,7 +399,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
     }
 }
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, controller: androidx.media3.session.MediaController?, modifier: Modifier, fullscreen: () -> Unit, settings: () -> Unit, settingsOpen: Boolean, add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
-    val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
+    val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
+    val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
@@ -423,12 +440,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
                             AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
                             AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
                             AssistChip(onClick = { vm.queueOpen.value = true }, label = { Text("Playback queue") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) })
-                            if (ContentVisibility.validChannel(details.video.channelId)) OverflowMenu("Video actions", listOf(details.video.id, vm.api.context()), Modifier.testTag("watch-actions-menu")) { close ->
-                                BlockChannelMenuItem(vm, details.video.channelId, details.video.author, signIn, Modifier.testTag("channel-block-${details.video.channelId}"), close)
-                            }
                         }
                         if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
-                        ChannelBlockingError(vm, details.video.channelId)
                         blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                         if (prefs.showYoutubeComments) CommentsEntry(comments, vm::openComments)
                         ActionRow(if (description) "Hide description" else "Show description",

@@ -140,14 +140,17 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val notifications = ApiParser.videos(j.optJSONArray("notifications") ?: JSONArray())
         return if (notificationsOnly) notifications else notifications + ApiParser.videos(j.optJSONArray("videos") ?: JSONArray())
     }
-    suspend fun subscriptions() = JSONArray(request("api/v1/auth/subscriptions", auth = true)).objects().map(ApiParser::channel)
+    suspend fun subscriptions(context: ApiContext = context()) = JSONArray(scopedRead("api/v1/auth/subscriptions", emptyMap(), true, context)).objects().map(ApiParser::channel)
     suspend fun blockedChannels(context: ApiContext) = BlockedChannel.parse(JSONArray(request("api/v1/auth/blocked_channels", auth = true, context = context)))
     suspend fun blockChannel(id: String, name: String, blocked: Boolean, context: ApiContext) {
         require(ContentVisibility.validChannel(id)) { "This video has no valid channel ID." }
         request("api/v1/auth/blocked_channels/$id", if (blocked) "POST" else "DELETE",
             if (blocked) JSONObject().put("name", name) else null, auth = true, context = context)
     }
-    suspend fun subscribe(id: String, subscribe: Boolean) { request("api/v1/auth/subscriptions/$id", if (subscribe) "POST" else "DELETE", auth = true) }
+    suspend fun subscribe(id: String, subscribe: Boolean, context: ApiContext = context()) {
+        request("api/v1/auth/subscriptions/$id", if (subscribe) "POST" else "DELETE", auth = true, context = context)
+            .also { if (context != this.context()) throw CancellationException("Account or instance changed") }
+    }
     suspend fun history(page: Int, q: String = "", context: ApiContext = context()) = History.parse(scopedRead("api/v1/auth/history",
         mapOf("details" to "true", "organized" to "true", "q" to q, "page" to "$page"), true, context))
     suspend fun playlists(context: ApiContext = context()) = JSONArray(scopedRead("api/v1/auth/playlists", emptyMap(), true, context)).objects().map { ApiParser.playlist(it, legacyOwned = true) }

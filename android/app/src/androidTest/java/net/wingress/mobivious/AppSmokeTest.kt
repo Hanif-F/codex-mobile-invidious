@@ -106,15 +106,16 @@ class AppSmokeTest {
         compose.onNodeWithText("0.25×").performClick()
         waitFor { activity.model.playback.value.speed == .25f }
         compose.onNodeWithText("Quality").performClick()
-        compose.onNodeWithText("360p · 24 FPS").performClick()
+        compose.onNodeWithText("360p24 · H.264").performClick()
         compose.onNodeWithText("Captions").performClick()
         compose.onNodeWithText("English").performClick()
-        waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
+        waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) &&
+            activity.model.playback.value.selection?.overrides?.values?.any { it.type == C.TRACK_TYPE_VIDEO } == true }
         compose.onNodeWithContentDescription("Close player settings").performClick()
         showControls()
         compose.onNodeWithContentDescription("Player settings").performClick()
         compose.onNodeWithText("0.25×").assertExists()
-        compose.onNodeWithText("360p · 24 FPS").assertExists()
+        compose.onNodeWithText("360p24 · H.264", substring = true).assertExists()
         compose.onNodeWithText("English").assertExists()
         compose.onNodeWithText("Audio").performClick()
         compose.onNodeWithText("Auto").assertExists()
@@ -178,7 +179,9 @@ class AppSmokeTest {
             val audioGroup = activity.model.controller.value!!.currentTracks.groups.first { it.type == C.TRACK_TYPE_AUDIO }
             activity.model.selectTrack(audioGroup.mediaTrackGroup, 0)
         }
-        waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
+        waitFor { activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) &&
+            activity.model.playback.value.selection?.overrides?.values?.any { it.type == C.TRACK_TYPE_VIDEO } == true &&
+            activity.model.playback.value.selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true }
         val requests = fixture().getInt("mediaRequests")
         showControls()
         compose.onNodeWithContentDescription("Player settings").performClick()

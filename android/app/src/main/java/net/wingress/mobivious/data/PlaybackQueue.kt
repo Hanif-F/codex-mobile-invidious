@@ -3,6 +3,7 @@ package net.wingress.mobivious.data
 import java.util.UUID
 import org.json.JSONObject
 import org.json.JSONArray
+import net.wingress.mobivious.player.VideoSelection
 
 data class QueueSource(val id: String, val title: String = "", val count: Int = 0, val mix: Boolean = id.startsWith("RD"), val owned: Boolean = false, val seedVideoId: String? = null)
 data class QueuePage(val source: QueueSource, val videos: List<Video>, val playlist: Playlist? = null)
@@ -18,7 +19,8 @@ data class PlaybackQueueSnapshot(val token: String = "", val context: ApiContext
     val source: QueueSource? = null, val items: List<QueueOccurrence> = emptyList(), val currentKey: String? = null,
     val details: VideoDetails? = null, val loading: Boolean = false, val error: String? = null,
     val sourceError: String? = null, val sourceLoading: Boolean = false, val sourceComplete: Boolean = true,
-    val repeat: QueueRepeat = QueueRepeat.OFF, val explicitQueue: Boolean = false) {
+    val repeat: QueueRepeat = QueueRepeat.OFF, val explicitQueue: Boolean = false,
+    val videoSelection: VideoSelection = VideoSelection()) {
     val currentIndex get() = items.indexOfFirst { it.key == currentKey }
     val current get() = items.getOrNull(currentIndex)
     fun json() = JSONObject().put("token", token).put("current", currentKey).put("repeat", repeat.name)

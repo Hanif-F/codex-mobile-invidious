@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -44,7 +45,9 @@ class PlaybackService : MediaSessionService() {
         const val QUEUE_CLOSE = "mobivious.queue.close"
         const val QUEUE_STATE = "mobivious.queue.state"
         const val QUEUE_SETTINGS = "mobivious.queue.settings"
-        val QUEUE_COMMANDS = listOf(QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS)
+        const val VIDEO_AUTO = "mobivious.video.auto"
+        const val VIDEO_SELECT = "mobivious.video.select"
+        val QUEUE_COMMANDS = listOf(QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT)
     }
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
@@ -73,12 +76,13 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         // This data source has no Authorization headers or account cookies.
         val mediaHttp = DefaultHttpDataSource.Factory().setUserAgent("Mobivious/0.1").setAllowCrossProtocolRedirects(false)
-        player = ExoPlayer.Builder(this).setMediaSourceFactory(DefaultMediaSourceFactory(mediaHttp)).build().apply {
+        val trackSelector = CodecAwareTrackSelector(this)
+        player = ExoPlayer.Builder(this).setTrackSelector(trackSelector).setMediaSourceFactory(DefaultMediaSourceFactory(mediaHttp)).build().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
             setHandleAudioBecomingNoisy(true)
             setWakeMode(PowerManager.PARTIAL_WAKE_LOCK)
         }
-        queue = QueueCoordinator(app, player, scope) { persist() }
+        queue = QueueCoordinator(app, player, trackSelector, scope) { persist() }
         sessionPlayer = QueueSessionPlayer(player, queue) { app.playbackQueue.value }
         queue.changed = { sessionPlayer.refresh() }
         session = MediaSession.Builder(this, sessionPlayer)
@@ -175,6 +179,12 @@ class PlaybackService : MediaSessionService() {
             QUEUE_MORE -> queue.more()
             QUEUE_CLOSE -> queue.close()
             QUEUE_SETTINGS -> queue.settings(AccountPreferences.parse(JSONObject(args.getString("settings") ?: "{}")))
+            VIDEO_AUTO -> if (!queue.autoVideo(args.getString("occurrence").orEmpty())) return SessionResult(SessionError.ERROR_INVALID_STATE)
+            VIDEO_SELECT -> {
+                val format = runCatching { Format.fromBundle(args.getBundle("format") ?: return SessionResult(SessionError.ERROR_BAD_VALUE)) }.getOrNull()
+                    ?: return SessionResult(SessionError.ERROR_BAD_VALUE)
+                if (!queue.manualVideo(args.getString("occurrence").orEmpty(), StreamKey.of(format))) return SessionResult(SessionError.ERROR_INVALID_STATE)
+            }
         }
         return SessionResult(SessionResult.RESULT_SUCCESS)
     }

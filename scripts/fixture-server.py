@@ -16,9 +16,9 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=18080)
 parser.add_argument('--media-dir', type=Path, required=True)
 args = parser.parse_args()
-def rich_formats():
+def rich_formats(manifest=None):
     ns = {'d': 'urn:mpeg:dash:schema:mpd:2011'}
-    manifest = args.media_dir / 'rich' / 'dash.mpd'
+    manifest = manifest or args.media_dir / 'rich' / 'dash.mpd'
     if not manifest.exists(): return []
     formats = []
     for group in ET.parse(manifest).findall('.//d:AdaptationSet', ns):
@@ -29,8 +29,11 @@ def rich_formats():
                 item.update(size=f"{attr['width']}x{attr['height']}", fps=24)
             else:
                 label = group.findtext('d:Label', namespaces=ns)
-                role = group.find('d:Role', ns).get('value')
-                item.update(audioTrack=dict(id=group.get('lang') + '.1', displayName=label, audioIsDefault=role == 'main'), isDrc='Stable Volume' in label)
+                role = group.find('d:Role', ns)
+                if label or group.get('lang'):
+                    item['audioTrack'] = dict(id=group.get('lang', 'und') + '.1', displayName=label or '')
+                    if role is not None: item['audioTrack']['audioIsDefault'] = role.get('value') == 'main'
+                item['isDrc'] = 'Stable Volume' in (label or '')
             formats.append(item)
     return formats
 video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', author='Mobivious Studio',
@@ -38,14 +41,14 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
              authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
 default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
-                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', captions=['', '', ''],
+                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', video_codec='auto', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
                      related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
                      sort='published', latest_only=False, unseen_only=False, notifications_only=False,
                      default_playlist=None, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
-state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0,
+state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
 def reset_comments():
@@ -94,6 +97,12 @@ reset_sponsorblock()
 def reset_channels():
     state.update(channelTabs=['videos', 'streams'], channelRequests=[], channelFailNext=False, channelDelayNext=None)
 reset_channels()
+
+def reset_home_subscriptions():
+    state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
+                 subscriptionRequests=[], subscriptionDelayNext=0, failSubscriptionRead=False,
+                 discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False)
+reset_home_subscriptions()
 
 def reset_search_history():
     state.update(searchTest=False, searchRequests=[], searchDelayNext=0, searchFailNext=False,
@@ -189,7 +198,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
-        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels', '/api/v1/auth/subscriptions/search')) and self.headers.get('Authorization') != 'Bearer fixture-token':
+        if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels', '/api/v1/auth/subscriptions')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/ggpht/'):
             state['avatarRequests'].append(dict(path=self.path, authorized=bool(self.headers.get('Authorization')), cookie=bool(self.headers.get('Cookie'))))
@@ -207,6 +216,7 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError): pass
         elif p.startswith('/media/'):
             state['mediaRequests'] += 1
+            state['mediaPaths'].append(p)
             root = args.media_dir.resolve()
             file = (root / p.removeprefix('/media/')).resolve()
             if not file.is_relative_to(root) or not file.is_file():
@@ -230,6 +240,15 @@ class Handler(BaseHTTPRequestHandler):
                          [dict(authorId=id, author=name) for id, name in sorted(state['blockedChannels'].items(), key=lambda x: (x[1], x[0]))],
                          503 if state['failBlockedRead'] else 200)
         elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'):
+            if p in ('/api/v1/popular', '/api/v1/trending'):
+                kind = p.rsplit('/', 1)[-1]
+                event = dict(kind=kind, completed=False)
+                state['discoveryRequests'].append(event)
+                delay = state['discoveryDelayNext']; state['discoveryDelayNext'] = 0
+                distinct = state['discoveryDistinct']
+                if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+                event['completed'] = True
+                if distinct: return self.respond([dict(video, title=f'{kind} discovery fixture')])
             if p == '/api/v1/search' and parse_qs(url.query).get('type') == ['playlist']:
                 return self.respond([source_playlist('PLlive'), source_playlist('RDopaque'), source_playlist('IVother')] if parse_qs(url.query).get('page', ['1']) == ['1'] else [])
             if p == '/api/v1/search' and state['searchTest']: return self.search('global', url.query)
@@ -242,8 +261,10 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
         elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03'):
             selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
+            codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
+            dash = f'/media/codec/{codec_manifest}' if codec_manifest else '/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd'
             self.respond(dict(**selected, description='A generated test video. No YouTube access is involved.',
-                              dashUrl='/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd', adaptiveFormats=rich_formats() if state['stream'] == 'rich' else [],
+                              dashUrl=dash, adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=[recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended]), liveNow=state['liveNow'], isMember=state['memberCurrent']))
         elif p.startswith('/api/v1/dearrow/'):
@@ -255,7 +276,15 @@ class Handler(BaseHTTPRequestHandler):
         elif p.endswith('/submissions') and p.startswith('/api/v1/auth/dearrow/'):
             self.respond(dict(error='Fixture submissions unavailable') if state['failSubmissions'] else dict(titles=submissions()), 502 if state['failSubmissions'] else 200)
         elif p == '/api/v1/auth/preferences': self.respond(prefs)
-        elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])])
+        elif p == '/api/v1/auth/subscriptions':
+            event = dict(completed=False, authorized=self.headers.get('Authorization') == 'Bearer fixture-token')
+            state['subscriptionRequests'].append(event)
+            channels = list(state['subscriptionChannels'])
+            delay = state['subscriptionDelayNext']; state['subscriptionDelayNext'] = 0
+            fail = state['failSubscriptionRead']
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            event['completed'] = True
+            self.respond(dict(error='Fixture subscriptions temporarily unavailable') if fail else channels, 503 if fail else 200)
         elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
         elif p == '/api/v1/auth/feed/rss': self.respond(dict(feedPath='/feed/private?token=fixture-rss-secret'))
         elif p == '/api/v1/auth/subscriptions/export':
@@ -366,13 +395,14 @@ class Handler(BaseHTTPRequestHandler):
             state['avatarRequests'] = []
             return self.respond(status=204)
         elif p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, failPlaylistSave=False,
+            state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
             prefs.clear()
             prefs.update(default_prefs)
             reset_sponsorblock()
             reset_channels()
+            reset_home_subscriptions()
             reset_playback()
             reset_visibility()
             reset_search_history()
@@ -381,6 +411,12 @@ class Handler(BaseHTTPRequestHandler):
         if p == '/test/comments':
             for key in ('commentFailNext', 'commentDelayNext', 'commentEmpty'):
                 if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/preferences':
+            prefs.update(data)
+            return self.respond(prefs)
+        if p == '/test/media-reset':
+            state['mediaPaths'].clear()
             return self.respond({})
         if p == '/test/watched':
             for key in ('watched', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
@@ -400,6 +436,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/channel':
             for key in ('channelTabs', 'channelFailNext', 'channelDelayNext'):
+                if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/home-subscriptions':
+            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'discoveryDelayNext', 'discoveryDistinct'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/search-history':
@@ -436,6 +476,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.command == 'POST': state['blockedChannels'].setdefault(id, data.get('name', '').strip()[:200] or id)
             elif self.command == 'DELETE': state['blockedChannels'].pop(id, None)
             return self.respond(None, 204)
+        if p.startswith('/api/v1/auth/subscriptions/'):
+            if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
+            id = p.rsplit('/', 1)[-1]
+            if self.command == 'POST' and all(c['authorId'] != id for c in state['subscriptionChannels']):
+                state['subscriptionChannels'].append(dict(authorId=id, author=video['author'], authorThumbnails=video['authorThumbnails']))
+            elif self.command == 'DELETE':
+                state['subscriptionChannels'] = [c for c in state['subscriptionChannels'] if c['authorId'] != id]
+            return self.respond(status=204)
         if p.startswith('/api/v1/auth/dearrow/'):
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
             if not state['identityReady']: return self.respond(dict(error='The instance administrator must configure DeArrow contribution storage.'), 503)

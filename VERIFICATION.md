@@ -985,3 +985,105 @@ remain unverified because the local emulator crashes before boot, as recorded
 above. Full avatar coverage uses the additive sibling server update and existing
 migration 21 cache; see `deploy/README.md`. Publishing the APK does not deploy that
 server or apply database migrations.
+
+
+## Codec-aware quality and shared preference — 4 October 2026
+
+The Android implementation follows sibling commit `4ac0170`. Quality menus show
+codec/FPS names with numeric bitrates and available file sizes; presentation
+retains at most four entries per resolution/rounded-FPS group, while the full
+supported catalog remains available to automatic selection, fixed defaults and
+restoration. DASH selection begins in the service-owned track selector before
+media loading. The service owns Auto/preset/manual state independently of track
+overrides and account updates. Manual choices survive refresh/retry/reconnection;
+new queue occurrences start with saved defaults.
+
+| Check | Result |
+|---|---|
+| Android unit/API tests | 165 passed |
+| Debug APK and instrumentation APK builds | Passed |
+| Android debug lint | 0 errors, 42 existing warnings |
+| Crystal native preference specs | 4 passed |
+| Invidious normal/API-only builds | Passed |
+| Guarded disposable account/API harness | Passed |
+| Real H.264/AV1 fixture generation and first-frame decoding | Passed |
+| Codec fixture HTTP, missing/unsupported manifests, request logs and preference reads | Passed |
+| Device playback, settings UI and screenshots | Unverified: no connected device; Pixel_8_Pro crashed with SIGSEGV (139) before boot |
+
+Unit coverage includes the four-entry cap, stable ties, unknown bitrates/codecs,
+rounded FPS groups, codec fallback, resolution-before-codec ranking, summaries for
+omitted representations, explicit Auto with one preferred candidate, preserved
+manual identity, captured defaults and fallback when a manual stream disappears.
+Client preference checks cover normalization, round trips, sparse PATCH writes and
+GET refreshes. Server checks exercise all codec values, invalid-type rejection,
+web form → native GET and native PATCH → web account state, preservation of
+unrelated settings and account isolation. The account harness used the empty,
+guarded `invidious_accounts_test` database on a disposable localhost PostgreSQL
+container, which was removed afterward.
+
+Four new instrumentation scenarios compile: initial DASH requests and resolution/
+unsupported fallback; manual/Auto refresh, retry and recreation; menu details in
+portrait/fullscreen and saved defaults on queue successors; and settings order
+with account writes/refreshes. Existing video-menu assertions now use codec labels.
+They have not executed, so native first-segment, decoder, layout and accessibility
+acceptance remains pending. The emulator attempt used no window, audio or snapshots
+and SwiftShader; its log is `/tmp/mobivious-codec-emulator.log`.
+
+Repeat Android checks with `scripts/test-android.sh` on a working device. The
+fixture generator adds short real AV1/H.264 renditions with codec-specific extrema,
+a manifest without the preferred codec at 360p, and AV1 renditions deliberately
+outside decoder capabilities. Request paths identify each representation. Server
+checks use `crystal spec spec/native_preferences_spec.cr`, normal/API-only builds,
+and the guarded account harness documented in the sibling tests/database README.
+
+Deploy the sibling native `video_codec` PATCH extension before distributing the
+updated app. Existing preference scopes/storage are reused; no migration, token
+renewal, version bump or production deployment was performed.
+
+
+## Home selection, subscribed channels and watch actions — 4 October 2026
+
+Popular/Trending selection is now observable state and updates before the feed
+request completes. Each request captures its selected feed/region. Subscriptions
+retains its video feed/search and channel chips, with a Channels button above the
+scrolling content. The separate channel directory sorts names ignoring case,
+filters names locally as you type, retains search/position when returning from a
+channel, and has independent loading, refresh, error and retry state. Subscription
+reads/writes capture account/instance contexts; list state and directory search
+reset on a context change. Playlist failures cannot prevent channel loading.
+The watch row keeps Playback queue and removes its blocking overflow menu and
+associated action error. Channel headers, cards and settings retain blocking.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 173 passed, including 8 new subscription scenarios |
+| Android debug and instrumentation APK builds | Passed |
+| Android debug lint | Passed; no errors; 32 existing/style/dependency warnings; no issues in the new subscription files |
+| Disposable HTTP fixture checks | Passed: authorization, refresh failure/retry, subscribe/unsubscribe, delayed snapshots, empty channels and distinct discovery results |
+| Fixture Python syntax and Git whitespace checks | Passed |
+| Focused connected UI tests, screenshots and layout acceptance | Unverified: emulator exited with SIGSEGV before Android booted; connected tests reported no devices |
+
+The new unit checks cover alphabetical ordering with equal names/distinct IDs,
+trimmed case-insensitive substring search by name, query/loaded-channel retention
+through errors, retries, duplicate response IDs, guest isolation, superseded
+refreshes, account/server/generation changes, bearer-authenticated reads and
+subscription writes, and rejected stale responses/writes. The localhost fixture
+uses synthetic data and was stopped after its HTTP checks.
+
+Five new full-app Compose scenarios and two presentation scenarios compile. They
+cover immediate Home highlighting during delayed/rapid requests, default-home and
+Activity recreation, access after feed scrolling, local search without requests,
+Back and directory-position restoration, unsubscribe, retry/empty/guest states,
+late reads after sign-out, and removal of the watch menu while Playback queue still
+opens. Presentation scenarios exercise 320dp/390dp light/dark layouts, larger text,
+accessible channel rows and thin-mode avatars. Existing blocking acceptance now
+uses channel headers while keeping the player running. These scenarios have not
+run on a device in this revision; no screenshots were produced or inspected.
+
+With a working emulator/device and the localhost fixture available, rerun
+`HomeSubscriptionsSmokeTest`, `SubscriptionsPresentationTest` and
+`VisibilitySmokeTest`, plus existing subscription-search/avatar/RSS scenarios.
+Full-app screenshots are saved under
+`/data/local/tmp/mobivious-home-subscriptions-screenshots/` by the new smoke tests.
+No server code, migration, token-scope, production account or release was changed
+for this revision. Existing uncommitted player/codec work was preserved.

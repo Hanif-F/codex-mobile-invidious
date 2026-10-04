@@ -124,3 +124,15 @@ fixed-host `/ggpht` proxy, which now preserves query parameters. Normal image
 requests may still reach YouTube's image CDN. Older servers remain usable with
 available response images/placeholders. Native runtime and screenshot acceptance
 are pending; see `../VERIFICATION.md` for validation and repeat commands.
+
+
+## Shared preferred video codec
+
+Deploy the sibling Invidious native preferences PATCH extension accepting
+`video_codec` (`auto`, `av1`, `h264`) before distributing an Android build with the
+codec setting. The web commit already stores this preference on the account;
+the extension enables sparse Android writes to that same value. Existing GET/PATCH
+preference scopes and storage are reused, with no migration or sign-in renewal.
+Older servers can still play video, but unsupported shared saves show the existing
+settings API update error. Guest codec settings remain local per instance.
+Building the APK does not deploy the server.

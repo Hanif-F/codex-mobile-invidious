@@ -9,6 +9,31 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PreferencesTest {
+    @Test fun codecPreferencesRoundTripAndProduceSparseAccountPatches() = runBlocking {
+        val before = AccountPreferences()
+        for (codec in listOf("auto", "av1", "h264")) {
+            val saved = before.copy(videoCodec = codec)
+            assertEquals(codec, AccountPreferences.parse(saved.json()).videoCodec)
+        }
+        for (raw in listOf("null", "true", "123", "{}", "[]", "\"AV1\"", "\"vp9\"", "\"\""))
+            assertEquals("auto", AccountPreferences.parse(JSONObject("""{"video_codec":$raw}""")).videoCodec)
+        assertEquals("auto", AccountPreferences.parse(JSONObject()).videoCodec)
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val api = InvidiousApi({ address }, { Account("token", "Alice", Long.MAX_VALUE, address) })
+            val changed = before.copy(videoCodec = "av1")
+            server.enqueue(MockResponse().setBody(changed.copy(region = "ID").json().toString()))
+            val saved = api.preferences(changed.changesFrom(before), api.context())
+            val patch = server.takeRequest()
+            assertEquals("PATCH", patch.method); assertEquals("Bearer token", patch.getHeader("Authorization"))
+            assertEquals("""{"video_codec":"av1"}""", patch.body.readUtf8())
+            assertEquals("ID", saved.region); assertEquals("av1", saved.videoCodec)
+            server.enqueue(MockResponse().setBody(saved.copy(videoCodec = "h264").json().toString()))
+            assertEquals("h264", api.preferences().videoCodec)
+            assertEquals("GET", server.takeRequest().method)
+            assertEquals("ID", before.copy(region = "ID").merge(changed.changesFrom(before)).region)
+        }
+    }
     @Test fun webPreferencesParseAndRoundTrip() {
         val json = JSONObject("""{"autoplay":false,"listen":true,"local":false,"speed":1.5,"quality_dash":"720p","captions":["Indonesian","English",""],"dark_mode":"dark","ui_density":"compact","thin_mode":true,"default_home":"Trending","feed_menu":["Trending","Popular","Playlists","Subscriptions"],"region":"ID","related_videos":false,"extend_desc":true,"comments":["","reddit"],"max_results":60,"sort":"channel name","latest_only":true,"unseen_only":true,"notifications_only":true,"default_playlist":"IVfixture"}""")
         val p = ApiParser.preferences(json)

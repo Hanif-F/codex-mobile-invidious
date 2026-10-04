@@ -101,6 +101,7 @@ class DeArrowSmokeTest {
         until { activity.model.controller.value?.mediaMetadata?.title?.toString() == replacement }
         assertEquals(original, activity.model.playback.value.details!!.video.title)
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(30_000); activity.model.speed(1.5f); activity.model.quality(720) }
+        until { activity.model.playback.value.selection?.overrides?.values?.any { it.type == C.TRACK_TYPE_VIDEO } == true }
         val watchedBefore = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }
         settings(); toggle("Replace video titles with DeArrow"); save()
         until { activity.model.controller.value?.mediaMetadata?.title?.toString() == original }

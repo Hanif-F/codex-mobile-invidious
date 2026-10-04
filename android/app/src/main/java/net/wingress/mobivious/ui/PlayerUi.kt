@@ -300,8 +300,8 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     val audioOnly = selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true
     val audioAuto = selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_AUDIO } != false && selection?.preferredAudioLanguages.isNullOrEmpty()
     val selectedCaption = if (selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) == true) null else captions.firstOrNull { it.selected }
-    val qualityAuto = selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_VIDEO } != false
-    val selectedVideo = video.firstOrNull { it.explicitlySelected(selection) }
+    val qualityAuto = playback.videoSelection.mode == net.wingress.mobivious.player.VideoSelectionMode.AUTO
+    val selectedVideo = if (qualityAuto) null else playback.videoSelection.fixed(video)
     val available = !playback.loading && playback.canSelectTracks
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sheetHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
@@ -320,7 +320,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                 if (page == "Player settings") {
                     item { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
                     item { SettingRow("SponsorBlock") { sponsorBlock() } }
-                    item { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.primary ?: "Auto", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
+                    item { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
                     item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
                     item { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
                     item { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
@@ -334,7 +334,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                 } else when (page) {
                     "Quality" -> {
                         item { SettingChoice("Auto", qualityAuto, available && !audioOnly) { vm.autoQuality(); page = "Player settings" } }
-                        items(video) { track -> SettingChoice(track.primary, track.explicitlySelected(selection), available && !audioOnly, track.secondary) {
+                        items(StreamCatalog.qualityMenu(video)) { track -> SettingChoice(track.primary, !qualityAuto && track == selectedVideo, available && !audioOnly, track.secondary) {
                             vm.selectTrack(track.group, track.index); page = "Player settings"
                         } }
                     }

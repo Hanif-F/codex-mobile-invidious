@@ -86,4 +86,25 @@ class SettingsSmokeTest {
         toggle("Latest video from each channel"); toggle("Unwatched videos only"); save("Subscriptions")
         assertTrue(state().getJSONObject("preferences").getBoolean("latest_only")); assertTrue(state().getJSONObject("preferences").getBoolean("unseen_only"))
     }
+    @Test fun codecSettingPrecedesQualityAndSyncsInBothDirections() {
+        fun option(label: String) = compose.onNode(hasText(label) and hasAnyAncestor(isPopup()))
+        compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null }
+        open("Playback")
+        compose.onNodeWithText("Preferred video codec").performScrollTo()
+        assertTrue(compose.onNodeWithText("Preferred video codec").fetchSemanticsNode().boundsInRoot.top <
+            compose.onNodeWithText("Default quality").fetchSemanticsNode().boundsInRoot.top)
+        compose.onNodeWithText("Preferred video codec").performClick()
+        option("Auto").assertIsSelected(); option("H.264").assertExists()
+        option("AV1").performClick(); save("Playback")
+        assertEquals("av1", state().getJSONObject("preferences").getString("video_codec"))
+        assertEquals("preserved", state().getJSONObject("preferences").getString("unrelated_setting"))
+        command("preferences", """{"video_codec":"h264"}""")
+        compose.runOnUiThread { activity.model.refreshSharedSettings() }
+        until { activity.model.preferences.value.videoCodec == "h264" }
+        open("Playback"); compose.onNodeWithText("Preferred video codec").performScrollTo().performClick()
+        option("H.264").assertIsSelected()
+        option("Auto").performClick(); save("Playback")
+        assertEquals("auto", state().getJSONObject("preferences").getString("video_codec"))
+    }
 }

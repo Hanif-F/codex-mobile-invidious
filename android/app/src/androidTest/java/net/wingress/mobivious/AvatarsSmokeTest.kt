@@ -108,7 +108,7 @@ class AvatarsSmokeTest {
 
     @Test fun subscriptionsHistoryAndPlaylistCreatorsUseExistingPayloads() {
         compose.runOnUiThread { activity.model.store.save(Account("fixture-token", "Viewer", Long.MAX_VALUE, server)) }
-        until { activity.model.subscriptions.value.isNotEmpty() }
+        until { activity.model.subscriptionChannels.value.channels.isNotEmpty() }
         compose.runOnUiThread { activity.model.navigate("Subscriptions") }
         until { !activity.model.browse.value.loading }
         compose.onNodeWithTag("subscription-avatar-UC${"a".repeat(22)}", true).assertExists()

@@ -37,6 +37,7 @@ import net.wingress.mobivious.player.SeekAccumulator
 import net.wingress.mobivious.player.PendingSeek
 import net.wingress.mobivious.player.StreamCatalog
 import net.wingress.mobivious.player.StreamKey
+import net.wingress.mobivious.player.VideoSelection
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
@@ -48,7 +49,7 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val bufferedPosition: Long = 0, val seekable: Boolean = false, val live: Boolean = false,
     val speed: Float = 1f, val tracks: Tracks = Tracks.EMPTY, val selection: TrackSelectionParameters? = null,
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
-    val canRefresh: Boolean = false)
+    val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection())
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
@@ -86,7 +87,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var playlistRevision = 0L
     private var playlistSeed: String? = null
     private var rssJob: Job? = null
-    val subscriptions = MutableStateFlow<List<Channel>>(emptyList())
+    private val subscriptionsController = SubscriptionsController(viewModelScope, api::context, api::subscriptions, ::friendly)
+    val subscriptionChannels = subscriptionsController.state
+    private var subscriptionChannelParent = false
+    private var subscriptionFeedSearch = SearchInput()
     private val commentController = CommentsController(viewModelScope, api::context,
         { video, sort, continuation, context -> api.comments(video, sort, continuation, context) }, ::friendly)
     val comments = commentController.state
@@ -109,7 +113,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var query: String
         get() = searchInput.value.submitted
         set(value) { searchInput.value = SearchInput(value, value) }
-    var discovery = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).second
+    val discovery = MutableStateFlow(PreferenceRules.destination(preferences.value.defaultHome, account.value != null).second)
     var region = preferences.value.region
     var sort = "relevance"
     var date = ""
@@ -164,7 +168,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             previous = state
             requestedVideo = state.current?.video?.id
             val old = playback.value.details?.video?.id
-            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error)
+            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection)
             if (old != state.details?.video?.id) {
                 cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
@@ -173,6 +177,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         } }
         viewModelScope.launch { account.collect {
             commentController.bind(null, false)
+            subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput()
             browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
             blockUndo.value = null
             playlistRevision++; playlistBusy.value = emptySet(); playlistErrors.value = emptyMap()
@@ -198,7 +203,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             dearrowIdentity.value = null; dearrowIdentityError.value = null
             preferencesContext = if (it == null) api.context() else null
             preferences.value = if (it == null) store.guestDeArrow() else AccountPreferences()
-            if (it != null) refreshAccount() else { subscriptions.value = emptyList(); playlists.value = emptyList() }
+            if (it != null) refreshAccount() else playlists.value = emptyList()
             refresh()
         } }
         viewModelScope.launch { combine(preferences, dearrowTitles.titles) { prefs, _ -> prefs }.collect {
@@ -247,9 +252,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun refreshAccount() {
         refreshSharedSettings()
+        refreshSubscriptions()
         val context = api.context(); val revision = playlistRevision
-        action { val channels = api.subscriptions(); val lists = api.playlists(context); if (api.context() == context) { subscriptions.value = channels; if (revision == playlistRevision) playlists.value = lists } }
+        action { val lists = api.playlists(context); if (api.context() == context && revision == playlistRevision) playlists.value = lists }
     }
+    fun refreshSubscriptions() = subscriptionsController.refresh()
+    fun searchSubscriptionChannels(query: String) = subscriptionsController.search(query)
     fun refreshSharedSettings() {
         val context = api.context()
         refreshBlockedChannels()
@@ -285,6 +293,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         store.saveSearchVisibility(api.context(), value); searchVisibility.value = value
     }
     fun contentSurface(): ContentSurface = when {
+        route == "subscription-channels" -> ContentSurface.SUBSCRIPTIONS
         route == "history" -> ContentSurface.HISTORY
         route.startsWith("channel:") -> ContentSurface.CHANNEL
         route.startsWith("playlist:") -> ContentSurface.PLAYLIST
@@ -307,7 +316,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; scopedSearch.value = SearchInput(); channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; refresh() }
+    fun navigate(tab: String, route: String = "") {
+        if (this.tab == "Subscriptions" && this.route.isEmpty() && route == "subscription-channels") subscriptionFeedSearch = scopedSearch.value
+        val returnToFeed = this.route == "subscription-channels" && tab == "Subscriptions" && route.isEmpty()
+        subscriptionChannelParent = tab == "Subscriptions" && route.startsWith("channel:") &&
+            (this.route == "subscription-channels" || this.tab == "Subscriptions" && this.route.startsWith("channel:") && subscriptionChannelParent)
+        this.tab = tab; navigation.value = tab to route; this.route = route
+        scopedSearch.value = if (returnToFeed) subscriptionFeedSearch else SearchInput()
+        channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; refresh()
+    }
+    fun backBrowse() = navigate(tab, if (subscriptionChannelParent && route.startsWith("channel:")) "subscription-channels" else "")
     fun openPlaylist(list: Playlist) {
         navigate("Library", "playlist:${list.id}")
         playlistSeed = list.seedVideoId
@@ -381,7 +399,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         refresh()
     }
     fun clearScopedSearch() { scopedSearch.value = SearchInput(); refresh() }
-    fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery = target.second; navigate(target.first) }
+    fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery.value = target.second; navigate(target.first) }
+    fun selectDiscovery(value: String) {
+        if (value !in listOf("popular", "trending") || discovery.value == value) return
+        discovery.value = value
+        refresh()
+    }
     fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow); refreshWatched() }
     private fun refreshWatched() {
         if (preferencesContext == api.context()) app.watched.configure(api.context(), preferences.value.savePosition)
@@ -405,6 +428,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         load(false, refreshChannel = false)
     }
     private fun load(more: Boolean, refreshChannel: Boolean = true) {
+        if (route == "subscription-channels") {
+            browseJob?.cancel(); browseGeneration++
+            browse.value = BrowseState(title = "Subscribed channels", end = true)
+            val state = subscriptionChannels.value
+            if (!state.loaded && !state.loading && state.error == null) refreshSubscriptions()
+            return
+        }
         if (more && (browse.value.loading || browse.value.end)) return
         browseJob?.cancel()
         val generation = ++browseGeneration
@@ -412,6 +442,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!more) browseReset.value++
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
+        val selectedDiscovery = discovery.value; val selectedRegion = region
         val listSearch = playlistSearch.value; val listSort = channelPlaylistSort.value; val revision = playlistRevision
         val scopedQuery = scopedSearch.value.submitted
         val context = api.context()
@@ -483,7 +514,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         hasMore = response.hasMore; response.items
                     } else api.feed(page, preferences.value.notificationsOnly)
                     selectedTab == "Library" -> { if (context.account != null) { val loaded = api.playlists(context); if (context == api.context() && revision == playlistRevision) playlists.value = loaded }; emptyList() }
-                    else -> api.discovery(discovery, region)
+                    else -> api.discovery(selectedDiscovery, selectedRegion)
                 }
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
                     continuation = continuation, history = history, lists = (old.lists + lists).distinctBy { it.id }, end = if (hasMore != null) !hasMore || more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
@@ -638,10 +669,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         updatePlayback()
     }
     fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
-    fun autoQuality() { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_VIDEO).setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE).build() } }
+    fun autoQuality() { queueCommand(PlaybackService.VIDEO_AUTO) { putString("occurrence", queue.value.currentKey) } }
     // Resolution callers select one current-video representation; defaults are edited in Settings.
     fun quality(height: Int) { if (height == Int.MAX_VALUE) autoQuality() else controller.value?.let { p ->
-        StreamCatalog.defaultVideo(StreamCatalog.choices(p.currentTracks, C.TRACK_TYPE_VIDEO), "${height}p")?.let { selectTrack(it.group, it.index) }
+        StreamCatalog.defaultVideo(StreamCatalog.choices(p.currentTracks, C.TRACK_TYPE_VIDEO), "${height}p",
+            if (queue.value.videoSelection.dash) queue.value.videoSelection.codec else "auto")?.let { selectTrack(it.group, it.index) }
     } }
     fun speed(value: Float) { store.defaultSpeed = value; controller.value?.setPlaybackSpeed(value); updatePlayerDefault { it.copy(speed = value) } }
     private fun updatePlayerDefault(change: (AccountPreferences) -> AccountPreferences) {
@@ -661,6 +693,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectTrack(group: TrackGroup, index: Int) { controller.value?.let { p ->
         val current = p.currentTracks.groups.firstOrNull { it.mediaTrackGroup == group } ?: return
         if (index !in 0 until current.length || !current.isTrackSupported(index) || !p.isCommandAvailable(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS)) return
+        if (group.type == C.TRACK_TYPE_VIDEO) {
+            queueCommand(PlaybackService.VIDEO_SELECT) { putString("occurrence", queue.value.currentKey); putBundle("format", group.getFormat(index).toBundle()) }
+            return
+        }
         val builder = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(group.type, false)
             .setOverrideForType(TrackSelectionOverride(group, index))
         if (group.type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(group.getFormat(index).language)
@@ -680,7 +716,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
     fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null); app.cache.clear(); navigate("Home") } }
-    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
@@ -770,7 +806,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             finally { if (sameContribution(state)) dearrowContribution.value = dearrowContribution.value.copy(busy = false) }
         }
     }
-    fun toggleSubscribe(id: String) = action { api.subscribe(id, subscriptions.value.none { it.id == id }); subscriptions.value = api.subscriptions() }
+    fun toggleSubscribe(id: String) {
+        val context = api.context()
+        val subscribe = subscriptionChannels.value.channels.none { it.id == id }
+        viewModelScope.launch {
+            try { api.subscribe(id, subscribe, context); if (context == api.context()) refreshSubscriptions() }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context()) message.value = friendly(e) }
+        }
+    }
     override fun onCleared() { cancelAccumulatedSeek(); MediaController.releaseFuture(future) }
     private fun friendly(e: Exception) = if (e is ApiException || e is IllegalArgumentException) e.message ?: "Request failed." else "Cannot reach this instance. Check the address and connection, then retry."
 }

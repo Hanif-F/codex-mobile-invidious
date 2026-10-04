@@ -123,7 +123,8 @@ class PlaybackVisibilitySmokeTest {
         openVideo()
         val controller = activity.model.controller.value!!
         ui { controller.pause(); activity.model.seekTo(30_000); activity.model.speed(1.5f); activity.model.quality(360) }
-        until { activity.model.playback.value.position == 30_000L && activity.model.playback.value.playerState == Player.STATE_READY }
+        until { activity.model.playback.value.position == 30_000L && activity.model.playback.value.playerState == Player.STATE_READY &&
+            activity.model.playback.value.selection?.overrides?.values?.any { it.type == C.TRACK_TYPE_VIDEO } == true }
         awake(false)
         val token = activity.model.queue.value.token
         val occurrence = activity.model.queue.value.currentKey
