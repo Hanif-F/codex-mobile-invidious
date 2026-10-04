@@ -960,3 +960,28 @@ With a working device, run `scripts/test-android.sh` and inspect the menus, sele
 rows, expanded descriptions and wrapping action groups in light/dark themes,
 portrait/landscape and at 200% font size. No server API, migration, token scope,
 release/version, production deployment or app installation changes were made.
+
+## Mobivious 0.4.0 release — 4 October 2026
+
+The signed release APK was built with version name **0.4.0** and version code **6**
+using the existing personal signing key. All 156 unit/API tests passed, and release
+lint completed with zero errors and 42 warnings. `apksigner verify` passed; the
+signer certificate matches the published 0.3.0 APK. The local reference APK's
+SHA-256 was checked against the existing GitHub release asset before comparing
+certificates.
+
+Packaged manifest checks confirm application ID `net.wingress.mobivious`, minimum
+SDK 26, target SDK 37, and arm64-v8a, armeabi-v7a, x86 and x86_64 native libraries.
+The APK and checksum file are `artifacts/Mobivious-0.4.0.apk` and
+`artifacts/Mobivious-0.4.0.apk.sha256`. Verified APK SHA-256:
+
+```text
+efefc227101559977cf60d00be1942f96bb31c0d7a2b58c4b80e0a261c75175f
+```
+
+This release includes the comments drawer, avatar visibility and action-control
+changes since 0.3.0. Native device/UI/accessibility and screenshot acceptance
+remain unverified because the local emulator crashes before boot, as recorded
+above. Full avatar coverage uses the additive sibling server update and existing
+migration 21 cache; see `deploy/README.md`. Publishing the APK does not deploy that
+server or apply database migrations.
