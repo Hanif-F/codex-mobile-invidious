@@ -1,57 +1,57 @@
 # Invidious web → Mobivious Android feature checklist
 
-Reviewed on **4 October 2026** against the local source checkouts:
+Reviewed on **5 October 2026** against the local source checkouts:
 
-- Web: `../invidious`, baseline audit at `a21a5513` plus the expanded native settings API changes; channel routes/API rechecked at `68e51ac2`. Includes this fork's custom features.
-- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; rows 06 and 33 now include scoped search and organized history; row 34 includes watched/progress, rows 40–41 content visibility, and rows 17/32 service-owned queues and video library actions; rows 31/45 now include playlist subscriptions and RSS with migration 20, reviewed on 4 October 2026. Row 22 now implements read-only YouTube comments with a spoiler-free entry and native drawer; Reddit is intentionally excluded. Current release version: `0.5.0` (version code 7).
+- Web: `../invidious` at `89c441b2`. Includes this fork's custom features and native API extensions.
+- Android: `ef2ab0d` plus working-tree channel/community changes, including player gestures (`cab1eda`), scroll-driven player resizing and complete channel descriptions (`a6848ee`). Current configured release version: `0.5.1` (version code 8); the new channel/community changes are in the debug build and have not been released.
 
-**The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
+**The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 
 - **Implemented:** the listed core capability has an Android implementation.
 - **Partial:** some parts exist; the last two columns identify what exists and what is missing.
 - **Not implemented:** no corresponding Android flow was found in the reviewed source.
 
-This is a source audit, not a new native runtime or production acceptance test. Features can depend on instance configuration, upstream content availability, and device capabilities. Validation is recorded in [VERIFICATION.md](VERIFICATION.md). That file reports the production mobile sign-in/account API rollout as still pending; account features below are implemented in source, but need the server patch deployed before production use. The channel revision additionally checks public channel endpoints on the existing live instance; it does not validate the production account rollout.
+The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 213 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, plus community and avatar fixture checks on 5 October. Ten new community Compose scenarios compile but remain unexecuted because the installed emulator crashes before boot. Signed 0.5.1 checks predate the channel/community changes. The latest recorded production status still requires deployment of the native account/API extensions; this audit does not verify the live server. Public channel endpoint checks do not validate the production account rollout.
 
-**Summary: 45 broad feature areas — 23 implemented, 13 partial, 9 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
+**Summary: 48 broad feature areas — 26 implemented, 12 partial, 10 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
 
 ## Discovery and channels
 
 | ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
 | --- | --- | --- | --- | --- |
 | 01 | Anonymous viewing through Invidious, without a Google account or official YouTube API | Implemented | Public browsing/playback through Invidious and Companion; no client-side YouTube extraction. | — |
-| 02 | Popular and trending discovery, with regional/category selection | Partial | Popular and trending tabs; editable trending region. | Trending category selector, such as Music/Gaming/Movies. |
+| 02 | Popular and trending discovery, with regional/category selection | Partial | Popular and trending Home chips; editable trending region. The fork's default trending source is Livestreams. | Livestreams/Gaming category selector. Music/Movies are not categories offered by the current web fork. |
 | 03 | Custom homepage and configurable feed navigation | Partial | Default homepage selection across Popular, Trending, Search, Subscriptions and Playlists; saved web feed-menu preferences order Home discovery chips. Four fixed bottom tabs: Home, Subscriptions, Library, Account. The top-right search field submits to existing results and Back restores the originating screen and browsing state. Search homepage support is retained. Guests fall back to public browsing for account-only homepages. | Full web menu visibility/removal; core native tabs remain fixed and Popular/Trending share Home. |
-| 04 | Search across videos, channels and playlists, with filters | Partial | Videos remain the default; Playlists & mixes uses typed playlist search, pagination, source labels and preserved mix seeds. Video relevance/views, date/duration filters, links and content-visibility controls remain available. | Channel search result cards and the remaining advanced web filters. |
-| 05 | Channel browsing and specialized tabs | Partial | Avatar, name, subscriber count, plain-text description; available Videos/Streams/Playlists tabs, continuation pagination, selected-tab restoration after search, and playlist Last added/Newest/Oldest sorting; channel subscribe/unsubscribe and RSS. | Shorts, Podcasts, Releases, Courses, Clips, Posts and related Channels tabs; video sorting; banner/verification/pronoun presentation and expandable rich description. Tabs depend on channel availability. |
+| 04 | Search across videos, channels and playlists, with filters | Partial | Videos remain the default; Playlists & mixes uses typed playlist search, pagination, source labels and preserved mix seeds. Video relevance/views sorting, upload-date filters, Short/Long duration, links and content-visibility controls remain available. | Channel result cards; All/Channel/Movie/Show type controls; Medium (4–20 minute) duration; feature-filter controls for Live, 4K/HD, captions, Creative Commons, 360°/VR180/3D, HDR, location and purchased content. Native filters do not expose the web's individual active-filter removal chips. |
+| 05 | Channel browsing and specialized tabs | Partial | Availability-driven Videos/Shorts/Streams/Podcasts/Releases/Courses/Playlists/Posts/Channels in website order; community/posts normalization and Videos fallback; video/playlist/channel/post cards and opaque continuation pagination. Shared video Newest/Oldest/Popular sorting and independent playlist Last added/Newest/Oldest sorting; controls hidden where ignored. Banner/avatar/name/subscribers, verification and pronouns; three-line description preview and complete selectable rich description with native links. Tab/sort/content/scroll restoration after search and child navigation; subscribe/unsubscribe and RSS. Compiled and fixture checks passed; device acceptance remains unverified. | Clips tab and clip functions are deferred. |
 | 06 | Search within a channel or the subscription library | Implemented | Search fields on channel and Subscriptions screens; public paginated channel video search independent of Videos/Streams; authenticated full-library title/channel subscription search, original-page pagination and saved search visibility controls. Clear restores the selected channel tab or configured feed. Icon, keyboard Search and physical Enter share submission, including pasted links on general Search. | — for the core capability; subscription search requires the sibling API update and renewed native tokens. Native runtime/layout acceptance remains unverified. |
-| 07 | Community posts and post comments | Not implemented | — | Community/post pages, media/polls and their read-only comment threads. |
+| 07 | Community posts and post comments | Implemented | Paginated channel posts and dedicated native post details with author/publication/edit metadata, expandable rich text, likes and comment counts; single images/enlarged swipeable galleries, native video/playlist attachments, read-only polls/quizzes and unknown-attachment fallback. Independent comment sheet with Top/Newest, paginated replies, Back, retained scroll and cursor-preserving retry; stale navigation/sort/account/instance responses rejected. Copy link, Share and native incoming post links; opening posts minimizes active playback and preserves video comments. | — for the core capability; native interaction/layout/playback acceptance remains unverified because the emulator crashes before boot. |
 | 08 | Hashtag browsing | Not implemented | — | Hashtag result pages and navigable hashtag links. |
 
-Evidence: [web routing][w-routing], [web search filters][w-search], [web channel routes][w-channels], [web channel header][w-channel-ui]; [Android browsing/navigation][a-ui], [Android view model][a-vm], [Android API][a-api].
+Evidence: [web routing][w-routing], [web trending][w-trending], [web search filters][w-search], [web filter controls][w-search-ui], [web channel routes][w-channels], [web channel header][w-channel-ui], [web community contracts][w-community]; [Android browsing/navigation][a-ui], [full channel description][a-channel-description], [community models/link parsing][a-community], [native posts and comment sheet][a-community-ui], [Android view model][a-vm], [Android API][a-api].
 
 ## Watching and player controls
 
 | ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
 | --- | --- | --- | --- | --- |
-| 09 | Standard video playback | Implemented | Media3 DASH/HLS and fallback playback with decoded video geometry and pixel aspect ratio. Aspect-preserving fit; regular natural height capped at 70% of watch content, 40% with comments; shape-aware fullscreen orientation and clamped PiP ratio. Bounded mini-player, shared fading controls, timeline, buffering/retry and accumulated double-tap seeking retain the service-owned player. | — for core playback; real decoding, shape transitions, orientation, PiP and layout acceptance remain unverified on a device. |
+| 09 | Standard video playback | Implemented | Media3 DASH/HLS and fallback playback with decoded geometry/pixel aspect ratio and aspect-preserving fit. Watch height follows natural size up to 70% of content, smoothly resizing toward a 40% cap over 96dp after the first 24dp of detail scrolling; comments use the 40% cap. Shape-aware fullscreen/PiP; one live video surface across watch/mini/fullscreen, swipe minimize/restore/dismiss, visible/accessibility alternatives, fading controls, timeline, buffering/retry and accumulated double-tap seeking. Watch scroll/resize/description state follows the queue occurrence; visible video/buffering keeps the screen awake. | — for core playback; real decoding, gestures, shape/scroll transitions, orientation, PiP and layout acceptance remain unverified on a device. |
 | 10 | Livestream playback | Implemented | HLS playback path and LIVE labels; playable live videos can be opened directly or from channel Streams tabs. | —; channel browsing coverage is tracked in row 05, and chat replay in row 23. |
 | 11 | Quality, audio-track and speed controls | Implemented | Auto or exact supported video representations with codec/FPS labels, numeric bitrates and available file sizes; at most four menu entries per resolution/FPS group, prioritizing AV1/H.264 bitrate extremes while selection uses the full catalog; original/stable-volume/dubbed audio groups and bitrate tiers, with conservative unlabeled-track fallback; unified captions and speed 0.25×–2× controls. Shared quality defaults include Auto, Best, 4320p–144p and Worst, plus preferred codec Auto/AV1/H.264. DASH selection applies before the first segment, resolves resolution before codec, and falls back to supported streams. Auto remains explicit even with one eligible stream. In-player exact choices apply to the current video; refresh/retry and controller reconnection preserve available selections, and successors use saved defaults. Synced changes apply to the next video. | — for the web capability; reliable audio enrichment uses the additive sibling video API update. Runtime/layout acceptance remains unverified; available streams and device decoding support determine offered choices. |
 | 12 | Audio-only listening and background playback | Implemented | Disable video tracks, background playback setting and service-owned playback. | — |
-| 13 | Captions/subtitles | Implemented | Load VTT captions, select available language, turn subtitles on/off through the unified player gear; available-track selection and active-selection display. Three saved language priorities select the first available caption when opening a video; preferences are shared with the account or saved locally for guests. | — for core captions; runtime acceptance of the new defaults remains unverified. |
+| 13 | Captions/subtitles | Implemented | Load VTT captions, select available language, turn subtitles on/off through the unified player gear; available-track selection and active-selection display. Three saved language priorities select the first available caption when opening a video; preferences are shared with the account or saved locally for guests. | — for core captions; appearance controls are tracked in row 48 and caption-file export in row 46. Runtime acceptance of the defaults remains unverified. |
 | 14 | Remember playback position and resume | Implemented | Signed-in account positions shared with the website, local fallback, periodic saves, completion reset and explicit timestamp precedence. Guests can enable device-local resume; changing the preference updates active service-owned playback too. | — for core resume; runtime acceptance of guest resume remains unverified. |
-| 15 | Video information and rich descriptions | Partial | Title, author, views, publication text and expandable plain-text description. | Rendered description links, clickable timestamps/hashtags, richer web metadata/actions such as likes and external source links. |
+| 15 | Video information and rich descriptions | Partial | Title, author/avatar, views, publication text, member labels and animated expandable plain-text description. | Rendered description links and clickable timestamps/hashtags; video likes, channel verification/subscriber count on watch, premiere/unlisted notices, genre/license/family-friendly/region metadata and music credits. External source actions are tracked in rows 24 and 32. |
 | 16 | Related/recommended videos | Implemented | Recommended video list on the watch screen; manual selection, channel navigation and a shared visibility preference. | —; automatic advancement is tracked separately. |
-| 17 | Automatic next-video playback, playlist queue and repeat | Implemented | Service-owned next-recommendation playback; public/private playlists and dynamic mixes; source occurrence context, overlapping-page loading, previous/next and queue selection; temporary Play next/Add to queue; local queue removal and separate owned-playlist deletion; session Off/One/All repeat (All for finite queues). Shared next/autoplay-next/loop defaults; background/audio/PiP advancement. | — for the requested capability; native runtime/layout acceptance remains unverified. Queues last for the current service session; shuffle and restart restoration are outside scope. |
+| 17 | Automatic next-video playback, playlist queue and repeat | Implemented | Service-owned next-recommendation playback; public/private playlists and dynamic mixes; source occurrence context, overlapping-page loading, previous/next and queue selection; temporary Play next/Add to queue; local queue removal and separate owned-playlist deletion; session Off/One/All repeat (All for finite queues). Explicit queues open inline before Up next, with bounded compact rows, current-occurrence following and animated collapse retained across navigation/Activity recreation. Shared next/autoplay-next/loop defaults; background/audio/PiP advancement. | — for the core capability; native runtime/layout acceptance remains unverified. Queues last for the current service session; shuffle and restart restoration are outside scope. |
 | 18 | Chapters and timeline thumbnail previews | Not implemented | — | Chapter navigation/markers and storyboard previews while seeking. |
 | 19 | Searchable transcripts | Not implemented | — | Transcript panel, language choice, text search and timestamp navigation. Captions alone do not provide this flow. |
 | 20 | Playback diagnostics and buffer recovery | Partial | Playback errors and Retry in both embedded/fullscreen modes; Retry reloads stream details and resumes at the current position. A dedicated Refresh buffer action reloads the current source while retaining paused/playing state, speed, quality, captions and audio-only mode; live playback returns to the live edge. | Web's detailed playback statistics/copy action. |
 | 21 | Legacy annotations and VR/360° viewing | Not implemented | — | Annotation overlays/toggles and specialized VR projection controls. |
 | 22 | Read-only YouTube comments (Reddit excluded) | Implemented | Spoiler-free entry without preview text; drawer beneath the visible player; Top/Newest sorting; independently paginated reply threads with Back and saved scroll positions; avatars, author/date/body hierarchy, thumb-up counts, creator/verified/pinned/member/heart metadata; expandable native rich text, links, timestamps and custom emoji; loading/empty/error states and cursor-preserving retry. | — for the requested YouTube capability. Reddit is deliberately excluded; posting and liking remain unsupported. Native runtime/layout acceptance remains unverified. |
 | 23 | Livestream archive chat replay | Not implemented | — | Replay synchronized to playback; docked/overlay chat; timestamp/font/size/opacity controls; user/word filters and saved timing offsets. This fork implements replay, not sending live chat messages. |
-| 24 | Sharing and opening content links | Partial | Android share sheet for the current video with timestamp; receive shared/pasted YouTube and configured-instance video, playlist and mix links, preserving list/index/timestamp context and normalizing YouTube indexes. Bare source links open a browser with Play; public lists work for guests. App-link registration includes `/watch`, `/playlist` and `/mix` on bundled hosts. | Channel, post and clip link navigation and broader web URL parameters. An embed URL can identify a video, but Android does not host a web embed player. |
+| 24 | Sharing and opening content links | Partial | Android share sheet for the current video with timestamp; receive shared/pasted YouTube and configured-instance video, playlist and mix links, preserving list/index/timestamp context and normalizing YouTube indexes. `youtu.be`, Shorts, Live and embed video URLs are parsed. Bare source links open a browser with Play; public lists work for guests. Shared/pasted/rich-text `/post/<id>` and community/posts links carrying `lb` open native post details, resolving missing channel IDs; post Copy link and Share actions. Rich-text links additionally open valid `/channel/UC…` links natively. App-link registration includes `/watch`, `/playlist`, `/mix` and `/post` on bundled hosts, with launch-intent replay prevention on Activity recreation. Post-link parsers and requests passed; native intent/runtime acceptance remains unverified. | General shared/pasted channel links and handle/custom-channel resolution; clip links; web path aliases such as `/watch/:id`, `/w/:id`, `/v/:id` and `/e/:id`; bounded `end` playback and other per-link overrides. Outgoing watch shares omit playlist/index context that the web share URL retains. Parsing an embed URL does not supply a native embed-hosting flow. |
 
-Evidence: [web watch page][w-watch], [web player component][w-player], [web player logic][w-player-js], [web stream controls][w-streams], [web playlist queue][w-watch-js], [web comments API][w-videos], [web comments UI][w-comments]; [Android watch UI][a-ui], [YouTube comment state][a-comments], [native comments drawer][a-comments-ui], [Android player controls/settings][a-player], [Android playback setup][a-vm], [Android playback service][a-service], [Android link parsing][a-models], [activity/PiP][a-activity], [manifest][a-manifest].
+Evidence: [web watch page][w-watch], [web player component][w-player], [web player logic][w-player-js], [web stream controls][w-streams], [web playlist queue][w-watch-js], [web comments API][w-videos], [web comments UI][w-comments]; [Android watch UI][a-ui], [YouTube comment state][a-comments], [native comments drawer][a-comments-ui], [Android player controls/settings][a-player], [player gestures][a-gestures], [player presentation][a-presentation], [scroll resizing][a-scroll], [video surface/screen wake][a-surface], [native queue panel][a-queue-ui], [Android playback setup][a-vm], [Android playback service][a-service], [Android link parsing][a-models], [activity/PiP][a-activity], [manifest][a-manifest].
 
 ## Accounts, subscriptions and library
 
@@ -59,18 +59,18 @@ Evidence: [web watch page][w-watch], [web player component][w-player], [web play
 | --- | --- | --- | --- | --- |
 | 25 | Account sign-in and sign-out | Implemented | Account tab with native sign-in, encrypted bearer-session storage, expiry handling and logout revocation/cleanup. Contextual sign-in returns to the interrupted screen/action. Delayed authentication and account-management responses are isolated by account and instance; incorrect current passwords retain the session. Settings is available within Account for guests and members. | —; requires the mobile login endpoint. Device acceptance remains unverified. |
 | 26 | Account registration and account/session management | Implemented | Native signup with instance availability and single-use CAPTCHA; password-confirmed username/password changes and account deletion; opaque browser-session/API-token listing with creation/available expiry and This session; individual/current-session revocation; guided permissions, advanced scopes, expiry choices and one-time token display/Copy. Credential changes atomically revoke old sessions/tokens and return a replacement mobile session, preserving internal identity and library data. | — for website parity; deploy the sibling server update and renew mobile sign-in for management scopes. No additional migration. Native runtime/layout acceptance remains unverified. |
-| 27 | Channel subscriptions and subscription feed | Implemented | Subscribe/unsubscribe from channel/watch pages, subscribed channel chips, paginated subscription feed sharing the web account. A pinned Channels button opens an alphabetical channel directory with immediate name search, independent refresh/retry and retained position when returning from a channel. | — |
+| 27 | Channel subscriptions and subscription feed | Implemented | Subscribe/unsubscribe from channel/watch pages; paginated subscription feed sharing the web account. A pinned Channels button opens an alphabetical channel directory with avatars, immediate name search, independent refresh/retry and retained position when returning from a channel. This directory replaces the older subscribed-channel chip strip. | — for core subscriptions/feed; unsubscribe from a directory entry requires opening its channel. |
 | 28 | Subscription-feed filtering and sorting | Partial | The shared feed API applies account settings. A dedicated settings screen edits latest-only/unwatched-only, page size, sort and pending-notifications-only. Feed/history requests respect server page sizes; notifications-only shows no ordinary videos when notifications are empty. | Separated notification/feed presentation and Android alerts. |
 | 29 | New-upload/livestream notifications | Not implemented | Pending notification videos returned by the feed API are included in the ordinary subscription list; this is not an alert implementation. | Upload notification subscription/stream handling, notification count/badge and Android alerts for new uploads/livestreams. The playback notification is a separate feature. |
 | 30 | Personal Invidious playlist management | Implemented | List/create/edit/delete playlists; public/unlisted/private privacy; edit title/description; add the watched video; remove items; paginated playlist contents. | — for core management; shortcuts, external playlists, sharing and queue behavior are tracked in rows 17, 24, 31, 32 and 36. |
 | 31 | Public/YouTube playlists, saved external playlists and mixes | Implemented | Typed discovery and channel Playlists tab; My playlists and Subscribed playlists with counts and source/ownership labels. Subscribe/unsubscribe YouTube, seeded mixes and others’ public/unlisted Invidious sources; current owner metadata/videos on open/refresh and cached metadata fallback. Subscribed sources stay read-only and are excluded from save/default destinations. Guest sign-in intent, duplicate prevention, retry and account/instance response isolation; unsubscribing preserves playback. | — for requested parity; requires migration 20 and renewed native sign-in. Device/runtime acceptance remains unverified. |
 | 32 | Video-card/context-menu library actions | Implemented | Shared Save to playlist/create-and-save sheet from cards and watch pages, writable/default playlist choices, failed-draft and partial-creation retry; Audio mode, Play next/Add to queue, channel navigation, Block/Unblock with scoped Undo; history/owned-playlist removal and success/error feedback. | Watch on YouTube and Switch Invidious instance actions are intentionally excluded from Android. Native runtime/layout acceptance remains unverified. |
 | 33 | Watch history and history organization | Implemented | Record watched videos; full-history title/channel search before pagination; account-timezone Today/Yesterday/Last 7 days/Last 30 days/Older groups; saved title/channel/duration/release/latest-watch metadata and unknown-value fallbacks; unavailable entries, single removal, clear confirmation and shared enable/disable setting. Basic viewing remains on older servers with a search update explanation. | — for website parity; organized history requires the sibling API update, using existing scopes. Archived-date expansion and date-range filters are outside the requested scope. Native runtime/layout acceptance remains unverified. |
-| 34 | Watched/progress indicators and manual watched state | Partial | Shared watched badges/thumbnail overlays and saved-progress bars across native video cards, including recommendations; compact and thumbnail-free presentation; accessible history/progress descriptions. Account state uses the shared playback API; guests see device-local progress when resume is enabled. Service-owned playback updates indicators in background/audio/PiP. Existing history removal preserves progress; clearing history clears both. | Explicit mark-watched/mark-unwatched actions are intentionally excluded from the Android UX. Native runtime/layout acceptance remains unverified. |
-| 35 | Data import/export and migration | Partial | Complete subscription OPML export with Invidious or YouTube feed URLs; owned private playlist Atom snapshots via document picker or file sharing. | Full account data import/export; YouTube playlist/history imports; NewPipe/FreeTube imports and other data migration flows. The native token has only the dedicated subscription-export permission. |
-| 36 | Shared account preferences | Partial | Dedicated Settings and submenu screens; shared history/resume, playback defaults (autoplay, next recommendation, autoplay next, single-video loop, audio only, proxy, speed, preferred DASH codec, ranked quality, caption priorities), color mode/density/thumbnails, homepage/feed order, region, members-only and comments/recommendations/description visibility, feed filters/sort/page size, default playlist, DeArrow and SponsorBlock. Sparse patches preserve unrelated server values; refresh on sign-in, settings opening and foreground return. | Preferences for capabilities outside the implemented native scope, including web theme registry/randomization, interface locale, annotations, VR, chat replay. Background/PiP stay device-local. The expanded shared settings require the sibling settings API update. |
+| 34 | Automatic watched/progress indicators | Implemented | Shared watched badges/thumbnail overlays and saved-progress bars across native video cards, including recommendations; compact and thumbnail-free presentation; accessible history/progress descriptions. Account state uses the shared playback API; guests see device-local progress when resume is enabled. Service-owned playback updates indicators in background/audio/PiP. Existing history removal preserves progress; clearing history clears both. | —; manual watched-state actions are listed under [Intentionally excluded parity](#intentionally-excluded-parity). |
+| 35 | Data import/export and migration | Partial | Complete subscription OPML export with Invidious or YouTube feed URLs; owned private playlist Atom snapshots via document picker or file sharing. | Full account JSON export/Invidious import; YouTube subscription, playlist CSV and watch-history JSON imports; NewPipe subscription JSON and FreeTube subscription DB imports. The native token has only the dedicated subscription-export permission for account export. |
+| 36 | Shared account preferences | Partial | Dedicated Settings and submenu screens; shared history/resume, playback defaults (autoplay, next recommendation, autoplay next, single-video loop, audio only, proxy, speed, preferred DASH codec, ranked quality, caption priorities), color mode/density/thumbnails, homepage/feed order, region, members-only and comments/recommendations/description visibility, feed filters/sort/page size, default playlist, DeArrow and SponsorBlock. Sparse patches preserve unrelated server values; refresh on sign-in, settings opening and foreground return. History consumes the account timezone supplied by the server. | Native history timezone selection/detection and shared preload control; interface locale, annotations, VR and chat replay settings. Browser-specific search privacy, non-DASH quality choices and nickname display have no native equivalents. Background/PiP stay device-local. The expanded shared settings require the sibling settings API update. |
 
-Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed rules][w-users], [web playlist routes][w-playlists], [web common playlist/mix API][w-playlist-api], [web history][w-history], [web watched indicators][w-indicator], [web data control][w-data], [web preferences][w-prefs]; [Android account/library UI][a-ui], [Android API][a-api], [Android watched/progress state][a-watched], [Android session/local settings][a-store], [mobile API contract][w-mobile].
+Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed rules][w-users], [web playlist routes][w-playlists], [web common playlist/mix API][w-playlist-api], [web history][w-history], [web watched indicators][w-indicator], [web data control][w-data], [web preferences][w-prefs]; [Android account/library UI][a-ui], [subscribed channel directory][a-subscriptions-ui], [native settings][a-settings], [preference model][a-prefs], [Android API][a-api], [Android watched/progress state][a-watched], [Android session/local settings][a-store], [mobile API contract][w-mobile].
 
 ## Enhancements, appearance and instances
 
@@ -81,30 +81,44 @@ Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed 
 | 39 | Clips | Not implemented | — | Resolve/play YouTube or native clips; create/preview/share bounded native clips; My Clips/channel Clips lists, loop control and deletion. Existing web native clips are public, immutable, 5–120 seconds; active-live clipping/editing/clip embeds are excluded there too. |
 | 40 | Channel blocking | Implemented | Shared account block list; card and channel Block/Unblock actions; Browsing settings manager with channel navigation, errors and retry; immediate discovery/search/recommendation filtering and saved search inclusion override. Confirmed snapshots support offline filtering and isolate accounts/instances. Subscriptions, history, playlists and direct access remain available. The watch action row omits the blocking overflow menu. | — for the web capability; requires the sibling blocking API deployment and renewed sign-in tokens. Native runtime/layout acceptance remains unverified. |
 | 41 | Members-only content visibility controls | Implemented | Shared show-members preference, per-instance guest preference, device-local search override/reset, explicit member metadata and Members only labels. Filters discovery, search, channels, subscriptions, playlists and recommendations; preserves history and direct access. Original pages and continuation state keep hidden pages navigable. | — for visibility controls; requires additive member metadata and preference PATCH support on the server. Missing metadata remains visible. This does not grant membership access. Native runtime/layout acceptance remains unverified. |
-| 42 | Appearance and layout preferences | Partial | Shared manual light/dark/system mode, compact video-list density and thumbnail-free thin mode; dedicated Appearance settings screen. | Registered Modern Neon/Diary themes, scheduled random theme selection and alternative player styles. |
+| 42 | Native appearance and layout preferences | Implemented | Shared light/dark/system color mode, compact video-list density and thumbnail-free thin mode; dedicated Appearance settings screen. | —; multiple web themes, random theme selection and alternative player skins are listed under [Intentionally excluded parity](#intentionally-excluded-parity). |
 | 43 | Interface localization | Not implemented | — | Translated app interface and language selector. Android's user-facing strings are hardcoded in English; caption/audio language selection is a separate capability. |
 | 44 | Instance selection/switching and proxy preference | Partial | Dedicated server screen for an HTTPS instance; fresh installs default to `https://invidious.wingress.net`; clear local session/cache/player when switching. A shared proxy preference is used by video and manifest requests. | Instance discovery/automatic redirection and per-content switch-instance flow. Switching servers does not migrate account data. |
 | 45 | RSS subscriptions | Implemented | Open/Copy/Share selected-instance channel, public/unlisted playlist, seeded mix and secret subscription-feed links. Subscription access explanation and memory-only link; authenticated Open/Save/Share private-owned Atom files through a restricted FileProvider; complete OPML in both web formats, shared server serializers and empty/error/retry/account-change handling. | — for website feed/export parity; no built-in RSS reader, polling or upload alerts. Device/export-app acceptance remains unverified. |
 
-Evidence: [web preferences][w-prefs], [web player/SponsorBlock integration][w-player], [web SponsorBlock behavior][w-sponsor-js], [web SponsorBlock data/settings][w-sponsor], [DeArrow implementation][w-dearrow], [DeArrow contribution contract][w-dearrow-doc], [native clip contract][w-clips], [web blocking][w-blocked], [web theme registry][w-themes], [web routing/RSS][w-routing]; [Android content visibility][a-visibility], [Android blocking controls][a-visibility-ui], [Android settings/appearance][a-ui], [Android SponsorBlock sheets][a-sponsor-ui], [Android SponsorBlock settings/data][a-sponsor], [Android SponsorBlock skip engine][a-sponsor-engine], [Android DeArrow UI][a-dearrow-ui], [Android title resolver][a-dearrow], [Android API][a-api], [Android models][a-models], [Android instance/session switching][a-vm].
+Evidence: [web preferences][w-prefs], [web player/SponsorBlock integration][w-player], [web SponsorBlock behavior][w-sponsor-js], [web SponsorBlock data/settings][w-sponsor], [DeArrow implementation][w-dearrow], [DeArrow contribution contract][w-dearrow-doc], [native clip contract][w-clips], [web blocking][w-blocked], [web routing/RSS][w-routing]; [Android content visibility][a-visibility], [Android blocking controls][a-visibility-ui], [Android settings/appearance][a-ui], [Android SponsorBlock sheets][a-sponsor-ui], [Android SponsorBlock settings/data][a-sponsor], [Android SponsorBlock skip engine][a-sponsor-engine], [Android DeArrow UI][a-dearrow-ui], [Android title resolver][a-dearrow], [Android API][a-api], [Android models][a-models], [Android instance/session switching][a-vm].
+
+## Additional player tools
+
+These web capabilities were missing from the original 45-area checklist. They have separate IDs so the existing feature references remain stable.
+
+| ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
+| --- | --- | --- | --- | --- |
+| 46 | Download video, audio and caption files | Not implemented | — | The web Download selector exports available combined, video-only, audio-only and VTT caption formats, subject to instance restrictions; Companion handles downloads when configured. Android has no media/caption file download flow. Cached JSON, streaming buffers and RSS/OPML exports do not implement this capability. |
+| 47 | Player keyboard shortcuts and fine seeking | Partial | Focusable native controls; Enter/Space restores the mini-player; Enter activates an available SponsorBlock skip; MediaSession transport controls, timeline and ±10-second seeking. | The web's player shortcut map for play/pause, seek, mute/volume, speed, captions and fullscreen; numeric percentage jumps and paused frame stepping. Android system volume/media controls do not reproduce the full web map. |
+| 48 | Caption appearance controls | Not implemented | Captions render through the Media3 PlayerView (row 13). | In-app caption size and text/window opacity controls with remembered styling, as exposed by the web player. Android has no corresponding caption appearance editor. |
+
+Evidence: [web download widget][w-download], [web download routing][w-watch-route], [web shortcuts/caption styling][w-player-js]; [native player controls][a-player], [native video/caption surface][a-surface], [playback service][a-service], [Android API][a-api].
 
 ## Integration details affecting the checklist
 
 1. **Search sorting now uses the fork’s contract:** [Android API][a-api] sends `sort=relevance` or `sort=views`, matching [the search parser][w-search]. The native menu exposes these supported choices; the former `view_count` value maps to `views`, while unsupported legacy values fall back to relevance. Date and duration retain their correctly named parameters. Wire behavior is covered by API tests; live result-order testing is not claimed.
-2. **External playlists are only partly reachable:** [authenticated playlist listing][w-auth] includes account-stored playlists; Android reads them through its authenticated playlist method. It has no public playlist/deep-link flow or external-playlist subscription method, and exposes edit/delete controls without distinguishing an external saved playlist from an owned native playlist. The server limits what those mutations can do. Mix IDs redirect in [the common API][w-playlist-api], while Android's HTTP client disables redirects and has no mix API method.
+2. **External playlists and mixes have native flows:** [Android API][a-api] calls public playlist endpoints and `/api/v1/mixes/:id` directly, retaining mix seeds/continuations without following redirects. Typed search, channel playlists and shared/pasted links reach these sources. The native bookmark API supports subscribe/unsubscribe, and ownership metadata gates editing/deletion and save/default destinations. Migration 20 and renewed native sign-in are required for account bookmarks/RSS; public playlist/mix playback works for guests. See rows 17, 24, 31 and 45.
 3. **Feed settings now have native controls:** [shared server feed rules][w-users] are applied by the authenticated feed endpoint. Android no longer overrides account page size with 30. Pending-notifications-only filters the returned notifications even when the web endpoint falls back to ordinary feed videos; latest-only and notifications-only lists do not expose redundant pagination. Other feeds still merge notifications and ordinary items.
 4. **Shared settings require the expanded PATCH API:** [the mobile PATCH endpoint][w-mobile] now validates supported native booleans, playback defaults, captions, appearance, browsing and feed values in addition to SponsorBlock. It merges changed fields under the account lock and preserves unknown preferences. The existing preference token scopes suffice; no migration or token renewal is added. Guests save native preferences per instance. Background playback and PiP remain device settings. Unsupported web capabilities have no native switches.
-5. **Channel first pages omit empty continuation values:** [Android API][a-api] omits the parameter for empty/blank tokens and preserves opaque follow-up tokens for both Videos and Streams. The existing live instance returns a YouTube 400 error when `continuation=` is present. [Channel metadata][a-models] selects supported tabs in Videos/Streams order, preserving the current selection on Refresh/Retry when available and falling back to Videos if no supported tab is advertised. WAN Show advertises Streams, Podcasts and Posts, so Android selects Streams. These existing public endpoints require no server patch.
+5. **Channel first pages omit empty continuation values:** [Android API][a-api] omits the parameter for empty/blank tokens and preserves opaque follow-up tokens for Videos, Streams and Playlists. Earlier recorded public-instance checks found a YouTube 400 error with `continuation=`; this audit does not rerun them. [Channel metadata][a-models] selects supported tabs in Videos/Streams/Playlists order, preserves the selection on Refresh/Retry when available, and falls back to Videos if no supported tab is advertised. A channel advertising Streams, Podcasts and Posts selects Streams. These public browsing endpoints require no native account extension.
+6. **The current trending baseline has two categories:** [web trending extraction][w-trending] supports Gaming and Livestreams, with Livestreams as the default. Android sends a region but no category parameter. Music/Movies should not be listed as current web parity gaps.
+7. **History timezone consumption is separate from editing:** [Android history parsing][a-history] uses server-provided calendar dates/timezone for grouping. [Web preferences][w-prefs] expose timezone selection and detection; [native settings][a-settings] do not. This gap is included in row 36 rather than claiming that history groups use the device timezone.
 
 ## Platform-specific context
 
 The web checkout also supplies embeddable players, developer JSON APIs, browser OpenSearch integration, server-side HTML with many no-JavaScript fallbacks, and self-hosting/administration controls. These are web/server capabilities rather than native screen parity items. Android consumes the APIs and inherits server extraction/proxy behavior; it does not need to duplicate the server.
 
-Android already adds native conveniences: a mini-player, MediaSession/system controls, playback notification, picture-in-picture with seek/play actions, background service playback, encrypted session storage, and short-lived cached discovery/search/subscription results. The response cache is not video downloading or offline media playback. Casting and offline media management were not found as comparable implemented web features in this checkout, so they are not counted as web parity gaps.
+Android adds a live-video mini-player with swipe minimize/restore/dismiss, scroll-driven watch-player resizing, animated description/queue disclosures, screen-awake handling, MediaSession/system controls, playback notification, picture-in-picture with seek/play actions, background service playback, encrypted session storage and short-lived cached discovery/search/subscription results. The response cache is not video downloading or offline media playback. Web media/caption downloads are a parity gap (row 46); a managed offline-media library and casting were not found as implemented web features in this checkout and are not counted.
 
 The original checklist was a documentation-only source audit. The subsequent Android player overhaul consolidates playback settings under one in-player gear, removes the persistent fullscreen/back overlays, and adds touch seeking and Refresh buffer. Row 11 also corrects an audit omission: the old Media3 gear already exposed 0.25× speed; the new unified sheet retains it. Rows 09, 11, 13 and 20 reflect the overhaul; their broad statuses and summary counts are unchanged. Detailed statistics remain missing. Runtime validation for this revision is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 
-The DeArrow revision implements row 38 and the DeArrow portion of row 36. Titles retain their canonical original metadata, contributions use the web account's encrypted identity, and write requests are never automatically retried. The server API update needs deployment; existing native tokens must be renewed by signing in again. The DeArrow revision brought the totals to 9 implemented, 17 partial and 19 not implemented areas; the SponsorBlock revision brought the totals to 10 implemented, 17 partial and 18 not implemented; the later settings revision is reflected in the summary above. Validation and production limitations are recorded in [VERIFICATION.md](VERIFICATION.md).
+The DeArrow implementation covers row 38 and the DeArrow portion of row 36. Titles retain their canonical original metadata, contributions use the web account's encrypted identity, and write requests are never automatically retried. The server API update needs deployment; existing native tokens must be renewed by signing in again. Validation and production limitations are recorded in [VERIFICATION.md](VERIFICATION.md).
 
 The SponsorBlock revision implements row 37 and the SponsorBlock portion of row 36. It follows the local web fork's opt-in defaults, modes, colors, inheritance, dismissal and once-per-session automatic skipping. Active livestreams are excluded. Segment failures leave playback usable. Segment submission/voting is outside the web baseline. Server checks and Android build/unit validation passed; connected tests and native screenshots remain unverified. The existing production rollout remains separate.
 
@@ -116,6 +130,15 @@ Links are repository-relative so this checklist works with the documented siblin
 [a-dearrow-ui]: android/app/src/main/java/net/wingress/mobivious/ui/DeArrowUi.kt
 [a-dearrow]: android/app/src/main/java/net/wingress/mobivious/data/DeArrow.kt
 [a-player]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerUi.kt
+[a-channel-description]: android/app/src/main/java/net/wingress/mobivious/ui/ChannelDescriptionUi.kt
+[a-gestures]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerGestures.kt
+[a-presentation]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerPresentation.kt
+[a-scroll]: android/app/src/main/java/net/wingress/mobivious/player/WatchPlayerScroll.kt
+[a-surface]: android/app/src/main/java/net/wingress/mobivious/ui/PlaybackVideoSurface.kt
+[a-queue-ui]: android/app/src/main/java/net/wingress/mobivious/ui/PlaybackQueueUi.kt
+[a-settings]: android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt
+[a-subscriptions-ui]: android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionsUi.kt
+[a-prefs]: android/app/src/main/java/net/wingress/mobivious/data/AppPreferences.kt
 [a-vm]: android/app/src/main/java/net/wingress/mobivious/ui/AppViewModel.kt
 [a-api]: android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt
 [a-models]: android/app/src/main/java/net/wingress/mobivious/data/Models.kt
@@ -126,10 +149,14 @@ Links are repository-relative so this checklist works with the documented siblin
 [a-manifest]: android/app/src/main/AndroidManifest.xml
 [w-routing]: ../invidious/src/invidious/routing.cr
 [w-search]: ../invidious/src/invidious/search/filters.cr
+[w-search-ui]: ../invidious/src/invidious/frontend/search_filters.cr
+[w-trending]: ../invidious/src/invidious/trending.cr
 [w-search-api]: ../invidious/src/invidious/routes/api/v1/search.cr
 [w-channels]: ../invidious/src/invidious/routes/channels.cr
 [w-channel-ui]: ../invidious/src/invidious/views/components/channel_info.ecr
 [w-watch]: ../invidious/src/invidious/views/watch.ecr
+[w-watch-route]: ../invidious/src/invidious/routes/watch.cr
+[w-download]: ../invidious/src/invidious/frontend/watch_page.cr
 [w-player]: ../invidious/src/invidious/views/components/player.ecr
 [w-player-js]: ../invidious/assets/js/player.js
 [w-streams]: ../invidious/assets/js/player-stream-menu.js
@@ -159,21 +186,25 @@ Links are repository-relative so this checklist works with the documented siblin
 [w-sponsor]: ../invidious/src/invidious/sponsorblock.cr
 
 
-## Settings overhaul — 3 October 2026
+## Revision history
+
+The dated notes below describe checks and rollout status at each implementation stage. Older test totals, installed APK versions and statements about deployment/publication apply to that stage; the reviewed snapshots and current feature totals are at the top of this file. Current release and acceptance evidence is in [VERIFICATION.md](VERIFICATION.md).
+
+### Settings overhaul — 3 October 2026
 
 Rows 03, 11, 13, 14, 16, 28, 36, 42 and 44 were updated against the current source. This adds two implemented areas (captions and guest resume) and moves homepage/navigation to partial. The 37 Android unit/API tests, debug APK builds, lint, focused server specs and disposable account/API harness passed. New Compose settings scenarios compile; they have not run because the installed emulator exits with SIGSEGV before boot. See `VERIFICATION.md` for exact validation and deployment requirements.
 
-## Channel loading and Streams tabs — 3 October 2026
+### Channel loading and Streams tabs — 3 October 2026
 
 Rows 05 and 10 now include native Streams browsing and automatic selection for streams-only channels. Row 05 remains Partial and the summary counts are unchanged. All 58 Android unit/API tests, debug/instrumentation APK builds, lint and disposable channel fixture checks passed. Public live API checks returned 15 WAN Show streams and two 60-video pages of regular uploads. Four new Compose channel scenarios compile but have not run because no device is connected; native runtime/layout acceptance remains pending. See `VERIFICATION.md` for the checks and repeat commands.
 
-## Watched/progress indicators — 4 October 2026
+### Watched/progress indicators — 4 October 2026
 
-Row 34 now includes automatic watched indicators and saved-progress bars throughout the shared native video cards, with guest progress, account/instance isolation, background service updates and existing history-control synchronization. It remains Partial because manual mark-watched/mark-unwatched actions are intentionally outside the requested Android behavior. No new server API, token scope or database migration is needed.
+Row 34 now includes automatic watched indicators and saved-progress bars throughout the shared native video cards, with guest progress, account/instance isolation, background service updates and existing history-control synchronization. The supported capability is Implemented; manual mark-watched/mark-unwatched actions are recorded under [Intentionally excluded parity](#intentionally-excluded-parity). No new server API, token scope or database migration is needed.
 
 All 78 Android unit/API tests, debug/instrumentation APK builds, lint and disposable watched/progress fixture HTTP checks passed. Six new Compose scenarios compile but have not run: the installed emulator exited with SIGSEGV before Android booted. Runtime, layout and screenshot acceptance remain pending; see `VERIFICATION.md`.
 
-## Members-only visibility and channel blocking — 4 October 2026
+### Members-only visibility and channel blocking — 4 October 2026
 
 Rows 40–41 now implement the web visibility capabilities. Blocking requires an account and shares the existing website block table. Android keeps public responses unpersonalized and filters the original loaded lists locally, retaining pagination and playlist occurrence indexes. Block changes and preference changes update lists/recommendations without stopping playback. Search visibility overrides are device-local and isolated by instance/account or guest; they do not overwrite global preferences. History and directly opened videos remain accessible.
 
@@ -184,7 +215,7 @@ All 93 Android unit/API tests, debug/instrumentation APK builds and lint passed,
 [a-visibility]: android/app/src/main/java/net/wingress/mobivious/data/ContentVisibility.kt
 [a-visibility-ui]: android/app/src/main/java/net/wingress/mobivious/ui/VisibilityUi.kt
 
-## Scoped search and organized history — 4 October 2026
+### Scoped search and organized history — 4 October 2026
 
 Rows 06 and 33 now implement the requested website capabilities. Search fields on
 channel, subscription and history screens keep submitted queries separate from
@@ -220,7 +251,7 @@ was introduced. Implementation: [history metadata and grouping][a-history],
 [a-history]: android/app/src/main/java/net/wingress/mobivious/data/History.kt
 [a-search-ui]: android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt
 
-## Video library actions and playback queues — 4 October 2026
+### Video library actions and playback queues — 4 October 2026
 
 Rows 17 and 32 now implement the requested native capability. Cards share library,
 audio and queue actions across browsing and recommendations. Save preserves the
@@ -241,7 +272,9 @@ navigation/background/PiP but is not persisted after service termination.
 Shared `continue`, `continue_autoplay` and `video_loop` defaults use the existing
 preference API/scopes and storage. Deploy the sibling native PATCH allowlist update;
 no migration or renewed token is needed. Runtime repeat selection stays session-local.
-External-playlist save/unsave, shuffle and restart restoration remain outside scope.
+External-playlist save/unsave was outside the initial queue revision and was
+subsequently implemented by playlist subscriptions (row 31). Shuffle and restart
+restoration remain outside scope.
 See VERIFICATION.md for checks and the emulator limitation.
 
 Explicit queues now appear expanded inline beneath watch metadata and before
@@ -253,7 +286,7 @@ item changes, navigation and Activity recreation. Loading and retry remain inlin
 when video details are absent; existing paging, repeat and occurrence actions are
 retained. This presentation update adds no server API or storage changes.
 
-## Playlist subscriptions and RSS — 4 October 2026
+### Playlist subscriptions and RSS — 4 October 2026
 
 Rows 31 and 45 are implemented in source. The Android Library and English web
 headings now use My playlists (count) and Subscribed playlists (count). Source
@@ -268,7 +301,7 @@ these changes until a new app build is installed. Validation and outstanding dev
 checks are recorded in VERIFICATION.md; no deployment or release was performed.
 
 
-## Read-only YouTube comments — 4 October 2026
+### Read-only YouTube comments — 4 October 2026
 
 Row 22 now covers the requested YouTube-only capability. Reddit is intentionally
 excluded from the native scope. A visible Comments card contains no author or
@@ -298,14 +331,15 @@ remain unverified; see `VERIFICATION.md`.
 [a-comments]: android/app/src/main/java/net/wingress/mobivious/data/Comments.kt
 [a-comments-ui]: android/app/src/main/java/net/wingress/mobivious/ui/CommentsUi.kt
 
-## Channel avatar visibility — 4 October 2026
+### Channel avatar visibility — 4 October 2026
 
 Android now displays circular avatars in channel/watch headers, subscription chips,
 comments/replies and creator hearts, shared video cards (including recommendations,
 history, playlists and queues), and YouTube playlist creator rows. Video titles
 retain their full width; thin mode omits avatars and a channel's own upload/stream
 lists suppress repeated owner images. The same author action handles image/name
-navigation. Missing/loading/failed images retain a themed initial or person icon.
+navigation. Missing/loading/failed images retain an initial or person icon matching
+the native color mode.
 
 Existing JSON responses gain optional `authorThumbnails` from supplied metadata or
 the existing migration 21 cache, with batched page/nested-entry reads and no extra
@@ -319,7 +353,7 @@ Validation and outstanding native device/screenshot checks are recorded in
 VERIFICATION.md. No installation, deployment or release publication was performed.
 
 
-## Codec-aware quality parity — 4 October 2026
+### Codec-aware quality parity — 4 October 2026
 
 Rows 11 and 36 now follow sibling commit `4ac0170`. Video choices use codec names
 and numeric bitrates, retain at most four variants per rounded resolution/FPS
@@ -338,4 +372,98 @@ unrelated-setting preservation. Real H.264/AV1 fixtures decode and their HTTP
 variants/request logs passed checks. Four new device scenarios compile but have
 not run: the installed emulator exited with SIGSEGV before boot. See VERIFICATION.md.
 
+### Native account parity and navigation — 4 October 2026
+
 The native account revision implements row 26 and updates rows 03, 09 and 25. Account replaces Search in the fixed bottom navigation; global search expands in the top-right and submits to the existing results screen. Settings is inside Account. The sibling server adds native registration and dedicated password-confirmed account APIs using existing account/session tables. Production requires that server update and renewed mobile sign-in; deployment and release publishing are separate. Android unit/build/lint, server builds/specs and the disposable account harness are recorded in [VERIFICATION.md](VERIFICATION.md); device acceptance remains unverified.
+
+
+### Player gestures, watch resizing and complete channel descriptions — 4 October 2026
+
+Rows 05 and 09 cover Android commits `cab1eda` and `a6848ee` in configured release
+0.5.1 (version code 8). Watch/fullscreen downward
+swipes, mini-player upward/sideways swipes and button/accessibility alternatives
+share one live video surface. Watch details smoothly resize the fitted player
+between the 70% and 40% caps after the 24dp top region, using 96dp of scroll
+travel. Comments retain the 40% cap; returning near the top expands the player.
+Scroll/resize/description state follows the queue occurrence, and description/queue
+disclosures respect the system animation-duration setting.
+
+Channel descriptions retain their preview and expose complete selectable text in
+a scrollable sheet. Row 05 stays Partial because rich links/formatting, additional
+channel tabs, video sorting and header metadata are still missing. These changes
+require no new server API, migration or token scope. Previously recorded checks
+include 197 passing Android unit/API tests, debug/instrumentation builds and lint,
+plus signed 0.5.1 release validation. Device decoding, gestures, layout and
+screenshots remain unverified; see [VERIFICATION.md](VERIFICATION.md).
+
+### Checklist coverage audit — 4 October 2026
+
+Rechecked the current sibling web routes, watch/download UI, player controls,
+search filters, channel headers, preferences and data controls against native
+models/API calls and screens. Added rows 46–48 for media/caption downloads, player
+keyboard shortcuts/fine seeking and caption appearance. At that audit stage, the
+previous 45 row statuses were unchanged; three additional areas brought the total
+to 48. The subsequent native scope decision below updates rows 34 and 42.
+
+Corrected release/snapshot metadata, the obsolete external-playlist/mix integration
+note, trending categories, native channel-description coverage, the subscribed
+channel directory and player presentation. Expanded the existing gaps for advanced
+search filters, video metadata, content-link variants, playlist-aware watch sharing,
+import formats and history timezone/preload settings. Search suggestions are
+API-only in this web checkout,
+and playlist reordering is a server TODO; neither is counted as an implemented web
+feature. This documentation update adds no app/server behavior or runtime checks.
+
+
+### Native scope exclusions — 4 October 2026
+
+Rows 34 and 42 are Implemented for the intended Android scope. Explicit manual
+watched-state actions, multiple visual themes, scheduled random theme changes and
+alternative player skins are unwanted native features rather than parity gaps.
+Row 36 no longer lists theme/player-skin preferences as missing. Light/dark/system
+color mode and native layout preferences remain supported. The checklist now has
+25 implemented, 12 partial and 11 not implemented areas. Device acceptance remains
+a separate verification status, as recorded above and in [VERIFICATION.md](VERIFICATION.md).
+
+### Channel tabs and community posts — 5 October 2026
+
+Row 05 now includes every available non-Clip channel tab, shared video sorting,
+independent playlist sorting, related-channel navigation, supplied header metadata
+and selectable rich channel descriptions. Tab changes and sorting restart paging;
+returning from search or child content retains the loaded channel and scroll
+position. Row 05 remains Partial solely for deferred Clips.
+
+Row 07 is Implemented in source. Channel posts open on a dedicated native page
+with images/galleries, video/playlist attachments, read-only polls/quizzes and
+unavailable-attachment fallback. A separate post-comment controller drives a
+Top/Newest sheet with replies, retained reading positions and cursor-preserving
+retry. Public requests use the resolved post channel ID and reject superseded
+navigation, sort, account and instance responses. Video comments and playback
+remain independent. Row 24 now includes native shared/pasted/rich-text post links,
+legacy community links carrying `lb`, Copy link/Share and bundled `/post` app links.
+Activity recreation does not replay an already-consumed launch intent.
+
+All 213 unit/API tests, debug/instrumentation APK builds, debug lint and localhost
+community/avatar fixture checks passed. Ten new Compose scenarios compile;
+device interaction, playback continuity, layout and screenshots remain unverified
+because the emulator exited with SIGSEGV (139) before boot. The totals are now
+26 implemented, 12 partial and 10 not implemented. Existing sibling public APIs
+supply the contracts; this change adds no server migration or token scope.
+See [VERIFICATION.md](VERIFICATION.md) for commands and acceptance limits.
+
+[a-community]: android/app/src/main/java/net/wingress/mobivious/data/Community.kt
+[a-community-ui]: android/app/src/main/java/net/wingress/mobivious/ui/CommunityUi.kt
+[w-community]: ../invidious/src/invidious/channels/community.cr
+
+## Intentionally excluded parity
+
+These web capabilities are deliberately omitted from the Android product scope.
+They are retained here for reference and are not missing implementation work or
+reasons to classify the related native feature as Partial.
+
+| Related rows | Excluded web capability | Android scope |
+| --- | --- | --- |
+| Row 34 | Explicit mark-watched/mark-unwatched actions | Use automatic watched indicators and saved progress; retain the existing history-removal and clear-history actions. No separate manual watched-state controls are planned. |
+| Rows 36, 42 | Multiple visual themes (Modern Neon/Diary), scheduled random theme selection and alternative player skins | Use the native appearance with light/dark/system color mode, list density and thumbnail visibility. No visual-theme catalog, automatic theme rotation or player-skin selector is planned. |
+
+Evidence: [web watched-state actions][w-watch-route], [web appearance/player preferences][w-prefs], [web theme registry][w-themes]; [native watched/progress state][a-watched], [native appearance settings][a-settings].

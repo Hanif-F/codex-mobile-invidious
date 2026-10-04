@@ -119,10 +119,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     }
     suspend fun searchPlaylists(q: String, page: Int, sort: String, context: ApiContext = context()) =
         ApiParser.playlists(JSONArray(scopedRead("api/v1/search", mapOf("q" to q, "page" to "$page", "sort" to sort, "type" to "playlist"), false, context)))
-    suspend fun channelPlaylists(id: String, continuation: String = "", sort: String = "last", context: ApiContext = context()): Page<Playlist> {
-        val j = JSONObject(scopedRead("api/v1/channels/$id/playlists", buildMap { put("sort_by", sort); if (continuation.isNotBlank()) put("continuation", continuation) }, false, context))
-        return Page(ApiParser.playlists(j.optJSONArray("playlists") ?: JSONArray()), j.text("continuation"))
-    }
+    suspend fun channelPlaylists(id: String, continuation: String = "", sort: String = "last", context: ApiContext = context()): Page<Playlist> =
+        channelPlaylistPage(id, ChannelTab.PLAYLISTS, continuation, sort, context)
     suspend fun subscribePlaylist(list: Playlist, subscribe: Boolean, context: ApiContext): Playlist? {
         require(list.id.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid playlist ID" }
         val raw = scopedPlaylistWrite("api/v1/auth/saved_playlists/${list.id}", if (subscribe) "PUT" else "DELETE", context,
@@ -152,14 +150,56 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         }
     suspend fun video(id: String, local: Boolean = true) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to local.toString()))))
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
-    suspend fun channel(id: String) = ApiParser.channel(JSONObject(request("api/v1/channels/$id")))
-    suspend fun channelVideos(id: String, continuation: String = "") = channelPage(id, ChannelTab.VIDEOS, continuation)
-    suspend fun channelStreams(id: String, continuation: String = "") = channelPage(id, ChannelTab.STREAMS, continuation)
-    private suspend fun channelPage(id: String, tab: ChannelTab, continuation: String): Page<Video> {
-        val query = if (continuation.isBlank()) emptyMap() else mapOf("continuation" to continuation)
-        val j = JSONObject(request("api/v1/channels/$id/${tab.path}", query = query))
+    suspend fun channel(id: String, context: ApiContext = context()) =
+        ApiParser.channel(JSONObject(scopedRead("api/v1/channels/$id", emptyMap(), false, context)))
+    suspend fun channelVideos(id: String, continuation: String = "") = channelVideoPage(id, ChannelTab.VIDEOS, continuation)
+    suspend fun channelStreams(id: String, continuation: String = "") = channelVideoPage(id, ChannelTab.STREAMS, continuation)
+    suspend fun channelVideoPage(id: String, tab: ChannelTab, continuation: String = "", sort: ChannelSort = ChannelSort.NEWEST,
+        context: ApiContext = context()): Page<Video> {
+        require(tab.videoTab)
+        val j = JSONObject(scopedRead("api/v1/channels/$id/${tab.path}", buildMap {
+            if (sort != ChannelSort.NEWEST) put("sort_by", sort.apiValue)
+            if (continuation.isNotBlank()) put("continuation", continuation)
+        }, false, context))
         return Page(ApiParser.videos(j.optJSONArray("videos") ?: JSONArray()), j.text("continuation"))
     }
+    suspend fun channelPlaylistPage(id: String, tab: ChannelTab, continuation: String = "", sort: String = "last",
+        context: ApiContext = context()): Page<Playlist> {
+        require(tab.playlistTab)
+        val j = JSONObject(scopedRead("api/v1/channels/$id/${tab.path}", buildMap {
+            if (tab == ChannelTab.PLAYLISTS) put("sort_by", sort)
+            if (continuation.isNotBlank()) put("continuation", continuation)
+        }, false, context))
+        return Page(ApiParser.playlists(j.optJSONArray("playlists") ?: JSONArray()), j.text("continuation"))
+    }
+    suspend fun channelRelated(id: String, continuation: String = "", context: ApiContext = context()): Page<Channel> {
+        val j = JSONObject(scopedRead("api/v1/channels/$id/channels", continuationQuery(continuation), false, context))
+        return Page(j.optJSONArray("relatedChannels")?.objects().orEmpty().map(ApiParser::channel), j.text("continuation"))
+    }
+    suspend fun channelPosts(id: String, continuation: String = "", context: ApiContext = context()): PostPage =
+        PostPage.parse(JSONObject(scopedRead("api/v1/channels/$id/posts", continuationQuery(continuation), false, context)))
+    suspend fun post(link: PostLink, context: ApiContext = context()): CommunityPost {
+        require(PostLinks.validId(link.id))
+        val j = JSONObject(scopedRead("api/v1/post/${link.id}", buildMap {
+            link.channelId?.takeIf(ContentVisibility::validChannel)?.let { put("ucid", it) }
+        }, false, context))
+        return PostPage.parse(j).items.firstOrNull { it.id == link.id }
+            ?: throw ApiException(404, "This post is unavailable.")
+    }
+    suspend fun postComments(target: CommentTarget.Post, sort: CommentSort = CommentSort.TOP, continuation: String = "",
+        context: ApiContext = context()): CommentPage {
+        require(PostLinks.validId(target.id) && ContentVisibility.validChannel(target.channelId))
+        return CommentPage.parse(JSONObject(scopedRead("api/v1/post/${target.id}/comments", buildMap {
+            put("ucid", target.channelId); put("sort_by", sort.apiValue)
+            if (continuation.isNotBlank()) put("continuation", continuation)
+        }, false, context)))
+    }
+    suspend fun comments(target: CommentTarget, sort: CommentSort, continuation: String, context: ApiContext): CommentPage =
+        when (target) {
+            is CommentTarget.Video -> comments(target.id, sort, continuation, context)
+            is CommentTarget.Post -> postComments(target, sort, continuation, context)
+        }
+    private fun continuationQuery(continuation: String) = if (continuation.isBlank()) emptyMap() else mapOf("continuation" to continuation)
     suspend fun comments(id: String, sort: CommentSort = CommentSort.TOP, continuation: String = "", context: ApiContext = context()): CommentPage =
         CommentPage.parse(JSONObject(scopedRead("api/v1/comments/$id", buildMap {
             put("source", "youtube"); put("sort_by", sort.apiValue)

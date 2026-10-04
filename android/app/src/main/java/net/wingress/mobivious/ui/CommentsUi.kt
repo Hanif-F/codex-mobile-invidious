@@ -64,70 +64,78 @@ internal fun CommentsEntry(state: CommentsState, open: () -> Unit) {
 internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Modifier,
     channel: (String) -> Unit, link: (String) -> Unit) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
-    val mainList = remember(state.videoId, state.context, state.sort) {
+    CommentsPanel(state, prefs.thinMode, modifier, vm::closeComments, { vm.backComments() }, vm::sortComments,
+        vm::loadComments, vm::openReplies, vm::commentPosition, channel, link)
+}
+
+@Composable
+internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Modifier, close: () -> Unit,
+    back: () -> Unit, changeSort: (CommentSort) -> Unit, load: (Boolean, String?) -> Unit,
+    replies: (Comment) -> Unit, savePosition: (String?, CommentPosition) -> Unit, channel: (String) -> Unit, link: (String) -> Unit) {
+    val latest by rememberUpdatedState(state)
+    val mainList = remember(state.target, state.context, state.sort) {
         LazyListState(state.feed.position.index, state.feed.position.offset)
     }
     val thread = state.thread
     val key = state.threadKey
-    val threadList = remember(state.videoId, state.context, state.sort, key) {
+    val threadList = remember(state.target, state.context, state.sort, key) {
         LazyListState(thread?.feed?.position?.index ?: 0, thread?.feed?.position?.offset ?: 0)
     }
     val list = if (thread == null) mainList else threadList
     val feed = thread?.feed ?: state.feed
-    LaunchedEffect(list, state.videoId, state.context, state.sort, key) {
+    LaunchedEffect(list, state.target, state.context, state.sort, key) {
         snapshotFlow { CommentPosition(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset) }
             .distinctUntilChanged().collect { position ->
-                val current = vm.comments.value
-                if (current.videoId == state.videoId && current.context == state.context && current.sort == state.sort)
-                    vm.commentPosition(key, position)
+                if (latest.target == state.target && latest.context == state.context && latest.sort == state.sort && latest.threadKey == key)
+                    savePosition(key, position)
             }
     }
     Surface(modifier.testTag("comments-drawer"), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (thread != null) IconButton(onClick = { vm.backComments() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
+                if (thread != null) IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
                 else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() },
                     style = MaterialTheme.typography.titleLarge)
                 if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
-                IconButton(onClick = vm::closeComments) { Icon(Icons.Default.Close, "Close comments") }
+                IconButton(onClick = close) { Icon(Icons.Default.Close, "Close comments") }
             }
             if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,
-                    onClick = { vm.sortComments(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
+                    onClick = { changeSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
             }
             HorizontalDivider()
             LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag(if (thread == null) "comments-list" else "comment-replies-list"),
                 state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
                 if (thread != null) item(key = "parent") {
-                    CommentRow(thread.parent, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link, parent = true, thinMode = prefs.thinMode)
+                    CommentRow(thread.parent, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link, parent = true, thinMode = thinMode)
                     Text("Replies", Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() },
                         style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
                 items(feed.page.items, key = { "comment:${it.key}" }) { comment ->
                     CommentRow(comment, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link,
-                        replies = if (thread == null) ({ vm.openReplies(comment) }) else null, thinMode = prefs.thinMode)
+                        replies = if (thread == null) ({ replies(comment) }) else null, thinMode = thinMode)
                 }
                 if (feed.loading) item { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(Modifier.size(28.dp)); Text("Loading ${if (thread == null) "comments" else "replies"}…", Modifier.padding(top = 12.dp))
                 } }
                 if (feed.loaded && feed.page.items.isEmpty() && feed.error == null) item {
-                    Text(if (thread == null) "No comments to show. Comments may be disabled for this video." else "No replies to show.",
+                    Text(if (thread == null) "No comments to show. ${if (state.target is CommentTarget.Post) "Comments may be unavailable for this post." else "Comments may be disabled for this video."}" else "No replies to show.",
                         Modifier.padding(24.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (feed.error != null) item {
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                         Text(if (thread == null) "Comments unavailable" else "Replies unavailable", style = MaterialTheme.typography.titleSmall)
                         Text(feed.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
-                        OutlinedButton(onClick = { vm.loadComments(feed.loaded, key) }, modifier = Modifier.testTag("comments-retry")) { Text("Retry") }
+                        OutlinedButton(onClick = { load(feed.loaded, key) }, modifier = Modifier.testTag("comments-retry")) { Text("Retry") }
                     }
                 }
                 if (feed.loadingMore) item { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "Loading more ${if (thread == null) "comments" else "replies"}" })
                 } }
                 else if (feed.loaded && feed.page.continuation.isNotEmpty() && feed.error == null) item {
-                    OutlinedButton(onClick = { vm.loadComments(true, key) }, modifier = Modifier.fillMaxWidth().testTag("comments-load-more")) {
+                    OutlinedButton(onClick = { load(true, key) }, modifier = Modifier.fillMaxWidth().testTag("comments-load-more")) {
                         Text(if (thread == null) "More comments" else "More replies")
                     }
                 }
@@ -197,7 +205,7 @@ private fun richContent(comment: Comment, server: String, video: String, color: 
         val withImages = Regex("(?is)<img\\b[^>]*>").replace(html) { match ->
             val alt = Html.fromHtml(attribute(match.value, "alt"), Html.FROM_HTML_MODE_COMPACT).toString().ifBlank { "Emoji" }
             val rawUrl = Html.fromHtml(attribute(match.value, "src"), Html.FROM_HTML_MODE_COMPACT).toString()
-            val url = resolved(server, rawUrl)
+            val url = ChannelImages.url(server, rawUrl) ?: resolved(server, rawUrl)
             if (rawUrl.isBlank() || CommentLinks.resolve(url, server, video) == null) Html.escapeHtml(alt)
             else {
                 val id = "emoji-${emoji.size}"
@@ -232,10 +240,12 @@ private fun richContent(comment: Comment, server: String, video: String, color: 
 }
 
 @Composable
-private fun RichCommentText(comment: Comment, server: String, video: String, link: (String) -> Unit) {
+internal fun RichCommentText(comment: Comment, server: String, video: String, link: (String) -> Unit,
+    collapsedLines: Int = 6, tag: String = "comment-body-${comment.key}") {
     val color = MaterialTheme.colorScheme.primary
+    val onLink by rememberUpdatedState(link)
     val content = remember(comment.html, comment.text, server, video, color) {
-        runCatching { richContent(comment, server, video, color, link) }
+        runCatching { richContent(comment, server, video, color) { onLink(it) } }
             .getOrElse { RichContent(AnnotatedString(comment.text), emptyMap()) }
     }
     var expanded by remember(comment.key) { mutableStateOf(false) }
@@ -249,8 +259,8 @@ private fun RichCommentText(comment: Comment, server: String, video: String, lin
         }
     }
     SelectionContainer {
-        Text(content.text, modifier = Modifier.testTag("comment-body-${comment.key}"), style = MaterialTheme.typography.bodyMedium, inlineContent = inline,
-            maxLines = if (expanded) Int.MAX_VALUE else 6,
+        Text(content.text, modifier = Modifier.testTag(tag), style = MaterialTheme.typography.bodyMedium, inlineContent = inline,
+            maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
             onTextLayout = { if (!expanded) truncated = it.hasVisualOverflow })
     }
     if (truncated || expanded) TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 8.dp)) {

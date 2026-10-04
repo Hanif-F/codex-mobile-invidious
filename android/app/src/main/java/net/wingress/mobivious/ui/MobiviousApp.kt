@@ -91,6 +91,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val playlistSearch by vm.playlistSearch.collectAsStateWithLifecycle()
     val channelPlaylistSort by vm.channelPlaylistSort.collectAsStateWithLifecycle()
+    val channelVideoSort by vm.channelVideoSort.collectAsStateWithLifecycle()
+    val postDetail by vm.postDetail.collectAsStateWithLifecycle()
+    val postNavigation by vm.postNavigation.collectAsStateWithLifecycle()
+    val postComments by vm.postComments.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
     val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val discovery by vm.discovery.collectAsStateWithLifecycle()
@@ -105,7 +110,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val browseReset by vm.browseReset.collectAsStateWithLifecycle()
     val browseList = rememberLazyListState()
     val subscriptionList = key(vm.api.context()) { rememberLazyListState() }
-    LaunchedEffect(browseReset) { browseList.scrollToItem(0) }
+    var handledBrowseReset by rememberSaveable { mutableLongStateOf(0L) }
+    LaunchedEffect(browseReset) {
+        if (browseReset > handledBrowseReset) { browseList.scrollToItem(0); handledBrowseReset = browseReset }
+    }
     val visibleVideos = ContentVisibility.filter(state.videos, vm.contentSurface(), prefs.showMemberVideos, searchVisibility, blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty())
     var tab by rememberSaveable { mutableStateOf(vm.tab) }
     var route by rememberSaveable { mutableStateOf(vm.route) }
@@ -148,6 +156,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     var authWatchId by rememberSaveable { mutableStateOf("") }
     var authWatchPosition by rememberSaveable { mutableLongStateOf(0L) }
     var navigationServer by rememberSaveable { mutableStateOf(vm.store.server) }
+    var handledPostNavigation by rememberSaveable { mutableLongStateOf(0L) }
+    LaunchedEffect(postNavigation) {
+        if (postNavigation > handledPostNavigation) {
+            handledPostNavigation = postNavigation
+            searchOpen = false; settingsPage = ""; browsePlayer()
+        }
+    }
     LaunchedEffect(vm.store.server) {
         if (navigationServer != vm.store.server) {
             authWatchId = ""; authSettings = ""; originWatch = false; vm.clearNavigationReturns(); navigationServer = vm.store.server
@@ -166,13 +181,19 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         tab = selectedTab.first; route = selectedTab.second
         if (selectedTab != observedNavigation) { browsePlayer(); observedNavigation = selectedTab }
         if (restoredBrowse > handledRestore) {
-            handledRestore = restoredBrowse; browseList.scrollToItem(originIndex, originOffset)
+            val position = vm.browse.value.position
+            browseList.scrollToItem(position.index, position.offset); handledRestore = restoredBrowse
             if (originWatch) restorePlayer() else browsePlayer(); originWatch = false
             if (account == null) { authWatchId = ""; authSettings = "" }
         }
         if (authenticationFinished > handledAuth) {
             handledAuth = authenticationFinished; settingsPage = authSettings; authSettings = ""
             if (authWatchId.isNotEmpty()) { vm.openLink(VideoLink(authWatchId, authWatchPosition)); restorePlayer(); authWatchId = "" }
+        }
+    }
+    LaunchedEffect(browseList, selectedTab, browseReset) {
+        snapshotFlow { CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset) }.collect { position ->
+            if (vm.restoredBrowse.value == handledRestore) vm.browsePosition(position)
         }
     }
     val saveSheet by vm.saveSheet.collectAsStateWithLifecycle()
@@ -182,6 +203,17 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     fun navigate(selected: String, path: String = "") { searchOpen = false; vm.cancelAccumulatedSeek(); tab = selected; route = path; browsePlayer(); vm.navigate(selected, path) }
+    fun openRichLink(raw: String) {
+        val target = CommentLinks.resolve(raw, vm.store.server, "") ?: return
+        channelDescriptionOpen = false; vm.closePostComments()
+        when (target) {
+            is CommentLink.Post -> { browsePlayer(); vm.openPost(target.link) }
+            is CommentLink.Channel -> navigate(tab, "channel:${target.id}")
+            is CommentLink.Video -> { if (vm.openLink(target.link)) restorePlayer() else browsePlayer() }
+            is CommentLink.Seek -> Unit
+            is CommentLink.External -> runCatching { uriHandler.openUri(target.url) }
+        }
+    }
     fun signIn() {
         dialog = ""; searchOpen = false
         originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset
@@ -195,6 +227,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         if (tab != "Search" || route.isNotEmpty() || watch) {
             originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset; originWatch = watch
         }
+        val postLink = PostLinks.parse(searchDraft, vm.store.server)
+        if (postLink != null) { browsePlayer(); vm.openPost(postLink); return }
         val link = VideoLinks.parse(searchDraft, vm.store.server)
         if (link != null) { if (vm.openLink(link)) restorePlayer() } else { browsePlayer(); vm.openGlobalSearch(searchDraft) }
     }
@@ -218,7 +252,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
-    LaunchedEffect(watch, pip, settingsPage) { if (watch || pip || settingsPage.isNotEmpty()) channelDescriptionOpen = false }
+    LaunchedEffect(watch, pip, settingsPage) { if (watch || pip || settingsPage.isNotEmpty()) {
+        channelDescriptionOpen = false; vm.closePostComments()
+    } }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
     BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> collapsePlayer(); watch -> { if (!vm.backComments()) { collapsePlayer() } }; else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
@@ -226,7 +262,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
-            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen,
+            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { dialog = "player" }) {
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
@@ -257,7 +293,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 bottomBar = { Column {
                     if (presentation.mode != PlayerPresentation.CLOSED && playback.details != null) MiniPlayer(vm, playback, presentation,
                         ::restorePlayer, vm::togglePlay, ::closePlayer,
-                        gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open)
+                        gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open)
                     NavigationBar(Modifier.playerAnchor { presentation.navigationBounds = it }) { PreferenceRules.navigation(prefs.feedMenu).map { name -> name to when(name) { "Home" -> Icons.Default.Home; "Account" -> Icons.Default.AccountCircle; "Subscriptions" -> Icons.Default.Subscriptions; else -> Icons.Default.VideoLibrary } }.forEach { (name, icon) ->
                         NavigationBarItem(enabled = !accountBusy, selected = tab == name && !watch, onClick = {
                             vm.clearNavigationReturns(); originWatch = false; authWatchId = ""; authSettings = ""; navigate(name)
@@ -300,7 +336,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         (prefs.feedMenu.filter { it in listOf("Popular", "Trending") } + listOf("Popular", "Trending")).distinct().forEach { name -> val key = name.lowercase(); FilterChip(selected = discovery == key, onClick = { vm.selectDiscovery(key) }, label = { Text(name) }, modifier = Modifier.testTag("discovery-$key")) }
                         Spacer(Modifier.weight(1f)); IconButton(onClick = vm::refresh) { Icon(Icons.Default.Refresh, "Refresh") }
                     }
-                    if (route == "subscription-channels") {
+                    if (route.startsWith("post:")) PostDetailScreen(vm, postDetail, browseList,
+                        { id -> navigate(tab, "channel:$id") }, ::openRichLink, { play(it) },
+                        { list -> browsePlayer(); vm.openPlaylist(list) }, { signIn() })
+                    else if (route == "subscription-channels") {
                         if (account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
                         else SubscriptionChannelsScreen(subscriptionChannels.takeIf { it.context == vm.api.context() } ?: SubscriptionChannelsState(), vm.store.server, prefs.thinMode,
                             subscriptionList, { query -> vm.searchSubscriptionChannels(query); scope.launch { subscriptionList.scrollToItem(0) } }, vm::refreshSubscriptions,
@@ -352,6 +391,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 }
                             }
                         } }
+                        if (channelTab?.videoTab == true && channel?.ageGated == false && scopedSearch.submitted.isBlank()) item {
+                            Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ChannelSort.entries.forEach { sort -> FilterChip(selected = channelVideoSort == sort,
+                                    onClick = { vm.setChannelVideoSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("channel-sort-${sort.apiValue}")) }
+                            }
+                        }
                         if (channelTab == ChannelTab.PLAYLISTS && scopedSearch.submitted.isBlank()) item {
                             Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf("last" to "Last added", "newest" to "Newest", "oldest" to "Oldest").forEach { (key, label) ->
@@ -365,6 +410,14 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         } }
                         items(vm.visiblePlaylists(state.lists), key = { "result:${it.id}" }) { list ->
                             PlaylistCard(vm, list, { browsePlayer(); vm.openPlaylist(list) }, { signIn() })
+                        }
+                        items(state.posts, key = { "post:${it.key}" }) { post ->
+                            CommunityPostCard(vm, post, open = { browsePlayer(); vm.openPost(PostLink(post.id, post.channelId)) },
+                                channel = { id -> navigate(tab, "channel:$id") }, link = ::openRichLink, play = { play(it) },
+                                playlist = { list -> browsePlayer(); vm.openPlaylist(list) }, signIn = { signIn() })
+                        }
+                        items(state.channels, key = { "channel:${it.id}" }) { related ->
+                            RelatedChannelCard(related, vm.store.server, prefs.thinMode) { navigate(tab, "channel:${related.id}") }
                         }
                         if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { "$it videos" } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge) } }
                         if (route.isEmpty() && tab == "Subscriptions" && subscriptions.isNotEmpty()) item {
@@ -380,10 +433,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 if (list != null) vm.removePlaylistVideo(list, video)
                                 else vm.removeHistory(video.id)
                             }) else null, audioPlay = { restorePlayer(); vm.playVideo(video, playlist, audio = true) }, removalLabel = if (playlist != null) "Remove from playlist" else "Remove from history",
-                                avatarOwner = channel?.id.takeIf { route.startsWith("channel:") && channelTab in listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS) }) }
+                                avatarOwner = channel?.id.takeIf { route.startsWith("channel:") && channelTab?.videoTab == true }) }
                         }
                         if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                        if (state.error != null) item { ErrorCard(state.error!!, vm::refresh); if (state.videos.isEmpty()) OutlinedButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
+                        if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty()) OutlinedButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
                         if (!state.loading && visibleVideos.isEmpty() && state.videos.isNotEmpty()) item {
                             Column(Modifier.padding(16.dp)) {
                                 Text("Videos hidden by your visibility settings")
@@ -391,10 +444,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 OutlinedButton(onClick = { if (vm.contentSurface() == ContentSurface.SEARCH) dialog = if (tab == "Subscriptions") "visibilityFilters" else "filters" else settingsPage = "Browsing" }) { Text("Visibility controls") }
                             }
                         }
-                        if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty()) item { EmptyState(
+                        if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty()) item { EmptyState(
                             if (scopedSearch.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
                             if (scopedSearch.submitted.isNotBlank()) "Try another title or channel, or clear the search." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search by title, channel, or paste a video link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
-                        if (!state.end && !state.loading) item { OutlinedButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
+                        if (!state.end && !state.loading && state.error == null) item { OutlinedButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
                     }
                 }
                 if (presentation.showsWatch && !pip) {
@@ -413,7 +466,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
           }
             RssSheet(vm)
             if (channelDescriptionOpen && !pip && channel != null && route == "channel:${channel!!.id}")
-                ChannelDescriptionSheet(channel!!) { channelDescriptionOpen = false }
+                ChannelDescriptionSheet(channel!!, vm.store.server, ::openRichLink) { channelDescriptionOpen = false }
+            if (postComments.open && !watch && !pip && settingsPage.isEmpty() && postComments.context == vm.api.context() &&
+                route == "post:${(postComments.target as? CommentTarget.Post)?.id}")
+                PostCommentsSheet(vm, postComments, { id -> vm.closePostComments(); navigate(tab, "channel:$id") }, ::openRichLink)
             when(dialog) {
                 "filters" -> FiltersDialog(vm, { dialog = "" })
                 "visibilityFilters" -> FiltersDialog(vm, { dialog = "" }, visibilityOnly = true)
@@ -590,6 +646,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                     is CommentLink.Seek -> vm.seekTo(target.seconds.coerceAtMost(Long.MAX_VALUE / 1000) * 1000)
                     is CommentLink.Video -> { vm.closeComments(); vm.openLink(target.link) }
                     is CommentLink.Channel -> { vm.closeComments(); channel(target.id) }
+                    is CommentLink.Post -> { vm.closeComments(); presentation.present(PlayerPresentation.MINI, animate = false); vm.openPost(target.link) }
                     is CommentLink.External -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target.url))) }
                         .onFailure { vm.message.value = "No app could open this link." }
                     null -> Unit

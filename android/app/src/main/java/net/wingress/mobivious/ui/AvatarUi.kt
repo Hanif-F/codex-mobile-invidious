@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +29,7 @@ import coil.compose.AsyncImage
 import coil.disk.DiskCache
 import net.wingress.mobivious.data.Avatars
 import net.wingress.mobivious.data.Channel
+import net.wingress.mobivious.data.ChannelImages
 import net.wingress.mobivious.data.ContentVisibility
 import net.wingress.mobivious.data.Video
 import java.io.File
@@ -97,11 +99,21 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
 @Composable
 internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean,
     actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {}, subscribe: () -> Unit) {
+    var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
+        if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
+            AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().aspectRatio(6f)
+                .padding(bottom = 12.dp).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
+        }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 64.dp, "channel-header-avatar")
             Column(Modifier.weight(1f)) {
                 Text(channel.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                if (channel.verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Default.Verified, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text("Verified channel", style = MaterialTheme.typography.labelSmall)
+                }
+                if (channel.pronouns.isNotBlank()) Text(channel.pronouns, style = MaterialTheme.typography.bodyMedium)
                 Text("${channel.subscribers} subscribers", style = MaterialTheme.typography.bodyMedium)
             }
             actions()

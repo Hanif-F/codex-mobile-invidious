@@ -40,31 +40,45 @@ data class CommentFeed(val page: CommentPage = CommentPage(emptyList()), val loa
     val loading: Boolean = false, val loadingMore: Boolean = false, val error: String? = null,
     val position: CommentPosition = CommentPosition())
 data class CommentThread(val parent: Comment, val feed: CommentFeed = CommentFeed())
-data class CommentsState(val videoId: String? = null, val context: ApiContext? = null, val open: Boolean = false,
+sealed interface CommentTarget {
+    data class Video(val id: String) : CommentTarget
+    data class Post(val id: String, val channelId: String) : CommentTarget
+}
+data class CommentsState(val target: CommentTarget? = null, val context: ApiContext? = null, val open: Boolean = false,
     val sort: CommentSort = CommentSort.TOP, val feed: CommentFeed = CommentFeed(),
     val threadKey: String? = null, val threads: Map<String, CommentThread> = emptyMap()) {
+    val videoId: String? get() = (target as? CommentTarget.Video)?.id
     val thread: CommentThread? get() = threads[threadKey]
 }
 
 /** Session-only public comments, independent of player and account mutations. Calls come from the UI scope. */
 class CommentsController(private val scope: CoroutineScope, private val context: () -> ApiContext,
-    private val fetch: suspend (String, CommentSort, String, ApiContext) -> CommentPage,
+    private val fetch: suspend (CommentTarget, CommentSort, String, ApiContext) -> CommentPage,
     private val errorMessage: (Exception) -> String) {
     val state = MutableStateFlow(CommentsState())
     private var revision = 0L
     private val jobs = mutableMapOf<String, Job>()
 
-    fun bind(videoId: String?, enabled: Boolean) {
-        val target = videoId.takeIf { enabled }
-        val currentContext = context()
-        if (state.value.videoId == target && state.value.context == currentContext) return
+    fun restore(saved: CommentsState) {
         revision++; jobs.values.forEach { it.cancel() }; jobs.clear()
-        state.value = CommentsState(videoId = target, context = currentContext)
+        state.value = if (saved.context == context()) saved.copy(open = false,
+            feed = saved.feed.copy(loading = false, loadingMore = false),
+            threads = saved.threads.mapValues { (_, thread) -> thread.copy(feed = thread.feed.copy(loading = false, loadingMore = false)) })
+        else CommentsState(context = context())
+    }
+
+    fun bind(videoId: String?, enabled: Boolean) = bind(videoId?.takeIf { enabled }?.let(CommentTarget::Video))
+    fun bind(target: CommentTarget?) {
+        val currentContext = context()
+        if (state.value.target == target && state.value.context == currentContext) return
+        revision++; jobs.values.forEach { it.cancel() }; jobs.clear()
+        state.value = CommentsState(target = target, context = currentContext)
     }
     fun open() {
-        if (state.value.videoId == null || state.value.context != context()) return
+        if (state.value.target == null || state.value.context != context()) return
         state.value = state.value.copy(open = true)
         if (!state.value.feed.loaded) load()
+        state.value.threadKey?.let { if (state.value.thread?.feed?.loaded != true) load(threadKey = it) }
     }
     fun close() { state.value = state.value.copy(open = false) }
     fun back(): Boolean {
@@ -97,18 +111,18 @@ class CommentsController(private val scope: CoroutineScope, private val context:
     }
     fun load(more: Boolean = false, threadKey: String? = null) {
         val current = state.value
-        val video = current.videoId ?: return
+        val target = current.target ?: return
         val capturedContext = current.context ?: return
         val before = feed(threadKey) ?: return
         if (capturedContext != context() || before.loading || before.loadingMore || more && before.page.continuation.isBlank()) return
         val token = if (more) before.page.continuation else threadKey?.let { current.threads[it]?.parent?.replyContinuation }.orEmpty()
         val capturedRevision = revision
-        fun active() = revision == capturedRevision && state.value.videoId == video && context() == capturedContext
+        fun active() = revision == capturedRevision && state.value.target == target && context() == capturedContext
         replace(threadKey, before.copy(loading = !more, loadingMore = more, error = null))
         val jobKey = threadKey?.let { "thread:$it" } ?: "feed"
         jobs[jobKey] = scope.launch {
             try {
-                val result = fetch(video, current.sort, token, capturedContext)
+                val result = fetch(target, current.sort, token, capturedContext)
                 if (active()) {
                     val latest = feed(threadKey) ?: return@launch
                     val items = (if (more) latest.page.items + result.items else result.items).distinctBy { it.key }
@@ -127,6 +141,7 @@ sealed interface CommentLink {
     data class Seek(val seconds: Long) : CommentLink
     data class Video(val link: VideoLink) : CommentLink
     data class Channel(val id: String) : CommentLink
+    data class Post(val link: PostLink) : CommentLink
     data class External(val url: String) : CommentLink
 }
 object CommentLinks {
@@ -139,6 +154,7 @@ object CommentLinks {
             url = (url.queryParameter("q") ?: url.queryParameter("url"))?.toHttpUrlOrNull() ?: return null
             if (url.username.isNotEmpty() || url.password.isNotEmpty()) return null
         }
+        PostLinks.parse(url.toString(), instance)?.let { return CommentLink.Post(it) }
         VideoLinks.parse(url.toString(), instance)?.let {
             return if (it.id == currentVideo && it.seconds != null) CommentLink.Seek(it.seconds) else CommentLink.Video(it)
         }

@@ -13,14 +13,15 @@ class ChannelTest {
     private suspend fun page(api: InvidiousApi, tab: ChannelTab, continuation: String = ""): Page<Video> = when (tab) {
         ChannelTab.VIDEOS -> api.channelVideos(id, continuation)
         ChannelTab.STREAMS -> api.channelStreams(id, continuation)
-        ChannelTab.PLAYLISTS -> error("Playlist pages have a separate result type")
+        ChannelTab.SHORTS -> api.channelVideoPage(id, tab, continuation)
+        else -> error("Playlist pages have a separate result type")
     }
 
     @Test fun metadataKeepsAdvertisedTabsAndIgnoresMalformedEntries() {
         val channel = ApiParser.channel(JSONObject("""{"authorId":"$id","author":"WAN Show","tabs":["streams","podcasts",null,42,"posts"]}"""))
         assertEquals(id, channel.id)
         assertEquals(listOf("streams", "podcasts", "posts"), channel.tabs)
-        assertEquals(listOf(ChannelTab.STREAMS), channel.contentTabs)
+        assertEquals(listOf(ChannelTab.STREAMS, ChannelTab.PODCASTS, ChannelTab.POSTS), channel.contentTabs)
         assertEquals(ChannelTab.STREAMS, channel.preferredTab())
     }
 
@@ -28,8 +29,8 @@ class ChannelTest {
         listOf(
             listOf("videos") to listOf(ChannelTab.VIDEOS),
             listOf("streams") to listOf(ChannelTab.STREAMS),
-            listOf("streams", "posts", "videos", "streams") to listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS),
-            listOf("shorts", "podcasts") to listOf(ChannelTab.VIDEOS),
+            listOf("streams", "posts", "videos", "streams") to listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS, ChannelTab.POSTS),
+            listOf("shorts", "podcasts") to listOf(ChannelTab.SHORTS, ChannelTab.PODCASTS),
             emptyList<String>() to listOf(ChannelTab.VIDEOS)
         ).forEach { (advertised, expected) ->
             val channel = Channel(id, "Channel", tabs = advertised)
@@ -53,7 +54,7 @@ class ChannelTest {
             server.start()
             val address = server.url("/").toString().trimEnd('/')
             val api = InvidiousApi({ address }, { Account("private-token", "Viewer", Long.MAX_VALUE, address) })
-            listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS).forEach { tab ->
+            listOf(ChannelTab.VIDEOS, ChannelTab.SHORTS, ChannelTab.STREAMS).forEach { tab ->
                 repeat(3) { variant ->
                     server.enqueue(MockResponse().setBody("""{"videos":[]}"""))
                     val result = when (variant) {
@@ -77,7 +78,7 @@ class ChannelTest {
             server.start()
             val api = InvidiousApi({ server.url("/").toString().trimEnd('/') }, { null })
             val token = " next+/=%25&終 "
-            listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS).forEach { tab ->
+            listOf(ChannelTab.VIDEOS, ChannelTab.SHORTS, ChannelTab.STREAMS).forEach { tab ->
                 server.enqueue(MockResponse().setBody(JSONObject().put("videos", org.json.JSONArray("""[{"videoId":"abcdefghijk","title":"First","liveNow":true}]""")).put("continuation", token).toString()))
                 val first = page(api, tab)
                 server.takeRequest()
@@ -100,7 +101,7 @@ class ChannelTest {
         MockWebServer().use { server ->
             server.start()
             val api = InvidiousApi({ server.url("/").toString().trimEnd('/') }, { null })
-            listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS).forEach { tab ->
+            listOf(ChannelTab.VIDEOS, ChannelTab.SHORTS, ChannelTab.STREAMS).forEach { tab ->
                 server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":"Temporary channel failure"}"""))
                 try { page(api, tab); fail("Channel failure ignored") }
                 catch (error: ApiException) { assertEquals(503, error.status); assertEquals("Temporary channel failure", error.message) }

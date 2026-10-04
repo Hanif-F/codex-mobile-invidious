@@ -78,8 +78,8 @@ Account features require the server extensions described in `deploy/README.md`.
 
 ## Features
 
-Home popular/trending, filtered search and shared video links; channel browsing with
-paginated Videos/Streams/Playlists tabs and automatic Streams selection for channels without uploads;
+Home popular/trending, filtered search and shared content links; channel browsing with
+available Videos/Shorts/Streams/Podcasts/Releases/Courses/Playlists/Posts/Channels tabs;
 native account registration and session management; subscription feed and subscribe/unsubscribe; playlists and
 watch history; descriptions, captions, read-only comments and recommendations.
 The four bottom tabs are Home, Subscriptions, Library and Account. Account contains
@@ -100,9 +100,25 @@ links remain available. Saved feed-menu preferences affect Home discovery order;
 the Search homepage remains supported without a Search bottom tab.
 
 Channel pages and Subscriptions each have their own search field. Channel search
-keeps the selected Videos/Streams/Playlists tab available; clearing search restores it.
+keeps the selected tab available; clearing search restores its loaded content and position.
 Channel descriptions retain a three-line preview; Read full description opens a
-scrollable sheet with the complete selectable text.
+scrollable sheet with complete selectable formatting and clickable links. Headers
+show supplied banners, verification and pronouns. Videos/Shorts/Streams share
+Newest/Oldest/Popular sorting within a channel; playlist sorting stays separate.
+Returning from search, related channels, playlists or posts restores the channel
+tab, sort, loaded pages and scroll position. Clips remain deferred.
+
+Community posts open on a native detail page with rich text, publication/edit
+information, likes, comment counts, Copy link and Share. Images and swipeable
+galleries open an enlarged viewer; attached videos/playlists use native playback.
+Polls and quizzes show supplied choices, images, vote totals and answer information
+without voting. Post comments open in an independent sheet with Top/Newest,
+pagination, replies, saved scroll positions and retry. Shared/pasted/rich-text
+YouTube or configured-instance post/community links open natively and resolve
+missing channel IDs through the public post API. Opening a post minimizes active
+playback and preserves video comments, including when video comments are hidden.
+This uses existing public server contracts without new migrations or token scopes.
+
 Subscription search matches titles/channels across the cached subscription library.
 The Channels button stays above the Subscriptions feed and opens a separate
 Subscribed channels screen. Channels are sorted by name; Search channels filters

@@ -18,6 +18,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import net.wingress.mobivious.data.VideoLinks
+import net.wingress.mobivious.data.PostLinks
 import net.wingress.mobivious.player.PlaybackService
 import net.wingress.mobivious.ui.AppViewModel
 import net.wingress.mobivious.ui.MobiviousApp
@@ -32,16 +33,21 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent { MobiviousApp(model, this, pipMode.value, sharedVideo) }
         // Recreation reconnects to the service session instead of replaying its launch link.
-        if (savedInstanceState == null || model.queue.value.token.isEmpty()) handleLink(intent)
+        if (!model.launchIntentConsumed) {
+            model.launchIntentConsumed = true
+            if (savedInstanceState == null || model.queue.value.token.isEmpty()) handleLink(intent)
+        }
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleLink(intent) }
     override fun onStart() { super.onStart(); model.refreshSharedSettings() }
     private fun handleLink(intent: Intent) {
         val text = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else intent.dataString
         if (text != null) {
+            val post = PostLinks.parse(text, model.store.server)
+            if (post != null) { sharedVideo.value = false; model.openPost(post); return }
             val link = VideoLinks.parse(text, model.store.server)
             if (link != null) { sharedVideo.value = model.openLink(link) }
-            else model.message.value = "Share a YouTube or configured Invidious video, playlist or mix link."
+            else model.message.value = "Share a YouTube or configured Invidious video, playlist, mix or post link."
         }
     }
     fun updatePip(watching: Boolean) {

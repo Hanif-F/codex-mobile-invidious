@@ -2,7 +2,6 @@ package net.wingress.mobivious.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -15,10 +14,11 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.Channel
+import net.wingress.mobivious.data.Comment
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ChannelDescriptionSheet(channel: Channel, dismiss: () -> Unit) {
+internal fun ChannelDescriptionSheet(channel: Channel, server: String = "", link: (String) -> Unit = {}, dismiss: () -> Unit) {
     val maxHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     ModalBottomSheet(onDismissRequest = dismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) {
@@ -30,10 +30,12 @@ internal fun ChannelDescriptionSheet(channel: Channel, dismiss: () -> Unit) {
                 }
                 IconButton(onClick = dismiss) { Icon(Icons.Default.Close, "Close channel description") }
             }
-            SelectionContainer(Modifier.weight(1f, fill = false).fillMaxWidth()
+            Column(Modifier.weight(1f, fill = false).fillMaxWidth()
                 .verticalScroll(rememberScrollState()).testTag("channel-description-scroll")) {
-                Text(channel.description, Modifier.fillMaxWidth().padding(16.dp).testTag("channel-description-text"),
-                    style = MaterialTheme.typography.bodyMedium)
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    RichCommentText(Comment(channel.name, channel.description, "", 0, id = "channel:${channel.id}", html = channel.descriptionHtml),
+                        server, "", link, collapsedLines = Int.MAX_VALUE, tag = "channel-description-text")
+                }
             }
         }
     }

@@ -1359,3 +1359,75 @@ descriptions, player gestures and presentation/disclosure animations since 0.5.0
 The build log is `/tmp/mobivious-0.5.1-release.log`, and local verification metadata
 is `artifacts/release-verification-0.5.1.json`. Native device acceptance remains
 unverified as recorded above. This release requires no new server API or migration.
+
+## Channel tabs and community posts — 5 October 2026
+
+Channel browsing now uses the available Videos, Shorts, Streams, Podcasts,
+Releases, Courses, Playlists, Posts and Channels tabs in website order. Models
+normalize community/posts, retain the Videos fallback and parse optional banners,
+verification, pronouns and rich descriptions. Video tabs share Newest/Oldest/Popular;
+playlist sorting is separate and controls are hidden for endpoints that ignore it.
+Tab/sort changes restart pagination, while search and child navigation retain
+loaded content and scroll positions. Clips remain deferred.
+
+Posts have a dedicated native page with rich text, author/publication/edit metadata,
+likes, comment counts, image galleries/enlarged viewers, video/playlist attachments,
+read-only polls/quizzes and unknown-attachment fallback. Post comments use a typed
+target and an independent controller in a sheet, including Top/Newest, replies,
+saved scroll positions, loading/empty/error states and cursor-preserving retry.
+Shared/pasted/rich-text post and legacy community links resolve natively, including
+missing channel IDs. Post navigation minimizes playback; launch intents are consumed
+once by the retained Activity view model. Video comments retain their own state and
+visibility preference.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API/controller tests | 213 passed; zero failures, errors or skips |
+| Debug APK | Passed; `android/app/build/outputs/apk/debug/app-debug.apk` |
+| Instrumentation APK | Passed; ten new Compose scenarios compile |
+| Debug lint | Passed; zero errors, 34 existing dependency/style warnings |
+| Disposable community fixture | Passed: nine result types, header metadata, paging, attachments, detail resolution/retry, comment sorting/replies, public requests and proxy images |
+| Existing avatar fixture regression | Passed: image placement, deferred requests, cache headers, query preservation, credentials and failures |
+| Python fixture syntax and repository whitespace | Passed |
+| Native UI, playback continuity, intents and screenshots | Unverified: Pixel_8_Pro emulator 37.2.12 exited with SIGSEGV (139) before boot; no ADB device was connected |
+
+New parser and MockWebServer coverage includes every tab/result kind, all video
+sorts and playlist-tab contracts, optional metadata, known/unknown/missing media,
+link-origin validation and post-channel resolution. Requests remain public without
+bearer tokens. Controller tests cover independent video/post state, opaque cursors,
+overlapping pages, repeated continuations, failed-page retry, restored pending reply
+loads and delayed responses superseded by target, sorting or account/instance changes.
+
+Seven fixture-backed scenarios in `CommunitySmokeTest` cover tab switching, shared
+video sorting, scoped/global search and child restoration, post pagination/retry,
+galleries/polls/quizzes, sheet/reply/Back navigation, stale responses, shared links,
+playback/video-comment independence and Activity recreation both on a post and
+after leaving it. Three `CommunityPresentationTest` scenarios cover narrow layouts,
+large fonts, light/dark modes, thumbnail-free identity presentation, clickable rich
+descriptions, missing gallery images and accessible sheet controls. These device
+scenarios have **not executed**; no new screenshots were produced or inspected.
+
+Reproduction:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:testDebugUnitTest \
+  :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug \
+  --offline --console=plain
+cd ..
+python3 scripts/check-community-fixture.py
+python3 scripts/check-avatar-fixture.py
+git diff --check
+```
+
+The final build log is `/tmp/mobivious-community-final-checks.log`; the failed
+emulator attempt is recorded in `/tmp/mobivious-community-emulator.log`. On a
+working emulator/device, run `scripts/test-android.sh` to generate local media,
+start the fixture, reverse its localhost port and run connected scenarios.
+Both fixture checks use temporary localhost servers and shut them down on exit.
+
+Existing sibling APIs provide posts in `comments`, related channels in
+`relatedChannels`, and playlist tabs in `playlists`; post comments receive the
+resolved channel ID as `ucid`. No server code, migration, token scope, dependency,
+signing/version metadata, production deployment or release publication was changed.
+The signed 0.5.1 release recorded above predates these working-tree changes.

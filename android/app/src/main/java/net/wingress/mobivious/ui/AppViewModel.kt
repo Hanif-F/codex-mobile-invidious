@@ -43,7 +43,11 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
     val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
-    val history: HistoryPage? = null, val lists: List<Playlist> = emptyList())
+    val history: HistoryPage? = null, val lists: List<Playlist> = emptyList(),
+    val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
+    val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false)
+data class PostDetailState(val link: PostLink? = null, val context: ApiContext? = null,
+    val post: CommunityPost? = null, val loading: Boolean = false, val error: String? = null)
 data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean = false, val error: String? = null,
     val playing: Boolean = false, val position: Long = 0, val duration: Long = 0, val buffering: Boolean = false,
     val mediaId: String = "", val playWhenReady: Boolean = false, val playerState: Int = Player.STATE_IDLE,
@@ -86,6 +90,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val rss = MutableStateFlow(RssState())
     val playlistSearch = MutableStateFlow(false)
     val channelPlaylistSort = MutableStateFlow("last")
+    val channelVideoSort = MutableStateFlow(ChannelSort.NEWEST)
+    val postDetail = MutableStateFlow(PostDetailState())
+    val postNavigation = MutableStateFlow(0L)
+    private val postCommentController = CommentsController(viewModelScope, api::context, api::comments, ::friendly)
+    val postComments = postCommentController.state
     private var pendingPlaylistSubscription: Pair<String, Playlist>? = null
     private var playlistRevision = 0L
     private var playlistSeed: String? = null
@@ -113,6 +122,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var tab = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).first
     val navigation = MutableStateFlow(tab to "")
     var route = ""
+    var launchIntentConsumed = false
     var query: String
         get() = searchInput.value.submitted
         set(value) { searchInput.value = SearchInput(value, value) }
@@ -134,12 +144,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var homeAppliedContext: ApiContext? = null
     private data class BrowseReturn(val tab: String, val route: String, val browse: BrowseState,
         val channel: Channel?, val channelTab: ChannelTab?, val playlist: Playlist?, val seed: String?,
-        val playlistSort: String, val scopedSearch: SearchInput, val discovery: String, val context: ApiContext)
+        val playlistSort: String, val videoSort: ChannelSort, val postDetail: PostDetailState, val postComments: CommentsState,
+        val scopedSearch: SearchInput, val discovery: String, val context: ApiContext,
+        val channelSearchOrigin: BrowseReturn?, val subscriptionParent: Boolean)
     private fun captureBrowse() = BrowseReturn(tab, route, browse.value, channel.value, channelTab.value,
-        playlist.value, playlistSeed, channelPlaylistSort.value, scopedSearch.value, discovery.value, api.context())
+        playlist.value, playlistSeed, channelPlaylistSort.value, channelVideoSort.value, postDetail.value,
+        postComments.value, scopedSearch.value, discovery.value, api.context(), channelSearchOrigin, subscriptionChannelParent)
+    private val browseReturns = mutableListOf<BrowseReturn>()
+    private var channelSearchOrigin: BrowseReturn? = null
     private var searchReturn: BrowseReturn? = null
     private var signInReturn: BrowseReturn? = null
-    fun clearNavigationReturns() { signInReturn = null; searchReturn = null }
+    fun clearNavigationReturns() { signInReturn = null; searchReturn = null; browseReturns.clear(); channelSearchOrigin = null }
     val restoredBrowse = MutableStateFlow(0L)
     val authenticationFinished = MutableStateFlow(0L)
     private val future = MediaController.Builder(application, SessionToken(application, ComponentName(application, PlaybackService::class.java)))
@@ -199,6 +214,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             blockUndo.value = null
             playlistRevision++; playlistBusy.value = emptySet(); playlistErrors.value = emptyMap()
             playlist.value = null; playlistSeed = null; playlists.value = emptyList()
+            postDetail.value = PostDetailState(); postCommentController.bind(null); browseReturns.clear(); channelSearchOrigin = null
             rssJob?.cancel(); rss.value = RssState()
             val pendingList = pendingPlaylistSubscription
             if (it != null && pendingList?.first == api.context().server) {
@@ -337,20 +353,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "") {
+    fun navigate(tab: String, route: String = "", loadContent: Boolean = true) {
+        if (this.route != route && (this.route.startsWith("channel:") || this.route.startsWith("post:")) &&
+            (route.startsWith("channel:") || route.startsWith("post:") || route.startsWith("playlist:"))) browseReturns += captureBrowse()
+        channelSearchOrigin = null
         if (this.tab == "Subscriptions" && this.route.isEmpty() && route == "subscription-channels") subscriptionFeedSearch = scopedSearch.value
         val returnToFeed = this.route == "subscription-channels" && tab == "Subscriptions" && route.isEmpty()
         subscriptionChannelParent = tab == "Subscriptions" && route.startsWith("channel:") &&
             (this.route == "subscription-channels" || this.tab == "Subscriptions" && this.route.startsWith("channel:") && subscriptionChannelParent)
+        postCommentController.bind(null)
+        postDetail.value = PostDetailState()
         this.tab = tab; navigation.value = tab to route; this.route = route
         scopedSearch.value = if (returnToFeed) subscriptionFeedSearch else SearchInput()
-        channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; refresh()
+        channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; channelVideoSort.value = ChannelSort.NEWEST; if (loadContent) refresh()
     }
     private fun restoreBrowse(saved: BrowseReturn, afterSignIn: Boolean = false) {
         if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Home"); return }
         browseJob?.cancel(); browseGeneration++
         tab = saved.tab; route = saved.route; channel.value = saved.channel; channelTab.value = saved.channelTab
         playlist.value = saved.playlist; playlistSeed = saved.seed; channelPlaylistSort.value = saved.playlistSort
+        channelVideoSort.value = saved.videoSort; postDetail.value = saved.postDetail.copy(context = api.context(), loading = false)
+        postCommentController.restore(saved.postComments)
+        channelSearchOrigin = saved.channelSearchOrigin; subscriptionChannelParent = saved.subscriptionParent
         scopedSearch.value = saved.scopedSearch; discovery.value = saved.discovery
         browse.value = saved.browse.copy(loading = false)
         navigation.value = tab to route; restoredBrowse.value++
@@ -366,9 +390,36 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val saved = searchReturn
         if (tab == "Search" && route.isEmpty() && saved != null) { searchReturn = null; restoreBrowse(saved) }
         else if (tab == "Account" && signInReturn != null) { val origin = signInReturn!!; signInReturn = null; restoreBrowse(origin) }
+        else if (browseReturns.isNotEmpty()) restoreBrowse(browseReturns.removeAt(browseReturns.lastIndex))
         else navigate(tab, if (subscriptionChannelParent && route.startsWith("channel:")) "subscription-channels" else "")
     }
-    val hasBrowseBack: Boolean get() = tab == "Search" && searchReturn != null || tab == "Account" && signInReturn != null
+    val hasBrowseBack: Boolean get() = browseReturns.isNotEmpty() || tab == "Search" && searchReturn != null || tab == "Account" && signInReturn != null
+    fun browsePosition(position: CommentPosition) {
+        if (!browse.value.loading && browse.value.position != position) browse.value = browse.value.copy(position = position)
+    }
+    fun openPost(link: PostLink) {
+        if (!PostLinks.validId(link.id)) return
+        navigate(tab, "post:${link.id}", loadContent = false)
+        postDetail.value = PostDetailState(link, api.context())
+        postNavigation.value++
+        load(false)
+    }
+    fun openPostComments() {
+        val detail = postDetail.value
+        val post = detail.post ?: return
+        if (detail.context != api.context() || !ContentVisibility.validChannel(post.channelId)) return
+        postCommentController.bind(CommentTarget.Post(post.id, post.channelId)); postCommentController.open()
+    }
+    fun closePostComments() = postCommentController.close()
+    fun backPostComments() = postCommentController.back()
+    fun sortPostComments(sort: CommentSort) = postCommentController.sort(sort)
+    fun openPostReplies(comment: Comment) = postCommentController.replies(comment)
+    fun loadPostComments(more: Boolean, key: String?) = postCommentController.load(more, key)
+    fun postCommentPosition(key: String?, position: CommentPosition) = postCommentController.position(key, position)
+    fun setChannelVideoSort(value: ChannelSort) {
+        if (channelVideoSort.value == value || channelTab.value?.videoTab != true || channel.value?.ageGated == true) return
+        channelVideoSort.value = value; load(false, refreshChannel = false)
+    }
     fun openSignIn() { if (tab != "Account") signInReturn = captureBrowse(); navigate("Account") }
     fun openPlaylist(list: Playlist) {
         navigate("Library", "playlist:${list.id}")
@@ -439,10 +490,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun submitSearch(scoped: Boolean) {
         val input = if (scoped) scopedSearch else searchInput
+        if (scoped && route.startsWith("channel:") && input.value.submitted.isBlank() && input.value.draft.isNotBlank())
+            channelSearchOrigin = captureBrowse().copy(scopedSearch = SearchInput(), channelSearchOrigin = null)
         input.value = input.value.copy(submitted = input.value.draft.trim())
-        refresh()
+        if (scoped && input.value.submitted.isBlank()) clearScopedSearch() else refresh()
     }
-    fun clearScopedSearch() { scopedSearch.value = SearchInput(); refresh() }
+    fun clearScopedSearch() {
+        val saved = channelSearchOrigin; channelSearchOrigin = null
+        if (saved != null && saved.route == route && saved.context == api.context()) restoreBrowse(saved)
+        else { scopedSearch.value = SearchInput(); refresh() }
+    }
     fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery.value = target.second; navigate(target.first) }
     fun selectDiscovery(value: String) {
         if (value !in listOf("popular", "trending") || discovery.value == value) return
@@ -463,10 +520,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         action { app.watched.clearHistory(context); if (api.context() == context) refresh() }
     }
     fun more() = load(true)
+    fun retryBrowse() = load(browse.value.retryMore, refreshChannel = false)
     fun selectChannelTab(value: ChannelTab) {
         val info = channel.value ?: return
         if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value && scopedSearch.value.submitted.isBlank()) return
-        scopedSearch.value = SearchInput()
+        if (value == channelTab.value && channelSearchOrigin != null) { clearScopedSearch(); return }
+        channelSearchOrigin = null; scopedSearch.value = SearchInput()
         channelTab.value = value
         dearrowTitles.clear()
         load(false, refreshChannel = false)
@@ -487,21 +546,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
         val selectedDiscovery = discovery.value; val selectedRegion = region
-        val listSearch = playlistSearch.value; val listSort = channelPlaylistSort.value; val revision = playlistRevision
+        val listSearch = playlistSearch.value; val listSort = channelPlaylistSort.value; val videoSort = channelVideoSort.value; val revision = playlistRevision
         val scopedQuery = scopedSearch.value.submitted
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
-        browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else selectedTab)
+        val selectedPostLink = postDetail.value.link ?: selectedRoute.takeIf { it.startsWith("post:") }?.let { PostLink(it.substringAfter(':')) }
+        browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute.startsWith("post:")) "Post" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
                 var continuation = ""
                 var hasMore: Boolean? = null
                 var history: HistoryPage? = null
                 var lists = emptyList<Playlist>()
+                var posts = emptyList<CommunityPost>()
+                var channels = emptyList<Channel>()
                 val videos = when {
+                    selectedRoute.startsWith("post:") && selectedPostLink != null -> {
+                        postDetail.value = PostDetailState(selectedPostLink, context, postDetail.value.post, loading = true)
+                        val post = api.post(selectedPostLink, context)
+                        if (generation != browseGeneration || context != api.context()) throw CancellationException("Post request superseded")
+                        postDetail.value = PostDetailState(selectedPostLink, context, post)
+                        postCommentController.bind(CommentTarget.Post(post.id, post.channelId))
+                        hasMore = false; emptyList()
+                    }
                     selectedRoute.startsWith("channel:") -> {
                         val id = selectedRoute.substringAfter(':')
-                        val info = if (selectedChannel == null || !more && refreshChannel) api.channel(id) else selectedChannel
+                        val info = if (selectedChannel == null || !more && refreshChannel) api.channel(id, context) else selectedChannel
                         if (generation != browseGeneration || context != api.context()) throw CancellationException("Channel request superseded")
                         val contentTab = info.preferredTab(selectedChannelTab)
                         channel.value = info; channelTab.value = contentTab
@@ -511,17 +581,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             response.items
                         } else {
                             val token = if (more) old.continuation else ""
-                            if (contentTab == ChannelTab.PLAYLISTS) {
-                                val response = api.channelPlaylists(id, token, listSort, context)
-                                lists = response.items; continuation = response.continuation
-                                hasMore = continuation.isNotBlank(); emptyList()
-                            } else {
-                                val response = when (contentTab) {
-                                    ChannelTab.STREAMS -> api.channelStreams(id, token)
-                                    else -> api.channelVideos(id, token)
+                            val resultVideos = when {
+                                contentTab.playlistTab -> {
+                                    val response = api.channelPlaylistPage(id, contentTab, token, listSort, context)
+                                    lists = response.items; continuation = response.continuation; emptyList()
                                 }
-                                continuation = response.continuation; response.items
+                                contentTab == ChannelTab.POSTS -> {
+                                    val response = api.channelPosts(id, token, context)
+                                    posts = response.items; continuation = response.continuation; emptyList()
+                                }
+                                contentTab == ChannelTab.CHANNELS -> {
+                                    val response = api.channelRelated(id, token, context)
+                                    channels = response.items; continuation = response.continuation; emptyList()
+                                }
+                                else -> {
+                                    val response = api.channelVideoPage(id, contentTab, token, if (info.ageGated) ChannelSort.NEWEST else videoSort, context)
+                                    continuation = response.continuation; response.items
+                                }
                             }
+                            if (more && continuation == token) continuation = ""
+                            hasMore = continuation.isNotBlank()
+                            resultVideos
                         }
                     }
                     selectedRoute.startsWith("playlist:") -> {
@@ -562,11 +642,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     else -> api.discovery(selectedDiscovery, selectedRegion)
                 }
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
-                    continuation = continuation, history = history, lists = (old.lists + lists).distinctBy { it.id }, end = if (hasMore != null) !hasMore || more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
+                    continuation = continuation, history = history, lists = (old.lists + lists).distinctBy { it.id },
+                    posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id }, retryMore = false, end = if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                         selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(loading = false, error = friendly(e))
+                if (generation == browseGeneration && context == api.context()) {
+                    browse.value = browse.value.copy(loading = false, error = friendly(e), retryMore = more)
+                    if (selectedRoute.startsWith("post:")) postDetail.value = postDetail.value.copy(loading = false, error = friendly(e))
+                }
             }
         }
     }
@@ -800,7 +884,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         api.revokeSession(session.id, context); if (session.current) clearAccount(context)
     }
     fun logout() = action { accountOperation { val context = api.context(); try { api.logout() } finally { clearAccount(context) } } }
-    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++

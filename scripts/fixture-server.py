@@ -95,8 +95,19 @@ def reset_sponsorblock():
 reset_sponsorblock()
 
 def reset_channels():
-    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None)
+    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None, channelRichHeader=False, postRequests=[], postFailNext=False, postDelayNext=0, postEmpty=False)
 reset_channels()
+
+def community_posts():
+    image = [dict(url='/ggpht/post-photo=s1280', width=1280, height=720)]
+    attachments = [None, dict(type='image', imageThumbnails=image), dict(type='multiImage', images=[image, image]),
+                   dict(video, type='video'), dict(source_playlist(), type='playlist'),
+                   dict(type='poll', totalVotes=42, choices=[dict(text='First choice', image=image), dict(text='Second choice')]),
+                   dict(type='quiz', totalVotes=12, choices=[dict(text='Correct choice', isCorrect=True), dict(text='Other choice', isCorrect=False)]),
+                   dict(type='unknown', error='Unrecognized attachment type.')]
+    return [dict(fixture_comment('Ugpost' + str(i + 1), author='Community creator', text='Community post ' + str(i + 1),
+                  contentHtml='<b>Community post ' + str(i + 1) + '</b><br><a href="/post/Ugpost2">Another post</a>',
+                  isEdited=True, replyCount=1234), attachment=attachment) for i, attachment in enumerate(attachments)]
 
 def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
@@ -146,11 +157,11 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(text.encode())
 
-    def channel(self, tab, query):
+    def channel(self, tab, query, ucid=video['authorId']):
         # Keep blank values: continuation= must fail just as it does on Invidious.
         params = parse_qs(query, keep_blank_values=True)
         token = params.get('continuation', [None])[0]
-        event = dict(tab=tab, continuation=token, completed=False)
+        event = dict(tab=tab, channelId=ucid, sort=params.get('sort_by', [None])[0], continuation=token, completed=False)
         state['channelRequests'].append(event)
         tabs = list(state['channelTabs'])
         delay = state['channelDelayNext']
@@ -159,7 +170,12 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(min(5000, max(0, delay['millis'])) / 1000)
         try:
             if tab == 'metadata':
-                return self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description=state['channelDescription'], subCount=42, tabs=tabs, authorThumbnails=video['authorThumbnails']))
+                header = dict(author='Mobivious Studio' if ucid == video['authorId'] else 'Related creator', authorId=ucid,
+                              description=state['channelDescription'], subCount=42, tabs=tabs, authorThumbnails=video['authorThumbnails'])
+                if state['channelRichHeader']:
+                    header.update(authorVerified=True, pronouns='they/them', descriptionHtml='<b>Fixture channel</b><br><a href="/post/Ugpost1">Channel post</a>',
+                                  authorBanners=[dict(url='/ggpht/banner=w1060-h175', width=1060, height=175)])
+                return self.respond(header)
             if token is not None and not token.strip():
                 return self.respond(dict(error='Error: non 200 status code. Youtube API returned status code 400.'), 500)
             if state['channelFailNext']:
@@ -170,10 +186,16 @@ class Handler(BaseHTTPRequestHandler):
             next_token = tab + '+/page=2%&'
             if token not in (None, next_token):
                 return self.respond(dict(error='Invalid channel continuation'), 400)
-            if tab == 'playlists':
+            if tab == 'posts':
+                posts = community_posts() if token is None else [community_posts()[-1], fixture_comment('UgpostLast', author='Community creator', text='Last community post', replyCount=0)]
+                return self.respond(dict(authorId=ucid, comments=[] if state['postEmpty'] else posts, continuation=next_token if token is None and not state['postEmpty'] else None))
+            if tab == 'channels':
+                related = dict(author='Related creator', authorId='UC' + 'c' * 22, authorVerified=True, subCount=24, description='Related channel description', authorThumbnails=video['authorThumbnails'])
+                return self.respond(dict(relatedChannels=[related] if token is None else [], continuation=next_token if token is None else None))
+            if tab in ('playlists', 'podcasts', 'releases', 'courses'):
                 state['events'].append(dict(action='channel-playlists', sort=params.get('sort_by', ['last'])[0], continuation=token))
                 return self.respond(dict(playlists=[source_playlist('PLlive' if token is None else 'RDopaque')], continuation=next_token if token is None else None))
-            if tab == 'videos':
+            if tab in ('videos', 'shorts'):
                 item = video if token is None else dict(video, videoId='testvideo02', title='Another channel upload')
             else:
                 item = dict(video, videoId='streamvid01' if token is None else 'streamvid02', title='Channel stream one' if token is None else 'Channel stream two', liveNow=token is None)
@@ -357,41 +379,65 @@ class Handler(BaseHTTPRequestHandler):
             id = p.rsplit('/', 1)[-1]
             self.respond(dict(position=state['positions'][id], videoId=id) if id in state['positions'] else dict(error='Playback position does not exist.'), 200 if id in state['positions'] else 404)
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
-        elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams', '/api/v1/channels/' + video['authorId'] + '/playlists'): self.channel(p.rsplit('/', 1)[-1], url.query)
+        elif p == '/api/v1/channels/' + 'UC' + 'c' * 22: self.channel('metadata', url.query, 'UC' + 'c' * 22)
+        elif p.startswith('/api/v1/channels/') and p.rsplit('/', 1)[-1] in ('videos', 'shorts', 'streams', 'playlists', 'podcasts', 'releases', 'courses', 'posts', 'channels'):
+            self.channel(p.rsplit('/', 1)[-1], url.query, p.split('/')[4])
+        elif p.startswith('/api/v1/post/') and p.endswith('/comments'):
+            self.comments(p.split('/')[4], url.query, is_post=True)
+        elif p.startswith('/api/v1/post/'):
+            self.post(p.rsplit('/', 1)[-1], url.query)
         elif p == '/api/v1/channels/' + video['authorId'] + '/search': self.search('channel', url.query)
         elif p.startswith('/api/v1/comments/'): self.comments(p.rsplit('/', 1)[-1], url.query)
         else: self.respond({'error': 'Fixture endpoint not found'}, 404)
 
-    def comments(self, video_id, query):
+    def post(self, id, query):
+        params = parse_qs(query)
+        entry = dict(id=id, ucid=params.get('ucid', [None])[0], completed=False, authorized=self.headers.get('Authorization') is not None)
+        state['postRequests'].append(entry)
+        delay = state['postDelayNext']; state['postDelayNext'] = 0
+        fail = state['postFailNext']; state['postFailNext'] = False
+        if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+        entry['completed'] = True
+        if fail: return self.respond(dict(error='Fixture post temporarily unavailable'), 503)
+        post = next((post for post in community_posts() if post['commentId'] == id), None)
+        if id == 'UgpostLast': post = fixture_comment(id, text='Last community post', replyCount=0)
+        if post is None: return self.respond(dict(error='Post not found.'), 404)
+        return self.respond(dict(authorId=video['authorId'], singlePost=True, comments=[post]))
+
+    def comments(self, video_id, query, is_post=False):
         params = parse_qs(query)
         token = params.get('continuation', [''])[0]
         sort = params.get('sort_by', ['top'])[0]
         entry = dict(videoId=video_id, source=params.get('source', [''])[0], sort=sort,
-                     continuation=token, completed=False, authorized=self.headers.get('Authorization') is not None)
+                     continuation=token, isPost=is_post, ucid=params.get('ucid', [None])[0], completed=False, authorized=self.headers.get('Authorization') is not None)
         state['commentRequests'].append(entry)
+        if is_post and params.get('ucid') != [video['authorId']]: return self.respond(dict(error='Post comments require the resolved channel ID.'), 400)
         delay = state['commentDelayNext']; state['commentDelayNext'] = 0
         fail = state['commentFailNext']; state['commentFailNext'] = False
         empty = state['commentEmpty']
         if delay: time.sleep(min(5000, max(0, delay)) / 1000)
         entry['completed'] = True
         if fail: return self.respond(dict(error='Fixture comments temporarily unavailable'), 503)
-        if empty: return self.respond(dict(comments=[], commentCount=0))
+        def respond(payload):
+            payload['postId' if is_post else 'videoId'] = video_id
+            return self.respond(payload)
+        if empty: return respond(dict(comments=[], commentCount=0))
         parent = fixture_comment('parent', author='Fixture creator', text='A test comment. Jump to 0:30. 😀',
-            contentHtml='<b>A test comment.</b><br>Jump to <a href="/watch?v=' + video_id + '&amp;t=30">0:30</a>. 😀 <img src="/media/thumbnail.jpg" alt=":wave:" />',
+            contentHtml='<b>A test comment.</b><br>Jump to <a href="/watch?v=' + (video['videoId'] if is_post else video_id) + '&amp;t=30">0:30</a>. 😀 <img src="/media/thumbnail.jpg" alt=":wave:" />',
             authorIsChannelOwner=True, verified=True, isPinned=True, isEdited=True, isSponsor=True,
             creatorHeart=dict(creatorName='Mobivious Studio', creatorThumbnail='/ggpht/studio=s88'),
             replies=dict(replyCount=3, continuation='replies+/page=1%&'))
         replies = [fixture_comment('reply1', author='First reply'), fixture_comment('reply2', author='Second reply')]
         if token == 'replies+/page=1%&':
-            return self.respond(dict(comments=replies, continuation='replies+/page=2%&'))
+            return respond(dict(comments=replies, continuation='replies+/page=2%&'))
         if token == 'replies+/page=2%&':
-            return self.respond(dict(comments=[replies[-1], fixture_comment('reply3', author='Third reply')]))
+            return respond(dict(comments=[replies[-1], fixture_comment('reply3', author='Third reply')]))
         tail = [fixture_comment('tail-' + str(i), author='Viewer ' + str(i)) for i in range(12)]
         if token == 'comments+/page=2%&':
-            return self.respond(dict(comments=[tail[-1], fixture_comment('last', author='Last viewer')]))
+            return respond(dict(comments=[tail[-1], fixture_comment('last', author='Last viewer')]))
         first = fixture_comment('newest', author='Newest viewer') if sort == 'new' else parent
         long = fixture_comment('long', author='Long commenter', text='\n'.join('Long comment line ' + str(i) for i in range(12)))
-        self.respond(dict(comments=[first, long] + tail, continuation='comments+/page=2%&', commentCount=1234))
+        respond(dict(comments=[first, long] + tail, continuation='comments+/page=2%&', commentCount=1234))
 
     def mutate(self):
         p = urlparse(self.path).path
@@ -455,8 +501,9 @@ class Handler(BaseHTTPRequestHandler):
                 state['playlists'] = [dict(playlistId='IVfixture', title='Visibility fixture playlist', privacy='private', videoCount=2,
                                           videos=[dict(video, indexId='A'), dict(visibility_member, indexId='B')])]
             return self.respond({})
-        if p == '/test/channel':
-            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext'):
+        if p in ('/test/channel', '/test/community'):
+            if p == '/test/community': state.update(channelTabs=['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'playlists', 'posts', 'channels'], channelRichHeader=True)
+            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext', 'postFailNext', 'postDelayNext', 'postEmpty'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':
