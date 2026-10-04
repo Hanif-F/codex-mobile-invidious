@@ -30,7 +30,6 @@ data class Playlist(val id: String, val title: String, val count: Int, val priva
     val mix get() = id.startsWith("RD")
     val sourceLabel get() = if (owned) "My playlist" else if (mix) "Mix" else if (id.startsWith("IV")) "Invidious playlist" else "YouTube playlist"
 }
-data class Comment(val author: String, val text: String, val published: String, val likes: Long)
 data class Page<T>(val items: List<T>, val continuation: String = "")
 data class Account(val token: String, val username: String, val expiresAt: Long, val server: String)
 data class ApiContext(val server: String, val account: Account?, val generation: Long = 0)

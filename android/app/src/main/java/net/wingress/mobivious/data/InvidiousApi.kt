@@ -130,10 +130,11 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val j = JSONObject(request("api/v1/channels/$id/${tab.path}", query = query))
         return Page(ApiParser.videos(j.optJSONArray("videos") ?: JSONArray()), j.text("continuation"))
     }
-    suspend fun comments(id: String, continuation: String = ""): Page<Comment> {
-        val j = JSONObject(request("api/v1/comments/$id", query = mapOf("continuation" to continuation)))
-        return Page(j.optJSONArray("comments")?.objects()?.map { Comment(it.text("author"), it.text("content"), it.text("publishedText"), it.optLong("likeCount")) } ?: emptyList(), j.text("continuation"))
-    }
+    suspend fun comments(id: String, sort: CommentSort = CommentSort.TOP, continuation: String = "", context: ApiContext = context()): CommentPage =
+        CommentPage.parse(JSONObject(scopedRead("api/v1/comments/$id", buildMap {
+            put("source", "youtube"); put("sort_by", sort.apiValue)
+            if (continuation.isNotBlank()) put("continuation", continuation)
+        }, false, context)))
     suspend fun feed(page: Int, notificationsOnly: Boolean = false): List<Video> {
         val j = JSONObject(request("api/v1/auth/feed", auth = true, query = mapOf("page" to "$page")))
         val notifications = ApiParser.videos(j.optJSONArray("notifications") ?: JSONArray())

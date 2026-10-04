@@ -87,8 +87,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var playlistSeed: String? = null
     private var rssJob: Job? = null
     val subscriptions = MutableStateFlow<List<Channel>>(emptyList())
-    val comments = MutableStateFlow(Page<Comment>(emptyList()))
-    val commentError = MutableStateFlow<String?>(null)
+    private val commentController = CommentsController(viewModelScope, api::context,
+        { video, sort, continuation, context -> api.comments(video, sort, continuation, context) }, ::friendly)
+    val comments = commentController.state
     val preferences = MutableStateFlow(store.guestDeArrow())
     val sponsorBlock = MutableStateFlow(SponsorBlockPlayback())
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
@@ -115,7 +116,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var durationFilter = ""
     private var browseJob: Job? = null
     private var videoJob: Job? = null
-    private var commentJob: Job? = null
     private var contributionJob: Job? = null
     private var preferenceGeneration = 0L
     private val preferenceWrites = Mutex()
@@ -166,12 +166,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val old = playback.value.details?.video?.id
             playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error)
             if (old != state.details?.video?.id) {
-                cancelAccumulatedSeek(false); commentJob?.cancel(); comments.value = Page(emptyList()); commentError.value = null
+                cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             }
-            state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
+            syncComments(); state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
         } }
         viewModelScope.launch { account.collect {
+            commentController.bind(null, false)
             browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
             blockUndo.value = null
             playlistRevision++; playlistBusy.value = emptySet(); playlistErrors.value = emptyMap()
@@ -205,7 +206,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             else dearrowTitles.clear()
             syncDeArrowMetadata()
         } }
-        viewModelScope.launch { preferences.collect { syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
+        viewModelScope.launch { preferences.collect { syncComments(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
         refresh()
     }
     private fun receiveSponsorState(args: Bundle) {
@@ -531,7 +532,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun nextQueue(direction: Int) { cancelAccumulatedSeek(false); if (direction > 0) controller.value?.seekToNextMediaItem() else controller.value?.seekToPreviousMediaItem() }
     fun repeatQueue(value: QueueRepeat) { controller.value?.repeatMode = when(value) { QueueRepeat.ONE -> Player.REPEAT_MODE_ONE; QueueRepeat.ALL -> Player.REPEAT_MODE_ALL; else -> Player.REPEAT_MODE_OFF } }
     fun retryPlayback() { cancelAccumulatedSeek(); queueCommand(PlaybackService.QUEUE_RETRY) }
-    fun closePlayer() { cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueOpen.value = false }
+    fun closePlayer() { commentController.bind(null, false); cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueOpen.value = false }
     fun undoBlock(value: BlockUndo) {
         if (value != blockUndo.value || value.context != api.context() || SystemClock.elapsedRealtime() > value.expires) return
         blockUndo.value = null
@@ -668,11 +669,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     } }
     fun autoAudio() { controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
         .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build() } }
-    fun loadComments(more: Boolean = false) {
-        val id = playback.value.details?.video?.id ?: return
-        commentJob?.cancel()
-        commentJob = viewModelScope.launch { try { val next = api.comments(id, if (more) comments.value.continuation else ""); comments.value = next.copy(items = if (more) comments.value.items + next.items else next.items); commentError.value = null } catch (e: CancellationException) { throw e } catch (e: Exception) { commentError.value = friendly(e) } }
-    }
+    private fun syncComments() = commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, preferences.value.showYoutubeComments)
+    fun openComments() { syncComments(); commentController.open() }
+    fun closeComments() = commentController.close()
+    fun backComments() = commentController.back()
+    fun sortComments(sort: CommentSort) = commentController.sort(sort)
+    fun openReplies(comment: Comment) = commentController.replies(comment)
+    fun loadComments(more: Boolean = false, threadKey: String? = null) = commentController.load(more, threadKey)
+    fun commentPosition(threadKey: String?, position: CommentPosition) = commentController.position(threadKey, position)
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
     fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null); app.cache.clear(); navigate("Home") } }

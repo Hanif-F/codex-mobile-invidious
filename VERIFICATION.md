@@ -789,3 +789,57 @@ remain: emulator/device, external RSS app and document-picker acceptance checks
 were not executed for this release. The server update at `742a4d004c4e869213618dc465e65ebf66007eed`
 and migration 20 must be deployed separately, followed by renewed native sign-in.
 No production server deployment or database migration was performed here.
+
+
+## Read-only YouTube comments — 4 October 2026
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 146 passed, including 11 comments tests |
+| Debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed: no errors; existing/dependency warnings remain; no comments-file findings |
+| Disposable localhost comments API fixture | Passed |
+| New native Compose scenarios | Nine compiled; not executed |
+| Native runtime, layout and screenshots | Unverified: no connected device; Pixel_8_Pro exited with SIGSEGV (139) before boot |
+
+Comments tests cover modern and legacy author thumbnail formats, optional
+metadata, creator hearts, reply continuations, unknown versus zero totals,
+explicit YouTube-only requests without bearer credentials, encoded opaque tokens,
+and captured-context rejection after an instance change. Controller tests verify
+fetch-on-open, cached close/reopen and scroll positions, pagination overlap and
+cursor-preserving retry, independent reply errors/pages, duplicate-load suppression,
+late sort/reply responses, context/visibility changes and repeated continuation
+termination. Link tests cover native timestamps/videos/playlists/channels,
+redirect resolution, external URLs and unsupported schemes.
+
+The fixture checks exercise complete metadata and rich-text/emoji payloads,
+Top/Newest ordering, overlapping main/reply pages, encoded cursors, transient
+failure/retry, concurrent delayed responses, empty responses and public request
+headers. These checks validate the fixture/API flow, not native rendering or live
+YouTube availability.
+
+Six new playback-fixture Compose scenarios compile for spoiler-free opening,
+metadata/read-only likes, cached reopening, reply navigation and scroll restoration,
+pagination retry and sorting, initial errors/empty/hidden preference states,
+delayed responses across sorting/video changes, and rich timestamp seeking in
+paused/playing modes plus text expansion. Three independent presentation scenarios
+compile for light/dark themes, rich formatting, 200% fonts at narrow width and wide
+layouts. They have **not executed**. Both emulator startup attempts used no window,
+no audio and no snapshot: one used SwiftShader; the other disabled GPU/Vulkan and
+both virtual cameras. Android Emulator 37.2.12 exited with code 139 before boot
+in both attempts. `adb devices -l` remained empty. No screenshots were produced;
+interaction, accessibility and layout acceptance remain pending.
+
+Repeat the static checks:
+
+```bash
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+```
+
+With a working emulator/device, run `scripts/test-android.sh`. Comments screenshots
+are saved by the interaction tests to
+`/data/local/tmp/mobivious-comments-screenshots/`; inspect them and repeat the drawer
+flow in landscape. No production deployment, app installation, release/version
+change, server API change, migration or new token permission was performed.

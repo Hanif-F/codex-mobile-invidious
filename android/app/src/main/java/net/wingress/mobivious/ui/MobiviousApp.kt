@@ -110,10 +110,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         activity.setFullscreen(fullscreen && !pip)
         onDispose { activity.setFullscreen(false) }
     }
-    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
+    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
-    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank())) { when { fullscreen -> fullscreen = false; watch -> { vm.cancelAccumulatedSeek(); watch = false }; else -> navigate(tab) } }
+    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank())) { when { fullscreen -> fullscreen = false; watch -> { if (!vm.backComments()) { vm.cancelAccumulatedSeek(); watch = false } }; else -> navigate(tab) } }
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
             if (pip || fullscreen) {
@@ -126,7 +126,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     if (watch) Text("Now playing", style = MaterialTheme.typography.titleMedium)
                     else if (route.isNotEmpty()) Text(channel?.name ?: playlist?.title ?: state.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("Mobivious", fontWeight = FontWeight.Bold) }
-                }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { vm.cancelAccumulatedSeek(); if (watch) watch = false else navigate(tab) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
+                }, navigationIcon = { if (watch || route.isNotEmpty()) IconButton(onClick = { vm.cancelAccumulatedSeek(); if (watch) { if (!vm.backComments()) watch = false } else navigate(tab) }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
                     IconButton(onClick = { vm.cancelAccumulatedSeek(); settingsPage = "Settings" }) { Icon(Icons.Default.Settings, "App settings") }
                     IconButton(onClick = { dialog = if (account == null) "login" else "account" }) { Icon(if (account == null) Icons.Default.AccountCircle else Icons.Default.VerifiedUser, "Account") }
                 }) },
@@ -351,43 +351,54 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
     }
 }
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, controller: androidx.media3.session.MediaController?, modifier: Modifier, fullscreen: () -> Unit, settings: () -> Unit, settingsOpen: Boolean, add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
-    val comments by vm.comments.collectAsStateWithLifecycle(); val error by vm.commentError.collectAsStateWithLifecycle(); val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
+    val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
-    var description by remember(playback.details?.video?.id, prefs.extendDescription) { mutableStateOf(prefs.extendDescription) }; var showingComments by remember(playback.details?.video?.id) { mutableStateOf(false) }
+    var description by remember(playback.details?.video?.id, prefs.extendDescription) { mutableStateOf(prefs.extendDescription) }
     val context = LocalContext.current
-    Column(modifier.fillMaxSize()) {
-        VideoPlayer(vm, playback, controller, Modifier.fillMaxWidth().padding(horizontal = 8.dp).aspectRatio(16f/9f).clip(RoundedCornerShape(16.dp)),
-            settingsOpen = settingsOpen, onFullscreen = fullscreen, onSettings = settings)
-        LazyColumn(Modifier.testTag("watch-details-list")) {
-            playback.details?.let { details ->
-                item { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (details.video.membersOnly) MembersBadge(details.video.id)
-                    DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("${count(details.video.views)} views · ${details.video.published}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Row(verticalAlignment = Alignment.CenterVertically) { Text(details.video.author, Modifier.weight(1f).clickable { channel(details.video.channelId) }, fontWeight = FontWeight.SemiBold); FilledTonalButton(onClick = { if(vm.account.value == null) vm.message.value = "Sign in from the account button to subscribe." else vm.toggleSubscribe(details.video.channelId) }) { Text(if(subscriptions.any { it.id == details.video.channelId }) "Subscribed" else "Subscribe") } }
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
-                        AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
-                        AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
-                    }
-                    if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = { vm.queueOpen.value = true }) { Text("Playback queue") }
-                    ChannelBlockingButton(vm, details.video.channelId, details.video.author, signIn)
-                    blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                    TextButton(onClick = { description = !description }) { Text(if(description) "Hide description" else "Show description") }
-                    if(description) Text(details.description, style = MaterialTheme.typography.bodyMedium)
-                    if (prefs.showYoutubeComments) TextButton(onClick = { showingComments = !showingComments; if(showingComments) vm.loadComments() }) { Text(if(showingComments) "Hide comments" else "Comments") }
-                } }
-                if(showingComments && prefs.showYoutubeComments) {
-                    items(comments.items) { c -> Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) { Text("${c.author} · ${c.published}", style = MaterialTheme.typography.labelMedium); Text(c.text, Modifier.padding(vertical = 6.dp)); Text("${c.likes} likes", style = MaterialTheme.typography.bodySmall) } }
-                    if(error != null) item { ErrorCard(error!!) { vm.loadComments() } }
-                    if(comments.continuation.isNotEmpty()) item { TextButton(onClick = { vm.loadComments(true) }) { Text("More comments") } }
+    val drawerOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
+    val detailsList = rememberLazyListState()
+    BoxWithConstraints(modifier.fillMaxSize()) {
+        val naturalPlayerHeight = (maxWidth - 16.dp) * 9f / 16f
+        val playerHeight = if (drawerOpen) minOf(naturalPlayerHeight, maxHeight * .4f) else naturalPlayerHeight
+        Column(Modifier.fillMaxSize()) {
+            VideoPlayer(vm, playback, controller, Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight).clip(RoundedCornerShape(16.dp)),
+                settingsOpen = settingsOpen, onFullscreen = fullscreen, onSettings = settings)
+            if (drawerOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel) { raw ->
+                when (val target = CommentLinks.resolve(raw, vm.store.server, playback.details?.video?.id.orEmpty())) {
+                    is CommentLink.Seek -> vm.seekTo(target.seconds.coerceAtMost(Long.MAX_VALUE / 1000) * 1000)
+                    is CommentLink.Video -> { vm.closeComments(); vm.openLink(target.link) }
+                    is CommentLink.Channel -> { vm.closeComments(); channel(target.id) }
+                    is CommentLink.External -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target.url))) }
+                        .onFailure { vm.message.value = "No app could open this link." }
+                    null -> Unit
                 }
-                if (prefs.relatedVideos) {
-                    item { Text("Up next", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge) }
-                    items(ContentVisibility.filter(details.recommendations, ContentSurface.RECOMMENDATIONS, prefs.showMemberVideos, blocked = blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty()), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn) }
+            }
+            else LazyColumn(Modifier.weight(1f).testTag("watch-details-list"), state = detailsList) {
+                playback.details?.let { details ->
+                    item { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (details.video.membersOnly) MembersBadge(details.video.id)
+                        DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("${count(details.video.views)} views · ${details.video.published}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Row(verticalAlignment = Alignment.CenterVertically) { Text(details.video.author, Modifier.weight(1f).clickable { channel(details.video.channelId) }, fontWeight = FontWeight.SemiBold); FilledTonalButton(onClick = { if(vm.account.value == null) vm.message.value = "Sign in from the account button to subscribe." else vm.toggleSubscribe(details.video.channelId) }) { Text(if(subscriptions.any { it.id == details.video.channelId }) "Subscribed" else "Subscribe") } }
+                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
+                            AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
+                            AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
+                        }
+                        if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { vm.queueOpen.value = true }) { Text("Playback queue") }
+                        ChannelBlockingButton(vm, details.video.channelId, details.video.author, signIn)
+                        blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                        if (prefs.showYoutubeComments) CommentsEntry(comments, vm::openComments)
+                        TextButton(onClick = { description = !description }) { Text(if(description) "Hide description" else "Show description") }
+                        if(description) Text(details.description, style = MaterialTheme.typography.bodyMedium)
+                    } }
+                    if (prefs.relatedVideos) {
+                        item { Text("Up next", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge) }
+                        items(ContentVisibility.filter(details.recommendations, ContentSurface.RECOMMENDATIONS, prefs.showMemberVideos, blocked = blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty()), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn) }
+                    }
                 }
             }
         }

@@ -3,7 +3,7 @@
 Reviewed on **4 October 2026** against the local source checkouts:
 
 - Web: `../invidious`, baseline audit at `a21a5513` plus the expanded native settings API changes; channel routes/API rechecked at `68e51ac2`. Includes this fork's custom features.
-- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; rows 06 and 33 now include scoped search and organized history; row 34 includes watched/progress, rows 40–41 content visibility, and rows 17/32 service-owned queues and video library actions; rows 31/45 now include playlist subscriptions and RSS with migration 20, reviewed on 4 October 2026. Current release version: `0.3.0` (version code 5).
+- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; rows 06 and 33 now include scoped search and organized history; row 34 includes watched/progress, rows 40–41 content visibility, and rows 17/32 service-owned queues and video library actions; rows 31/45 now include playlist subscriptions and RSS with migration 20, reviewed on 4 October 2026. Row 22 now implements read-only YouTube comments with a spoiler-free entry and native drawer; Reddit is intentionally excluded. Current release version: `0.3.0` (version code 5).
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
@@ -13,7 +13,7 @@ Reviewed on **4 October 2026** against the local source checkouts:
 
 This is a source audit, not a new native runtime or production acceptance test. Features can depend on instance configuration, upstream content availability, and device capabilities. Validation is recorded in [VERIFICATION.md](VERIFICATION.md). That file reports the production mobile sign-in/account API rollout as still pending; account features below are implemented in source, but need the server patch deployed before production use. The channel revision additionally checks public channel endpoints on the existing live instance; it does not validate the production account rollout.
 
-**Summary: 45 broad feature areas — 21 implemented, 14 partial, 10 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
+**Summary: 45 broad feature areas — 22 implemented, 13 partial, 10 not implemented.** These counts describe the grouping below, not a weighted completion percentage.
 
 ## Discovery and channels
 
@@ -47,11 +47,11 @@ Evidence: [web routing][w-routing], [web search filters][w-search], [web channel
 | 19 | Searchable transcripts | Not implemented | — | Transcript panel, language choice, text search and timestamp navigation. Captions alone do not provide this flow. |
 | 20 | Playback diagnostics and buffer recovery | Partial | Playback errors and Retry in both embedded/fullscreen modes; Retry reloads stream details and resumes at the current position. A dedicated Refresh buffer action reloads the current source while retaining paused/playing state, speed, quality, captions and audio-only mode; live playback returns to the live edge. | Web's detailed playback statistics/copy action. |
 | 21 | Legacy annotations and VR/360° viewing | Not implemented | — | Annotation overlays/toggles and specialized VR projection controls. |
-| 22 | Read-only YouTube and Reddit comments | Partial | Top-level YouTube comments, author/text/date/like count, continuation pagination and retry. | Reply-thread navigation, sorting, Reddit source selection and rich links/content. Neither client provides posting or liking YouTube comments through this feature. |
+| 22 | Read-only YouTube comments (Reddit excluded) | Implemented | Spoiler-free entry without preview text; drawer beneath the visible player; Top/Newest sorting; independently paginated reply threads with Back and saved scroll positions; avatars, author/date/body hierarchy, thumb-up counts, creator/verified/pinned/member/heart metadata; expandable native rich text, links, timestamps and custom emoji; loading/empty/error states and cursor-preserving retry. | — for the requested YouTube capability. Reddit is deliberately excluded; posting and liking remain unsupported. Native runtime/layout acceptance remains unverified. |
 | 23 | Livestream archive chat replay | Not implemented | — | Replay synchronized to playback; docked/overlay chat; timestamp/font/size/opacity controls; user/word filters and saved timing offsets. This fork implements replay, not sending live chat messages. |
 | 24 | Sharing and opening content links | Partial | Android share sheet for the current video with timestamp; receive shared/pasted YouTube and configured-instance video, playlist and mix links, preserving list/index/timestamp context and normalizing YouTube indexes. Bare source links open a browser with Play; public lists work for guests. App-link registration includes `/watch`, `/playlist` and `/mix` on bundled hosts. | Channel, post and clip link navigation and broader web URL parameters. An embed URL can identify a video, but Android does not host a web embed player. |
 
-Evidence: [web watch page][w-watch], [web player component][w-player], [web player logic][w-player-js], [web stream controls][w-streams], [web playlist queue][w-watch-js], [web comments API][w-videos], [web comments UI][w-comments]; [Android watch UI][a-ui], [Android player controls/settings][a-player], [Android playback setup][a-vm], [Android playback service][a-service], [Android link parsing][a-models], [activity/PiP][a-activity], [manifest][a-manifest].
+Evidence: [web watch page][w-watch], [web player component][w-player], [web player logic][w-player-js], [web stream controls][w-streams], [web playlist queue][w-watch-js], [web comments API][w-videos], [web comments UI][w-comments]; [Android watch UI][a-ui], [YouTube comment state][a-comments], [native comments drawer][a-comments-ui], [Android player controls/settings][a-player], [Android playback setup][a-vm], [Android playback service][a-service], [Android link parsing][a-models], [activity/PiP][a-activity], [manifest][a-manifest].
 
 ## Accounts, subscriptions and library
 
@@ -257,3 +257,34 @@ and any caller-owned legacy external row. Deploy the server migration/API update
 and sign out/in to renew native permissions. The installed 0.2.1 APK does not gain
 these changes until a new app build is installed. Validation and outstanding device
 checks are recorded in VERIFICATION.md; no deployment or release was performed.
+
+
+## Read-only YouTube comments — 4 October 2026
+
+Row 22 now covers the requested YouTube-only capability. Reddit is intentionally
+excluded from the native scope. A visible Comments card contains no author or
+comment preview, and requests start only after opening. The drawer occupies the
+area below the player; Top/Newest sorting, reply threads, Back navigation and
+cached scroll positions preserve reading context without changing playback.
+
+Native rows separate author/metadata, comment body and informational likes with
+avatars, typography, spacing and dividers. Available creator, verification,
+pinned, membership and creator-heart metadata is retained. Rich text supports
+links, line breaks, formatting and inline custom emoji with accessible fallback.
+Current-video timestamp links seek through the existing player; channel/video/
+playlist links use existing navigation, and other HTTP(S) links open externally.
+
+The existing public YouTube comments endpoint supplies both comments and replies.
+No server patch, migration or renewed token is needed. Stale video/account/instance/
+sort responses are rejected, overlapping pages are deduplicated and failed pages
+retain their cursor and loaded rows. Comments remain session-local. Saved comment
+visibility is respected; posting and liking are outside scope.
+
+All 146 Android unit/API tests, debug/instrumentation APK builds, lint and
+localhost comments fixture checks passed. Nine new Compose scenarios compile but
+have not run: the installed Pixel emulator again exited with SIGSEGV (139) before
+boot, and no device was connected. Native interactions, layout and screenshots
+remain unverified; see `VERIFICATION.md`.
+
+[a-comments]: android/app/src/main/java/net/wingress/mobivious/data/Comments.kt
+[a-comments-ui]: android/app/src/main/java/net/wingress/mobivious/ui/CommentsUi.kt

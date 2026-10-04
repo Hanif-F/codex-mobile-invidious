@@ -47,6 +47,15 @@ prefs = default_prefs.copy()
 state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0,
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[])
+def reset_comments():
+    state.update(commentRequests=[], commentFailNext=False, commentDelayNext=0, commentEmpty=False)
+reset_comments()
+
+def fixture_comment(id, author='Viewer', text=None, **extra):
+    return dict(commentId=id, author=author, authorId=video['authorId'], authorUrl='/channel/' + video['authorId'],
+                authorThumbnail='/media/thumbnail.jpg', content=text or ('Comment body ' + id), likeCount=3,
+                publishedText='today', **extra)
+
 def source_playlist(id='PLlive'):
     if id.startswith('RD'):
         return dict(type='playlist', playlistId=id, mixId=id, title='Fixture mix', videoCount=-1, isMix=True,
@@ -289,8 +298,39 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
         elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams', '/api/v1/channels/' + video['authorId'] + '/playlists'): self.channel(p.rsplit('/', 1)[-1], url.query)
         elif p == '/api/v1/channels/' + video['authorId'] + '/search': self.search('channel', url.query)
-        elif p == '/api/v1/comments/testvideo01': self.respond(dict(comments=[dict(author='Viewer', content='A test comment.', likeCount=3, publishedText='today')]))
+        elif p.startswith('/api/v1/comments/'): self.comments(p.rsplit('/', 1)[-1], url.query)
         else: self.respond({'error': 'Fixture endpoint not found'}, 404)
+
+    def comments(self, video_id, query):
+        params = parse_qs(query)
+        token = params.get('continuation', [''])[0]
+        sort = params.get('sort_by', ['top'])[0]
+        entry = dict(videoId=video_id, source=params.get('source', [''])[0], sort=sort,
+                     continuation=token, completed=False, authorized=self.headers.get('Authorization') is not None)
+        state['commentRequests'].append(entry)
+        delay = state['commentDelayNext']; state['commentDelayNext'] = 0
+        fail = state['commentFailNext']; state['commentFailNext'] = False
+        empty = state['commentEmpty']
+        if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+        entry['completed'] = True
+        if fail: return self.respond(dict(error='Fixture comments temporarily unavailable'), 503)
+        if empty: return self.respond(dict(comments=[], commentCount=0))
+        parent = fixture_comment('parent', author='Fixture creator', text='A test comment. Jump to 0:30. 😀',
+            contentHtml='<b>A test comment.</b><br>Jump to <a href="/watch?v=' + video_id + '&amp;t=30">0:30</a>. 😀 <img src="/media/thumbnail.jpg" alt=":wave:" />',
+            authorIsChannelOwner=True, verified=True, isPinned=True, isEdited=True, isSponsor=True,
+            creatorHeart=dict(creatorName='Mobivious Studio', creatorThumbnail='/media/thumbnail.jpg'),
+            replies=dict(replyCount=3, continuation='replies+/page=1%&'))
+        replies = [fixture_comment('reply1', author='First reply'), fixture_comment('reply2', author='Second reply')]
+        if token == 'replies+/page=1%&':
+            return self.respond(dict(comments=replies, continuation='replies+/page=2%&'))
+        if token == 'replies+/page=2%&':
+            return self.respond(dict(comments=[replies[-1], fixture_comment('reply3', author='Third reply')]))
+        tail = [fixture_comment('tail-' + str(i), author='Viewer ' + str(i)) for i in range(12)]
+        if token == 'comments+/page=2%&':
+            return self.respond(dict(comments=[tail[-1], fixture_comment('last', author='Last viewer')]))
+        first = fixture_comment('newest', author='Newest viewer') if sort == 'new' else parent
+        long = fixture_comment('long', author='Long commenter', text='\n'.join('Long comment line ' + str(i) for i in range(12)))
+        self.respond(dict(comments=[first, long] + tail, continuation='comments+/page=2%&', commentCount=1234))
 
     def mutate(self):
         p = urlparse(self.path).path
@@ -317,6 +357,11 @@ class Handler(BaseHTTPRequestHandler):
             reset_playback()
             reset_visibility()
             reset_search_history()
+            reset_comments()
+            return self.respond({})
+        if p == '/test/comments':
+            for key in ('commentFailNext', 'commentDelayNext', 'commentEmpty'):
+                if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/watched':
             for key in ('watched', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
