@@ -1339,3 +1339,23 @@ device for fixture-backed acceptance; the focused classes are
 
 No server API, migration, dependency, signing/version metadata, production
 deployment or release publication was changed.
+
+## Mobivious 0.5.1 release preparation — 4 October 2026
+
+The release version is 0.5.1 with version code 8. `scripts/build-release.sh`
+passed all 197 unit/API tests, built the signed release APK and passed release
+lint (zero errors, 42 existing warnings). APK metadata confirms
+`net.wingress.mobivious`, Android 8+ (minimum SDK 26), target SDK 37 and all four
+supported CPU architectures. `apksigner verify --print-certs` passed and confirmed
+the same signing certificate as the published 0.5.0 APK, preserving in-place
+updates. The previous local APK was checked against the GitHub asset's SHA-256
+before comparing certificates.
+
+Release files are `artifacts/Mobivious-0.5.1.apk` and its `.apk.sha256` file;
+`sha256sum -c` passed. The APK SHA-256 is
+`2b7c8185d909e6f6ee30501b501ff29353db5dc80ef2e941834913667eb73458`.
+The release tag is `v0.5.1`; its notes cover player resizing, complete channel
+descriptions, player gestures and presentation/disclosure animations since 0.5.0.
+The build log is `/tmp/mobivious-0.5.1-release.log`, and local verification metadata
+is `artifacts/release-verification-0.5.1.json`. Native device acceptance remains
+unverified as recorded above. This release requires no new server API or migration.
