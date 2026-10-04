@@ -83,7 +83,7 @@ internal fun PlaybackQueueSheet(vm: AppViewModel, signIn: () -> Unit, channel: (
     val state by vm.queue.collectAsStateWithLifecycle()
     val lists by vm.playlists.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
-    val owned = state.source?.id?.let { id -> id.startsWith("IV") && lists.any { it.id == id } } == true
+    val owned = state.source?.id?.let { id -> lists.any { it.id == id && it.owned } } == true
     ModalBottomSheet(onDismissRequest = { vm.queueOpen.value = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
         LazyColumn(Modifier.fillMaxWidth().testTag("playback-queue"), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {

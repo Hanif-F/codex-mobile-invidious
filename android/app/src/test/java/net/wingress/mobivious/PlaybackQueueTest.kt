@@ -118,7 +118,7 @@ class PlaybackQueueTest {
             server.enqueue(MockResponse().setBody("""{"videos":[]}""")); api.queuePage("IVprivate")
             val private = server.takeRequest(); assertTrue(private.path!!.startsWith("/api/v1/auth/playlists/IVprivate")); assertEquals("Bearer token", private.getHeader("Authorization"))
             server.enqueue(MockResponse().setBody("""{"videos":[]}""")); api.queuePage("RDtestvideo01", continuation = "testvideo02")
-            val mix = server.takeRequest(); assertEquals("/api/v1/mixes/RDtestvideo01?continuation=testvideo02", mix.path); assertNull(mix.getHeader("Authorization"))
+            val mix = server.takeRequest(); assertEquals("/api/v1/auth/playlists/RDtestvideo01?continuation=testvideo02", mix.path); assertEquals("Bearer token", mix.getHeader("Authorization"))
         }
     }
     @Test fun creationAndFailedSaveRetryUseSamePlaylistAndStableRemovalId() = runBlocking {

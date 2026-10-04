@@ -44,9 +44,18 @@ default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=F
                      sort='published', latest_only=False, unseen_only=False, notifications_only=False,
                      default_playlist=None, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
-state = dict(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0,
+state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0,
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[])
+def source_playlist(id='PLlive'):
+    if id.startswith('RD'):
+        return dict(type='playlist', playlistId=id, mixId=id, title='Fixture mix', videoCount=-1, isMix=True,
+                    seedVideoId='testvideo01', isOwned=False, isSaved=id in state['savedPlaylists'], privacy='public',
+                    videos=[dict(video, index=0), dict(recommended, index=1)])
+    return dict(type='playlist', playlistId=id, title=state['sourceTitle'], videoCount=2, privacy='unlisted',
+                isOwned=False, isSaved=id in state['savedPlaylists'], author='Source owner', authorId=video['authorId'],
+                playlistThumbnail='/media/thumbnail.jpg', videos=[dict(video, index=0), dict(recommended, index=1)])
+
 replacement = 'A calm scene'
 recommended = dict(video, videoId='testvideo02', title='Another original title')
 unknown_video = dict(video, videoId='unknownvid1', title='Unknown duration fixture', lengthSeconds=0)
@@ -105,6 +114,13 @@ class Handler(BaseHTTPRequestHandler):
         if data is not None:
             self.wfile.write(json.dumps(data).encode())
 
+    def xml(self, text, content_type='application/xml'):
+        self.send_response(200)
+        self.send_header('Content-Type', content_type)
+        self.send_header('Cache-Control', 'private, no-store')
+        self.end_headers()
+        self.wfile.write(text.encode())
+
     def channel(self, tab, query):
         # Keep blank values: continuation= must fail just as it does on Invidious.
         params = parse_qs(query, keep_blank_values=True)
@@ -129,6 +145,9 @@ class Handler(BaseHTTPRequestHandler):
             next_token = tab + '+/page=2%&'
             if token not in (None, next_token):
                 return self.respond(dict(error='Invalid channel continuation'), 400)
+            if tab == 'playlists':
+                state['events'].append(dict(action='channel-playlists', sort=params.get('sort_by', ['last'])[0], continuation=token))
+                return self.respond(dict(playlists=[source_playlist('PLlive' if token is None else 'RDopaque')], continuation=next_token if token is None else None))
             if tab == 'videos':
                 item = video if token is None else dict(video, videoId='testvideo02', title='Another channel upload')
             else:
@@ -187,6 +206,8 @@ class Handler(BaseHTTPRequestHandler):
                          [dict(authorId=id, author=name) for id, name in sorted(state['blockedChannels'].items(), key=lambda x: (x[1], x[0]))],
                          503 if state['failBlockedRead'] else 200)
         elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'):
+            if p == '/api/v1/search' and parse_qs(url.query).get('type') == ['playlist']:
+                return self.respond([source_playlist('PLlive'), source_playlist('RDopaque'), source_playlist('IVother')] if parse_qs(url.query).get('page', ['1']) == ['1'] else [])
             if p == '/api/v1/search' and state['searchTest']: return self.search('global', url.query)
             if state['visibilityVideos']:
                 state['visibilityReads'].append(dict(path=p, query=parse_qs(url.query), authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
@@ -212,10 +233,21 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/api/v1/auth/preferences': self.respond(prefs)
         elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId=video['authorId'])])
         elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
-        elif p == '/api/v1/auth/playlists': self.respond(state['playlists'])
+        elif p == '/api/v1/auth/feed/rss': self.respond(dict(feedPath='/feed/private?token=fixture-rss-secret'))
+        elif p == '/api/v1/auth/subscriptions/export':
+            feed = 'https://www.youtube.com/feeds/videos.xml?channel_id=' if parse_qs(url.query).get('format') == ['newpipe'] else 'http://127.0.0.1:18080/feed/channel/'
+            self.xml('<opml version="1.1"><body><outline text="Subscriptions"><outline type="rss" xmlUrl="' + feed + video['authorId'] + '"/></outline></body></opml>')
+        elif p.endswith('/feed') and p.startswith('/api/v1/auth/playlists/'):
+            self.xml('<feed xmlns="http://www.w3.org/2005/Atom"><id>iv:playlist:IVowned</id><title>My private playlist</title><updated>2026-10-04T00:00:00Z</updated></feed>', 'application/atom+xml')
+        elif p == '/api/v1/auth/playlists': self.respond([dict(pl, isOwned=True, isSaved=False) for pl in state['playlists']] + [source_playlist(id) for id in state['savedPlaylists']])
         elif p.startswith('/api/v1/auth/playlists/') or p.startswith('/api/v1/playlists/'):
             plid = p.rsplit('/', 1)[-1]
-            pl = next((x for x in state['playlists'] if x['playlistId'] == plid), None)
+            if plid.startswith('RD'):
+                continuation = parse_qs(url.query).get('continuation', ['testvideo01'])[0]
+                upcoming = 'testvideo02' if continuation == 'testvideo01' else 'testvideo03'
+                return self.respond(dict(source_playlist(plid), videos=[dict(video, index=0, videoId=continuation), dict(recommended, index=1, videoId=upcoming)]))
+            pl = next((dict(x, isOwned=True) for x in state['playlists'] if x['playlistId'] == plid), None)
+            if state['playlistRss'] and plid in ('PLlive', 'IVother'): pl = source_playlist(plid)
             if plid == 'PLfixture':
                 pl = dict(playlistId=plid, title='Public queue', videoCount=103,
                           videos=[dict(video if i % 2 == 0 else recommended, indexId='', index=i) for i in range(103)])
@@ -255,7 +287,7 @@ class Handler(BaseHTTPRequestHandler):
             id = p.rsplit('/', 1)[-1]
             self.respond(dict(position=state['positions'][id], videoId=id) if id in state['positions'] else dict(error='Playback position does not exist.'), 200 if id in state['positions'] else 404)
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
-        elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams'): self.channel(p.rsplit('/', 1)[-1], url.query)
+        elif p in ('/api/v1/channels/' + video['authorId'] + '/videos', '/api/v1/channels/' + video['authorId'] + '/streams', '/api/v1/channels/' + video['authorId'] + '/playlists'): self.channel(p.rsplit('/', 1)[-1], url.query)
         elif p == '/api/v1/channels/' + video['authorId'] + '/search': self.search('channel', url.query)
         elif p == '/api/v1/comments/testvideo01': self.respond(dict(comments=[dict(author='Viewer', content='A test comment.', likeCount=3, publishedText='today')]))
         else: self.respond({'error': 'Fixture endpoint not found'}, 404)
@@ -263,12 +295,19 @@ class Handler(BaseHTTPRequestHandler):
     def mutate(self):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if p == '/test/playlist-rss':
+            state['playlistRss'] = True
+            for key in ('sourceTitle', 'failSubscribe'):
+                if key in data: state[key] = data[key]
+            state['channelTabs'] = ['videos', 'streams', 'playlists']
+            if not state['playlists']: state['playlists'] = [dict(playlistId='IVowned', title='My private playlist', privacy='private', videoCount=1, videos=[dict(video, indexId='A', index=0)])]
+            return self.respond(state)
         if p == '/test/queue':
             state['playlists'] = [dict(playlistId='IVqueue', title='Queue fixture', privacy='private', videoCount=3, videos=[dict(video, indexId='A', index=0), dict(video, indexId='B', index=1), dict(recommended, indexId='C', index=2)])]
             state['failPlaylistSave'] = bool(data.get('failSave', False))
             return self.respond(state)
         elif p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], events=[], stream='dash', mediaRequests=0, failPlaylistSave=False,
+            state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[])
             prefs.clear()
@@ -379,6 +418,16 @@ class Handler(BaseHTTPRequestHandler):
             state['playlists'].append(dict(playlistId=plid, title=data['title'], privacy=data['privacy'], videoCount=0, videos=[]))
             state['events'].append(dict(action='playlist-create', playlist=plid))
             self.respond(dict(playlistId=plid, title=data['title']), 201)
+        elif p.startswith('/api/v1/auth/saved_playlists/'):
+            plid = p.rsplit('/', 1)[-1]
+            if state['failSubscribe']:
+                state['failSubscribe'] = False
+                return self.respond(dict(error='Fixture subscribe failed; retry'), 502)
+            if self.command == 'PUT':
+                if plid not in state['savedPlaylists']: state['savedPlaylists'].append(plid)
+            elif plid in state['savedPlaylists']: state['savedPlaylists'].remove(plid)
+            state['events'].append(dict(action='playlist-subscribe' if self.command == 'PUT' else 'playlist-unsubscribe', playlist=plid, seed=data.get('seedVideoId')))
+            return self.respond(source_playlist(plid)) if self.command == 'PUT' else self.respond(status=204)
         elif p.startswith('/api/v1/auth/playlists/'):
             plid = p.split('/')[5]
             pl = next((x for x in state['playlists'] if x['playlistId'] == plid), None)

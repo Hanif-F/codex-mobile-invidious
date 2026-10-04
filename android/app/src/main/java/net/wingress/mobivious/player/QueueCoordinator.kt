@@ -64,14 +64,14 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         }
     }
     fun start(id: String, source: String? = null, index: Int? = null, seconds: Long? = null,
-        audio: Boolean = false, paused: Boolean = false) {
+        audio: Boolean = false, paused: Boolean = false, sourceSeed: String? = null) {
         beforeChange(); job?.cancel(); selection = null; decoderError = false; mixContinuations.clear()
         player.pause()
         val context = app.api.context()
         if (prefsContext != context) { prefs = app.store.guestDeArrow(); prefsContext = context }
         val token = UUID.randomUUID().toString()
         val seed = id.takeIf { it.isNotEmpty() }?.let { QueueOccurrence.local(Video(it, it)).copy(sourceIndex = index) }
-        update(PlaybackQueueSnapshot(token, context, source?.let { QueueSource(it) }, items = listOfNotNull(seed), currentKey = seed?.key, loading = true,
+        update(PlaybackQueueSnapshot(token, context, source?.let { QueueSource(it, seedVideoId = sourceSeed) }, items = listOfNotNull(seed), currentKey = seed?.key, loading = true,
             sourceComplete = source == null, explicitQueue = source != null))
         launch { _, _ ->
             val version = settingsVersion
@@ -83,7 +83,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             var entry: QueueOccurrence? = null
             if (source != null) {
                 try {
-                    readSource(token, context, index ?: 0, id.takeIf { it.isNotBlank() }, initial = true)
+                    readSource(token, context, index ?: 0, id.takeIf { it.isNotBlank() } ?: sourceSeed, initial = true)
                     entry = if (id.isEmpty()) state.items.firstOrNull { QueueRules.eligible(it, prefs.showMemberVideos) }
                         else state.items.firstOrNull { (index == null || it.sourceIndex == index) && it.video.id == id }
                             ?: state.items.firstOrNull { it.video.id == id }
@@ -120,7 +120,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                 if (source.mix && continuation != null) mixContinuations.add(continuation)
                 val merged = QueueRules.mergePage(state, page, index, if (initial) null else continuation)
                 val complete = !source.mix && (page.videos.isEmpty() || (merged.mapNotNull { it.sourceIndex }.maxOrNull() ?: -1) + 1 >= page.source.count || merged.size == state.items.size)
-                update(state.copy(source = page.source, items = merged, sourceLoading = false, sourceComplete = complete))
+                update(state.copy(source = page.source.copy(seedVideoId = source.seedVideoId ?: page.source.seedVideoId), items = merged, sourceLoading = false, sourceComplete = complete))
             }
         } catch (e: CancellationException) { throw e } catch (e: Exception) {
             if (valid(token, context)) update(state.copy(sourceLoading = false, sourceError = e.message ?: "Queue could not load. Retry."))
@@ -256,6 +256,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             playlistWrites.withLock {
                 if (!valid(token, context) || state.items.firstOrNull { it.key == key }?.removed != false) return@withLock
                 try {
+                    require(source.owned || app.api.playlists(context).any { it.id == source.id && it.owned }) { "Only My playlists can be edited." }
                     app.api.removeFromPlaylist(source.id, entry.video.indexId, context); check(token, context)
                     update(state.copy(source = state.source?.copy(count = (state.source!!.count - 1).coerceAtLeast(0)), items = state.items.map {
                         when { it.key == key -> it.copy(removed = true); it.sourceIndex != null && it.sourceIndex > (entry.sourceIndex ?: Int.MAX_VALUE) -> it.copy(sourceIndex = it.sourceIndex - 1); else -> it }

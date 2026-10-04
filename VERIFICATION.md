@@ -727,3 +727,49 @@ with SwiftShader and with GPU/Vulkan disabled. `adb devices -l` listed no device
 after either attempt. Run `scripts/test-android.sh` on a working emulator/device
 to verify real video frames, inactivity, PiP and layouts. No production server,
 release signing configuration, database or stored preference format was changed.
+
+## Playlist subscriptions and RSS — 4 October 2026
+
+This revision implements parity rows 31 and 45 across the Android app and sibling
+server. The public release remains 0.2.1; no production deployment, migration or
+release publishing was performed.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer suite | 135 passed, including 9 playlist/RSS scenarios |
+| Debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed; dependency/existing style warnings remain |
+| Crystal parser/core specs | 215 passed |
+| Crystal standard specs | 48 passed |
+| Guarded disposable PostgreSQL account/API harness | Passed, including migration 20 and playlist/RSS checks |
+| Normal and API-only Crystal executable builds | Passed |
+| Disposable API fixture HTTP/XML checks | Passed |
+| English web headings with retained counts | Rendered production template assertions passed |
+| Native emulator runtime/screenshots | Unverified: Pixel 8 Pro emulator exits with SIGSEGV before boot |
+
+Server checks cover preserved legacy rows and repeated migration, concurrent
+idempotent subscriptions and independent accounts, source metadata/video updates,
+read-only ownership, actual unlisted privacy, caller-only legacy cleanup, late
+refresh after unsubscribe, native scopes/cookie CSRF/no-store headers, account
+cascades, private Atom authorization, empty/populated Atom namespaces and required
+entry times, preserved mix seeds, and complete OPML in both formats. The OPML
+fixture has 165 subscriptions, including one without cached channel metadata.
+The web assertions render My playlists (0) and Subscribed playlists (2) with the
+existing count spans; the layout and controls are retained.
+
+Android tests cover ownership parsing/legacy fallback, playlist search without
+video upload/duration filters, channel continuation/sorting, dedicated subscribe
+routes and mix seeds, updated details, selected-instance RSS URLs, private-link
+validation, XML request types, bearer-secret exclusion, stale account reads, and
+distinct old-token/missing-server explanations. Four additional Compose fixture
+scenarios compile for grouping/read-only controls and owner updates, unsubscribe
+without stopping playback, guest sign-in intent and retry, discovery/channel
+pagination/selected-tab restoration, and RSS sheets/account-change cleanup.
+They could not execute because the installed emulator crashed before boot.
+
+Physical-device layout, external RSS apps/shares, document-picker cancellation and
+file-provider grants, and live YouTube playlist/mix extraction remain runtime
+acceptance checks. Source/API fixture coverage is not a claim of those checks.
+Deploy migration 20 and the server APIs, install a new app build and renew native
+permissions by signing out and in before acceptance. Built-in RSS reading/polling
+and upload alerts remain outside this revision.

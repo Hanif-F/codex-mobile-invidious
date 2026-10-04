@@ -13,6 +13,7 @@ class ChannelTest {
     private suspend fun page(api: InvidiousApi, tab: ChannelTab, continuation: String = ""): Page<Video> = when (tab) {
         ChannelTab.VIDEOS -> api.channelVideos(id, continuation)
         ChannelTab.STREAMS -> api.channelStreams(id, continuation)
+        ChannelTab.PLAYLISTS -> error("Playlist pages have a separate result type")
     }
 
     @Test fun metadataKeepsAdvertisedTabsAndIgnoresMalformedEntries() {
@@ -52,7 +53,7 @@ class ChannelTest {
             server.start()
             val address = server.url("/").toString().trimEnd('/')
             val api = InvidiousApi({ address }, { Account("private-token", "Viewer", Long.MAX_VALUE, address) })
-            ChannelTab.entries.forEach { tab ->
+            listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS).forEach { tab ->
                 repeat(3) { variant ->
                     server.enqueue(MockResponse().setBody("""{"videos":[]}"""))
                     val result = when (variant) {
@@ -76,7 +77,7 @@ class ChannelTest {
             server.start()
             val api = InvidiousApi({ server.url("/").toString().trimEnd('/') }, { null })
             val token = " next+/=%25&終 "
-            ChannelTab.entries.forEach { tab ->
+            listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS).forEach { tab ->
                 server.enqueue(MockResponse().setBody(JSONObject().put("videos", org.json.JSONArray("""[{"videoId":"abcdefghijk","title":"First","liveNow":true}]""")).put("continuation", token).toString()))
                 val first = page(api, tab)
                 server.takeRequest()
@@ -99,7 +100,7 @@ class ChannelTest {
         MockWebServer().use { server ->
             server.start()
             val api = InvidiousApi({ server.url("/").toString().trimEnd('/') }, { null })
-            ChannelTab.entries.forEach { tab ->
+            listOf(ChannelTab.VIDEOS, ChannelTab.STREAMS).forEach { tab ->
                 server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":"Temporary channel failure"}"""))
                 try { page(api, tab); fail("Channel failure ignored") }
                 catch (error: ApiException) { assertEquals(503, error.status); assertEquals("Temporary channel failure", error.message) }

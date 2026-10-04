@@ -40,15 +40,30 @@ recovery copy only and does not need to be copied to the server.
 docker compose --env-file .env config --quiet
 docker compose pull companion invidious-db
 docker compose build invidious
+docker compose up -d invidious-db
+docker compose run --rm --no-deps invidious /invidious/invidious --migrate
 docker compose up -d
 docker compose ps
 curl -f https://mobivious.wingress.net/api/v1/stats
 ```
 
-The mobile patch adds no schema migrations. The fork already has account-schema
-migrations; your existing deployed version must have those, as it did during local
-analysis. New installations initialize from the existing SQL files. If updating from
-an older fork, follow that fork's migration instructions before starting it.
+The playlist/RSS update adds **migration 20**. Back up the database, keep all old
+Invidious instances stopped, and run the new executable’s `--migrate` against the
+existing database before restarting the app service, as shown above. Migration 20
+creates `saved_playlists` keyed by account and source ID, caches source metadata
+and optional mix seed, and backfills legacy external saves without deleting their
+rows. A repeated migration is safe. Account deletion cascades bookmarks;
+unsubscribe cleans only the caller’s bookmark and caller-owned legacy save.
+
+Fresh installations use the added SQL initialization file. Table integrity checks
+can create the table but do not replace migration backfill on an existing database.
+Both normal and API-only builds expose RSS routes. Existing native tokens need
+renewal: sign out and sign in after deployment for saved-playlist writes, secret RSS
+link access and subscription OPML export. Private Atom uses playlist-read scopes.
+Verify independent saves from two accounts, live owner updates, private access,
+My playlists/Subscribed playlists counts, and Android read-only controls before
+accepting the rollout. No production migration, deployment or release publishing
+was performed as part of this source change.
 
 If the host reverse proxy reaches Invidious through Docker's bridge gateway, set
 `AUTH_TRUSTED_PROXY_CIDR` to that gateway IP `/32` (inspect the Compose network).

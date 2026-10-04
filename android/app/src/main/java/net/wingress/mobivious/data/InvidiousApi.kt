@@ -33,12 +33,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     fun url(path: String, query: Map<String, String> = emptyMap()): HttpUrl = server().toHttpUrl().newBuilder()
         .addPathSegments(path.removePrefix("/")).apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
     suspend fun request(path: String, method: String = "GET", data: JSONObject? = null, auth: Boolean = false,
-        query: Map<String, String> = emptyMap(), context: ApiContext? = null): String = withContext(Dispatchers.IO) {
+        query: Map<String, String> = emptyMap(), context: ApiContext? = null, accept: String = "application/json"): String = withContext(Dispatchers.IO) {
         val target = context ?: this@InvidiousApi.context()
         if (context != null && target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
         val address = target.server.toHttpUrl().newBuilder().addPathSegments(path.removePrefix("/"))
             .apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
-        val builder = Request.Builder().url(address).header("Accept", "application/json")
+        val builder = Request.Builder().url(address).header("Accept", accept)
         if (auth) {
             val session = target.account ?: throw ApiException(401, "Sign in to use your account.")
             if (session.server.toHttpUrl() != target.server.toHttpUrl() || session.expiresAt <= System.currentTimeMillis() / 1000) { if (target == this@InvidiousApi.context()) expired(); throw ApiException(401, "Your session expired. Sign in again.") }
@@ -62,6 +62,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/blocked_channels") -> "Sign out and sign in again to enable channel blocking with an updated token."
                     response.code in listOf(404, 405) && path == "api/v1/auth/subscriptions/search" -> "This server needs the Mobivious subscription-search API update."
                     response.code == 403 && error == "Invalid scope" && path == "api/v1/auth/subscriptions/search" -> "Sign out and sign in again to enable subscription search with an updated token."
+                    response.code in listOf(404, 405) && (path.startsWith("api/v1/auth/saved_playlists/") || path == "api/v1/auth/feed/rss" || path == "api/v1/auth/subscriptions/export" || path.endsWith("/feed")) -> "This server needs the Mobivious playlist/RSS API update."
+                    response.code == 403 && error == "Invalid scope" && (path.startsWith("api/v1/auth/saved_playlists/") || path == "api/v1/auth/feed/rss" || path == "api/v1/auth/subscriptions/export") -> "Sign out and sign in again to enable playlist subscriptions and RSS exports with an updated token."
                     error.isNotBlank() -> error.take(300)
                     response.code >= 500 -> "The server could not complete this request. Try again."
                     else -> "Request failed (${response.code})."
@@ -85,6 +87,27 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val order = if (sort in listOf("views", "view_count")) "views" else "relevance"
         return ApiParser.videos(JSONArray(request("api/v1/search", query = mapOf("q" to q, "page" to page.toString(), "sort" to order, "date" to date, "duration" to duration, "type" to "video"))))
     }
+    suspend fun searchPlaylists(q: String, page: Int, sort: String, context: ApiContext = context()) =
+        ApiParser.playlists(JSONArray(scopedRead("api/v1/search", mapOf("q" to q, "page" to "$page", "sort" to sort, "type" to "playlist"), false, context)))
+    suspend fun channelPlaylists(id: String, continuation: String = "", sort: String = "last", context: ApiContext = context()): Page<Playlist> {
+        val j = JSONObject(scopedRead("api/v1/channels/$id/playlists", buildMap { put("sort_by", sort); if (continuation.isNotBlank()) put("continuation", continuation) }, false, context))
+        return Page(ApiParser.playlists(j.optJSONArray("playlists") ?: JSONArray()), j.text("continuation"))
+    }
+    suspend fun subscribePlaylist(list: Playlist, subscribe: Boolean, context: ApiContext): Playlist? {
+        require(list.id.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid playlist ID" }
+        val raw = scopedPlaylistWrite("api/v1/auth/saved_playlists/${list.id}", if (subscribe) "PUT" else "DELETE", context,
+            if (subscribe) JSONObject().apply { list.seedVideoId?.let { put("seedVideoId", it) } } else null)
+        return if (subscribe) ApiParser.playlist(JSONObject(raw)) else null
+    }
+    suspend fun subscriptionFeedLink(context: ApiContext): String = RssLinks.privateFeed(context.server,
+        JSONObject(scopedRead("api/v1/auth/feed/rss", emptyMap(), true, context)).getString("feedPath"))
+    suspend fun subscriptionOpml(format: String, context: ApiContext): String {
+        require(format in listOf("rss", "newpipe"))
+        return request("api/v1/auth/subscriptions/export", auth = true, query = mapOf("format" to format), context = context, accept = "application/xml")
+            .also { if (context != this.context()) throw CancellationException("Account or instance changed") }
+    }
+    suspend fun playlistAtom(id: String, context: ApiContext): String = request("api/v1/auth/playlists/$id/feed", auth = true,
+        context = context, accept = "application/atom+xml").also { if (context != this.context()) throw CancellationException("Account or instance changed") }
     suspend fun channelSearch(id: String, q: String, page: Int, context: ApiContext = context()) =
         SearchPage.parse(scopedRead("api/v1/channels/$id/search", mapOf("q" to q, "page" to "$page"), false, context))
     suspend fun subscriptionSearch(q: String, page: Int, context: ApiContext = context()) =
@@ -126,25 +149,26 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun subscribe(id: String, subscribe: Boolean) { request("api/v1/auth/subscriptions/$id", if (subscribe) "POST" else "DELETE", auth = true) }
     suspend fun history(page: Int, q: String = "", context: ApiContext = context()) = History.parse(scopedRead("api/v1/auth/history",
         mapOf("details" to "true", "organized" to "true", "q" to q, "page" to "$page"), true, context))
-    suspend fun playlists() = JSONArray(request("api/v1/auth/playlists", auth = true)).objects().map(ApiParser::playlist)
+    suspend fun playlists(context: ApiContext = context()) = JSONArray(scopedRead("api/v1/auth/playlists", emptyMap(), true, context)).objects().map { ApiParser.playlist(it, legacyOwned = true) }
     suspend fun playlist(id: String, page: Int = 1): Pair<Playlist, List<Video>> {
         val result = queuePage(id, (page - 1) * 100)
-        return Playlist(result.source.id, result.source.title, result.source.count) to result.videos
+        return (result.playlist ?: Playlist(result.source.id, result.source.title, result.source.count)) to result.videos
     }
     suspend fun queuePage(id: String, index: Int = 0, continuation: String? = null, context: ApiContext = context()): QueuePage {
         require(id.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) { "Invalid playlist ID." }
         val mix = id.startsWith("RD")
-        val auth = !mix && context.account != null
-        val path = if (mix) "api/v1/mixes/$id" else "api/v1/${if (auth) "auth/" else ""}playlists/$id"
+        val auth = context.account != null
+        val path = if (mix && !auth) "api/v1/mixes/$id" else "api/v1/${if (auth) "auth/" else ""}playlists/$id"
         val query = if (mix) continuation?.let { mapOf("continuation" to it) }.orEmpty() else buildMap {
             put("index", "$index"); if (continuation != null && index == 0) put("continuation", continuation)
         }
         val j = JSONObject(scopedRead(path, query, auth, context))
-        return QueuePage(QueueSource(id, j.text("title"), j.optInt("videoCount"), mix), ApiParser.videos(j.optJSONArray("videos") ?: JSONArray()))
+        val list = ApiParser.playlist(j)
+        return QueuePage(QueueSource(id, list.title, list.count, mix, list.owned, list.seedVideoId), ApiParser.videos(j.optJSONArray("videos") ?: JSONArray()), list)
     }
     suspend fun createPlaylist(title: String, privacy: String, context: ApiContext = context()): Playlist {
         val j = JSONObject(scopedPlaylistWrite("api/v1/auth/playlists", "POST", context, JSONObject().put("title", title).put("privacy", privacy)))
-        return Playlist(j.getString("playlistId"), j.text("title", title), 0, privacy)
+        return Playlist(j.getString("playlistId"), j.text("title", title), 0, privacy, owned = true)
     }
     suspend fun editPlaylist(id: String, title: String, privacy: String, description: String) { request("api/v1/auth/playlists/$id", "PATCH", JSONObject().put("title", title).put("privacy", privacy).put("description", description), true) }
     suspend fun deletePlaylist(id: String) { request("api/v1/auth/playlists/$id", "DELETE", auth = true) }

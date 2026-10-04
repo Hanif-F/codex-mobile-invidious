@@ -161,7 +161,7 @@ class PlaybackService : MediaSessionService() {
                 if ((id.isNotEmpty() && !SponsorBlockRules.validVideo(id)) || (source != null && !source.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) || id.isEmpty() && source == null)
                     return SessionResult(SessionError.ERROR_BAD_VALUE)
                 queue.start(id, source, if (args.containsKey("index")) args.getInt("index") else null,
-                    if (args.containsKey("seconds")) args.getLong("seconds") else null, args.getBoolean("audio"))
+                    if (args.containsKey("seconds")) args.getLong("seconds") else null, args.getBoolean("audio"), sourceSeed = args.getString("seed"))
             }
             QUEUE_INSERT -> {
                 val video = runCatching { ApiParser.video(JSONObject(args.getString("video") ?: "{}")) }.getOrNull()

@@ -16,7 +16,7 @@ data class StreamFormat(val id: String, val mimeType: String, val codec: String,
 data class VideoDetails(val video: Video, val description: String, val dash: String, val hls: String,
     val fallback: String, val captions: List<Caption>, val recommendations: List<Video>, val formats: List<StreamFormat> = emptyList())
 enum class ChannelTab(val path: String, val label: String) {
-    VIDEOS("videos", "Videos"), STREAMS("streams", "Streams")
+    VIDEOS("videos", "Videos"), STREAMS("streams", "Streams"), PLAYLISTS("playlists", "Playlists")
 }
 data class Channel(val id: String, val name: String, val description: String = "", val subscribers: String = "", val image: String = "",
     val tabs: List<String> = emptyList()) {
@@ -24,14 +24,19 @@ data class Channel(val id: String, val name: String, val description: String = "
         get() = ChannelTab.entries.filter { it.path in tabs }.ifEmpty { listOf(ChannelTab.VIDEOS) }
     fun preferredTab(current: ChannelTab? = null): ChannelTab = current?.takeIf { it in contentTabs } ?: contentTabs.first()
 }
-data class Playlist(val id: String, val title: String, val count: Int, val privacy: String = "private", val description: String = "")
+data class Playlist(val id: String, val title: String, val count: Int, val privacy: String = "public", val description: String = "",
+    val thumbnail: String = "", val author: String = "", val channelId: String = "", val owned: Boolean = false,
+    val saved: Boolean = false, val seedVideoId: String? = null) {
+    val mix get() = id.startsWith("RD")
+    val sourceLabel get() = if (owned) "My playlist" else if (mix) "Mix" else if (id.startsWith("IV")) "Invidious playlist" else "YouTube playlist"
+}
 data class Comment(val author: String, val text: String, val published: String, val likes: Long)
 data class Page<T>(val items: List<T>, val continuation: String = "")
 data class Account(val token: String, val username: String, val expiresAt: Long, val server: String)
 data class ApiContext(val server: String, val account: Account?, val generation: Long = 0)
 data class DeArrowIdentity(val ready: Boolean, val configured: Boolean)
 data class DeArrowSubmission(val title: String, val original: Boolean, val votes: Int, val locked: Boolean, val uuid: String)
-data class VideoLink(val id: String, val seconds: Long? = null, val playlistId: String? = null, val index: Int? = null)
+data class VideoLink(val id: String, val seconds: Long? = null, val playlistId: String? = null, val index: Int? = null, val seedVideoId: String? = null)
 
 object VideoLinks {
     private val idPattern = Regex("^[A-Za-z0-9_-]{11}$")
@@ -53,7 +58,8 @@ object VideoLinks {
         val youtube = host in listOf("youtu.be", "youtube.com", "youtube-nocookie.com")
         val index = url.queryParameter("index")?.toIntOrNull()?.let { if (youtube) it - 1 else it }?.takeIf { it >= 0 }
         val timestamp = url.queryParameter("t") ?: url.queryParameter("start") ?: url.fragment?.removePrefix("t=")
-        return VideoLink(id.orEmpty(), timestamp?.let(::timestampSeconds), list, index)
+        return VideoLink(id.orEmpty(), timestamp?.let(::timestampSeconds), list, index,
+            if (list?.startsWith("RD") == true) url.queryParameter("continuation")?.takeIf { idPattern.matches(it) } ?: id?.takeIf { idPattern.matches(it) } else null)
     }
     fun timestampSeconds(value: String): Long? {
         value.removeSuffix("s").toLongOrNull()?.let { return it.takeIf { seconds -> seconds >= 0 } }
@@ -96,7 +102,19 @@ object ApiParser {
             j.optLong("bitrate", 0).coerceAtLeast(0), j.optLong("clen", j.optLong("contentLength", 0)).coerceAtLeast(0),
             audio, if (j.opt("isDrc") is Boolean) j.getBoolean("isDrc") else null)
     }
-    fun playlist(json: JSONObject) = Playlist(json.text("playlistId"), json.text("title"), json.optInt("videoCount"), json.text("privacy", "private"), json.text("description"))
+    fun playlist(json: JSONObject, legacyOwned: Boolean = false): Playlist {
+        val id = json.text("playlistId", json.text("mixId"))
+        val thumbnail = json.text("playlistThumbnail")
+        val seed = sequenceOf(json.text("seedVideoId"), json.optJSONArray("videos")?.optJSONObject(0)?.text("videoId").orEmpty(),
+            thumbnail.toHttpUrlOrNull()?.pathSegments?.getOrNull(1).orEmpty(), thumbnail.split('/').getOrNull(2).orEmpty(), id.removePrefix("RD"))
+            .firstOrNull { it.matches(Regex("^[A-Za-z0-9_-]{11}$")) }.takeIf { id.startsWith("RD") }
+        val owned = if (json.opt("isOwned") is Boolean) json.getBoolean("isOwned") else legacyOwned && id.startsWith("IV")
+        return Playlist(id, json.text("title"), json.optInt("videoCount", if (id.startsWith("RD")) -1 else 0),
+            json.text("privacy", if (owned) "private" else "public").lowercase(), json.text("description"),
+            thumbnail, json.text("author"), json.text("authorId"), owned,
+            json.optBoolean("isSaved", legacyOwned && !id.startsWith("IV")), seed)
+    }
+    fun playlists(array: JSONArray) = array.objects().filter { it.text("playlistId", it.text("mixId")).isNotBlank() }.map { playlist(it) }
     fun channel(json: JSONObject) = Channel(json.text("authorId"), json.text("author"), json.text("description"), json.text("subCountText", json.optLong("subCount").toString()),
         json.optJSONArray("authorThumbnails")?.objects()?.lastOrNull()?.text("url") ?: "",
         json.optJSONArray("tabs")?.let { tabs -> (0 until tabs.length()).mapNotNull { tabs.opt(it) as? String } } ?: emptyList())

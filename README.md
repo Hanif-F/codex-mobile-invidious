@@ -79,11 +79,11 @@ Account features require the server extensions described in `deploy/README.md`.
 ## Features
 
 Home popular/trending, filtered search and shared video links; channel browsing with
-paginated Videos/Streams tabs and automatic Streams selection for channels without uploads;
+paginated Videos/Streams/Playlists tabs and automatic Streams selection for channels without uploads;
 native account sign-in; subscription feed and subscribe/unsubscribe; playlists and
 watch history; descriptions, captions, read-only comments and recommendations.
 Channel pages and Subscriptions each have their own search field. Channel search
-keeps the selected Videos/Streams tab available; clearing search restores it.
+keeps the selected Videos/Streams/Playlists tab available; clearing search restores it.
 Subscription search matches titles/channels across the cached subscription library.
 History supports title/channel search, account-timezone date groups and saved
 release/watch metadata, including unavailable videos. Search icons, the keyboard
@@ -190,3 +190,24 @@ fork's responsibility.
 Invidious retains its AGPL-3.0 license and attribution. Mobivious is AGPL-3.0-only;
 the root LICENSE mirrors Invidious's license. Include corresponding source when
 distributing modified binaries as required by that license.
+
+## Playlist subscriptions and RSS
+
+Library separates **My playlists** from **Subscribed playlists**, with counts and
+source labels. Only owned playlists can be edited or used as saving/default
+destinations. Subscribe to YouTube playlists, mixes, or another user’s
+public/unlisted Invidious playlist; opening or refreshing fetches owner updates.
+Unsubscribe removes your subscription while playback continues. Search defaults to
+Videos and also offers Playlists & mixes; channel playlists support continuation
+pagination and Last added/Newest/Oldest sorting.
+
+RSS sheets offer Open, Copy and Share for feed links. The subscription-feed link
+grants access to its holder and stays in memory; the native bearer token is never
+shared. Private owned playlists export authenticated Atom snapshots via Open, Save
+file or Share. Subscription OPML exports support both Invidious and YouTube feeds.
+This adds feed/export access, without RSS reading, polling or upload alerts.
+
+The sibling server requires **migration 20** before rollout. Renew native tokens by
+signing out and in after the API update. See [deployment instructions](deploy/README.md),
+[API contract](../invidious/docs/mobile-api.md) and [verification](VERIFICATION.md).
+The existing 0.2.1 APK predates this implementation; no new release is published here.

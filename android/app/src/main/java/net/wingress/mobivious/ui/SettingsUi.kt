@@ -177,7 +177,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     else Text("Sign in to keep a shared watch history.", style = MaterialTheme.typography.bodyMedium)
                     SettingsToggle("Remember playback position", if (account != null) "Resume across Android and the website" else "Resume videos on this device", value.savePosition, !busy) { update(value.copy(savePosition = it)) }
                     if (account != null) {
-                        SettingsChoice("Default playlist", listOf("" to "None") + playlists.map { it.id to it.title }, value.defaultPlaylist, !busy) { update(value.copy(defaultPlaylist = it)) }
+                        SettingsChoice("Default playlist", listOf("" to "None") + playlists.filter { it.owned }.map { it.id to it.title }, value.defaultPlaylist, !busy) { update(value.copy(defaultPlaylist = it)) }
                         Text("The default playlist appears first when saving a video.", style = MaterialTheme.typography.bodySmall)
                     }
                 }

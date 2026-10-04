@@ -41,7 +41,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
     val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
-    val history: HistoryPage? = null)
+    val history: HistoryPage? = null, val lists: List<Playlist> = emptyList())
 data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean = false, val error: String? = null,
     val playing: Boolean = false, val position: Long = 0, val duration: Long = 0, val buffering: Boolean = false,
     val mediaId: String = "", val playWhenReady: Boolean = false, val playerState: Int = Player.STATE_IDLE,
@@ -77,6 +77,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val channelTab = MutableStateFlow<ChannelTab?>(null)
     val playlists = MutableStateFlow<List<Playlist>>(emptyList())
     val playlist = MutableStateFlow<Playlist?>(null)
+    val playlistBusy = MutableStateFlow<Set<String>>(emptySet())
+    val playlistErrors = MutableStateFlow<Map<String, String>>(emptyMap())
+    val rss = MutableStateFlow(RssState())
+    val playlistSearch = MutableStateFlow(false)
+    val channelPlaylistSort = MutableStateFlow("last")
+    private var pendingPlaylistSubscription: Pair<String, Playlist>? = null
+    private var playlistRevision = 0L
+    private var playlistSeed: String? = null
+    private var rssJob: Job? = null
     val subscriptions = MutableStateFlow<List<Channel>>(emptyList())
     val comments = MutableStateFlow(Page<Comment>(emptyList()))
     val commentError = MutableStateFlow<String?>(null)
@@ -165,6 +174,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { account.collect {
             browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
             blockUndo.value = null
+            playlistRevision++; playlistBusy.value = emptySet(); playlistErrors.value = emptyMap()
+            playlist.value = null; playlistSeed = null; playlists.value = emptyList()
+            rssJob?.cancel(); rss.value = RssState()
+            val pendingList = pendingPlaylistSubscription
+            if (it != null && pendingList?.first == api.context().server) {
+                pendingPlaylistSubscription = null
+                subscribePlaylist(pendingList.second, true)
+            } else if (pendingList?.first != api.context().server) pendingPlaylistSubscription = null
             val pendingSave = saveSheet.value
             if (pendingSave.video != null) {
                 if (pendingSave.context?.server == api.context().server) { saveSheet.value = PlaylistSaveState(pendingSave.video, api.context()); if (it != null) loadSaveLists() }
@@ -229,8 +246,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun refreshAccount() {
         refreshSharedSettings()
-        val context = api.context()
-        action { val channels = api.subscriptions(); val lists = api.playlists(); if (api.context() == context) { subscriptions.value = channels; playlists.value = lists } }
+        val context = api.context(); val revision = playlistRevision
+        action { val channels = api.subscriptions(); val lists = api.playlists(context); if (api.context() == context) { subscriptions.value = channels; if (revision == playlistRevision) playlists.value = lists } }
     }
     fun refreshSharedSettings() {
         val context = api.context()
@@ -278,6 +295,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun visibleVideos(videos: List<Video>, surface: ContentSurface = contentSurface()): List<Video> =
         ContentVisibility.filter(videos, surface, preferences.value.showMemberVideos, searchVisibility.value,
             blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
+    fun visiblePlaylists(lists: List<Playlist>): List<Playlist> = if (contentSurface() == ContentSurface.SEARCH && !searchVisibility.value.includeBlocked)
+        lists.filter { it.channelId !in blocked.value.takeIf { state -> state.context == api.context() }?.ids.orEmpty() } else lists
     fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
     private fun syncDeArrowMetadata() {
         val video = playback.value.details?.video ?: return
@@ -287,7 +306,70 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; scopedSearch.value = SearchInput(); channel.value = null; channelTab.value = null; playlist.value = null; refresh() }
+    fun navigate(tab: String, route: String = "") { this.tab = tab; navigation.value = tab to route; this.route = route; scopedSearch.value = SearchInput(); channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; refresh() }
+    fun openPlaylist(list: Playlist) {
+        navigate("Library", "playlist:${list.id}")
+        playlistSeed = list.seedVideoId
+        playlist.value = list.copy(owned = list.owned || playlists.value.any { it.id == list.id && it.owned }, saved = listsSubscribed(list.id))
+        refresh()
+    }
+    fun listsSubscribed(id: String) = playlists.value.any { it.id == id && it.saved && !it.owned }
+    fun preparePlaylistSubscription(list: Playlist) { pendingPlaylistSubscription = api.context().server to list }
+    fun subscribePlaylist(list: Playlist, subscribe: Boolean = !listsSubscribed(list.id)) {
+        if (list.owned || list.id in playlistBusy.value) return
+        val context = api.context()
+        if (context.account == null) { preparePlaylistSubscription(list); return }
+        playlistRevision++
+        playlistBusy.value += list.id; playlistErrors.value -= list.id
+        viewModelScope.launch {
+            try {
+                val result = api.subscribePlaylist(list, subscribe, context)
+                if (context == api.context()) {
+                    playlistRevision++
+                    playlists.value = playlists.value.filterNot { it.id == list.id } + listOfNotNull(result)
+                    if (playlist.value?.id == list.id) playlist.value = (result ?: playlist.value!!).copy(saved = subscribe)
+                    message.value = if (subscribe) "Playlist subscribed" else "Playlist unsubscribed"
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context()) playlistErrors.value += list.id to friendly(e) }
+            finally { if (context == api.context()) playlistBusy.value -= list.id }
+        }
+    }
+    fun setPlaylistSearch(value: Boolean) { if (playlistSearch.value != value) { playlistSearch.value = value; refresh() } }
+    fun setChannelPlaylistSort(value: String) { if (value in listOf("last", "newest", "oldest")) { channelPlaylistSort.value = value; load(false, refreshChannel = false) } }
+    fun openChannelRss(info: Channel) {
+        rssJob?.cancel()
+        val link = runCatching { RssLinks.channel(api.context().server, info.id) }
+        rss.value = RssState(true, "${info.name} RSS", api.context(), url = link.getOrNull(), error = link.exceptionOrNull()?.message)
+    }
+    fun openPlaylistRss(list: Playlist) {
+        rssJob?.cancel()
+        val privateFile = list.owned && list.privacy == "private"
+        val link = runCatching { if (privateFile) null else RssLinks.playlist(api.context().server, list) }
+        rss.value = RssState(true, "${list.title} RSS", api.context(), playlist = list,
+            url = link.getOrNull(), error = link.exceptionOrNull()?.message, filename = "playlist.atom")
+        if (privateFile) retryRss()
+    }
+    fun openSubscriptionRss() { rss.value = RssState(true, "Subscriptions RSS", api.context(), privateLink = true); retryRss() }
+    fun openOpml(format: String = "rss") { rss.value = RssState(true, "Subscription OPML", api.context(), opml = true, format = format, filename = "subscriptions.opml"); retryRss() }
+    fun dismissRss() { rssJob?.cancel(); rss.value = RssState() }
+    fun retryRss() {
+        val initial = rss.value; val context = initial.context ?: return
+        if (initial.playlist?.let { !it.owned || it.privacy != "private" } == true) { openPlaylistRss(initial.playlist); return }
+        if (!initial.privateLink && !initial.opml && initial.playlist == null) return
+        rssJob?.cancel(); rss.value = initial.copy(loading = true, error = null)
+        rssJob = viewModelScope.launch {
+            try {
+                val loaded = when {
+                    initial.opml -> initial.copy(xml = api.subscriptionOpml(initial.format, context))
+                    initial.playlist != null -> initial.copy(xml = api.playlistAtom(initial.playlist.id, context))
+                    else -> initial.copy(url = api.subscriptionFeedLink(context))
+                }
+                if (context == api.context() && rss.value.open) rss.value = loaded.copy(loading = false)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context() && rss.value.open) rss.value = initial.copy(loading = false, error = friendly(e)) }
+        }
+    }
     fun editSearch(value: String, scoped: Boolean) {
         val input = if (scoped) scopedSearch else searchInput
         input.value = input.value.copy(draft = value)
@@ -329,6 +411,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!more) browseReset.value++
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
+        val listSearch = playlistSearch.value; val listSort = channelPlaylistSort.value; val revision = playlistRevision
         val scopedQuery = scopedSearch.value.submitted
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
@@ -338,6 +421,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 var continuation = ""
                 var hasMore: Boolean? = null
                 var history: HistoryPage? = null
+                var lists = emptyList<Playlist>()
                 val videos = when {
                     selectedRoute.startsWith("channel:") -> {
                         val id = selectedRoute.substringAfter(':')
@@ -351,18 +435,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             response.items
                         } else {
                             val token = if (more) old.continuation else ""
-                            val response = when (contentTab) {
-                                ChannelTab.VIDEOS -> api.channelVideos(id, token)
-                                ChannelTab.STREAMS -> api.channelStreams(id, token)
+                            if (contentTab == ChannelTab.PLAYLISTS) {
+                                val response = api.channelPlaylists(id, token, listSort, context)
+                                lists = response.items; continuation = response.continuation
+                                hasMore = continuation.isNotBlank(); emptyList()
+                            } else {
+                                val response = when (contentTab) {
+                                    ChannelTab.STREAMS -> api.channelStreams(id, token)
+                                    else -> api.channelVideos(id, token)
+                                }
+                                continuation = response.continuation; response.items
                             }
-                            continuation = response.continuation; response.items
                         }
                     }
                     selectedRoute.startsWith("playlist:") -> {
                         val id = selectedRoute.substringAfter(':'); val mix = id.startsWith("RD")
                         val result = api.queuePage(id, if (more) (old.videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1 else 0,
-                            if (mix && more) old.videos.lastOrNull()?.id else null, context)
-                        if (generation == browseGeneration && context == api.context()) playlist.value = Playlist(id, result.source.title, result.source.count)
+                            if (mix && more) old.videos.lastOrNull()?.id else if (mix) playlistSeed ?: playlists.value.find { it.id == id }?.seedVideoId else null, context)
+                        if (generation == browseGeneration && context == api.context()) {
+                            val metadata = result.playlist ?: Playlist(id, result.source.title, result.source.count)
+                            playlist.value = metadata.copy(owned = metadata.owned || playlists.value.any { it.id == id && it.owned }, saved = if (revision == playlistRevision) metadata.saved || listsSubscribed(id) else listsSubscribed(id), seedVideoId = playlistSeed ?: metadata.seedVideoId)
+                            if (playlistSeed == null) playlistSeed = metadata.seedVideoId
+                            if (revision == playlistRevision && playlists.value.any { it.id == id }) playlists.value = playlists.value.map { if (it.id == id) playlist.value!! else it }
+                        }
                         hasMore = if (mix) result.videos.isNotEmpty() && !ContentVisibility.exhausted(old.videos, result.videos)
                             else (result.videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1 < result.source.count && result.videos.isNotEmpty()
                         result.videos
@@ -377,16 +472,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         history = response; hasMore = response.hasMore
                         response.entries
                     }
-                    selectedTab == "Search" -> if (selectedQuery.isBlank()) emptyList() else api.search(selectedQuery, page, sort, date, durationFilter)
+                    selectedTab == "Search" -> if (selectedQuery.isBlank()) emptyList() else if (listSearch) {
+                        lists = api.searchPlaylists(selectedQuery, page, sort, context)
+                        hasMore = lists.isNotEmpty() && (!more || lists.any { incoming -> old.lists.none { it.id == incoming.id } })
+                        emptyList()
+                    } else api.search(selectedQuery, page, sort, date, durationFilter)
                     selectedTab == "Subscriptions" -> if (context.account == null) emptyList() else if (scopedQuery.isNotBlank()) {
                         val response = api.subscriptionSearch(scopedQuery, page, context)
                         hasMore = response.hasMore; response.items
                     } else api.feed(page, preferences.value.notificationsOnly)
-                    selectedTab == "Library" -> { if (account.value != null) playlists.value = api.playlists(); emptyList() }
+                    selectedTab == "Library" -> { if (context.account != null) { val loaded = api.playlists(context); if (context == api.context() && revision == playlistRevision) playlists.value = loaded }; emptyList() }
                     else -> api.discovery(discovery, region)
                 }
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
-                    continuation = continuation, history = history, end = if (hasMore != null) !hasMore || more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
+                    continuation = continuation, history = history, lists = (old.lists + lists).distinctBy { it.id }, end = if (hasMore != null) !hasMore || more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                         selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
@@ -406,14 +505,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             result.addListener({ runCatching { if (result.get().resultCode != SessionResult.RESULT_SUCCESS) message.value = "Playback request expired. Try again." } }, ContextCompat.getMainExecutor(getApplication()))
         }
     }
-    fun play(id: String, explicit: Long? = null, source: String? = null, index: Int? = null, audio: Boolean = false) {
+    fun play(id: String, explicit: Long? = null, source: String? = null, index: Int? = null, audio: Boolean = false, seed: String? = null) {
         cancelAccumulatedSeek(false)
-        queueCommand(PlaybackService.QUEUE_START) { putString("id", id); source?.let { putString("source", it) }; index?.let { putInt("index", it) }; explicit?.let { putLong("seconds", it) }; putBoolean("audio", audio) }
+        queueCommand(PlaybackService.QUEUE_START) { putString("id", id); (seed ?: playlist.value?.takeIf { it.id == source }?.seedVideoId)?.let { putString("seed", it) }; source?.let { putString("source", it) }; index?.let { putInt("index", it) }; explicit?.let { putLong("seconds", it) }; putBoolean("audio", audio) }
     }
     fun playVideo(video: Video, source: Playlist? = null, audio: Boolean = false) = play(video.id, source = source?.id, index = video.playlistIndex, audio = audio)
     fun openLink(link: VideoLink): Boolean {
-        if (link.id.isEmpty()) { navigate("Library", "playlist:${link.playlistId}"); return false }
-        play(link.id, link.seconds, link.playlistId, link.index); return true
+        if (link.id.isEmpty()) { openPlaylist(Playlist(link.playlistId!!, "Playlist", 0, seedVideoId = link.seedVideoId)); return false }
+        play(link.id, link.seconds, link.playlistId, link.index, seed = link.seedVideoId); return true
     }
     fun insertQueue(video: Video, next: Boolean) {
         queueCommand(PlaybackService.QUEUE_INSERT) {
@@ -423,6 +522,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         message.value = if (next) "Will play next" else "Added to queue"
     }
     fun removePlaylistVideo(list: Playlist, video: Video) {
+        if (!list.owned) return
         val occurrence = queue.value.items.firstOrNull { it.video.indexId == video.indexId }
         if (queue.value.source?.id == list.id && occurrence != null) queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", occurrence.key) }
         else action { val context = api.context(); api.removeFromPlaylist(list.id, video.indexId, context); if (context == api.context()) { refresh(); refreshAccount(); message.value = "Removed from playlist" } }
@@ -445,7 +545,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (state.loading || state.busy || context.account == null) return
         saveSheet.value = state.copy(loading = true, error = null)
         viewModelScope.launch {
-            try { val lists = api.playlists().filter { it.id.startsWith("IV") }; if (saveSheet.value.video == state.video && context == api.context()) saveSheet.value = saveSheet.value.copy(lists = lists.sortedBy { it.id != preferences.value.defaultPlaylist }, loading = false) }
+            try { val lists = api.playlists(context).filter { it.owned }; if (saveSheet.value.video == state.video && context == api.context()) saveSheet.value = saveSheet.value.copy(lists = lists.sortedBy { it.id != preferences.value.defaultPlaylist }, loading = false) }
             catch (e: CancellationException) { throw e } catch (e: Exception) { if (saveSheet.value.video == state.video && context == api.context()) saveSheet.value = saveSheet.value.copy(loading = false, error = friendly(e)) }
         }
     }
@@ -576,7 +676,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
     suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
     fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null); app.cache.clear(); navigate("Home") } }
-    fun switchServer(value: String) { sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
