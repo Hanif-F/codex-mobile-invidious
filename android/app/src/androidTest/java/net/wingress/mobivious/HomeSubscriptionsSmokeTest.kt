@@ -177,16 +177,16 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithText("Sign in", substring = false).assertIsDisplayed()
     }
 
-    @Test fun guestWatchActionsHaveNoOverflowAndPlaybackQueueStillOpens() {
+    @Test fun guestWatchActionsHaveNoOverflowOrImplicitQueue() {
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
         compose.onNodeWithTag("watch-actions-menu").assertDoesNotExist()
         compose.onNodeWithContentDescription("Video actions").assertDoesNotExist()
         compose.onNodeWithTag("channel-block-$channelId").assertDoesNotExist()
-        compose.onNodeWithText("Playback queue").performClick()
-        until { activity.model.queueOpen.value }
-        compose.onNodeWithTag("playback-queue").assertExists()
+        compose.onNodeWithText("Playback queue").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Playback queue").assertDoesNotExist()
+        compose.onNodeWithTag("playback-queue").assertDoesNotExist()
         screenshot("watch-actions")
     }
 }

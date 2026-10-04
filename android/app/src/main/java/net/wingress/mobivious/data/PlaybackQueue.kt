@@ -23,6 +23,7 @@ data class PlaybackQueueSnapshot(val token: String = "", val context: ApiContext
     val videoSelection: VideoSelection = VideoSelection()) {
     val currentIndex get() = items.indexOfFirst { it.key == currentKey }
     val current get() = items.getOrNull(currentIndex)
+    val hasExplicitQueue get() = token.isNotEmpty() && explicitQueue
     fun json() = JSONObject().put("token", token).put("current", currentKey).put("repeat", repeat.name)
         .put("loading", loading).put("error", error).put("sourceError", sourceError).put("sourceLoading", sourceLoading)
         .put("sourceComplete", sourceComplete).put("explicitQueue", explicitQueue)

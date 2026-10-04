@@ -13,7 +13,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.wingress.mobivious.data.*
-import net.wingress.mobivious.player.PlaybackService
 
 @Composable
 internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit, channel: (String) -> Unit,
@@ -71,51 +70,6 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
                 }
             }
             item { TextButton(onClick = vm::dismissSave, enabled = !state.busy) { Text("Cancel") } }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun PlaybackQueueSheet(vm: AppViewModel, signIn: () -> Unit, channel: (String) -> Unit) {
-    val state by vm.queue.collectAsStateWithLifecycle()
-    val lists by vm.playlists.collectAsStateWithLifecycle()
-    val prefs by vm.preferences.collectAsStateWithLifecycle()
-    val owned = state.source?.id?.let { id -> lists.any { it.id == id && it.owned } } == true
-    ModalBottomSheet(onDismissRequest = { vm.queueOpen.value = false }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        LazyColumn(Modifier.fillMaxWidth().testTag("playback-queue"), contentPadding = PaddingValues(bottom = 24.dp)) {
-            item {
-                Column(Modifier.padding(16.dp)) {
-                    Text(state.source?.title?.ifBlank { "Playback queue" } ?: "Playback queue", style = MaterialTheme.typography.titleLarge)
-                    Row {
-                        IconButton(onClick = { vm.nextQueue(-1) }, enabled = !state.loading && (state.currentIndex > 0 || (state.current?.sourceIndex ?: 0) > 0 || state.repeat == QueueRepeat.ALL)) { Icon(Icons.Default.SkipPrevious, "Previous video") }
-                        IconButton(onClick = { vm.nextQueue(1) }, enabled = !state.loading && (QueueRules.successor(state, 1, prefs.showMemberVideos) != null || !state.sourceComplete || state.repeat == QueueRepeat.ALL)) { Icon(Icons.Default.SkipNext, "Next video") }
-                    }
-                    Text("Repeat", style = MaterialTheme.typography.labelLarge)
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { QueueRepeat.entries.forEach { value ->
-                        FilterChip(selected = state.repeat == value, onClick = { vm.repeatQueue(value) }, enabled = value != QueueRepeat.ALL || state.source?.mix != true,
-                            label = { Text(value.label) }, modifier = Modifier.testTag("queue-repeat-${value.name}"))
-                    } }
-                    if (state.loading || state.sourceLoading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                    state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(onClick = vm::retryPlayback) { Text("Retry playback") } }
-                    state.sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(onClick = { vm.queueCommand(PlaybackService.QUEUE_MORE) }) { Text("Retry queue") } }
-                    if (state.items.isEmpty()) Text("Your queue is empty. Add a video using its actions menu.")
-                }
-            }
-            items(state.items.filter { (!it.removed || it.key == state.currentKey) && (prefs.showMemberVideos || !it.video.membersOnly || it.key == state.currentKey) }, key = { it.key }) { entry ->
-                Column(Modifier.testTag("queue-occurrence-${entry.key}")) {
-                    if (entry.key == state.currentKey) Text(if (entry.removed) "Now playing · removed from queue" else "Now playing", Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.primary)
-                    if (entry.video.unavailable) Text("Unavailable video", Modifier.padding(horizontal = 16.dp))
-                    else if (entry.video.membersOnly && !prefs.showMemberVideos) Text("Hidden by members-only setting", Modifier.padding(horizontal = 16.dp))
-                    VideoCard(vm, entry.video, vm.store.server, { if (QueueRules.eligible(entry, prefs.showMemberVideos)) vm.selectQueue(entry.key) }, channel, signIn,
-                        remove = if (!entry.removed) ({ vm.queueCommand(PlaybackService.QUEUE_REMOVE) { putString("key", entry.key) } }) else null,
-                        audioPlay = { vm.audioOnly(true); vm.selectQueue(entry.key) }, removalLabel = "Remove from queue",
-                        removeFromPlaylist = if (owned && entry.video.indexId.isNotEmpty() && !entry.removed) ({
-                            vm.queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", entry.key) }
-                        }) else null, removeFromPlaylistEnabled = !state.loading && !state.sourceLoading)
-                }
-            }
-            if (!state.sourceComplete && !state.sourceLoading) item { OutlinedButton(onClick = { vm.queueCommand(PlaybackService.QUEUE_MORE) }, enabled = !state.loading, modifier = Modifier.fillMaxWidth()) { Text("Load more queue items") } }
         }
     }
 }

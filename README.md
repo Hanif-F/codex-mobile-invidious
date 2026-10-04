@@ -188,17 +188,22 @@ Settings → Server still configures the app's instance.
 Frequent actions use visible buttons and labeled chips. Channel menus group RSS,
 blocking and SponsorBlock settings; playlist menus group RSS, editing and deletion.
 Subscriptions has an RSS/OPML menu, and History has a Clear watch history menu.
-The watch action row includes Playback queue. Queue item menus
-distinguish Remove from queue from Remove from playlist. Settings selectors show
+Explicit playback queues appear inline before Up next, expanded by default. The
+queue header is the only expand/collapse control; standalone videos and automatic
+recommendation continuation do not show a queue. Queue item menus distinguish
+Remove from queue from Remove from playlist. Settings selectors show
 their label and current value, and descriptions expand through an arrow row.
 
 Public playlist/mix links open for guests; watch links retain list, occurrence index
 and timestamp. The service owns sequential playback, paging and dynamic mix
-continuation, including background audio and PiP. Open Playback queue from the
-watch page or player controls to select items, navigate previous/next, remove local
-queue entries, delete an owned playlist occurrence separately, or select repeat
-Off/One/All. All applies to finite queues. Queues last until playback closes, the
-service stops, or the account/instance changes. Shared next-recommendation,
+continuation, including background audio and PiP. Playlists, mixes, Play next and
+Add to queue create explicit queues, including single-item queues. Their inline
+panel uses compact rows in a bounded scroll area and follows the highlighted
+current occurrence without scrolling the watch page. Collapse remains selected
+through playback changes, navigation and Activity recreation. The panel retains
+previous/next, local removal, owned-playlist occurrence deletion, loading/retry,
+paging and repeat Off/One/All. All applies to finite queues. Queues last until
+playback closes, the service stops, or the account/instance changes. Shared next-recommendation,
 autoplay-next and single-video-loop defaults require the sibling native preference
 PATCH allowlist update, using existing scopes and no migration. Runtime repeat
 selection is session-only. Native runtime/layout acceptance remains unverified

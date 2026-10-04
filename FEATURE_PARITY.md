@@ -244,6 +244,15 @@ no migration or renewed token is needed. Runtime repeat selection stays session-
 External-playlist save/unsave, shuffle and restart restoration remain outside scope.
 See VERIFICATION.md for checks and the emulator limitation.
 
+Explicit queues now appear expanded inline beneath watch metadata and before
+Up next. The collapsible header replaces both the watch action chip and player
+queue icon. Standalone and implicit recommendation playback have no queue panel.
+A bounded list of compact rows follows the current occurrence and marks it with
+a tinted background, play marker and accessible selected state. Collapse survives
+item changes, navigation and Activity recreation. Loading and retry remain inline
+when video details are absent; existing paging, repeat and occurrence actions are
+retained. This presentation update adds no server API or storage changes.
+
 ## Playlist subscriptions and RSS — 4 October 2026
 
 Rows 31 and 45 are implemented in source. The Android Library and English web

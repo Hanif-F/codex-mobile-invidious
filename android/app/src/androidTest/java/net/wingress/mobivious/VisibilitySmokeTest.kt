@@ -168,7 +168,7 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
         compose.onNodeWithTag("watch-actions-menu").assertDoesNotExist()
         compose.onNodeWithContentDescription("Video actions").assertDoesNotExist()
-        compose.onNodeWithText("Playback queue").assertExists()
+        compose.onNodeWithTag("playback-queue").assertDoesNotExist()
         compose.onAllNodesWithText("Mobivious Studio", substring = false)[0].performClick()
         until { activity.model.channel.value != null && !activity.model.browse.value.loading }
         command("""{"failBlockedWrite":true}""")

@@ -106,7 +106,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val blockUndo = MutableStateFlow<BlockUndo?>(null)
     val saveSheet = MutableStateFlow(PlaylistSaveState())
     val queue = app.playbackQueue
-    val queueOpen = MutableStateFlow(false)
+    val queueExpanded = MutableStateFlow(queue.value.hasExplicitQueue)
     var tab = PreferenceRules.destination(preferences.value.defaultHome, account.value != null).first
     val navigation = MutableStateFlow(tab to "")
     var route = ""
@@ -161,6 +161,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }, ContextCompat.getMainExecutor(application))
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
         viewModelScope.launch { var previous = queue.value; queue.collect { state ->
+            if (state.token != previous.token || state.hasExplicitQueue != previous.hasExplicitQueue)
+                queueExpanded.value = state.hasExplicitQueue
             if (previous.source?.id == state.source?.id && previous.source?.count != state.source?.count && state.source != null) {
                 if (route == "playlist:${state.source.id}") refresh()
                 if (account.value != null) refreshAccount()
@@ -563,7 +565,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun nextQueue(direction: Int) { cancelAccumulatedSeek(false); if (direction > 0) controller.value?.seekToNextMediaItem() else controller.value?.seekToPreviousMediaItem() }
     fun repeatQueue(value: QueueRepeat) { controller.value?.repeatMode = when(value) { QueueRepeat.ONE -> Player.REPEAT_MODE_ONE; QueueRepeat.ALL -> Player.REPEAT_MODE_ALL; else -> Player.REPEAT_MODE_OFF } }
     fun retryPlayback() { cancelAccumulatedSeek(); queueCommand(PlaybackService.QUEUE_RETRY) }
-    fun closePlayer() { commentController.bind(null, false); cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueOpen.value = false }
+    fun closePlayer() { commentController.bind(null, false); cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueExpanded.value = false }
     fun undoBlock(value: BlockUndo) {
         if (value != blockUndo.value || value.context != api.context() || SystemClock.elapsedRealtime() > value.expires) return
         blockUndo.value = null

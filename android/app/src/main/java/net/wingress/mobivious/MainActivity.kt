@@ -31,7 +31,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent { MobiviousApp(model, this, pipMode.value, sharedVideo) }
-        handleLink(intent)
+        // Recreation reconnects to the service session instead of replaying its launch link.
+        if (savedInstanceState == null || model.queue.value.token.isEmpty()) handleLink(intent)
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleLink(intent) }
     override fun onStart() { super.onStart(); model.refreshSharedSettings() }

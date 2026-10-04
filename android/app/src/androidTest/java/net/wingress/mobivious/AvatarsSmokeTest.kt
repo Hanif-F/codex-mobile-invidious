@@ -83,8 +83,10 @@ class AvatarsSmokeTest {
             assertTrue(AvatarImageLoader.get(activity).execute(request) is coil.request.SuccessResult)
         }
         val before = state().getJSONArray("avatarRequests").length()
-        compose.runOnUiThread { activity.model.queueOpen.value = true }
-        until { activity.model.queueOpen.value }
+        compose.runOnUiThread { activity.model.insertQueue(activity.model.playback.value.details!!.recommendations.first(), false) }
+        until { activity.model.queue.value.hasExplicitQueue && activity.model.queueExpanded.value }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        compose.onNodeWithTag("playback-queue-items").performScrollToNode(hasTestTag("queue-occurrence-${activity.model.queue.value.currentKey}"))
         compose.onAllNodesWithTag("video-avatar-testvideo01", true).assertCountEquals(1)
         compose.waitForIdle()
         assertEquals(before, state().getJSONArray("avatarRequests").length())

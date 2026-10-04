@@ -1,11 +1,14 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import android.net.Uri
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.C
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackService
 import org.json.JSONObject
@@ -31,7 +34,7 @@ class QueueLibrarySmokeTest {
         command("reset"); command("queue")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        ui { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
+        ui { activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
         waitFor { activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() { if (::activity.isInitialized) ui { activity.model.closePlayer(); activity.finishAndRemoveTask() } }
@@ -40,6 +43,103 @@ class QueueLibrarySmokeTest {
         waitFor { !activity.model.queue.value.loading && activity.model.playback.value.playing }
     }
     private fun finishCurrent() { ui { activity.model.seekTo(119_700) } }
+    private fun showQueue() = compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+    private fun recreateActivity() {
+        val old = activity
+        ui { old.recreate() }
+        waitFor { var ready = false; ui { ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== old } }; ready }
+        ui { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
+    }
+    private fun screenshot(name: String) {
+        compose.waitForIdle()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        listOf("mkdir -p /data/local/tmp/mobivious-queue-screenshots",
+            "screencap -p /data/local/tmp/mobivious-queue-screenshots/$name.png").forEach { command ->
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+        }
+    }
+    @Test fun standaloneManualQueueCollapseAndNewSessionVisibility() {
+        ui { activity.model.play("testvideo01"); activity.sharedVideo.value = true }
+        waitFor { activity.model.playback.value.playing }
+        compose.onNodeWithTag("playback-queue").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Playback queue").assertDoesNotExist()
+        compose.onNodeWithTag("watch-actions").performScrollTo()
+        compose.onNodeWithText("Playback queue").assertDoesNotExist()
+        ui { activity.model.insertQueue(Video("testvideo02", "Manual next"), true) }
+        waitFor { activity.model.queue.value.hasExplicitQueue && activity.model.queueExpanded.value }
+        showQueue()
+        compose.onNodeWithTag("playback-queue-items").assertExists()
+        compose.onNodeWithTag("queue-occurrence-${activity.model.queue.value.currentKey}").assertIsSelected()
+        screenshot("manual-expanded")
+        compose.onNodeWithTag("playback-queue-header").performClick()
+        compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
+        ui { activity.model.nextQueue(1) }
+        waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
+        assertFalse(activity.model.queueExpanded.value)
+        compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
+        ui { activity.model.navigate("Home") }
+        compose.onNodeWithTag("mini-player-preview").performClick()
+        showQueue()
+        compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
+        ui { activity.model.togglePlay() }
+        waitFor { !activity.model.playback.value.playWhenReady }
+        compose.onNodeWithContentDescription("Full screen").performClick()
+        compose.onNodeWithTag("playback-queue").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Playback queue").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Exit full screen").performClick()
+        showQueue()
+        assertFalse(activity.model.queueExpanded.value)
+        recreateActivity()
+        assertFalse(activity.model.queueExpanded.value)
+        showQueue()
+        compose.onNodeWithTag("playback-queue-header").performClick()
+        compose.onNodeWithTag("queue-occurrence-${activity.model.queue.value.currentKey}").assertIsSelected()
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-up-next"))
+        compose.onNodeWithTag("watch-up-next").assertIsDisplayed()
+        ui { activity.model.play("testvideo01") }
+        waitFor { !activity.model.queue.value.hasExplicitQueue && activity.model.playback.value.playing }
+        compose.onNodeWithTag("playback-queue").assertDoesNotExist()
+        playSource()
+        assertTrue(activity.model.queueExpanded.value)
+        showQueue()
+        screenshot("playlist-expanded")
+    }
+    @Test fun singleItemQueueWithoutRecommendationsAndImplicitContinuation() {
+        ui { activity.model.closePlayer() }
+        waitFor { activity.model.queue.value.token.isEmpty() }
+        ui { activity.model.insertQueue(Video("testvideo01", "Single item"), false); activity.sharedVideo.value = true }
+        waitFor { activity.model.queue.value.hasExplicitQueue && activity.model.playback.value.details != null }
+        assertEquals(1, activity.model.queue.value.items.size)
+        ui { activity.model.preferences.value = activity.model.preferences.value.copy(relatedVideos = false) }
+        showQueue()
+        compose.onNodeWithTag("playback-queue-items").assertExists()
+        compose.onNodeWithTag("watch-up-next").assertDoesNotExist()
+        ui {
+            activity.model.store.guestDeArrow(AccountPreferences(continueNext = true))
+            activity.model.refreshSharedSettings(); activity.model.play("testvideo01")
+        }
+        waitFor { activity.model.playback.value.playing && !activity.model.queue.value.explicitQueue }
+        finishCurrent()
+        waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
+        assertFalse(activity.model.queue.value.hasExplicitQueue)
+        compose.onNodeWithTag("playback-queue").assertDoesNotExist()
+    }
+    @Test fun playlistLaunchLinkDoesNotRestartTheQueueOnRecreation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
+            .setAction(Intent.ACTION_VIEW).setData(Uri.parse("http://127.0.0.1:18080/watch?v=testvideo01&list=PLfixture"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
+        waitFor { activity.model.queue.value.source?.id == "PLfixture" && activity.model.playback.value.playing }
+        val token = activity.model.queue.value.token
+        showQueue()
+        compose.onNodeWithTag("playback-queue-header").performClick()
+        recreateActivity()
+        waitFor { activity.model.playback.value.details != null }
+        assertEquals(token, activity.model.queue.value.token)
+        assertFalse(activity.model.queueExpanded.value)
+        showQueue()
+        compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
+    }
     @Test fun guestSaveSignInCreateAndRetryKeepsCreatedPlaylist() {
         compose.onAllNodesWithTag("video-actions-testvideo01").onFirst().performClick()
         compose.onNodeWithText("Save to playlist").performClick()
@@ -87,7 +187,7 @@ class QueueLibrarySmokeTest {
         playSource("IVqueue")
         val key = activity.model.queue.value.currentKey!!
         waitFor { activity.model.playlists.value.any { it.id == "IVqueue" && it.owned } }
-        ui { activity.model.queueOpen.value = true }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
         compose.onNode(hasTestTag("video-actions-testvideo01") and hasAnyAncestor(hasTestTag("queue-occurrence-$key"))).performScrollTo().performClick()
         compose.onNodeWithText("Remove from playlist").assertExists()
         compose.onNodeWithText("Remove from queue").performClick()
@@ -109,14 +209,15 @@ class QueueLibrarySmokeTest {
         waitFor { activity.model.queue.value.token == token }
     }
     @Test fun mixAndPlaylistLinksRetainContextsAndMixDisablesAll() {
-        ui { activity.model.openLink(VideoLinks.parse("https://youtube.com/watch?v=testvideo01&list=RDtestvideo01&t=0", activity.model.store.server)!!) }
+        ui { activity.model.openLink(VideoLinks.parse("https://youtube.com/watch?v=testvideo01&list=RDtestvideo01&t=0", activity.model.store.server)!!); activity.sharedVideo.value = true }
         waitFor { activity.model.playback.value.playing && activity.model.queue.value.source?.mix == true }
         val loaded = activity.model.queue.value.items.size
         ui { activity.model.queueCommand(PlaybackService.QUEUE_MORE) }
         waitFor { !activity.model.queue.value.sourceLoading && activity.model.queue.value.items.size > loaded }
         assertNull(activity.model.queue.value.sourceError)
         assertFalse(activity.model.queue.value.sourceComplete)
-        ui { activity.model.repeatQueue(QueueRepeat.ALL); activity.model.queueOpen.value = true }
+        ui { activity.model.repeatQueue(QueueRepeat.ALL) }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
         compose.onNodeWithTag("queue-repeat-ALL").assertIsNotEnabled()
         finishCurrent()
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
@@ -129,7 +230,7 @@ class QueueLibrarySmokeTest {
         finishCurrent()
         waitFor { activity.model.queue.value.currentKey == key && activity.model.playback.value.position < 3000 && activity.model.playback.value.playing }
         waitFor { activity.model.playlists.value.any { it.id == "IVqueue" && it.owned } }
-        ui { activity.model.queueOpen.value = true }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
         compose.onNode(hasTestTag("video-actions-testvideo01") and hasAnyAncestor(hasTestTag("queue-occurrence-$key"))).performScrollTo().performClick()
         compose.onNodeWithText("Remove from queue").assertExists()
         compose.onNodeWithText("Remove from playlist").performClick()

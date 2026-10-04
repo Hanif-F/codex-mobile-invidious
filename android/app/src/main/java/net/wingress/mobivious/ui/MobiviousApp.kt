@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -94,7 +93,6 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val selectedTab by vm.navigation.collectAsStateWithLifecycle()
     LaunchedEffect(selectedTab) { tab = selectedTab.first; route = selectedTab.second; watch = false }
     val saveSheet by vm.saveSheet.collectAsStateWithLifecycle()
-    val queueOpen by vm.queueOpen.collectAsStateWithLifecycle()
     val blockUndo by vm.blockUndo.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -307,7 +305,6 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; dialog = "login" }, dismiss = { vm.sponsorSettingsChannel.value = null })
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
             if (saveSheet.video != null && dialog != "login" && !pip) SavePlaylistSheet(vm) { dialog = "login" }
-            if (queueOpen && saveSheet.video == null && !pip) PlaybackQueueSheet(vm, { vm.queueOpen.value = false; dialog = "login" }, { id -> vm.queueOpen.value = false; navigate("Home", "channel:$id") })
         }
     }
 }
@@ -315,7 +312,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
 @Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PlayCircleOutline, null, Modifier.size(48.dp), MaterialTheme.colorScheme.primary); Text(title, style = MaterialTheme.typography.titleLarge); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant); FilledTonalButton(onClick = onClick) { Text(action) } } }
 @Composable private fun ErrorCard(message: String, retry: () -> Unit) { Card(Modifier.padding(16.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(16.dp)) { Text(message); OutlinedButton(onClick = retry) { Text("Retry") } } } }
 internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
-private fun time(seconds: Long): String = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60) else "%d:%02d".format(seconds / 60, seconds % 60)
+internal fun time(seconds: Long): String = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60) else "%d:%02d".format(seconds / 60, seconds % 60)
 private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0); value >= 1000 -> "%.1fK".format(value / 1000.0); else -> "$value" }
 @Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove", avatarOwner: String? = null,
     removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true) {
@@ -404,6 +401,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
+    val queue by vm.queue.collectAsStateWithLifecycle()
     var description by remember(playback.details?.video?.id, prefs.extendDescription) { mutableStateOf(prefs.extendDescription) }
     val context = LocalContext.current
     val drawerOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
@@ -426,7 +424,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
             }
             else LazyColumn(Modifier.weight(1f).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
-                    item { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
                         DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text("${count(details.video.views)} views · ${details.video.published}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -439,7 +437,6 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
                             AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
                             AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
                             AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
-                            AssistChip(onClick = { vm.queueOpen.value = true }, label = { Text("Playback queue") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistPlay, null) })
                         }
                         if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                         blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
@@ -449,8 +446,11 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: Me
                             trailingIcon = if (description) Icons.Default.ExpandLess else Icons.Default.ExpandMore) { description = !description }
                         if(description) Text(details.description, style = MaterialTheme.typography.bodyMedium)
                     } }
+                }
+                if (queue.hasExplicitQueue) item(key = "watch:queue") { PlaybackQueuePanel(vm, signIn, channel) }
+                playback.details?.let { details ->
                     if (prefs.relatedVideos) {
-                        item { Text("Up next", Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge) }
+                        item(key = "watch:up-next") { Text("Up next", Modifier.padding(16.dp).testTag("watch-up-next"), style = MaterialTheme.typography.titleLarge) }
                         items(ContentVisibility.filter(details.recommendations, ContentSurface.RECOMMENDATIONS, prefs.showMemberVideos, blocked = blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty()), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn) }
                     }
                 }

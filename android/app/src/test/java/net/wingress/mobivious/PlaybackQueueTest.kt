@@ -13,6 +13,16 @@ import kotlinx.coroutines.Dispatchers
 
 class PlaybackQueueTest {
     private fun entry(index: Int) = QueueOccurrence.source("IVlist", Video("testvideo01", "Video $index", indexId = "${index + 10}", playlistIndex = index), index)
+    @Test fun queueVisibilityRequiresAnActiveExplicitSessionRatherThanAnItemCount() {
+        val standalone = PlaybackQueueSnapshot(token = "session", items = listOf(entry(0)), currentKey = entry(0).key)
+        assertFalse(standalone.hasExplicitQueue)
+        assertFalse(standalone.copy(items = listOf(entry(0), entry(1))).hasExplicitQueue)
+        assertTrue(standalone.copy(explicitQueue = true).hasExplicitQueue)
+        assertTrue(standalone.copy(source = QueueSource("PLlist"), explicitQueue = true, loading = true).hasExplicitQueue)
+        assertTrue(QueueRules.insert(standalone, Video("testvideo02", "Next"), true).hasExplicitQueue)
+        assertTrue(QueueRules.insert(standalone, Video("testvideo02", "Tail"), false).hasExplicitQueue)
+        assertFalse(standalone.copy(token = "", explicitQueue = true).hasExplicitQueue)
+    }
     @Test fun duplicatesAndOverlappingWindowsKeepLocalEdits() {
         val first = entry(0); val duplicate = entry(1)
         var state = PlaybackQueueSnapshot(items = listOf(first, duplicate), currentKey = first.key)

@@ -21,7 +21,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -225,7 +224,6 @@ internal fun VideoPlayer(
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                             Text("${playerTime(scrub?.toLong() ?: playback.position)} / ${if (playback.live) "LIVE" else if (playback.duration > 0) playerTime(playback.duration) else "—"}",
                                 Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.labelLarge)
-                            IconButton(onClick = { vm.cancelAccumulatedSeek(); interact(); vm.queueOpen.value = true }, enabled = controller != null) { Icon(Icons.AutoMirrored.Filled.QueueMusic, "Playback queue", tint = Color.White) }
                             IconButton(onClick = { vm.cancelAccumulatedSeek(); interact(); onSettings() }, enabled = controller != null) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }
                             IconButton(onClick = { interact(); onFullscreen() }) { Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                                 if (fullscreen) "Exit full screen" else "Full screen", tint = Color.White) }

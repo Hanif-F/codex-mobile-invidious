@@ -1087,3 +1087,52 @@ Full-app screenshots are saved under
 `/data/local/tmp/mobivious-home-subscriptions-screenshots/` by the new smoke tests.
 No server code, migration, token-scope, production account or release was changed
 for this revision. Existing uncommitted player/codec work was preserved.
+
+## Inline playback queue — 4 October 2026
+
+Explicit playlist, mix and manually assembled queues now appear expanded inline
+after watch metadata and before Up next. Ordinary video playback and implicit
+recommendation continuation have no queue panel. The inline header replaces both
+queue shortcuts and the bottom sheet. Expansion is scoped to the service queue
+token and is retained through item changes, navigation, fullscreen return and
+Activity recreation. The 288dp maximum-height viewport uses occurrence keys,
+compact rows and an accessible highlighted current item. Playback following only
+scrolls the internal list. Loading and retry remain available when video details
+are absent and while the list is collapsed.
+
+| Check | Result |
+|---|---|
+| Android unit/MockWebServer tests | 174 passed; zero failures, errors or skips |
+| Debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed; zero errors, 32 existing warnings; no queue UI issues |
+| Git whitespace check | Passed |
+| Focused connected UI tests and screenshot acceptance | Unverified: emulator startup crashed; connected tests reported no devices |
+
+The added unit regression distinguishes active explicit queues from standalone
+playback and multi-item implicit continuation, including single-item, loading and
+closed sessions. Six new presentation scenarios compile and cover visibility,
+duplicate-occurrence selection, bounded internal following without outer scrolling,
+collapse/advance/reopen, recovery without details, paging, disabled Mix Repeat All,
+48dp item actions, 320dp dark/2x text and 390dp light/1.3x text layouts. Three new
+fixture-backed smoke scenarios compile and cover manual/single-item creation,
+collapse across advancement/navigation/fullscreen/recreation, new-session expansion,
+recommendations disabled, implicit advancement, launch-link recreation without a
+session restart and queue shortcut removal. Activity recreation now reconnects to
+an active service queue instead of replaying its original launch link. Existing
+queue/library, watch visibility, guest watch actions and avatar-cache tests were
+updated for inline access.
+
+These instrumentation scenarios have **not run**. `adb devices -l` showed no
+devices. Android Emulator 37.2.12 exited with SIGSEGV (139) before boot using the
+existing Pixel_8_Pro AVD in read-only/no-snapshot mode with SwiftShader. The focused
+`connectedDebugAndroidTest` task failed with `No connected devices!`. No new native
+screenshots were produced or inspected; touch scrolling, large-font layouts,
+accessibility interactions and actual player transitions still need device
+acceptance.
+
+With a working emulator/device, run `scripts/test-android.sh`, including
+`PlaybackQueuePresentationTest`, `QueueLibrarySmokeTest`,
+`HomeSubscriptionsSmokeTest`, `AvatarsSmokeTest` and `VisibilitySmokeTest`.
+The new queue tests save screenshots under
+`/data/local/tmp/mobivious-queue-screenshots/`. No server, wire-format, queue-command,
+storage migration, production deployment or signed release changes were made.

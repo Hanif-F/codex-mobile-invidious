@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,13 +63,13 @@ internal fun ChannelAvatar(server: String, image: String, name: String, size: Dp
 @Composable
 internal fun ChannelAuthor(server: String, image: String, name: String,
     showAvatar: Boolean, modifier: Modifier = Modifier, size: Dp = 24.dp, tag: String,
-    onClick: (() -> Unit)? = null) {
+    onClick: (() -> Unit)? = null, maxLines: Int = Int.MAX_VALUE) {
     val action = if (onClick != null) Modifier.clickable(onClickLabel = "Open $name's channel", onClick = onClick) else Modifier
     Row(modifier.semantics(mergeDescendants = true) {}.then(action),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (showAvatar) ChannelAvatar(server, image, name, size, tag)
         Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium,
-            modifier = Modifier.weight(1f, fill = false))
+            modifier = Modifier.weight(1f, fill = false), maxLines = maxLines, overflow = TextOverflow.Ellipsis)
     }
 }
 
