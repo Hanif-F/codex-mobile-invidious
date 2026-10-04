@@ -1,7 +1,5 @@
 package net.wingress.mobivious.ui
 
-import android.content.Context
-import android.view.accessibility.AccessibilityManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -14,7 +12,6 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,10 +31,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,9 +70,13 @@ internal fun speedLabel(speed: Float) = "${speed.toString().removeSuffix(".0")}Ã
 internal fun VideoPlayer(
     vm: AppViewModel, playback: PlaybackState, controller: MediaController?, modifier: Modifier,
     fullscreen: Boolean = false, controls: Boolean = true, settingsOpen: Boolean = false,
+    presentation: PlayerPresentation = PlayerPresentation.WATCH, drag: PlayerDragHandler? = null,
+    gesturesEnabled: Boolean = true, chromeVisible: Boolean = true, gestureKey: Any? = null,
+    onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
     onFullscreen: () -> Unit, onSettings: () -> Unit,
 ) {
     val current by rememberUpdatedState(playback)
+    val currentDrag by rememberUpdatedState(drag)
     val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
     val sponsorState by vm.sponsorBlock.collectAsStateWithLifecycle()
     val sponsor = sponsorState.takeIf { it.mediaId == playback.mediaId } ?: SponsorBlockPlayback()
@@ -84,14 +87,8 @@ internal fun VideoPlayer(
     var feedback by remember(playback.mediaId, controls) { mutableStateOf<String?>(null) }
     var feedbackGeneration by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-    val accessibility = remember(context) { context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager }
-    var exploring by remember { mutableStateOf(accessibility.isTouchExplorationEnabled) }
-    DisposableEffect(accessibility) {
-        val listener = AccessibilityManager.TouchExplorationStateChangeListener { exploring = it }
-        accessibility.addTouchExplorationStateChangeListener(listener)
-        onDispose { accessibility.removeTouchExplorationStateChangeListener(listener) }
-    }
+    var inputOrigin by remember { mutableStateOf(Offset.Zero) }
+    val exploring = rememberPlayerTouchExploration()
     fun interact() { interaction++; visible = true }
     fun toggleControls() { vm.cancelAccumulatedSeek(); visible = !visible; interaction++ }
     fun seek(offset: Long) {
@@ -117,24 +114,30 @@ internal fun VideoPlayer(
     }
     LaunchedEffect(feedbackGeneration) { if (feedback != null) { delay(800); feedback = null } }
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
-    BoxWithConstraints(modifier.background(Color.Black).testTag("player-surface")) {
+    BoxWithConstraints(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
+        .onGloballyPositioned { inputOrigin = it.positionInRoot() }) {
         val shortPlayer = maxHeight < 180.dp
         val showTimeline = maxHeight >= 96.dp
-        PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
+        if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
+        else playback.details?.video?.let { video ->
+            coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
+                Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        }
         Box(Modifier.matchParentSize().testTag("player-gestures")
-        .pointerInput(playback.mediaId, controls) {
-            if (controls) coroutineScope {
+        .pointerInput(playback.mediaId, controls, presentation, gesturesEnabled, exploring, gestureKey) {
+            if (!gesturesEnabled) return@pointerInput
+            if (controls || presentation == PlayerPresentation.MINI) coroutineScope {
                 var single: Job? = null
                 var firstTime = Long.MIN_VALUE
                 var firstZone = 0
                 fun zone(x: Float) = when { x < size.width / 3f -> -1; x > size.width * 2 / 3f -> 1; else -> 0 }
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    down.consume()
-                    val up = waitForUpOrCancellation() ?: return@awaitEachGesture
-                    up.consume()
-                    if ((up.position - down.position).getDistance() > viewConfiguration.touchSlop ||
-                        up.uptimeMillis - down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) return@awaitEachGesture
+                    val up = playerGesture(down, presentation, if (exploring) null else currentDrag,
+                        position = { it + inputOrigin }) {
+                        single?.cancel(); firstTime = Long.MIN_VALUE; vm.cancelAccumulatedSeek()
+                    } ?: return@awaitEachGesture
+                    if (presentation == PlayerPresentation.MINI) { onRestore?.invoke(); return@awaitEachGesture }
                     val direction = zone(up.position.x)
                     if (vm.pendingSeek.value != null) {
                         single?.cancel(); firstTime = Long.MIN_VALUE
@@ -152,25 +155,38 @@ internal fun VideoPlayer(
             }
         }
         .onKeyEvent { event ->
-            if (controls && !settingsOpen && sponsor.active != null && event.key == Key.Enter && event.type == KeyEventType.KeyUp &&
+            if (gesturesEnabled && chromeVisible && presentation == PlayerPresentation.MINI && event.type == KeyEventType.KeyUp &&
+                (event.key == Key.Enter || event.key == Key.Spacebar)) { onRestore?.invoke(); true }
+            else if (controls && chromeVisible && !settingsOpen && sponsor.active != null && event.key == Key.Enter && event.type == KeyEventType.KeyUp &&
                 !event.isAltPressed && !event.isCtrlPressed && !event.isMetaPressed && !event.isShiftPressed) {
                 vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, sponsor.active.id); true
             } else false
-        }.focusable(enabled = controls).semantics {
-            if (controls) {
+        }.focusable(enabled = gesturesEnabled && chromeVisible && (controls || presentation == PlayerPresentation.MINI)).semantics {
+            if (controls && chromeVisible && !settingsOpen) {
                 onClick(label = if (visible) "Hide player controls" else "Show player controls") { toggleControls(); true }
                 customActions = listOf(
                     CustomAccessibilityAction("Back 10 seconds") { if (current.seekable) { seek(-10_000); true } else false },
                     CustomAccessibilityAction("Forward 10 seconds") { if (current.seekable) { seek(10_000); true } else false },
-                ) + if (sponsor.active != null) listOf(CustomAccessibilityAction("Skip ${sponsor.active.category.label}") {
+                ) + listOfNotNull(onCollapse?.let { collapse -> CustomAccessibilityAction(if (fullscreen) "Exit full screen" else "Minimize player") { collapse(); true } }) + if (sponsor.active != null) listOf(CustomAccessibilityAction("Skip ${sponsor.active.category.label}") {
                     vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, sponsor.active.id); true
                 }) else emptyList()
+            } else if (presentation == PlayerPresentation.MINI && gesturesEnabled && chromeVisible) {
+                role = Role.Button
+                onClick(label = "Open player") { onRestore?.invoke(); true }
+                customActions = listOf(CustomAccessibilityAction("Restore player") { onRestore?.invoke(); true },
+                    CustomAccessibilityAction("Dismiss player") { onDismiss?.invoke(); true })
             }
         })
         if (controls) {
-            AnimatedVisibility(visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200)), modifier = Modifier.fillMaxSize()) {
+            AnimatedVisibility(visible && chromeVisible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200)), modifier = Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxSize().testTag("player-controls").onFocusChanged { focused = it.hasFocus }.focusGroup()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .75f))))) {
+                    onCollapse?.let { collapse ->
+                        IconButton(onClick = { vm.cancelAccumulatedSeek(); collapse() }, modifier = Modifier.align(Alignment.TopEnd)
+                            .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier)) {
+                            Icon(Icons.Default.KeyboardArrowDown, if (fullscreen) "Return to watch page" else "Minimize player", tint = Color.White)
+                        }
+                    }
                     if (!shortPlayer && !playback.loading && playback.error == null) {
                         IconButton(
                             onClick = { vm.togglePlay(); interact() }, enabled = playback.canPlay,

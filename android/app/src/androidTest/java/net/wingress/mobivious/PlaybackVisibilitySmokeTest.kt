@@ -12,6 +12,8 @@ import android.view.SurfaceView
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.test.*
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.media3.common.C
@@ -112,6 +114,172 @@ class PlaybackVisibilitySmokeTest {
             compose.onNodeWithTag("player-gestures").performClick()
         }
         until { compose.onAllNodesWithContentDescription("Player settings").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    private fun playerDrag(dx: Float = 0f, dy: Float = 0f, duration: Long = 600) {
+        val density = activity.resources.displayMetrics.density
+        compose.onNodeWithTag("player-gestures").performTouchInput {
+            val start = Offset(width * .5f, height * .2f)
+            swipe(start, start + Offset(dx * density, dy * density), durationMillis = duration)
+        }
+        compose.waitForIdle()
+    }
+
+    @Test fun swipesMinimizeAndRestoreTheSameLiveSurfaceAndPreservePausedPlayback() {
+        openVideo()
+        val controller = activity.model.controller.value!!
+        lateinit var view: PlayerView
+        ui { view = playerViews().single(); controller.pause(); activity.model.seekTo(30_000); activity.model.speed(1.5f); activity.model.quality(360) }
+        until { activity.model.playback.value.position == 30_000L && activity.model.playback.value.playerState == Player.STATE_READY }
+        val token = activity.model.queue.value.token
+        val key = activity.model.queue.value.currentKey
+        val selection = controller.trackSelectionParameters
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-description-toggle"))
+        compose.onNodeWithTag("watch-description-toggle").performClick()
+        playerDrag(dy = 96f)
+        compose.onNodeWithTag("mini-player").assertIsDisplayed()
+        compose.onNodeWithTag("watch-details-list").assertDoesNotExist()
+        assertEquals("Home", activity.model.tab)
+        ui { assertSame(view, playerViews().single()); assertSame(controller, activity.model.controller.value) }
+        awake(false)
+        playerDrag(dy = -96f)
+        compose.onNodeWithTag("watch-details-list").assertIsDisplayed()
+        compose.onNodeWithTag("watch-description-toggle").assertIsDisplayed()
+        compose.onNodeWithText("A generated test video. No YouTube access is involved.").assertExists()
+        ui {
+            assertSame(view, playerViews().single()); assertEquals(token, activity.model.queue.value.token)
+            assertEquals(key, activity.model.queue.value.currentKey); assertEquals(selection, controller.trackSelectionParameters)
+            assertEquals(30_000L, controller.currentPosition); assertEquals(1.5f, controller.playbackParameters.speed, .001f)
+            assertFalse(controller.playWhenReady)
+            controller.play()
+        }
+        until { activity.model.playback.value.playing }
+        playerDrag(dy = 96f)
+        val first = frame(); Thread.sleep(350); val next = frame()
+        assertFalse("The minimized video must continue rendering moving frames", first.sameAs(next))
+        first.recycle(); next.recycle(); awake(true)
+        compose.onNodeWithTag("mini-player-preview").performClick()
+        compose.onNodeWithTag("watch-details-list").assertExists()
+    }
+
+    @Test fun incompleteAndCanceledDragsReturnAndBothSidewaysDirectionsStopPlayback() {
+        openVideo()
+        val watchBounds = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+        playerDrag(dy = 20f)
+        assertEquals(watchBounds, compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot())
+        val density = activity.resources.displayMetrics.density
+        compose.onNodeWithTag("player-gestures").performTouchInput {
+            down(Offset(width * .5f, height * .2f)); moveBy(Offset(0f, 80f * density), delayMillis = 600)
+        }
+        compose.waitForIdle()
+        val moving = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+        assertTrue("The video should shrink while the finger is still down", moving.right - moving.left < watchBounds.right - watchBounds.left)
+        assertTrue(moving.top > watchBounds.top)
+        ui { assertEquals(1, playerViews().size) }
+        compose.onNodeWithTag("player-gestures").performTouchInput { cancel() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("watch-details-list").assertExists()
+        for (direction in listOf(-1f, 1f)) {
+            playerDrag(dy = 96f)
+            val miniBounds = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+            playerDrag(dx = 20f * direction)
+            assertEquals(miniBounds, compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot())
+            compose.onNodeWithTag("mini-player").performTouchInput {
+                val start = Offset(width * .5f, height * .5f)
+                swipe(start, start + Offset(20f * density * direction, 0f), durationMillis = 600)
+            }
+            compose.waitForIdle()
+            assertEquals(miniBounds, compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot())
+            playerDrag(dx = activity.resources.configuration.screenWidthDp * .5f * direction)
+            until { activity.model.playback.value.details == null }
+            compose.onNodeWithTag("mini-player").assertDoesNotExist(); compose.onNodeWithTag("player-surface").assertDoesNotExist()
+            awake(false)
+            if (direction < 0) openVideo()
+        }
+    }
+
+    @Test fun claimedPresentationDragCancelsAccumulatedSeekAndRestoresPlayingIntent() {
+        openVideo()
+        val controller = activity.model.controller.value!!
+        val position = controller.currentPosition
+        ui { activity.model.accumulateSeek(1) }
+        assertNotNull(activity.model.pendingSeek.value)
+        playerDrag(dy = 96f, duration = 100)
+        compose.onNodeWithTag("mini-player").assertIsDisplayed()
+        ui {
+            assertNull(activity.model.pendingSeek.value); assertTrue(controller.playWhenReady)
+            assertTrue("Canceling the batch must not apply its 10-second seek", controller.currentPosition < position + 5_000)
+        }
+    }
+
+    @Test fun fullscreenSwipeReturnsToWatchBeforeMinimizingAndButtonsAndSemanticsMatch() {
+        openVideo(); showControls()
+        val controller = activity.model.controller.value!!
+        val token = activity.model.queue.value.token
+        compose.onNodeWithContentDescription("Full screen").performClick()
+        until { compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isNotEmpty() }
+        playerDrag(dy = 96f)
+        compose.onNodeWithTag("watch-details-list").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Exit full screen").assertDoesNotExist()
+        showControls(); compose.onNodeWithContentDescription("Minimize player").performClick()
+        compose.onNodeWithTag("mini-player").assertIsDisplayed()
+        val restore = compose.onNodeWithTag("player-gestures").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            .single { it.label == "Restore player" }
+        ui { assertTrue(restore.action()); assertSame(controller, activity.model.controller.value); assertEquals(token, activity.model.queue.value.token) }
+        compose.waitForIdle(); compose.onNodeWithTag("watch-details-list").assertIsDisplayed()
+        val minimize = compose.onNodeWithTag("player-gestures").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            .single { it.label == "Minimize player" }
+        ui { assertTrue(minimize.action()) }; compose.waitForIdle()
+        val dismiss = compose.onNodeWithTag("player-gestures").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            .single { it.label == "Dismiss player" }
+        ui { assertTrue(dismiss.action()) }; until { activity.model.playback.value.details == null }
+        compose.onNodeWithTag("mini-player").assertDoesNotExist()
+    }
+
+    @Test fun timelineCommentsQueueAndMiniButtonsKeepPriorityOverPresentationGestures() {
+        openVideo(); showControls()
+        compose.onNodeWithTag("player-timeline").performTouchInput { swipe(centerLeft, centerRight, durationMillis = 400) }
+        compose.onNodeWithTag("watch-details-list").assertExists()
+        ui { activity.model.openComments() }; until { activity.model.comments.value.open }
+        compose.onNodeWithTag("comments-list").performTouchInput { swipeDown() }
+        compose.onNodeWithTag("watch-content").assertExists()
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        ui { activity.model.insertQueue(Video("testvideo02", "Next video"), true) }
+        until { activity.model.queue.value.items.size == 2 }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        if (compose.onAllNodesWithTag("playback-queue-items").fetchSemanticsNodes().isEmpty())
+            compose.onNodeWithTag("playback-queue-header").performClick()
+        compose.onNodeWithTag("playback-queue-items").performTouchInput { swipeDown() }
+        compose.onNodeWithTag("watch-content").assertExists()
+        playerDrag(dy = 96f)
+        compose.onNodeWithContentDescription("Pause").performClick(); until { !activity.model.playback.value.playWhenReady }
+        compose.onNodeWithTag("mini-player").assertExists()
+        compose.onNodeWithContentDescription("Play").performClick(); until { activity.model.playback.value.playWhenReady }
+        compose.onNodeWithTag("mini-player").assertExists()
+        compose.onNodeWithContentDescription("Close player").performClick(); until { activity.model.playback.value.details == null }
+    }
+
+    @Test fun miniStateSurvivesActivityRecreationAndSystemAnimationScaleZero() {
+        openVideo(); playerDrag(dy = 96f)
+        val controller = activity.model.controller.value!!
+        val token = activity.model.queue.value.token
+        ui { activity.recreate() }
+        until {
+            var found = false
+            ui { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>()
+                .singleOrNull()?.let { activity = it; found = true } }
+            found
+        }
+        compose.onNodeWithTag("mini-player").assertIsDisplayed()
+        ui { assertSame(controller, activity.model.controller.value); assertEquals(token, activity.model.queue.value.token) }
+        val scale = shell("settings get global animator_duration_scale")
+        try {
+            shell("settings put global animator_duration_scale 0")
+            playerDrag(dy = -96f); compose.onNodeWithTag("watch-details-list").assertExists()
+            playerDrag(dy = 96f); compose.onNodeWithTag("mini-player").assertIsDisplayed()
+        } finally {
+            shell(if (scale.toFloatOrNull() != null) "settings put global animator_duration_scale $scale" else "settings delete global animator_duration_scale")
+        }
     }
 
     private fun foreground() {

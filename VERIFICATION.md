@@ -1231,3 +1231,65 @@ The planned GitHub tag is `v0.5.0`; release notes include changes since 0.4.0,
 server compatibility, renewed sign-in requirements and the device-validation
 limitation. Native runtime acceptance remains unverified as described above.
 Preparing or publishing this APK does not deploy the sibling server.
+
+## Player gestures and presentation animations — 4 October 2026
+
+The player now uses one saveable closed/mini/watch/fullscreen presentation state
+and a shared host above the browsing scaffold. Watch and mini-player slots contain
+layout/chrome; the host owns the live video surface and interpolates its bounds
+while dragging. Browsing stays composed beneath the watch page. Watch scroll and
+description state are retained by queue occurrence. The existing service/controller,
+selection, queue and screen-awake rules remain responsible for playback.
+
+Downward watch swipes minimize; downward fullscreen swipes return to watch first.
+Mini-player upward swipes or preview/title taps restore watch. Sideways mini-player
+swipes dismiss and send the existing close command after settling. Short/canceled
+drags spring back without bounce. Vertical completion uses 64dp; horizontal
+completion uses 35% of row width. A directional 1,000dp/second fling also completes
+after 24dp. Touch slop and dominant-axis locking separate taps from drags; controls
+keep their hit areas. Claiming a drag cancels pending tap/seek batches and restores
+playing intent. PiP, modal interaction, touch exploration, rotation, media changes
+and lifecycle interruption disable or cancel presentation drags. Unclipped anchors
+and current measured callbacks prevent dismissal drift or stale size thresholds.
+
+A visible minimize control, accessibility actions and keyboard mini-player restore
+provide alternatives to dragging. Description and queue disclosures animate their
+height/opacity and chevrons over 200ms. Spring/disclosure animations use Compose's
+system animation-duration handling. Media3's Compose surface synchronization
+workaround is enabled for the existing SurfaceView rendering path.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 190 passed; zero failures, errors or skips, including 6 new gesture/state tests |
+| Debug APK | Passed; `android/app/build/outputs/apk/debug/app-debug.apk` |
+| Instrumentation APK | Passed; 6 added real-media gesture scenarios compile |
+| Debug lint | Passed; zero errors, 32 existing warnings |
+| Repository whitespace check | Passed |
+| Connected player tests and screenshot/layout acceptance | Unverified: emulator exited with SIGSEGV (139) before boot; connected task reported `No connected devices!` |
+
+The added device scenarios cover watch/mini swipes retaining the same PlayerView,
+controller, position, selections and queue; moving minimized frames; watch disclosure
+and scroll retention; drag-following geometry; partial/canceled drags; short preview
+and title drags; dismissal in both directions; accumulated-seek cancellation;
+fullscreen's two-step collapse; buttons/accessibility equivalents; timeline,
+comments/queue scroll priority; Activity recreation; and animation scale zero.
+Existing scenarios continue to cover audio-only mode, queue advance, PiP/background,
+screen wake and narrow/light/dark/large-font screenshots. These device scenarios
+have **not executed**, and no new screenshots were produced or inspected.
+
+Final compiled checks:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug \
+  :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+```
+
+The final log is `/tmp/mobivious-gestures-final-checks.log`; the failed read-only
+Pixel_8_Pro attempt used no window/audio/snapshots, SwiftShader and disabled Vulkan
+and cameras, with log `/tmp/mobivious-gestures-emulator.log`. On a working device,
+run `scripts/test-android.sh` to supply the local fixture and real generated media.
+The focused connected class is `net.wingress.mobivious.PlaybackVisibilitySmokeTest`.
+No server, stored preference format, dependency version, signing/version metadata,
+production deployment or release publication was changed.

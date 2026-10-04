@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -29,12 +30,12 @@ internal fun OverflowMenu(description: String, resetKey: Any?, modifier: Modifie
 @Composable
 internal fun ActionRow(title: String, modifier: Modifier = Modifier, detail: String? = null,
     icon: ImageVector? = null, trailingIcon: ImageVector = Icons.Default.ChevronRight,
-    enabled: Boolean = true, actionLabel: String = title, onClick: () -> Unit) {
+    enabled: Boolean = true, actionLabel: String = title, trailingRotation: Float = 0f, onClick: () -> Unit) {
     val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f)
     ListItem(headlineContent = { Text(title, color = color) },
         supportingContent = detail?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f)) } },
         leadingContent = icon?.let { { Icon(it, null, tint = color) } },
-        trailingContent = { Icon(trailingIcon, null, tint = color) },
+        trailingContent = { Icon(trailingIcon, null, Modifier.rotate(trailingRotation), tint = color) },
         modifier = modifier.fillMaxWidth().heightIn(min = 56.dp)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = actionLabel, onClick = onClick))
 }

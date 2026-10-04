@@ -34,6 +34,7 @@ internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaCont
                 useController = false
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
+                setEnableComposeSurfaceSyncWorkaround(true)
             }
         },
         update = {

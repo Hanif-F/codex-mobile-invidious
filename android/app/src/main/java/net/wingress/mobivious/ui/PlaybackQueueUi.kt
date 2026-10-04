@@ -1,5 +1,12 @@
 package net.wingress.mobivious.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -79,11 +86,14 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
         Column {
             ActionRow(state.source?.title?.ifBlank { "Playback queue" } ?: "Playback queue",
                 detail = currentTitle?.let { "Now playing · $it" }, icon = Icons.AutoMirrored.Filled.PlaylistPlay,
-                trailingIcon = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                trailingIcon = Icons.Default.ExpandMore,
+                trailingRotation = animateFloatAsState(if (expanded) 180f else 0f, tween(200), label = "queue-chevron").value,
                 actionLabel = if (expanded) "Collapse playback queue" else "Expand playback queue",
                 modifier = Modifier.testTag("playback-queue-header").semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
                 onClick = toggle)
-            if (expanded) {
+            AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
+              Column {
                 HorizontalDivider()
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -105,6 +115,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
                         }
                     }
                 }
+              }
             }
             // Status and recovery remain accessible even if the user collapsed the list.
             if (state.loading || state.sourceLoading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("queue-loading"))
@@ -112,13 +123,16 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
                 state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(retry) { Text("Retry playback") } }
                 state.sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(more) { Text("Retry queue") } }
             }
-            if (expanded) {
+            AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+                exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
+              Column {
                 if (visible.isEmpty() && !state.loading && !state.sourceLoading) Text("Your queue is empty. Add a video using its actions menu.", Modifier.padding(12.dp))
                 if (visible.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().heightIn(max = 288.dp).testTag("playback-queue-items"), state = list) {
                     items(visible, key = { it.key }) { entry -> row(entry) }
                 }
                 if (!state.sourceComplete && !state.sourceLoading) OutlinedButton(more, enabled = !state.loading,
                     modifier = Modifier.fillMaxWidth().padding(12.dp)) { Text("Load more queue items") }
+              }
             }
         }
     }

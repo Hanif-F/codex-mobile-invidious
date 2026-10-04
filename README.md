@@ -135,6 +135,14 @@ when opening or leaving the watch screen. Visible video playback and buffering k
 the screen awake in the watch player, fullscreen, mini-player and PiP; paused,
 audio-only and hidden playback allow the normal screen timeout.
 
+Swipe down on the watch player to minimize it while browsing; swipe up on the
+mini-player, or tap its preview/title, to return. A downward fullscreen swipe
+returns to the watch page first. Swipe the mini-player left or right to close it
+and stop playback. Player transitions follow the drag and settle smoothly; short
+or canceled swipes return to their starting position. The minimize button and
+accessibility actions offer the same transitions. Description and playback-queue
+expansion also animate, respecting the system animation-duration setting.
+
 The quality menu selects exact supported representations with codec/FPS labels,
 numeric bitrates and available file sizes. Each resolution/FPS group shows at most
 four choices, prioritizing the highest and lowest AV1 and H.264 bitrates; automatic
