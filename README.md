@@ -50,7 +50,7 @@ local. For each release, update `versionName` and increment `versionCode` in
 
 ```sh
 # Match versionName for this release.
-release_version=0.2.1
+release_version=0.3.0
 scripts/build-release.sh
 
 # Confirm the APK's signature before publishing.
@@ -210,4 +210,4 @@ This adds feed/export access, without RSS reading, polling or upload alerts.
 The sibling server requires **migration 20** before rollout. Renew native tokens by
 signing out and in after the API update. See [deployment instructions](deploy/README.md),
 [API contract](../invidious/docs/mobile-api.md) and [verification](VERIFICATION.md).
-The existing 0.2.1 APK predates this implementation; no new release is published here.
+Release 0.3.0 includes these changes; the older 0.2.1 APK predates this implementation.

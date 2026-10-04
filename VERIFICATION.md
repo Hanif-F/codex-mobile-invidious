@@ -773,3 +773,19 @@ acceptance checks. Source/API fixture coverage is not a claim of those checks.
 Deploy migration 20 and the server APIs, install a new app build and renew native
 permissions by signing out and in before acceptance. Built-in RSS reading/polling
 and upload alerts remain outside this revision.
+
+## Signed release 0.3.0 — 4 October 2026
+
+`versionName` is 0.3.0 and `versionCode` is 5. The release script passed
+`testDebugUnitTest` (135 tests), `assembleRelease` and `lintRelease`.
+The APK package remains `net.wingress.mobivious`; arm64-v8a, armeabi-v7a, x86
+and x86_64 are included. The verified signing certificate matches the local
+0.2.1 APK, whose SHA-256 was checked against the published GitHub asset digest.
+This preserves in-place update compatibility.
+
+The `.apk.sha256` file accompanies `Mobivious-0.3.0.apk` on the v0.3.0 release
+and records the final uploaded APK checksum. Existing runtime limitations above
+remain: emulator/device, external RSS app and document-picker acceptance checks
+were not executed for this release. The server update at `742a4d004c4e869213618dc465e65ebf66007eed`
+and migration 20 must be deployed separately, followed by renewed native sign-in.
+No production server deployment or database migration was performed here.

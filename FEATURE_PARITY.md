@@ -3,7 +3,7 @@
 Reviewed on **4 October 2026** against the local source checkouts:
 
 - Web: `../invidious`, baseline audit at `a21a5513` plus the expanded native settings API changes; channel routes/API rechecked at `68e51ac2`. Includes this fork's custom features.
-- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; rows 06 and 33 now include scoped search and organized history; row 34 includes watched/progress, rows 40–41 content visibility, and rows 17/32 service-owned queues and video library actions; rows 31/45 now include playlist subscriptions and RSS with migration 20, reviewed on 4 October 2026. Current release version: `0.2.1` (version code 4).
+- Android: baseline audit at `c43eb76`; rows 05 and 10 updated against channel implementation `febc567`; rows 06 and 33 now include scoped search and organized history; row 34 includes watched/progress, rows 40–41 content visibility, and rows 17/32 service-owned queues and video library actions; rows 31/45 now include playlist subscriptions and RSS with migration 20, reviewed on 4 October 2026. Current release version: `0.3.0` (version code 5).
 
 **The status column describes implementation in the Android app compared with the web version.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction.
 
