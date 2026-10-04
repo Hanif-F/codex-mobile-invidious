@@ -5,6 +5,26 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VideoGeometryTest {
+    @Test fun watchResizingInterpolatesFittedHeightsAndLeavesSmallerVideosAlone() {
+        val portrait = VideoGeometry("portrait", 1080, 1920)
+        assertEquals(490f, portrait.embeddedHeight(400f, 700f, false, 0f), .01f)
+        assertEquals(385f, portrait.embeddedHeight(400f, 700f, false, .5f), .01f)
+        assertEquals(280f, portrait.embeddedHeight(400f, 700f, false, 1f), .01f)
+        assertEquals(340f, VideoGeometry("square", 500, 500).embeddedHeight(400f, 700f, false, .5f), .01f)
+        for (geometry in listOf(VideoGeometry("wide", 1920, 1080), VideoGeometry(), VideoGeometry("invalid", 800, 0))) {
+            for (progress in listOf(0f, .25f, .5f, 1f)) assertEquals(225f, geometry.embeddedHeight(400f, 700f, false, progress), .01f)
+        }
+        // A landscape video can still need resizing in a short window.
+        assertEquals(165f, VideoGeometry("wide", 1920, 1080).embeddedHeight(400f, 300f, false, .5f), .01f)
+    }
+    @Test fun commentsOverrideResizingAndProgressStaysWithinBounds() {
+        val portrait = VideoGeometry("portrait", 1080, 1920)
+        for (progress in listOf(0f, .5f, 1f)) assertEquals(280f, portrait.embeddedHeight(400f, 700f, true, progress), .01f)
+        assertEquals(490f, portrait.embeddedHeight(400f, 700f, false, -1f), .01f)
+        assertEquals(280f, portrait.embeddedHeight(400f, 700f, false, 2f), .01f)
+        assertEquals(490f, portrait.embeddedHeight(400f, 700f, false, Float.NaN), .01f)
+        assertEquals(0f, portrait.embeddedHeight(400f, 0f, false, .5f), .01f)
+    }
     @Test fun portraitVideosUseMoreWatchSpaceAndRespectCommentsCap() {
         val portrait = VideoGeometry("short", 1080, 1920)
         assertEquals(490f, portrait.embeddedHeight(400f, 700f, false), .01f)

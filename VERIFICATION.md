@@ -1293,3 +1293,49 @@ run `scripts/test-android.sh` to supply the local fixture and real generated med
 The focused connected class is `net.wingress.mobivious.PlaybackVisibilitySmokeTest`.
 No server, stored preference format, dependency version, signing/version metadata,
 production deployment or release publication was changed.
+
+## Smooth watch resizing and complete channel descriptions — 4 October 2026
+
+The embedded player now interpolates between its aspect-ratio-fitted 70% and 40%
+height limits while scrolling watch details. The first 24dp stays expanded; the
+next 96dp controls resizing directly. A nested-scroll coordinator consumes only
+the resizing distance and leaves the remainder for the list. Its saveable progress
+is independent of viewport remeasurement, preventing short-page resize loops,
+and is scoped to the current queue occurrence. Comments still use the 40% cap,
+and the existing single live PlayerView/controller owns playback throughout.
+
+Channel headers keep the three-line preview and offer Read full description for
+nonblank text. A bounded Material sheet displays all existing API description
+text with line breaks and selection, a fixed Close button and a scrollable body.
+It is owned outside the lazy header and dismissed on channel/instance changes.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 197 passed; no failures, errors or skips |
+| Debug APK and instrumentation APK | Compiled successfully |
+| Debug lint | Passed; zero errors, existing warnings only |
+| Fixture Python syntax and repository whitespace | Passed |
+| Native UI, decoded playback and screenshot acceptance | Unverified: the read-only Pixel_8_Pro emulator exited with SIGSEGV (139) before boot; ADB lists no connected device |
+
+Seven new unit scenarios cover fitted-height interpolation, smaller/unknown video
+dimensions, comments and progress bounds, the 24dp/96dp thresholds, scroll
+remainders, near-top reversal, short-page clamping, large fling deltas and restored
+progress. New compiled device scenarios cover active-drag sizing, flings, short
+pages, comments, minimization, state restoration, new occurrences and smaller
+landscape video. Channel scenarios cover complete text/final-line visibility,
+Close/Back/swipe dismissal, blank/short descriptions, large fonts and reading
+cached metadata without additional requests. A real-media scenario checks the
+same live surface, controller, position, paused/playing intent, selections and
+queue during resizing/minimization. These native scenarios have **not executed**;
+no screenshots were produced or inspected.
+
+Validation used `:app:testDebugUnitTest :app:assembleDebug
+:app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain` with the
+existing JDK/SDK. The build log is `/tmp/mobivious-resize-checks.log` and the emulator
+log is `/tmp/mobivious-resize-emulator.log`. Run `scripts/test-android.sh` on a working
+device for fixture-backed acceptance; the focused classes are
+`WatchPlayerResizePresentationTest`, `ChannelDescriptionPresentationTest`,
+`ChannelSmokeTest` and `PlaybackVisibilitySmokeTest`.
+
+No server API, migration, dependency, signing/version metadata, production
+deployment or release publication was changed.

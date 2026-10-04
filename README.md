@@ -101,6 +101,8 @@ the Search homepage remains supported without a Search bottom tab.
 
 Channel pages and Subscriptions each have their own search field. Channel search
 keeps the selected Videos/Streams/Playlists tab available; clearing search restores it.
+Channel descriptions retain a three-line preview; Read full description opens a
+scrollable sheet with the complete selectable text.
 Subscription search matches titles/channels across the cached subscription library.
 The Channels button stays above the Subscriptions feed and opens a separate
 Subscribed channels screen. Channels are sorted by name; Search channels filters
@@ -236,7 +238,12 @@ because the installed emulator crashes before boot; see VERIFICATION.md.
 
 Playback follows Media3 decoded video dimensions, including pixel aspect ratio,
 with a 16:9 fallback while dimensions are unknown. Regular watch height follows the
-video ratio up to 70% of available content height, or 40% while comments are open.
+video ratio up to 70% of available content height. Scrolling watch details keeps the
+player expanded within 24dp of the top, then smoothly resizes toward a 40% cap over
+the next 96dp. Returning near the top reverses the resize; smaller videos retain
+their natural fitted height. Comments use the 40% cap, and closing them restores
+the current browsing size. Resize progress is retained with the current queue
+occurrence across minimization and Activity recreation.
 Fullscreen follows portrait/landscape shape and device orientation for square or
 unknown video; PiP uses the video ratio within Android limits. Video always fits
 without stretching. The bounded mini-player and service-owned playback survive

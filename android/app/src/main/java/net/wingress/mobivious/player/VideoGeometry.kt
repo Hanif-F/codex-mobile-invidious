@@ -11,8 +11,14 @@ data class VideoGeometry(val mediaId: String = "", val width: Int = 0, val heigh
         pipRatio >= 2.39f -> 239 to 100
         else -> kotlin.math.round(pipRatio * 100000).toInt().coerceIn(41842, 239000) to 100000
     }
-    fun embeddedHeight(width: Float, availableHeight: Float, comments: Boolean): Float =
-        minOf(width.coerceAtLeast(0f) / layoutRatio, availableHeight.coerceAtLeast(0f) * if (comments) .4f else .7f)
+    fun embeddedHeight(width: Float, availableHeight: Float, comments: Boolean, resizeProgress: Float = 0f): Float {
+        val natural = width.coerceAtLeast(0f) / layoutRatio
+        val compact = minOf(natural, availableHeight.coerceAtLeast(0f) * .4f)
+        if (comments) return compact
+        val expanded = minOf(natural, availableHeight.coerceAtLeast(0f) * .7f)
+        val progress = resizeProgress.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f
+        return expanded + (compact - expanded) * progress
+    }
     val orientation: Int get() = ratio?.let {
         when { it < .99f -> 1; it > 1.01f -> -1; else -> 0 }
     } ?: 0

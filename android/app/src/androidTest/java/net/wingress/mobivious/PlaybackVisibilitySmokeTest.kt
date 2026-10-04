@@ -25,6 +25,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.Video
+import net.wingress.mobivious.data.VideoLink
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -160,6 +161,43 @@ class PlaybackVisibilitySmokeTest {
         first.recycle(); next.recycle(); awake(true)
         compose.onNodeWithTag("mini-player-preview").performClick()
         compose.onNodeWithTag("watch-details-list").assertExists()
+    }
+
+    @Test fun portraitBrowsingResizeKeepsTheLiveSurfaceSessionAndSelections() {
+        ui { activity.model.openLink(VideoLink("portrait001")); activity.sharedVideo.value = true }
+        until { activity.model.playback.value.mediaId == "portrait001" && activity.model.playback.value.geometry.ratio != null && activity.model.playback.value.playing }
+        val controller = activity.model.controller.value!!
+        lateinit var view: PlayerView
+        ui { view = playerViews().single(); controller.pause(); activity.model.seekTo(4_000); activity.model.speed(1.5f) }
+        until { activity.model.playback.value.position == 4_000L && activity.model.playback.value.playerState == Player.STATE_READY }
+        val token = activity.model.queue.value.token
+        val selection = controller.trackSelectionParameters
+        val content = compose.onNodeWithTag("watch-content").getUnclippedBoundsInRoot()
+        val contentHeight = (content.bottom - content.top).value
+        val density = activity.resources.displayMetrics.density
+        val expanded = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("watch-details-list").performTouchInput {
+            down(center); moveBy(Offset(0f, -180f * density), delayMillis = 600); advanceEventTime(200); up()
+        }
+        compose.waitForIdle()
+        val compact = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+        assertEquals(contentHeight * .4f, (compact.bottom - compact.top).value, 1f)
+        assertTrue((compact.bottom - compact.top) < (expanded.bottom - expanded.top))
+        ui {
+            assertSame(view, playerViews().single()); assertSame(controller, activity.model.controller.value)
+            assertEquals(4_000L, controller.currentPosition); assertFalse(controller.playWhenReady)
+            assertEquals(selection, controller.trackSelectionParameters); assertEquals(token, activity.model.queue.value.token)
+        }
+        playerDrag(dy = 96f)
+        playerDrag(dy = -96f)
+        assertEquals(compact, compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("watch-details-list").performTouchInput { swipeDown(durationMillis = 100) }
+        compose.waitForIdle()
+        val restored = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+        assertEquals((expanded.bottom - expanded.top).value, (restored.bottom - restored.top).value, 1f)
+        ui { assertSame(view, playerViews().single()); controller.play() }
+        until { activity.model.playback.value.playing }
+        awake(true)
     }
 
     @Test fun incompleteAndCanceledDragsReturnAndBothSidewaysDirectionsStopPlayback() {

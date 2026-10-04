@@ -95,7 +95,7 @@ def reset_sponsorblock():
 reset_sponsorblock()
 
 def reset_channels():
-    state.update(channelTabs=['videos', 'streams'], channelRequests=[], channelFailNext=False, channelDelayNext=None)
+    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None)
 reset_channels()
 
 def reset_home_subscriptions():
@@ -159,7 +159,7 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(min(5000, max(0, delay['millis'])) / 1000)
         try:
             if tab == 'metadata':
-                return self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description='Fixture channel', subCount=42, tabs=tabs, authorThumbnails=video['authorThumbnails']))
+                return self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description=state['channelDescription'], subCount=42, tabs=tabs, authorThumbnails=video['authorThumbnails']))
             if token is not None and not token.strip():
                 return self.respond(dict(error='Error: non 200 status code. Youtube API returned status code 400.'), 500)
             if state['channelFailNext']:
@@ -456,7 +456,7 @@ class Handler(BaseHTTPRequestHandler):
                                           videos=[dict(video, indexId='A'), dict(visibility_member, indexId='B')])]
             return self.respond({})
         if p == '/test/channel':
-            for key in ('channelTabs', 'channelFailNext', 'channelDelayNext'):
+            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':

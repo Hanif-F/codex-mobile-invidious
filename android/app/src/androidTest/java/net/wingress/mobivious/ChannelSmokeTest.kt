@@ -84,6 +84,21 @@ class ChannelSmokeTest {
         assertEquals(listOf(null, "videos+/page=2%&", null, "streams+/page=2%&", null), pages.map { if (it.isNull("continuation")) null else it.getString("continuation") })
     }
 
+    @Test fun fullDescriptionUsesLoadedMetadataAndClosesWhenLeavingTheChannel() {
+        val description = (1..30).joinToString("\n\n") { "Channel description paragraph $it." } + "\n\nFinal channel line."
+        command(JSONObject().put("channelDescription", description).toString())
+        openChannel()
+        val reads = requests().size
+        compose.onNodeWithTag("channel-description-open").performClick()
+        compose.onNodeWithTag("channel-description-text").assertTextEquals(description)
+        compose.onNodeWithContentDescription("Close channel description").performClick()
+        assertEquals(reads, requests().size)
+        compose.onNodeWithTag("channel-description-open").performClick()
+        compose.runOnUiThread { activity.model.navigate("Home") }
+        until { activity.model.channel.value == null && !activity.model.browse.value.loading }
+        compose.onNodeWithTag("channel-description-sheet").assertDoesNotExist()
+    }
+
     @Test fun streamsOnlyChannelsOpenOnStreamsAndRetryPreservesTheSelection() {
         command("""{"channelTabs":["streams","podcasts","posts"]}""")
         openChannel()

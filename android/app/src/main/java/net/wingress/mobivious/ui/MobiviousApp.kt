@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -108,11 +109,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val visibleVideos = ContentVisibility.filter(state.videos, vm.contentSurface(), prefs.showMemberVideos, searchVisibility, blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty())
     var tab by rememberSaveable { mutableStateOf(vm.tab) }
     var route by rememberSaveable { mutableStateOf(vm.route) }
+    var channelDescriptionOpen by rememberSaveable(vm.store.server, channel?.id, route) { mutableStateOf(false) }
     val presentation = rememberPlayerPresentation()
     val watch = presentation.watch
     val fullscreen = presentation.fullscreen
     val queue by vm.queue.collectAsStateWithLifecycle()
     val watchList = key(queue.currentKey) { rememberLazyListState() }
+    val watchResize = key(queue.currentKey) { rememberWatchPlayerResizeState() }
     var watchDescription by rememberSaveable(queue.currentKey, prefs.extendDescription) { mutableStateOf(prefs.extendDescription) }
     fun browsePlayer() = presentation.present(if (playback.details != null) PlayerPresentation.MINI else PlayerPresentation.CLOSED, animate = false)
     fun restorePlayer() { vm.cancelAccumulatedSeek(); presentation.present(PlayerPresentation.WATCH) }
@@ -215,6 +218,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
+    LaunchedEffect(watch, pip, settingsPage) { if (watch || pip || settingsPage.isNotEmpty()) channelDescriptionOpen = false }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
     BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> collapsePlayer(); watch -> { if (!vm.backComments()) { collapsePlayer() } }; else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
@@ -222,7 +226,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
-            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy,
+            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { dialog = "player" }) {
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
@@ -328,7 +332,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                     BlockChannelMenuItem(vm, info.id, info.name, { signIn() }, Modifier.testTag("channel-block-${info.id}"), close)
                                     DropdownMenuItem(text = { Text("Channel SponsorBlock settings") }, onClick = { close(); vm.openSponsorBlock(info.id) })
                                 }
-                            }) {
+                            }, readDescription = { channelDescriptionOpen = true }) {
                                 if (account == null) signIn() else vm.toggleSubscribe(info.id)
                             }
                             Box(Modifier.padding(horizontal = 16.dp)) { ChannelBlockingError(vm, info.id) }
@@ -401,13 +405,15 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         bottom = (padding.calculateBottomPadding() - miniPadding).coerceAtLeast(0.dp))
                     WatchScreen(vm, playback, Modifier.padding(watchPadding).graphicsLayer { alpha = presentation.watchAlpha }
                         .hiddenPlayerContent(!watch || presentation.active),
-                        presentation, watchList, watchDescription, { watchDescription = it }, vm::openSave,
+                        presentation, watchList, watchResize, watchDescription, { watchDescription = it }, vm::openSave,
                         { id -> navigate("Home", "channel:$id") }, { play(it) }, { signIn() })
                 }
                 }
             }
           }
             RssSheet(vm)
+            if (channelDescriptionOpen && !pip && channel != null && route == "channel:${channel!!.id}")
+                ChannelDescriptionSheet(channel!!) { channelDescriptionOpen = false }
             when(dialog) {
                 "filters" -> FiltersDialog(vm, { dialog = "" })
                 "visibilityFilters" -> FiltersDialog(vm, { dialog = "" }, visibilityOnly = true)
@@ -555,6 +561,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
 }
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, modifier: Modifier,
     presentation: PlayerPresentationState, detailsList: androidx.compose.foundation.lazy.LazyListState,
+    resize: WatchPlayerResizeState,
     description: Boolean, describe: (Boolean) -> Unit,
     add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
     val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
@@ -570,7 +577,11 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
             awaitEachGesture { awaitFirstDown().consume(); waitForUpOrCancellation()?.consume() }
         }) {
-        val playerHeight = playback.geometry.embeddedHeight((maxWidth - 16.dp).value, maxHeight.value, drawerOpen).dp
+        val playerWidth = (maxWidth - 16.dp).value
+        val expandedHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false)
+        val compactHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f)
+        val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight > compactHeight && !drawerOpen)
+        val playerHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
                 .playerAnchor { presentation.watchBounds = it })
@@ -584,7 +595,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                     null -> Unit
                 }
             }
-            else LazyColumn(Modifier.weight(1f).testTag("watch-details-list"), state = detailsList) {
+            else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
                     item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)

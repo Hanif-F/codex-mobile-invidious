@@ -96,7 +96,7 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
 
 @Composable
 internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean,
-    actions: @Composable () -> Unit = {}, subscribe: () -> Unit) {
+    actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {}, subscribe: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 64.dp, "channel-header-avatar")
@@ -106,8 +106,10 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
             }
             actions()
         }
-        if (channel.description.isNotBlank()) Text(channel.description, maxLines = 3,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+        if (channel.description.isNotBlank()) {
+            Text(channel.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+            TextButton(onClick = readDescription, modifier = Modifier.testTag("channel-description-open")) { Text("Read full description") }
+        }
         Button(onClick = subscribe) { Text(if (subscribed) "Subscribed" else "Subscribe") }
     }
 }
