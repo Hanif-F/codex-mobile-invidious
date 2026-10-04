@@ -120,14 +120,14 @@ internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Mo
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                         Text(if (thread == null) "Comments unavailable" else "Replies unavailable", style = MaterialTheme.typography.titleSmall)
                         Text(feed.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
-                        TextButton(onClick = { vm.loadComments(feed.loaded, key) }, modifier = Modifier.testTag("comments-retry")) { Text("Retry") }
+                        OutlinedButton(onClick = { vm.loadComments(feed.loaded, key) }, modifier = Modifier.testTag("comments-retry")) { Text("Retry") }
                     }
                 }
                 if (feed.loadingMore) item { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "Loading more ${if (thread == null) "comments" else "replies"}" })
                 } }
                 else if (feed.loaded && feed.page.continuation.isNotEmpty() && feed.error == null) item {
-                    TextButton(onClick = { vm.loadComments(true, key) }, modifier = Modifier.fillMaxWidth().testTag("comments-load-more")) {
+                    OutlinedButton(onClick = { vm.loadComments(true, key) }, modifier = Modifier.fillMaxWidth().testTag("comments-load-more")) {
                         Text(if (thread == null) "More comments" else "More replies")
                     }
                 }
@@ -173,11 +173,10 @@ internal fun CommentRow(comment: Comment, server: String, videoId: String, chann
                         Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     } }
                 }
-                if (replies != null && comment.replyContinuation.isNotBlank()) TextButton(onClick = replies,
-                    contentPadding = PaddingValues(horizontal = 8.dp), modifier = Modifier.testTag("comment-replies-${comment.key}")) {
-                    Icon(Icons.Default.Forum, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                    Text(if (comment.replyCount > 0) "${commentCount(comment.replyCount.toLong())} ${if (comment.replyCount == 1) "reply" else "replies"}" else "View replies")
-                }
+                if (replies != null && comment.replyContinuation.isNotBlank()) AssistChip(onClick = replies,
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("comment-replies-${comment.key}"),
+                    leadingIcon = { Icon(Icons.Default.Forum, null, Modifier.size(18.dp)) },
+                    label = { Text(if (comment.replyCount > 0) "${commentCount(comment.replyCount.toLong())} ${if (comment.replyCount == 1) "reply" else "replies"}" else "View replies") })
             }
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)

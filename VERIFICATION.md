@@ -915,3 +915,48 @@ available response images and placeholders. Ordinary `/ggpht` downloads can stil
 contact YouTube's image CDN; no additional channel/video metadata lookup is added.
 No production deployment, app installation, version change or release publication
 was performed.
+
+## Action controls and contextual menus — 4 October 2026
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 156 passed; zero failures/errors |
+| Debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed: zero errors, 42 warnings; none in the new action-control helper or presentation tests |
+| Native interaction/layout checks | Compiled; not executed |
+| Device screenshots | Unavailable: local emulator crashed before boot |
+
+Channel, watch, playlist, Subscriptions and History menus retain existing action
+callbacks, authentication, ownership restrictions, errors, Undo and confirmations.
+Queue menus distinguish local removal from deletion of a saved playlist occurrence.
+Standalone commands use visible buttons; setting choices use label/value rows with
+dropdown arrows, and settings navigation uses chevrons. Action groups wrap, feed
+sheets scroll, and the shared controls provide button semantics and 48 dp minimum
+touch targets.
+
+Five new presentation scenarios cover menu dismissal, nested-card interactions,
+entity/account changes while a menu is open, disabled selectors, and light/dark
+layouts with 200% fonts at narrow and wide widths. Two new fixture scenarios cover
+nested playlist subscription and confirmed playlist deletion. Existing smoke tests
+now navigate the menus for editing, SponsorBlock, blocking, RSS/OPML, history
+clearing and both queue removal actions. The watch blocking scenario also checks
+that failed writes remain visible after the menu closes and can be retried without
+changing the playing media.
+
+These native scenarios have **not executed**. Android Emulator 37.2.12 exited with
+code 139 while starting Pixel_8_Pro in read-only mode with no window, audio or
+snapshots, SwiftShader graphics and disabled cameras. `adb devices -l` found no
+connected devices. Runtime interactions, accessibility, layout and screenshot
+acceptance remain pending; successful compilation does not confirm them.
+
+Repeat the static checks from `android/`:
+
+```bash
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+```
+
+With a working device, run `scripts/test-android.sh` and inspect the menus, selector
+rows, expanded descriptions and wrapping action groups in light/dark themes,
+portrait/landscape and at 200% font size. No server API, migration, token scope,
+release/version, production deployment or app installation changes were made.

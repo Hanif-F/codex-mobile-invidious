@@ -244,11 +244,13 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Pause").assertExists()
         compose.onNodeWithContentDescription("Library", useUnmergedTree = true).performClick()
-        compose.onNodeWithText("New").performClick()
+        compose.onNodeWithText("New playlist").performClick()
         compose.onNodeWithText("Title").performTextInput("Emulator playlist")
         compose.onNodeWithText("Save", useUnmergedTree = true).performClick()
         waitFor { activity.model.playlists.value.any { it.title == "Emulator playlist" } }
         compose.onNodeWithText("Emulator playlist").performClick()
+        waitFor { activity.model.playlist.value?.title == "Emulator playlist" }
+        compose.onNodeWithTag("playlist-actions-${activity.model.playlist.value!!.id}").performScrollTo().performClick()
         compose.onNodeWithText("Edit playlist").performClick()
         compose.onNodeWithText("Title").performTextReplacement("Renamed playlist")
         compose.onNodeWithText("Save", useUnmergedTree = true).performClick()

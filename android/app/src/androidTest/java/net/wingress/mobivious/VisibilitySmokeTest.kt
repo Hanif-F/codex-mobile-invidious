@@ -132,6 +132,7 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
         navigate("Home", "channel:$first")
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
+        compose.onNodeWithTag("channel-actions-$first").performScrollTo().performClick()
         compose.onNodeWithTag("channel-block-$first").performClick()
         until { first !in activity.model.blocked.value.ids }
     }
@@ -164,7 +165,16 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("video-members-testvideo01", useUnmergedTree = true).assertExists()
         assertFalse(activity.model.preferences.value.showMemberVideos)
         val media = activity.model.controller.value!!.currentMediaItem!!.mediaId
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("channel-block-$first"))
+        command("""{"failBlockedWrite":true}""")
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions-menu"))
+        compose.onNodeWithTag("watch-actions-menu").performClick()
+        compose.onNodeWithTag("channel-block-$first").performClick()
+        until { activity.model.blocked.value.actionErrors[first] != null }
+        compose.onNodeWithTag("channel-block-$first").assertDoesNotExist()
+        compose.onNodeWithTag("channel-block-error-$first").performScrollTo().assertIsDisplayed()
+        assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)
+        command("""{"failBlockedWrite":false}""")
+        compose.onNodeWithTag("watch-actions-menu").performScrollTo().performClick()
         compose.onNodeWithTag("channel-block-$first").performClick()
         until { first in activity.model.blocked.value.ids }
         assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)

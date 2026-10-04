@@ -130,7 +130,7 @@ timeline ranges and scrub labels complement Skip/Dismiss prompts. The playback
 service handles skipping during background, audio-only and PiP playback, and offers
 manual controls when replaying an automatically skipped segment. App Settings opens
 a full SponsorBlock screen with channel submenus. The player gear opens a settings
-sheet; watch/channel screens link to the channel editor. Signed-in settings are shared with the website through the updated
+sheet; the channel header's three-dot menu opens the channel editor. Signed-in settings are shared with the website through the updated
 preference API; guests save global settings locally per instance. SponsorBlock is
 off by default, with manual modes. Active livestreams are excluded. Native runtime
 and layout checks remain unverified because the installed emulator crashes before
@@ -171,6 +171,13 @@ Play next, Add to queue, channel navigation and Block/Unblock with Undo. Save re
 the selected video through sign-in and retries a failed add without recreating its
 playlist. Watch on YouTube and Switch Invidious instance actions are excluded;
 Settings → Server still configures the app's instance.
+
+Frequent actions use visible buttons and labeled chips. Channel menus group RSS,
+blocking and SponsorBlock settings; playlist menus group RSS, editing and deletion.
+Subscriptions has an RSS/OPML menu, and History has a Clear watch history menu.
+The watch action row includes Playback queue and a blocking menu. Queue item menus
+distinguish Remove from queue from Remove from playlist. Settings selectors show
+their label and current value, and descriptions expand through an arrow row.
 
 Public playlist/mix links open for guests; watch links retain list, occurrence index
 and timestamp. The service owns sequential playback, paging and dynamic mix

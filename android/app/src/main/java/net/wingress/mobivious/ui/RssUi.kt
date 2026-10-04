@@ -8,8 +8,13 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -74,32 +79,34 @@ internal fun RssSheet(vm: AppViewModel) {
         }
     }
     ModalBottomSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().padding(16.dp).testTag("rss-sheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(state.title, style = MaterialTheme.typography.titleLarge)
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).testTag("rss-sheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text(state.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                IconButton(onClick = vm::dismissRss) { Icon(Icons.Default.Close, "Close feed") }
+            }
             if (state.privateLink) Text("Anyone with this link can read your subscription feed. Share it only when you want to grant that access.")
             if (state.playlist?.let { it.owned && it.privacy == "private" } == true) Text("This exports a snapshot of your private playlist. The file does not update automatically.")
-            if (state.opml) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (state.opml) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(selected = state.format == "rss", onClick = { vm.openOpml("rss") }, label = { Text("Invidious feeds") })
                 FilterChip(selected = state.format == "newpipe", onClick = { vm.openOpml("newpipe") }, label = { Text("YouTube feeds") })
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = vm::retryRss) { Text("Retry") } }
-            if (!state.loading && state.error == null && state.url != null) Row {
-                TextButton(onClick = { external(Intent(Intent.ACTION_VIEW, Uri.parse(state.url))) }) { Text("Open") }
-                TextButton(onClick = {
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(onClick = vm::retryRss) { Text("Retry") } }
+            if (!state.loading && state.error == null && state.url != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { external(Intent(Intent.ACTION_VIEW, Uri.parse(state.url))) }) { Text("Open") }
+                OutlinedButton(onClick = {
                     if (state.context == vm.api.context()) {
                         (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("RSS feed", state.url))
                         vm.message.value = "Feed link copied"
                     }
                 }) { Text("Copy") }
-                TextButton(onClick = { external(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, state.url), true) }) { Text("Share") }
+                OutlinedButton(onClick = { external(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, state.url), true) }) { Text("Share") }
             }
-            if (!state.loading && state.error == null && state.xml != null) Row {
-                TextButton(onClick = { fileIntent(false) }) { Text("Open") }
-                TextButton(onClick = { if (state.context == vm.api.context()) { pendingSave = state; save.launch(state.filename) } }) { Text("Save file") }
-                TextButton(onClick = { fileIntent(true) }) { Text("Share") }
+            if (!state.loading && state.error == null && state.xml != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilledTonalButton(onClick = { fileIntent(false) }) { Text("Open") }
+                OutlinedButton(onClick = { if (state.context == vm.api.context()) { pendingSave = state; save.launch(state.filename) } }) { Text("Save file") }
+                OutlinedButton(onClick = { fileIntent(true) }) { Text("Share") }
             }
-            TextButton(onClick = vm::dismissRss) { Text("Close") }
         }
     }
 }

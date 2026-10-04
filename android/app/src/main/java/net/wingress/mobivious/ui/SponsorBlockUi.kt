@@ -30,17 +30,6 @@ import net.wingress.mobivious.data.*
 
 internal fun sponsorColor(value: String): Color = Color(value.toColorInt())
 
-@Composable
-private fun SponsorChoice(label: String, choices: List<Pair<String, String>>, selected: String, enabled: Boolean, change: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        TextButton(onClick = { expanded = true }, enabled = enabled) { Text("$label: ${choices.firstOrNull { it.first == selected }?.second.orEmpty()}") }
-        DropdownMenu(expanded, { expanded = false }) {
-            choices.forEach { (value, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { change(value); expanded = false }) }
-        }
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn: () -> Unit, dismiss: () -> Unit, fullScreen: Boolean = false) {
@@ -111,7 +100,7 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                             Text(if (account != null) "These settings are shared with the website." else "Global settings are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall)
                             Row(verticalAlignment = Alignment.CenterVertically) { Text("Enable SponsorBlock", Modifier.weight(1f)); Switch(global.enabled, { global = global.copy(enabled = it); edited = true }, enabled = !busy) }
                             Text("Choose how to handle community-submitted segments. Auto and manual modes also show timeline markers. Disabled categories are hidden.", style = MaterialTheme.typography.bodySmall)
-                            TextButton(onClick = { navigate("Configured channels") }, enabled = !busy) { Text("Channel SponsorBlock settings") }
+                            ActionRow("Channel SponsorBlock settings", enabled = !busy) { navigate("Configured channels") }
                         }
                         items(SponsorBlockCategory.entries) { category ->
                             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -120,12 +109,12 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                                     Box(Modifier.size(20.dp).clip(CircleShape).background(sponsorColor(color.takeIf(SponsorBlockRules::validColor) ?: category.color)))
                                     Text(category.label, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.titleMedium)
                                 }
-                                SponsorChoice("Skip option", SponsorBlockMode.entries.map { it.wire to it.label }, global.modes[category]?.wire ?: "manual", !busy) {
+                                DropdownChoiceRow("Skip option", SponsorBlockMode.entries.map { it.wire to it.label }, global.modes[category]?.wire ?: "manual", enabled = !busy) {
                                     global = global.copy(modes = global.modes + (category to SponsorBlockMode.parse(it)!!)); edited = true
                                 }
                                 OutlinedTextField(color, { global = global.copy(colors = global.colors + (category to it)); edited = true }, label = { Text("${category.label} color (#RRGGBB)") },
                                     singleLine = true, enabled = !busy, isError = !SponsorBlockRules.validColor(color), modifier = Modifier.fillMaxWidth())
-                                TextButton(onClick = { global = global.copy(colors = global.colors + (category to category.color)); edited = true }, enabled = !busy) { Text("Restore default color") }
+                                OutlinedButton(onClick = { global = global.copy(colors = global.colors + (category to category.color)); edited = true }, enabled = !busy) { Text("Restore default color") }
                             }
                         }
                         item {
@@ -134,31 +123,31 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                         }
                     }
                     "Configured channels" -> {
-                        if (account == null) item { Text("Sign in to save channel-specific SponsorBlock settings."); TextButton(onClick = signIn) { Text("Sign in") } }
+                        if (account == null) item { Text("Sign in to save channel-specific SponsorBlock settings."); Button(onClick = signIn) { Text("Sign in") } }
                         else {
                             item {
                                 Text("Channel settings override global settings. Use global follows future global changes. Colors remain global.")
                                 OutlinedTextField(input, { input = it }, label = { Text("Channel ID or /channel/UC… URL") }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
-                                TextButton(onClick = { val id = SponsorBlockRules.channelId(input); if (id == null) error = "Enter a valid channel ID or /channel/UC… URL." else navigate("Channel SponsorBlock settings", id) }) { Text("Edit channel settings") }
+                                Button(enabled = !busy, onClick = { val id = SponsorBlockRules.channelId(input); if (id == null) error = "Enter a valid channel ID or /channel/UC… URL." else navigate("Channel SponsorBlock settings", id) }) { Text("Edit channel settings") }
                                 if (prefs.sponsorBlock.channels.isEmpty()) Text("No channel overrides yet.")
                             }
-                            items(prefs.sponsorBlock.channels.toList().sortedBy { it.second.name.lowercase() }, key = { it.first }) { (id, saved) -> TextButton(onClick = { navigate("Channel SponsorBlock settings", id) }) { Text(saved.name) } }
+                            items(prefs.sponsorBlock.channels.toList().sortedBy { it.second.name.lowercase() }, key = { it.first }) { (id, saved) -> ActionRow(saved.name, detail = "Channel SponsorBlock settings", enabled = !busy) { navigate("Channel SponsorBlock settings", id) } }
                         }
                     }
                     "Channel SponsorBlock settings" -> {
-                        if (account == null) item { Text("Sign in to save channel-specific SponsorBlock settings."); TextButton(onClick = signIn) { Text("Sign in") } }
+                        if (account == null) item { Text("Sign in to save channel-specific SponsorBlock settings."); Button(onClick = signIn) { Text("Sign in") } }
                         else {
                             item {
                                 Text(channel.name, style = MaterialTheme.typography.titleMedium)
                                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-                                SponsorChoice("SponsorBlock", listOf("inherit" to "Use global (${if (prefs.sponsorBlock.enabled) "Enabled" else "Disabled"})", "true" to "Enabled", "false" to "Disabled"),
-                                    channel.enabled?.toString() ?: "inherit", !busy && !loading) { channel = channel.copy(enabled = it.toBooleanStrictOrNull()); edited = true }
+                                DropdownChoiceRow("SponsorBlock", listOf("inherit" to "Use global (${if (prefs.sponsorBlock.enabled) "Enabled" else "Disabled"})", "true" to "Enabled", "false" to "Disabled"),
+                                    channel.enabled?.toString() ?: "inherit", enabled = !busy && !loading, modifier = Modifier.testTag("sponsor-channel-enabled")) { channel = channel.copy(enabled = it.toBooleanStrictOrNull()); edited = true }
                                 Text("Category colors remain global.", style = MaterialTheme.typography.bodySmall)
                             }
                             items(SponsorBlockCategory.entries) { category ->
                                 Text(category.label, style = MaterialTheme.typography.titleMedium)
-                                SponsorChoice("Skip option", listOf("inherit" to "Use global (${prefs.sponsorBlock.modes[category]?.label})") + SponsorBlockMode.entries.map { it.wire to it.label },
-                                    channel.modes[category]?.wire ?: "inherit", !busy && !loading) {
+                                DropdownChoiceRow("Skip option", listOf("inherit" to "Use global (${prefs.sponsorBlock.modes[category]?.label})") + SponsorBlockMode.entries.map { it.wire to it.label },
+                                    channel.modes[category]?.wire ?: "inherit", enabled = !busy && !loading) {
                                     channel = channel.copy(modes = channel.modes.toMutableMap().apply { SponsorBlockMode.parse(it)?.let { mode -> put(category, mode) } ?: remove(category) }); edited = true
                                 }
                             }
@@ -169,9 +158,9 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
             }
             if (page != "Configured channels" && (page == "Global SponsorBlock settings" || account != null)) {
                 HorizontalDivider()
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.End) {
-                    if (page == "Channel SponsorBlock settings") TextButton(onClick = { save(true) }, enabled = !busy && !loading) { Text("Reset to global") }
-                    TextButton(onClick = { save() }, enabled = !busy && !loading && (page != "Global SponsorBlock settings" || global.colors.values.all(SponsorBlockRules::validColor))) { Text(if (busy) "Saving…" else "Save") }
+                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (page == "Channel SponsorBlock settings") OutlinedButton(onClick = { save(true) }, enabled = !busy && !loading) { Text("Reset to global") }
+                    Button(onClick = { save() }, enabled = !busy && !loading && (page != "Global SponsorBlock settings" || global.colors.values.all(SponsorBlockRules::validColor))) { Text(if (busy) "Saving…" else "Save") }
                 }
             }
         }

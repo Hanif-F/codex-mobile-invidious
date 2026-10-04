@@ -1,7 +1,6 @@
 package net.wingress.mobivious.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
@@ -71,9 +70,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
 
 @Composable
 private fun SettingsLink(title: String, detail: String, icon: ImageVector, navigate: (String) -> Unit) {
-    ListItem(headlineContent = { Text(title) }, supportingContent = { Text(detail) }, leadingContent = {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-    }, trailingContent = { Icon(Icons.Default.ChevronRight, null) }, modifier = Modifier.clickable { navigate(title) }.padding(horizontal = 4.dp))
+    ActionRow(title, modifier = Modifier.padding(horizontal = 4.dp), detail = detail, icon = icon) { navigate(title) }
 }
 
 @Composable
@@ -221,11 +218,7 @@ private fun SettingsToggle(label: String, detail: String, value: Boolean, enable
 
 @Composable
 private fun SettingsChoice(label: String, choices: List<Pair<String, String>>, selected: String, enabled: Boolean, update: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    Box {
-        ListItem(headlineContent = { Text(label) }, supportingContent = { Text(choices.firstOrNull { it.first == selected }?.second ?: selected.ifBlank { "None" }) }, trailingContent = { Icon(Icons.Default.ArrowDropDown, null) }, modifier = Modifier.fillMaxWidth().clickable(enabled = enabled) { expanded = true })
-        DropdownMenu(expanded, { expanded = false }) { choices.forEach { (id, name) -> DropdownMenuItem(text = { Text(name) }, onClick = { update(id); expanded = false }, leadingIcon = { if (id == selected) Icon(Icons.Default.Check, null) }) } }
-    }
+    DropdownChoiceRow(label, choices, selected, enabled = enabled, change = update)
 }
 
 @Composable

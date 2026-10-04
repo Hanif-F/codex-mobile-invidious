@@ -169,10 +169,11 @@ class SearchHistorySmokeTest {
         compose.onNodeWithContentDescription("Remove Saved today").performClick()
         until { !vm.browse.value.loading && vm.browse.value.history?.total == 5 }
         assertEquals(40, fixture().getJSONObject("positions").getInt("testvideo01"))
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Clear"))
-        compose.onNodeWithText("Clear").performClick(); compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithTag("history-actions").performClick()
+        compose.onNodeWithText("Clear watch history").performClick(); compose.onNodeWithText("Cancel").performClick()
         assertEquals(5, fixture().getJSONArray("watched").length())
-        compose.onNodeWithText("Clear").performClick(); compose.onNodeWithText("Delete").performClick()
+        compose.onNodeWithTag("history-actions").performClick()
+        compose.onNodeWithText("Clear watch history").performClick(); compose.onNodeWithText("Delete").performClick()
         until { !vm.browse.value.loading && vm.browse.value.history?.total == 0 }
         assertEquals(0, fixture().getJSONObject("positions").length())
         compose.onNodeWithText("Your history is empty").assertExists()

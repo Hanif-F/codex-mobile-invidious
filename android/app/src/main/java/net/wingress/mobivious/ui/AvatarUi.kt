@@ -94,7 +94,8 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
 }
 
 @Composable
-internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean, subscribe: () -> Unit) {
+internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean,
+    actions: @Composable () -> Unit = {}, subscribe: () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 64.dp, "channel-header-avatar")
@@ -102,6 +103,7 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
                 Text(channel.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 Text("${channel.subscribers} subscribers", style = MaterialTheme.typography.bodyMedium)
             }
+            actions()
         }
         if (channel.description.isNotBlank()) Text(channel.description, maxLines = 3,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))

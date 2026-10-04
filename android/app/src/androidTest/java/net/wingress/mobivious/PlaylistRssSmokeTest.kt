@@ -48,8 +48,10 @@ class PlaylistRssSmokeTest {
         compose.onNodeWithText("Subscribed playlists (1)").assertExists()
         compose.onNodeWithTag("playlist-card-IVother").performClick()
         until { vm.playlist.value?.id == source.id && !vm.browse.value.loading }
+        compose.onNodeWithTag("playlist-actions-IVother").performScrollTo().performClick()
         compose.onNodeWithTag("playlist-edit").assertDoesNotExist()
         compose.onNodeWithTag("playlist-delete").assertDoesNotExist()
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         command("playlist-rss", """{"sourceTitle":"Owner updated playlist"}""")
         compose.runOnUiThread { vm.refresh() }
         until { vm.playlist.value?.title == "Owner updated playlist" && !vm.browse.value.loading }
@@ -61,7 +63,40 @@ class PlaylistRssSmokeTest {
         assertEquals(queueToken, vm.queue.value.token)
         compose.runOnUiThread { vm.openPlaylist(vm.playlists.value.single { it.owned }) }
         until { vm.playlist.value?.owned == true && !vm.browse.value.loading }
+        compose.onNodeWithTag("playlist-actions-${vm.playlist.value!!.id}").performScrollTo().performClick()
         compose.onNodeWithTag("playlist-edit").assertExists()
+    }
+
+    @Test fun nestedPlaylistSubscriptionDoesNotOpenThePlaylist() {
+        signIn()
+        val source = Playlist("IVother", "Live owner playlist", 2)
+        compose.runOnUiThread { vm.subscribePlaylist(source, true) }
+        until { vm.playlists.value.any { it.id == source.id && it.saved } }
+        compose.runOnUiThread { vm.navigate("Library") }
+        until { !vm.browse.value.loading }
+        compose.onNodeWithTag("library-playlist-list").performScrollToNode(hasTestTag("playlist-subscribe-IVother"))
+        compose.onNodeWithTag("playlist-subscribe-IVother").performClick()
+        until { vm.playlists.value.none { it.id == source.id } }
+        assertNull(vm.playlist.value)
+        assertEquals("Library", vm.tab)
+        assertEquals("", vm.route)
+    }
+
+    @Test fun ownedPlaylistDeletionStillRequiresConfirmation() {
+        signIn()
+        val list = vm.playlists.value.single { it.owned }
+        compose.runOnUiThread { vm.openPlaylist(list) }
+        until { !vm.browse.value.loading && vm.playlist.value?.id == list.id }
+        compose.onNodeWithTag("playlist-actions-${list.id}").performScrollTo().performClick()
+        compose.onNodeWithTag("playlist-delete").performClick()
+        compose.onNodeWithText("Delete playlist?").assertExists()
+        compose.onNodeWithText("Cancel").performClick()
+        assertTrue(vm.playlists.value.any { it.id == list.id })
+        compose.onNodeWithTag("playlist-actions-${list.id}").performClick()
+        compose.onNodeWithTag("playlist-delete").performClick()
+        compose.onNodeWithText("Delete", useUnmergedTree = true).performClick()
+        until { vm.playlists.value.none { it.id == list.id } && vm.route.isEmpty() }
+        assertEquals("Library", vm.tab)
     }
 
     @Test fun signInRetainsSubscriptionIntentAndFailureCanRetry() {
@@ -105,7 +140,10 @@ class PlaylistRssSmokeTest {
 
     @Test fun rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange() {
         signIn()
-        compose.runOnUiThread { vm.openSubscriptionRss() }
+        compose.runOnUiThread { vm.navigate("Subscriptions") }
+        until { !vm.browse.value.loading }
+        compose.onNodeWithTag("subscription-actions").performClick()
+        compose.onNodeWithText("RSS").performClick()
         until { vm.rss.value.url != null }
         assertTrue(vm.rss.value.url!!.contains("fixture-rss-secret"))
         assertFalse(vm.rss.value.url!!.contains("fixture-token"))
@@ -114,7 +152,11 @@ class PlaylistRssSmokeTest {
         until { vm.rss.value.xml != null }
         assertNull(vm.rss.value.url)
         compose.onNodeWithText("Save file").assertExists()
-        compose.runOnUiThread { vm.openOpml("newpipe") }
+        compose.onNodeWithContentDescription("Close feed").performClick()
+        compose.onNodeWithTag("subscription-actions").performClick()
+        compose.onNodeWithText("Export OPML").performClick()
+        until { vm.rss.value.xml != null }
+        compose.onNodeWithText("YouTube feeds").performClick()
         until { vm.rss.value.xml?.contains("youtube.com/feeds/") == true }
         compose.runOnUiThread { vm.store.save(null) }
         until { !vm.rss.value.open && vm.playlists.value.isEmpty() }

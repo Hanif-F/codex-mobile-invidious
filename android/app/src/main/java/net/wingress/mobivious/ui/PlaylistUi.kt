@@ -1,8 +1,8 @@
 package net.wingress.mobivious.ui
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -25,7 +25,7 @@ internal fun PlaylistSubscriptionButton(vm: AppViewModel, list: Playlist, signIn
     val owned = list.owned || lists.any { it.id == list.id && it.owned }
     val subscribed = lists.any { it.id == list.id && it.saved && !it.owned }
     if (!owned) Column {
-        TextButton(enabled = list.id !in busy, onClick = {
+        OutlinedButton(enabled = list.id !in busy, onClick = {
             if (account == null) { vm.preparePlaylistSubscription(list); signIn() }
             else vm.subscribePlaylist(list, !subscribed)
         }, modifier = Modifier.testTag("playlist-subscribe-${list.id}")) {
@@ -71,13 +71,15 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
         if (list.author.isNotBlank()) PlaylistAuthor(vm, list, prefs.thinMode)
         if (!list.mix && list.count >= 0) Text("${list.count} videos")
         if (list.description.isNotBlank()) Text(list.description, style = MaterialTheme.typography.bodySmall)
-        Row(Modifier.horizontalScroll(rememberScrollState())) {
-            TextButton(onClick = play) { Text("Play") }
+        FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = play) { Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text("Play") }
             PlaylistSubscriptionButton(vm, list, signIn)
-            TextButton(onClick = { vm.openPlaylistRss(list.copy(owned = owned)) }) { Text("RSS") }
-            if (owned) {
-                TextButton(onClick = edit, modifier = Modifier.testTag("playlist-edit")) { Text("Edit playlist") }
-                TextButton(onClick = delete, modifier = Modifier.testTag("playlist-delete")) { Text("Delete playlist") }
+            OverflowMenu("Actions for playlist ${list.title}", listOf(list, vm.api.context(), owned), Modifier.testTag("playlist-actions-${list.id}")) { close ->
+                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
+                if (owned) {
+                    DropdownMenuItem(text = { Text("Edit playlist") }, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
+                    DropdownMenuItem(text = { Text("Delete playlist") }, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
+                }
             }
         }
     }

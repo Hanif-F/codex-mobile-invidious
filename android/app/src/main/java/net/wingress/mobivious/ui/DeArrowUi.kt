@@ -64,7 +64,7 @@ internal fun DeArrowIdentitySettings(vm: AppViewModel) {
             modifier = Modifier.fillMaxWidth().testTag("dearrow-private-id"))
         Text("Optional: import your existing private ID to share its contribution identity. This is not a public ID or license key. Leave blank to keep it. Your instance stores it encrypted.", style = MaterialTheme.typography.bodySmall)
         if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
-        TextButton(enabled = !busy && DeArrowRules.validPrivateId(privateId), onClick = {
+        Button(enabled = !busy && DeArrowRules.validPrivateId(privateId), onClick = {
             val context = vm.api.context(); val submitted = privateId; busy = true; error = null
             scope.launch {
                 try { vm.importDeArrowIdentity(submitted, context); privateId = "" }
@@ -115,7 +115,7 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
                     item {
                         Text("Check all four guidelines to submit.")
                         Button(enabled = ready && state.acknowledgements.size == 4, onClick = { vm.contributeDeArrow("submit") }, modifier = Modifier.fillMaxWidth()) { Text("Submit title") }
-                        TextButton(enabled = !state.busy, onClick = { vm.reviewDeArrow(false) }) { Text("Back to editing") }
+                        OutlinedButton(enabled = !state.busy, onClick = { vm.reviewDeArrow(false) }) { Text("Back to editing") }
                     }
                 } else {
                     item {
@@ -133,7 +133,7 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
                     val proposals = state.titles.filter { !it.original }
                     if (state.loaded && proposals.isEmpty()) item { Text("No community titles yet. Suggest the first one.") }
                     items(proposals, key = { it.uuid }) { item -> DeArrowVoteRow(vm, item.title.replace(">", ""), item, false, ready && state.loaded) }
-                    item { TextButton(enabled = !state.busy, onClick = vm::refreshDeArrow) { Text("Refresh submissions") } }
+                    item { OutlinedButton(enabled = !state.busy, onClick = vm::refreshDeArrow) { Text("Refresh submissions") } }
                 }
                 item {
                     TextButton(onClick = { uri.openUri("https://wiki.sponsor.ajay.app/w/DeArrow/Guidelines") }) { Text("DeArrow guidelines") }

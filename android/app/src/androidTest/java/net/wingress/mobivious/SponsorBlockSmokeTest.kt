@@ -123,13 +123,14 @@ class SponsorBlockSmokeTest {
         compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
         compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("watch-details-list"))).performScrollTo().performClick()
         until { activity.model.channel.value?.id == id }
-        compose.onNodeWithText("Channel SponsorBlock settings").performScrollTo().performClick()
-        compose.onNodeWithText("SponsorBlock: Disabled").performClick()
+        compose.onNodeWithTag("channel-actions-$id").performScrollTo().performClick()
+        compose.onNodeWithText("Channel SponsorBlock settings").performClick()
+        compose.onNodeWithTag("sponsor-channel-enabled").assert(hasText("Disabled")).performClick()
         compose.onNodeWithText("Enabled").performClick()
         command("sponsorblock", """{"failPreferences":true}""")
         compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
         until { compose.onAllNodesWithTag("sponsorblock-save-error").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("SponsorBlock: Enabled").assertExists()
+        compose.onNodeWithTag("sponsor-channel-enabled").assert(hasText("Enabled"))
         assertFalse(activity.model.preferences.value.sponsorBlock.channels[id]!!.enabled!!)
         command("sponsorblock", """{"failPreferences":false}""")
         compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()

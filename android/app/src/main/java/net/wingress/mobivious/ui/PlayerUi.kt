@@ -239,7 +239,7 @@ internal fun VideoPlayer(
             playback.error?.let { error ->
                 Column(Modifier.align(Alignment.Center).padding(start = 16.dp, end = 16.dp, bottom = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(error, color = Color.White, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    TextButton(onClick = { interact(); vm.retryPlayback() }) { Text("Retry", color = Color.White) }
+                    FilledTonalButton(onClick = { interact(); vm.retryPlayback() }) { Text("Retry") }
                 }
             }
             feedback?.let { Text(it, Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = .8f), CircleShape).padding(16.dp)
@@ -264,7 +264,7 @@ internal fun VideoPlayer(
                                 if (sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.testTag("sponsorblock-notice").semantics { liveRegion = LiveRegionMode.Polite },
                                     color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
-                            TextButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, active.id) }) { Text("Skip", color = Color.White) }
+                            FilledTonalButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, active.id) }) { Text("Skip") }
                             IconButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_DISMISS, active.id) }) { Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", tint = Color.White) }
                         }
                     }

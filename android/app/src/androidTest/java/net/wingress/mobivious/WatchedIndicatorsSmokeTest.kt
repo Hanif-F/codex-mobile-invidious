@@ -138,7 +138,8 @@ class WatchedIndicatorsSmokeTest {
         assertEquals(40L, activity.model.watched.value.positions[first])
         navigate("Home"); watched(first).assertDoesNotExist(); progress(first).assertExists()
         navigate("Library", "history")
-        compose.onNodeWithText("Clear").performClick(); compose.onNodeWithText("Delete", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("history-actions").performClick()
+        compose.onNodeWithText("Clear watch history").performClick(); compose.onNodeWithText("Delete", useUnmergedTree = true).performClick()
         until { activity.model.watched.value.watched.isEmpty() && activity.model.watched.value.positions.isEmpty() }
         assertTrue(fixture().getJSONObject("positions").length() == 0)
         navigate("Home"); watched(first).assertDoesNotExist(); progress(first).assertDoesNotExist()

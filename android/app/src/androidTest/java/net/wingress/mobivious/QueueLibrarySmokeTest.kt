@@ -86,7 +86,12 @@ class QueueLibrarySmokeTest {
         ui { activity.model.store.save(Account("fixture-token", "Alice", Long.MAX_VALUE, activity.model.store.server)) }
         playSource("IVqueue")
         val key = activity.model.queue.value.currentKey!!
-        ui { activity.model.queueCommand(PlaybackService.QUEUE_REMOVE) { putString("key", key) } }
+        waitFor { activity.model.playlists.value.any { it.id == "IVqueue" && it.owned } }
+        ui { activity.model.queueOpen.value = true }
+        compose.onNode(hasTestTag("video-actions-testvideo01") and hasAnyAncestor(hasTestTag("queue-occurrence-$key"))).performScrollTo().performClick()
+        compose.onNodeWithText("Remove from playlist").assertExists()
+        compose.onNodeWithText("Remove from queue").performClick()
+        compose.onNodeWithText("Remove from playlist").assertDoesNotExist()
         waitFor { activity.model.queue.value.current?.removed == true }
         assertTrue(activity.model.playback.value.playing)
         assertEquals(3, fixture().getJSONArray("playlists").getJSONObject(0).getInt("videoCount"))
@@ -123,7 +128,11 @@ class QueueLibrarySmokeTest {
         ui { activity.model.repeatQueue(QueueRepeat.ONE) }
         finishCurrent()
         waitFor { activity.model.queue.value.currentKey == key && activity.model.playback.value.position < 3000 && activity.model.playback.value.playing }
-        ui { activity.model.queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", key) } }
+        waitFor { activity.model.playlists.value.any { it.id == "IVqueue" && it.owned } }
+        ui { activity.model.queueOpen.value = true }
+        compose.onNode(hasTestTag("video-actions-testvideo01") and hasAnyAncestor(hasTestTag("queue-occurrence-$key"))).performScrollTo().performClick()
+        compose.onNodeWithText("Remove from queue").assertExists()
+        compose.onNodeWithText("Remove from playlist").performClick()
         waitFor { activity.model.queue.value.current!!.removed }
         assertTrue(activity.model.playback.value.playing)
         assertEquals(2, fixture().getJSONArray("playlists").getJSONObject(0).getInt("videoCount"))
