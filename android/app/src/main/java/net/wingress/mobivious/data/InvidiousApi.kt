@@ -35,6 +35,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun request(path: String, method: String = "GET", data: JSONObject? = null, auth: Boolean = false,
         query: Map<String, String> = emptyMap(), context: ApiContext? = null, accept: String = "application/json"): String = withContext(Dispatchers.IO) {
         val target = context ?: this@InvidiousApi.context()
+        if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context())
+            throw CancellationException("Account or instance changed")
         if (context != null && target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
         val address = target.server.toHttpUrl().newBuilder().addPathSegments(path.removePrefix("/"))
             .apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
@@ -49,13 +51,18 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val transport = if (method != "GET") contributionClient else client
         try { transport.newCall(builder.build()).execute().use { response ->
             val body = response.body?.string().orEmpty()
+            if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
             if (!response.isSuccessful) {
-                if (response.code == 401 && auth && target == this@InvidiousApi.context()) expired()
+                val invalidPassword = path.startsWith("api/v1/auth/account/") &&
+                    runCatching { JSONObject(body).text("code") == "invalid_password" }.getOrDefault(false)
+                if (response.code == 401 && auth && !invalidPassword && target == this@InvidiousApi.context()) expired()
                 val error = runCatching { JSONObject(body).text("error") }.getOrDefault("")
                 if (auth && response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired")) && target == this@InvidiousApi.context()) expired()
                 throw ApiException(response.code, when {
                     response.code == 429 -> "Too many attempts. Try again after ${response.header("Retry-After") ?: "a few"} seconds."
                     response.code == 404 && path == "api/v1/mobile/login" -> "This server needs the Mobivious native sign-in update."
+                    response.code in listOf(404, 405) && error != "Session no longer exists." && (path.startsWith("api/v1/mobile/registration") || path == "api/v1/mobile/register" || path.startsWith("api/v1/auth/account/")) -> "Update this server to enable native registration and account management."
+                    response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/account/") -> "Sign out and sign in again to enable account management with an updated token."
                     response.code == 404 && path.startsWith("api/v1/auth/dearrow/") -> "This server needs the Mobivious DeArrow API update."
                     response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/dearrow/") -> "Sign out and sign in again to enable DeArrow contributions with an updated token."
                     response.code in listOf(404, 405) && path.startsWith("api/v1/auth/blocked_channels") -> "This server needs the Mobivious channel-blocking API update."
@@ -78,9 +85,32 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
             saved
         }
     }
-    suspend fun login(username: String, password: String): Account {
-        val json = JSONObject(request("api/v1/mobile/login", "POST", JSONObject().put("username", username).put("password", password)))
-        return Account(json.getString("accessToken"), json.getString("username"), json.getLong("expiresAt"), server())
+    private fun accountResponse(body: String, context: ApiContext): Account {
+        if (context != this.context()) throw CancellationException("Account or instance changed")
+        val json = JSONObject(body)
+        return Account(json.getString("accessToken"), json.getString("username"), json.getLong("expiresAt"), context.server)
+    }
+    suspend fun login(username: String, password: String, context: ApiContext = context()): Account = accountResponse(
+        request("api/v1/mobile/login", "POST", JSONObject().put("username", username).put("password", password), context = context), context)
+    suspend fun registration(context: ApiContext) = Registration.parse(JSONObject(request("api/v1/mobile/registration", context = context)))
+    suspend fun register(username: String, password: String, confirmation: String, captchaAnswer: String, captchaToken: String, context: ApiContext): Account = accountResponse(
+        request("api/v1/mobile/register", "POST", JSONObject().put("username", username).put("password", password)
+            .put("passwordConfirmation", confirmation).put("captchaAnswer", captchaAnswer).put("captchaToken", captchaToken), context = context), context)
+    suspend fun changeCredentials(kind: String, fields: JSONObject, context: ApiContext): Account {
+        require(kind in listOf("username", "password"))
+        return accountResponse(request("api/v1/auth/account/$kind", "POST", fields, auth = true, context = context), context)
+    }
+    suspend fun deleteAccount(password: String, context: ApiContext) {
+        request("api/v1/auth/account/delete", "POST", JSONObject().put("password", password), auth = true, context = context)
+    }
+    suspend fun accountSessions(context: ApiContext) = JSONArray(request("api/v1/auth/account/sessions", auth = true, context = context)).objects().map(AccountSession::parse)
+    suspend fun revokeSession(id: String, context: ApiContext) {
+        request("api/v1/auth/account/sessions/revoke", "POST", JSONObject().put("id", id), auth = true, context = context)
+    }
+    suspend fun createToken(password: String, scopes: List<String>, expiresAt: Long?, context: ApiContext): String {
+        require(AccountPermissions.valid(scopes)) { "Select valid API permissions." }
+        return JSONObject(request("api/v1/auth/account/tokens", "POST", JSONObject().put("password", password)
+            .put("scopes", JSONArray(scopes)).put("expiresAt", expiresAt ?: JSONObject.NULL), auth = true, context = context)).getString("accessToken")
     }
     suspend fun discovery(kind: String, region: String = "US") = ApiParser.videos(JSONArray(request("api/v1/$kind", query = if (kind == "trending") mapOf("region" to region) else emptyMap())))
     suspend fun search(q: String, page: Int, sort: String, date: String, duration: String): List<Video> {

@@ -56,7 +56,7 @@ class VisibilitySmokeTest {
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun manager() {
-        compose.onNodeWithContentDescription("App settings").performClick()
+        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Blocked channels", substring = false).performClick()
         compose.onNodeWithTag("blocked-channel-manager").assertIsDisplayed()
@@ -76,7 +76,7 @@ class VisibilitySmokeTest {
 
     @Test fun guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts() {
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        compose.onNodeWithContentDescription("App settings").performClick()
+        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Show members-only videos", substring = false).performClick()
         compose.onNodeWithTag("settings-save").performClick()

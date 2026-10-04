@@ -38,6 +38,7 @@ import net.wingress.mobivious.player.PendingSeek
 import net.wingress.mobivious.player.StreamCatalog
 import net.wingress.mobivious.player.StreamKey
 import net.wingress.mobivious.player.VideoSelection
+import net.wingress.mobivious.player.VideoGeometry
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
@@ -49,7 +50,8 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val bufferedPosition: Long = 0, val seekable: Boolean = false, val live: Boolean = false,
     val speed: Float = 1f, val tracks: Tracks = Tracks.EMPTY, val selection: TrackSelectionParameters? = null,
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
-    val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection())
+    val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection(),
+    val geometry: VideoGeometry = VideoGeometry())
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
@@ -60,6 +62,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val store = app.store
     val api = app.api
     val account = store.account
+    val accountBusy = MutableStateFlow(false)
     val offline = app.offline
     val watched = app.watched.state
     val blocked = app.blocked.state
@@ -129,6 +132,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var browseGeneration = 0
     private var requestedVideo: String? = null
     private var homeAppliedContext: ApiContext? = null
+    private data class BrowseReturn(val tab: String, val route: String, val browse: BrowseState,
+        val channel: Channel?, val channelTab: ChannelTab?, val playlist: Playlist?, val seed: String?,
+        val playlistSort: String, val scopedSearch: SearchInput, val discovery: String, val context: ApiContext)
+    private fun captureBrowse() = BrowseReturn(tab, route, browse.value, channel.value, channelTab.value,
+        playlist.value, playlistSeed, channelPlaylistSort.value, scopedSearch.value, discovery.value, api.context())
+    private var searchReturn: BrowseReturn? = null
+    private var signInReturn: BrowseReturn? = null
+    fun clearNavigationReturns() { signInReturn = null; searchReturn = null }
+    val restoredBrowse = MutableStateFlow(0L)
+    val authenticationFinished = MutableStateFlow(0L)
     private val future = MediaController.Builder(application, SessionToken(application, ComponentName(application, PlaybackService::class.java)))
         .setListener(object : MediaController.Listener {
             override fun onCustomCommand(controller: MediaController, command: SessionCommand, args: Bundle): ListenableFuture<SessionResult> {
@@ -142,6 +155,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 controller.value = future.get().apply {
                     addListener(object : Player.Listener {
                         override fun onEvents(player: Player, events: Player.Events) { updatePlayback() }
+                        override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) { updatePlayback() }
                         override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) { cancelAccumulatedSeek() }
                         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                             if (pendingSeek.value?.mediaId != mediaItem?.mediaId) cancelAccumulatedSeek(false)
@@ -172,6 +186,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val old = playback.value.details?.video?.id
             playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection)
             if (old != state.details?.video?.id) {
+                playback.value = playback.value.copy(geometry = VideoGeometry())
                 cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             }
@@ -240,6 +255,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     private fun updatePlayback() {
         val p = controller.value ?: return
+        val mediaId = p.currentMediaItem?.mediaId.orEmpty()
+        val size = p.videoSize
+        val decoded = VideoGeometry(mediaId, size.width, size.height, size.pixelWidthHeightRatio)
+        val geometry = if (decoded.ratio != null) decoded else playback.value.geometry.takeIf { it.mediaId == mediaId } ?: decoded
         playback.value = playback.value.copy(
             playing = p.isPlaying, playWhenReady = p.playWhenReady, playerState = p.playbackState,
             mediaId = p.currentMediaItem?.mediaId.orEmpty(), position = p.currentPosition.coerceAtLeast(0),
@@ -250,7 +269,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             canPlay = p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),
             canSetSpeed = p.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH),
             canSelectTracks = p.isCommandAvailable(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS),
-            canRefresh = p.mediaItemCount > 0 && p.isCommandAvailable(Player.COMMAND_STOP) && p.isCommandAvailable(Player.COMMAND_PREPARE))
+            canRefresh = p.mediaItemCount > 0 && p.isCommandAvailable(Player.COMMAND_STOP) && p.isCommandAvailable(Player.COMMAND_PREPARE), geometry = geometry)
     }
     fun refreshAccount() {
         refreshSharedSettings()
@@ -270,7 +289,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
             val membersChanged = value.showMemberVideos != preferences.value.showMemberVideos
             preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
-            if (homeAppliedContext != context) { homeAppliedContext = context; openDefaultHome() }
+            if (homeAppliedContext != context) { homeAppliedContext = context; if (tab != "Account" && signInReturn == null) openDefaultHome() }
             else if (tab == "Subscriptions" || route == "history" || membersChanged && route.startsWith("playlist:")) refresh()
         } }
         viewModelScope.launch {
@@ -327,7 +346,30 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         scopedSearch.value = if (returnToFeed) subscriptionFeedSearch else SearchInput()
         channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; refresh()
     }
-    fun backBrowse() = navigate(tab, if (subscriptionChannelParent && route.startsWith("channel:")) "subscription-channels" else "")
+    private fun restoreBrowse(saved: BrowseReturn, afterSignIn: Boolean = false) {
+        if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Home"); return }
+        browseJob?.cancel(); browseGeneration++
+        tab = saved.tab; route = saved.route; channel.value = saved.channel; channelTab.value = saved.channelTab
+        playlist.value = saved.playlist; playlistSeed = saved.seed; channelPlaylistSort.value = saved.playlistSort
+        scopedSearch.value = saved.scopedSearch; discovery.value = saved.discovery
+        browse.value = saved.browse.copy(loading = false)
+        navigation.value = tab to route; restoredBrowse.value++
+        if (saved.browse.loading || afterSignIn && saved.tab in listOf("Library", "Subscriptions")) load(false, refreshChannel = false)
+    }
+    fun openGlobalSearch(text: String) {
+        if (text.isBlank()) return
+        if (tab != "Search" || route.isNotEmpty()) searchReturn = captureBrowse()
+        searchInput.value = SearchInput(text, text.trim())
+        navigate("Search")
+    }
+    fun backBrowse() {
+        val saved = searchReturn
+        if (tab == "Search" && route.isEmpty() && saved != null) { searchReturn = null; restoreBrowse(saved) }
+        else if (tab == "Account" && signInReturn != null) { val origin = signInReturn!!; signInReturn = null; restoreBrowse(origin) }
+        else navigate(tab, if (subscriptionChannelParent && route.startsWith("channel:")) "subscription-channels" else "")
+    }
+    val hasBrowseBack: Boolean get() = tab == "Search" && searchReturn != null || tab == "Account" && signInReturn != null
+    fun openSignIn() { if (tab != "Account") signInReturn = captureBrowse(); navigate("Account") }
     fun openPlaylist(list: Playlist) {
         navigate("Library", "playlist:${list.id}")
         playlistSeed = list.seedVideoId
@@ -515,6 +557,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         val response = api.subscriptionSearch(scopedQuery, page, context)
                         hasMore = response.hasMore; response.items
                     } else api.feed(page, preferences.value.notificationsOnly)
+                    selectedTab == "Account" -> emptyList()
                     selectedTab == "Library" -> { if (context.account != null) { val loaded = api.playlists(context); if (context == api.context() && revision == playlistRevision) playlists.value = loaded }; emptyList() }
                     else -> api.discovery(selectedDiscovery, selectedRegion)
                 }
@@ -716,8 +759,47 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun loadComments(more: Boolean = false, threadKey: String? = null) = commentController.load(more, threadKey)
     fun commentPosition(threadKey: String?, position: CommentPosition) = commentController.position(threadKey, position)
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
-    suspend fun login(username: String, password: String) { store.save(api.login(username, password)); refresh() }
-    fun logout() = action { val context = api.context(); try { api.logout() } finally { closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null); app.cache.clear(); navigate("Home") } }
+    private fun acceptAuthentication(value: Account, context: ApiContext, resumeIntent: Boolean = true) {
+        if (context != api.context()) throw CancellationException("Account or instance changed")
+        homeAppliedContext = null
+        store.save(value)
+        homeAppliedContext = api.context()
+        val origin = signInReturn; signInReturn = null
+        // Run after the account collector resets account-scoped state.
+        viewModelScope.launch { yield()
+            if (account.value != value) return@launch
+            if (resumeIntent && origin != null) restoreBrowse(origin, afterSignIn = true)
+            else navigate("Account")
+            authenticationFinished.value++
+        }
+    }
+    private suspend fun <T> accountOperation(block: suspend () -> T): T = viewModelScope.async {
+        accountBusy.value = true
+        try { block() } finally { accountBusy.value = false }
+    }.await()
+    suspend fun login(username: String, password: String) = accountOperation {
+        val context = api.context(); acceptAuthentication(api.login(username, password, context), context)
+    }
+    suspend fun register(username: String, password: String, confirmation: String, answer: String, token: String) = accountOperation {
+        val context = api.context(); acceptAuthentication(api.register(username, password, confirmation, answer, token, context), context)
+    }
+    suspend fun changeCredentials(kind: String, fields: JSONObject, context: ApiContext) = accountOperation {
+        acceptAuthentication(api.changeCredentials(kind, fields, context), context, resumeIntent = false)
+    }
+    suspend fun createAccountToken(password: String, scopes: List<String>, expires: Long?, context: ApiContext) = accountOperation {
+        api.createToken(password, scopes, expires, context)
+    }
+    fun clearAccount(context: ApiContext) {
+        if (context != api.context()) return
+        signInReturn = null; searchReturn = null
+        closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null)
+        app.cache.clear(); navigate("Account")
+    }
+    suspend fun deleteAccount(password: String, context: ApiContext) = accountOperation { api.deleteAccount(password, context); clearAccount(context) }
+    suspend fun revokeSession(session: AccountSession, context: ApiContext) = accountOperation {
+        api.revokeSession(session.id, context); if (session.current) clearAccount(context)
+    }
+    fun logout() = action { accountOperation { val context = api.context(); try { api.logout() } finally { clearAccount(context) } } }
     fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")

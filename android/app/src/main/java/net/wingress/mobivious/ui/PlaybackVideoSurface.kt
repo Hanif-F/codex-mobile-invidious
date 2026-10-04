@@ -11,6 +11,7 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.ui.PlayerView
+import androidx.media3.ui.AspectRatioFrameLayout
 
 internal val PlaybackState.videoEnabled: Boolean
     get() = C.TRACK_TYPE_VIDEO !in selection?.disabledTrackTypes.orEmpty()
@@ -31,6 +32,7 @@ internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaCont
         factory = { context ->
             PlayerView(context).apply {
                 useController = false
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                 setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER)
             }
         },

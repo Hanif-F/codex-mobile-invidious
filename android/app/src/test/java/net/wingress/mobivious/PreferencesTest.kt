@@ -65,7 +65,7 @@ class PreferencesTest {
         assertEquals("Search" to "popular", PreferenceRules.destination("", false))
         assertEquals("Library" to "popular", PreferenceRules.destination("Playlists", true))
         assertEquals("Home" to "popular", PreferenceRules.destination("Subscriptions", false))
-        assertEquals(listOf("Library", "Subscriptions", "Home", "Search"), PreferenceRules.navigation(listOf("Playlists", "Subscriptions", "Trending", "Popular")))
+        assertEquals(listOf("Home", "Subscriptions", "Library", "Account"), PreferenceRules.navigation(listOf("Playlists", "Subscriptions", "Trending", "Popular")))
         assertEquals(4, PreferenceRules.navigation(emptyList()).size)
     }
     @Test fun malformedPreferencesHaveUsableDefaults() {

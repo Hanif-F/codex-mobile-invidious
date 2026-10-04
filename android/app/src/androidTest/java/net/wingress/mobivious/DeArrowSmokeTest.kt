@@ -44,7 +44,7 @@ class DeArrowSmokeTest {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
-    private fun settings() { compose.onNodeWithContentDescription("App settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
+    private fun settings() { compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
     private fun save() { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
     private fun login() {
@@ -84,8 +84,8 @@ class DeArrowSmokeTest {
         command("dearrow", """{"dearrow_enabled":true,"seedPlaylist":true}""")
         login()
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Search").performClick()
-        compose.onNodeWithText("Search videos or paste a link").performTextInput("fixture")
+        compose.onNodeWithTag("global-search").performClick()
+        compose.onNodeWithTag("main-search").performTextInput("fixture")
         compose.onNode(hasContentDescription("Search") and hasAnyAncestor(hasSetTextAction()), useUnmergedTree = true).performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNodeWithText("Subscriptions").performClick()

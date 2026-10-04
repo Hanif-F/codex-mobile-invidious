@@ -136,3 +136,29 @@ preference scopes and storage are reused, with no migration or sign-in renewal.
 Older servers can still play video, but unsupported shared saves show the existing
 settings API update error. Guest codec settings remain local per instance.
 Building the APK does not deploy the server.
+
+## Native account management and flexible playback
+
+Build and deploy the sibling server update before using native registration and
+account management. Both normal and API-only builds include the new routes listed
+in `../invidious/docs/mobile-api.md`. Preserve the existing HMAC key and account
+schema; this addition requires **no new database migration**. Existing migrations
+needed by earlier features still apply. Sign out and sign in on Android after the
+server update to receive the explicit account-management scopes. Existing login
+remains available on servers without the new endpoints; Android explains missing
+routes or old token permissions.
+
+Keep login/registration and CAPTCHA configuration consistent with the website.
+CAPTCHA image rendering uses the existing `rsvg-convert` runtime dependency
+already installed by the server Dockerfiles. Verify availability/challenge refresh,
+signup, password typos without logout, credential replacement, browser/token
+listing and revocation, selected token permissions/expiry, and account deletion
+using disposable accounts. The account harness exercises these transactions and
+CAPTCHA replay before rollout; see the sibling `tests/database/README.md`.
+
+The Android update puts Settings inside Account and Search in the top-right;
+it also sizes playback from decoded dimensions. Test portrait/square/landscape/
+ultrawide media, comments, fullscreen, PiP and queue transitions on a real device
+before runtime acceptance. Local connected tests are unverified because the
+emulator crashes before boot. No production deployment or release publishing was
+performed for this change.

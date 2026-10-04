@@ -1136,3 +1136,80 @@ With a working emulator/device, run `scripts/test-android.sh`, including
 The new queue tests save screenshots under
 `/data/local/tmp/mobivious-queue-screenshots/`. No server, wire-format, queue-command,
 storage migration, production deployment or signed release changes were made.
+
+## Native account parity, global search and flexible playback — 4 October 2026
+
+Account replaces Search in the fixed Home/Subscriptions/Library/Account bottom
+navigation. Settings is available inside Account for guests and members. Native
+signup follows instance availability and CAPTCHA; account management supports
+password-confirmed credential changes/deletion, opaque session metadata and
+revocation, and guided/advanced scoped tokens with expiry choices and one-time
+Copy. Credential changes issue an atomic replacement mobile session and preserve
+the account identity/library. Password typos retain the bearer session. New
+account requests and responses reject changed account/instance contexts.
+
+The top-right search field opens without navigation or a search request. Submit
+uses the existing results, filters, pagination, playlist/mix and link handling.
+Back closes the field before returning from results to the originating browse
+snapshot/position; contextual sign-in returns to its interrupted screen/action.
+Search homepage and saved web feed preferences remain supported. Channel,
+subscription and history search remain within their existing screens.
+
+Playback geometry uses Media3 decoded dimensions and pixel aspect ratio, bound to
+the current media item and refreshed on size changes/reconnection. Regular watch
+height follows the ratio up to 70% of content height, or 40% with comments.
+Fullscreen follows video shape; square/unknown dimensions follow device
+orientation. Both PiP entry paths use a bounded ratio with exact platform endpoints.
+Aspect-preserving fit, bounded mini-player and service-owned playback are retained.
+Short ultrawide players put Play/Pause in the footer to avoid overlapping controls.
+
+| Check | Result |
+| --- | --- |
+| Android unit/MockWebServer tests | 184 passed; zero failures, errors or skips |
+| Android debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed; zero errors, existing warnings only |
+| Invidious normal build | Passed with `-Dskip_videojs_download` |
+| Invidious API-only build | Passed with `-Dapi_only -Dskip_videojs_download` |
+| Invidious specs | 224 Spectator examples and 49 standard examples passed; no failures/errors |
+| Disposable PostgreSQL account harness | Passed against a fresh `invidious_accounts_test` database |
+| Disposable HTTP account/shape fixture checks | Passed; ffprobe confirmed all four generated video dimensions |
+| Python syntax and both repository whitespace checks | Passed |
+| Connected instrumentation, native screenshots and real decoding acceptance | Unverified: emulator exited with SIGSEGV (139) before boot; connected task reported `No connected devices!` |
+
+New API/unit coverage includes registration/CAPTCHA contracts, credential/session/
+token requests, incorrect current passwords versus expired sessions, old endpoints
+and scopes, delayed login/token responses, preflight context rejection, guided and
+advanced scope validation, portrait/comments caps, square/anamorphic/unknown
+geometry and exact PiP bounds. The account harness uses production middleware and
+transactions for duplicate signup, materialized-view failure rollback, session
+ownership, credential-change/login races, identity/subscription preservation,
+CAPTCHA endpoint binding/expiry/replay, delegated permissions and current-session
+revocation/deletion. CAPTCHA image rendering was not exercised on this host because
+`rsvg-convert` is unavailable; the existing server Dockerfiles supply that runtime.
+
+Five new fixture-backed instrumentation scenarios compile. They cover fixed tabs
+and guest Settings, search cancellation/submission/query editing/Back (including
+Account subpages), contextual signup, password typo/rename, browser revocation,
+scoped token creation and deletion confirmation. Real-media scenarios cover inline
+sizing, the comments cap, shape-aware fullscreen and manual PiP, queue transitions
+between portrait and landscape, service-session retention and Activity recreation.
+Existing settings, search/history, watch/library and contextual save tests were
+updated for Account entry. These scenarios have **not run**; no screenshots were
+produced or inspected. Automatic PiP entry and selection retention still need
+runtime acceptance along with touch, keyboard, accessibility and large-font layout.
+
+Reproduction: Android used `:app:testDebugUnitTest :app:assembleDebug
+:app:assembleDebugAndroidTest :app:lintDebug --offline`; server checks used
+`crystal spec`, normal/API-only builds and `tests/database/accounts.cr` with
+`ACCOUNT_TEST_DATABASE_URL` targeting a disposable PostgreSQL 14 container.
+Run `scripts/test-android.sh` on a working emulator/device to start the localhost
+fixture, generate portrait (360×640), square (480×480), landscape (640×360) and
+ultrawide (960×360) AAC/H.264 MP4s, reverse port 18080 and run connected tests.
+The localhost fixture and disposable database container were removed after checks.
+
+Feature-parity rows 03, 09, 25 and 26, summary counts, API and deployment documents
+were updated in their respective repositories. This addition uses existing account/
+session tables and requires no new migration. Deploy the sibling server update
+and renew mobile sign-in for the explicit management scopes before production use.
+No production account, deployment, migration, signing version or release publishing
+was changed.

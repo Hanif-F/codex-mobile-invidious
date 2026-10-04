@@ -36,7 +36,7 @@ class SettingsSmokeTest {
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
-    private fun open(page: String) { compose.onNodeWithContentDescription("App settings").performClick(); compose.onNodeWithText(page).performScrollTo().performClick() }
+    private fun open(page: String) { compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText(page).performScrollTo().performClick() }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
     private fun save(page: String) { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
 
@@ -49,7 +49,7 @@ class SettingsSmokeTest {
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
         save("Browsing")
         assertFalse(activity.model.store.guestDeArrow().relatedVideos)
-        compose.onNodeWithContentDescription("App settings").performClick()
+        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         compose.onNodeWithText("Playback").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Back from Playback").performClick()
         compose.onNodeWithTag("settings-root").assertExists()

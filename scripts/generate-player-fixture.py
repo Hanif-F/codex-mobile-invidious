@@ -87,3 +87,18 @@ def generate_codecs():
 
 generate_rich()
 generate_codecs()
+
+
+def generate_shapes():
+    directory = args.media_dir / 'shapes'
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, size in [('portrait', '360x640'), ('square', '480x480'), ('landscape', '640x360'), ('ultrawide', '960x360')]:
+        target = directory / (name + '.mp4')
+        if target.exists():
+            continue
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi',
+                        '-i', 'testsrc2=size=' + size + ':rate=24', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+                        '-t', '20', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-c:a', 'aac',
+                        '-movflags', '+faststart', str(target)], check=True)
+
+generate_shapes()

@@ -195,7 +195,7 @@ class PlaybackVisibilitySmokeTest {
         awake(false)
         ui { assertTrue(activity.model.controller.value!!.playWhenReady) }
         foreground(); awake(true)
-        compose.onNodeWithContentDescription("App settings").performClick()
+        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         awake(false)
         ui { assertTrue(playerViews().isEmpty()) }
         compose.onNodeWithContentDescription("Back from Settings").performClick()

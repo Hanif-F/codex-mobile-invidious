@@ -230,8 +230,9 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Account").performClick()
         compose.onNodeWithText("Username").performTextInput("EmulatorViewer")
         compose.onNodeWithText("Password").performTextInput("fixture-password")
-        compose.onNodeWithText("Sign in", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("account-auth-submit").performClick()
         waitFor { activity.model.account.value != null }
+        compose.onNodeWithContentDescription("Home").performClick()
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
         assertNull(activity.model.playback.value.error)

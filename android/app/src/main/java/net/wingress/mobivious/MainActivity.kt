@@ -51,7 +51,7 @@ class MainActivity : ComponentActivity() {
         val playing = model.controller.value?.playWhenReady == true
         fun action(name: String, icon: Int, command: String, code: Int) = RemoteAction(Icon.createWithResource(this, icon), name, name,
             PendingIntent.getService(this, code, Intent(this, PlaybackService::class.java).setAction(command), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
-        val params = PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9))
+        val params = PictureInPictureParams.Builder().setAspectRatio(pipAspectRatio())
             .setActions(listOf(action("Back 10 seconds", android.R.drawable.ic_media_rew, "mobivious.rewind", 1),
                 action(if (playing) "Pause" else "Play", if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, "mobivious.toggle", 2),
                 action("Forward 10 seconds", android.R.drawable.ic_media_ff, "mobivious.forward", 3)))
@@ -65,7 +65,12 @@ class MainActivity : ComponentActivity() {
             if (fullscreen) hide(WindowInsetsCompat.Type.systemBars()) else show(WindowInsetsCompat.Type.systemBars())
         }
     }
-    fun enterPip() { model.cancelAccumulatedSeek(); if (model.playback.value.details != null && supportsPip()) enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build()) }
+    private fun pipAspectRatio(): Rational {
+        // Preserve the exact Android boundaries; rounding below 1 / 2.39 is rejected.
+        val (numerator, denominator) = model.playback.value.geometry.pipFraction
+        return Rational(numerator, denominator)
+    }
+    fun enterPip() { model.cancelAccumulatedSeek(); if (model.playback.value.details != null && supportsPip()) { updatePip(pipWatching); enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(pipAspectRatio()).build()) } }
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         model.cancelAccumulatedSeek()

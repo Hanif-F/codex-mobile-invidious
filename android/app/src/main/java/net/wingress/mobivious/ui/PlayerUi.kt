@@ -117,7 +117,9 @@ internal fun VideoPlayer(
     }
     LaunchedEffect(feedbackGeneration) { if (feedback != null) { delay(800); feedback = null } }
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
-    Box(modifier.background(Color.Black).testTag("player-surface")) {
+    BoxWithConstraints(modifier.background(Color.Black).testTag("player-surface")) {
+        val shortPlayer = maxHeight < 180.dp
+        val showTimeline = maxHeight >= 96.dp
         PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
         Box(Modifier.matchParentSize().testTag("player-gestures")
         .pointerInput(playback.mediaId, controls) {
@@ -169,7 +171,7 @@ internal fun VideoPlayer(
             AnimatedVisibility(visible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200)), modifier = Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxSize().testTag("player-controls").onFocusChanged { focused = it.hasFocus }.focusGroup()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .75f))))) {
-                    if (!playback.loading && playback.error == null) {
+                    if (!shortPlayer && !playback.loading && playback.error == null) {
                         IconButton(
                             onClick = { vm.togglePlay(); interact() }, enabled = playback.canPlay,
                             modifier = Modifier.align(Alignment.Center).offset(y = if (fullscreen) 0.dp else if (compactPlay) (-12).dp else (-24).dp)
@@ -183,7 +185,7 @@ internal fun VideoPlayer(
                     Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)) else Modifier)
                         .padding(horizontal = 12.dp)) {
-                        Box(Modifier.fillMaxWidth()) {
+                        if (showTimeline) Box(Modifier.fillMaxWidth()) {
                             Slider(
                                 value = scrub ?: playback.position.coerceAtMost(playback.duration).toFloat(),
                                 onValueChange = { vm.cancelAccumulatedSeek(); scrub = it; interact() },
@@ -222,6 +224,11 @@ internal fun VideoPlayer(
                             }
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            if (shortPlayer) IconButton(onClick = { vm.togglePlay(); interact() }, enabled = playback.canPlay && !playback.loading && playback.error == null) {
+                                val ended = playback.playerState == Player.STATE_ENDED
+                                Icon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                                    if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play", tint = Color.White)
+                            }
                             Text("${playerTime(scrub?.toLong() ?: playback.position)} / ${if (playback.live) "LIVE" else if (playback.duration > 0) playerTime(playback.duration) else "—"}",
                                 Modifier.weight(1f), color = Color.White, style = MaterialTheme.typography.labelLarge)
                             IconButton(onClick = { vm.cancelAccumulatedSeek(); interact(); onSettings() }, enabled = controller != null) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }

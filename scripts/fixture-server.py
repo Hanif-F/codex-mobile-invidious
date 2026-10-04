@@ -109,6 +109,12 @@ def reset_search_history():
                  historyRequests=[], historyEntries=[], historyToday='2026-10-04', historyLegacy=False)
 reset_search_history()
 
+def reset_accounts():
+    state.update(accountUsername='Fixture', registrationEnabled=True, accountRevoked=False,
+                 accountSessions=[dict(id='current', type='api', issuedAt=1700000000, expiresAt=9999999999, current=True),
+                                  dict(id='browser', type='browser', issuedAt=1700000001, expiresAt=9999999999, current=False)])
+reset_accounts()
+
 def history_group(watched):
     if not watched: return 4
     days = (date.fromisoformat(state['historyToday']) - date.fromisoformat(watched)).days
@@ -198,6 +204,12 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
+        if p == '/api/v1/mobile/registration':
+            return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=None))
+        if p == '/api/v1/auth/account/sessions':
+            if state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token':
+                return self.respond(dict(error='Request must be authenticated'), 403)
+            return self.respond(state['accountSessions'])
         if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels', '/api/v1/auth/subscriptions')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/ggpht/'):
@@ -259,6 +271,11 @@ class Handler(BaseHTTPRequestHandler):
                 items = {1: [visibility_member], 2: [video]}.get(int(parse_qs(url.query).get('page', ['1'])[0]), [])
             self.respond(items)
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
+        elif p.rsplit('/', 1)[-1] in ('portrait001', 'square00001', 'landscape01', 'ultrawide01') and p.startswith('/api/v1/videos/'):
+            name = {'portrait001':'portrait', 'square00001':'square', 'landscape01':'landscape', 'ultrawide01':'ultrawide'}[p.rsplit('/', 1)[-1]]
+            return self.respond(dict(video, videoId=p.rsplit('/', 1)[-1], title=name + ' geometry fixture',
+                                     formatStreams=[dict(url='/media/shapes/' + name + '.mp4', type='video/mp4', quality='medium')],
+                                     description='Real ratio fixture', recommendedVideos=[recommended]))
         elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03'):
             selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
             codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
@@ -407,6 +424,10 @@ class Handler(BaseHTTPRequestHandler):
             reset_visibility()
             reset_search_history()
             reset_comments()
+            reset_accounts()
+            return self.respond({})
+        if p == '/test/accounts':
+            if 'registrationEnabled' in data: state['registrationEnabled'] = bool(data['registrationEnabled'])
             return self.respond({})
         if p == '/test/comments':
             for key in ('commentFailNext', 'commentDelayNext', 'commentEmpty'):
@@ -495,8 +516,33 @@ class Handler(BaseHTTPRequestHandler):
             state['contributions'].append(data)
             state['identityConfigured'] = True
             return self.respond(dict(ok=True))
-        if p == '/api/v1/mobile/login':
-            self.respond(dict(accessToken='fixture-token', username=data.get('username', 'Viewer'), expiresAt=9999999999))
+        if p in ('/api/v1/mobile/login', '/api/v1/mobile/register'):
+            if p.endswith('/register') and not state['registrationEnabled']:
+                return self.respond(dict(error='Registration is disabled on this instance.'), 403)
+            if p.endswith('/register') and data.get('password') != data.get('passwordConfirmation'):
+                return self.respond(dict(error='New passwords must match'), 400)
+            state['accountUsername'] = data.get('username', 'Viewer'); state['accountRevoked'] = False
+            return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999))
+        elif p.startswith('/api/v1/auth/account/'):
+            if state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token':
+                return self.respond(dict(error='Request must be authenticated'), 403)
+            if p.endswith('/revoke'):
+                selected = next((entry for entry in state['accountSessions'] if entry['id'] == data.get('id')), None)
+                if not selected: return self.respond(dict(error='Session no longer exists.'), 404)
+                state['accountSessions'].remove(selected)
+                if selected['current']: state['accountRevoked'] = True
+                return self.respond(status=204)
+            if data.get('password') == 'wrong':
+                return self.respond(dict(error='Incorrect current password.', code='invalid_password'), 401)
+            if p.endswith('/delete'):
+                state['accountRevoked'] = True; state['accountSessions'] = []
+                return self.respond(status=204)
+            if p.endswith('/tokens'):
+                state['accountSessions'].append(dict(id='new-api', type='api', issuedAt=int(time.time()), expiresAt=data.get('expiresAt'), current=False))
+                return self.respond(dict(accessToken='new-external-fixture-token'))
+            if p.endswith('/username'): state['accountUsername'] = data['username']
+            state['accountSessions'] = [entry for entry in state['accountSessions'] if entry['current']]
+            return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999))
         elif p == '/api/v1/auth/preferences':
             if state['failPreferences']: return self.respond(dict(error='Fixture settings could not be saved'), 503)
             for key, value in data.items():

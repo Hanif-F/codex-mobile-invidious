@@ -88,9 +88,7 @@ object PreferenceRules {
         "Playlists" -> (if (signedIn) "Library" else "Home") to "popular"
         else -> "Home" to "popular"
     }
-    fun navigation(menu: List<String>): List<String> = (menu.mapNotNull { when(it) {
-        "Popular", "Trending" -> "Home"; "Subscriptions" -> "Subscriptions"; "Playlists" -> "Library"; "" -> "Search"; else -> null
-    } } + listOf("Home", "Search", "Subscriptions", "Library")).distinct()
+    fun navigation(@Suppress("UNUSED_PARAMETER") menu: List<String>): List<String> = listOf("Home", "Subscriptions", "Library", "Account")
     // The web stores English language names; also accept tags from older/native preferences.
     fun caption(preferred: List<String>, available: List<Caption>): Caption? = preferred.asSequence().filter { it.isNotBlank() }.mapNotNull { choice ->
         available.firstOrNull { c -> c.language.equals(choice, true) || c.label.equals(choice, true) ||

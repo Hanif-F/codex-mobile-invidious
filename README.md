@@ -80,8 +80,25 @@ Account features require the server extensions described in `deploy/README.md`.
 
 Home popular/trending, filtered search and shared video links; channel browsing with
 paginated Videos/Streams/Playlists tabs and automatic Streams selection for channels without uploads;
-native account sign-in; subscription feed and subscribe/unsubscribe; playlists and
+native account registration and session management; subscription feed and subscribe/unsubscribe; playlists and
 watch history; descriptions, captions, read-only comments and recommendations.
+The four bottom tabs are Home, Subscriptions, Library and Account. Account contains
+Sign in/Create account, the selected instance, Settings, credential changes,
+Sessions & API tokens, Sign out and Delete account. Signup follows instance
+registration switches and CAPTCHA requirements. Credential changes require the
+current password, revoke previous sessions/tokens and keep this app signed in with
+a replacement session. Token creation offers guided permissions, advanced scopes,
+expiry choices (30 days by default) and one-time display/Copy. Deletion requires
+the password and a final confirmation. Passwords and generated tokens are never
+saved in UI state. Contextual sign-in resumes the interrupted screen/action.
+
+The top-right Search icon opens a field and keyboard on the current screen.
+Typing performs no search. The keyboard Search action, Enter and submit icon open
+the existing results screen; Back first closes an open field, then restores the
+originating screen from results. Search filters, paging, playlists/mixes and pasted
+links remain available. Saved feed-menu preferences affect Home discovery order;
+the Search homepage remains supported without a Search bottom tab.
+
 Channel pages and Subscriptions each have their own search field. Channel search
 keeps the selected Videos/Streams/Playlists tab available; clearing search restores it.
 Subscription search matches titles/channels across the cached subscription library.
@@ -209,7 +226,15 @@ PATCH allowlist update, using existing scopes and no migration. Runtime repeat
 selection is session-only. Native runtime/layout acceptance remains unverified
 because the installed emulator crashes before boot; see VERIFICATION.md.
 
-The native sign-in/history/settings extensions must be deployed before account
+Playback follows Media3 decoded video dimensions, including pixel aspect ratio,
+with a 16:9 fallback while dimensions are unknown. Regular watch height follows the
+video ratio up to 70% of available content height, or 40% while comments are open.
+Fullscreen follows portrait/landscape shape and device orientation for square or
+unknown video; PiP uses the video ratio within Android limits. Video always fits
+without stretching. The bounded mini-player and service-owned playback survive
+layout changes; short ultrawide players use a compact control row.
+
+The native registration/account/history/settings extensions must be deployed before account
 features work against production. An APK alone does not update the Ubuntu server.
 
 ## Upstream maintenance

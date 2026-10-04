@@ -139,8 +139,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     item {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
                         SettingsChoice("Default homepage", homes.map { it to it.ifBlank { "Search" } }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
-                        Text("The homepage opens on launch or sign-in. Search and Library remain reachable in navigation.", style = MaterialTheme.typography.bodySmall)
-                        SettingsHeading("Feed navigation order")
+                        Text("The homepage opens on launch or sign-in. Search is available from the top-right button; Library remains a tab.", style = MaterialTheme.typography.bodySmall)
+                        SettingsHeading("Home discovery order")
                         repeat(if (account == null) 2 else 4) { index ->
                             SettingsChoice("Feed priority ${index + 1}", homes.map { it to it.ifBlank { "Search" } }, value.feedMenu.getOrElse(index) { "" }, !busy) { home ->
                                 val menu = value.feedMenu.toMutableList(); while (menu.size <= index) menu.add(""); menu[index] = home
