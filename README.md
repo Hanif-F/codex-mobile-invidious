@@ -98,6 +98,11 @@ controls, accumulated double-tap seeking, and one gear menu for quality, audio,
 captions, speed, audio only, picture in picture and Refresh buffer. Explicit URL timestamps override saved resume
 positions. History and resume settings are shared with the website.
 
+The taller browsing mini-player shows live video on the left and preserves playback
+when opening or leaving the watch screen. Visible video playback and buffering keep
+the screen awake in the watch player, fullscreen, mini-player and PiP; paused,
+audio-only and hidden playback allow the normal screen timeout.
+
 The quality menu selects exact supported representations with codec/FPS/bitrate
 details. Audio choices distinguish original, stable-volume and dubbed streams
 where metadata is available. Saved quality defaults include Auto, Best, 4320p
@@ -107,7 +112,7 @@ the direction. Playback pauses until a single jump 600 ms after the last tap,
 then restores its previous playing or paused state. Reliable audio labels use the
 additive video API metadata update; older instances retain manifest-based choices.
 
-Optional DeArrow titles appear throughout browsing and playback, with an original-title toggle. A native watch-page sheet supports title suggestions, all four guideline acknowledgements, voting and refresh. Signed-in settings and the encrypted contribution identity are shared with the website; Settings also supports private-ID import. Guests keep local title settings per instance. Contributions require the server API update and a fresh sign-in token.
+Optional DeArrow titles appear throughout browsing and playback, with an original-title toggle. The DeArrow Title button beside Share opens a native watch-page sheet for title suggestions, all four guideline acknowledgements, voting and refresh. Signed-in settings and the encrypted contribution identity are shared with the website; Settings also supports private-ID import. Guests keep local title settings per instance. Contributions require the server API update and a fresh sign-in token.
 
 SponsorBlock matches this fork's eight categories, automatic/manual skipping,
 marker-only and disabled modes, custom colors and per-channel inheritance. Colored

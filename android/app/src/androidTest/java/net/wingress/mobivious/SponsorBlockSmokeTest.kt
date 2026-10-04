@@ -120,6 +120,9 @@ class SponsorBlockSmokeTest {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.preferences.value.sponsorBlock.channels.containsKey(id) }
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
+        compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
+        compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("watch-details-list"))).performScrollTo().performClick()
+        until { activity.model.channel.value?.id == id }
         compose.onNodeWithText("Channel SponsorBlock settings").performScrollTo().performClick()
         compose.onNodeWithText("SponsorBlock: Disabled").performClick()
         compose.onNodeWithText("Enabled").performClick()

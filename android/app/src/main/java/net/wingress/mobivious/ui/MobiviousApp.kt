@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -42,6 +43,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
 import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import net.wingress.mobivious.MainActivity
@@ -127,7 +130,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 }) },
                 snackbarHost = { SnackbarHost(snackbar) },
                 bottomBar = { Column {
-                    if (!watch && playback.details != null) MiniPlayer(vm, playback, { watch = true }, vm::togglePlay, vm::closePlayer)
+                    if (!watch && playback.details != null) MiniPlayer(vm, playback, controller, { watch = true }, vm::togglePlay, vm::closePlayer)
                     NavigationBar { PreferenceRules.navigation(prefs.feedMenu).map { name -> name to when(name) { "Home" -> Icons.Default.Home; "Search" -> Icons.Default.Search; "Subscriptions" -> Icons.Default.Subscriptions; else -> Icons.Default.VideoLibrary } }.forEach { (name, icon) ->
                         NavigationBarItem(selected = tab == name && !watch, onClick = { navigate(name) }, icon = { Icon(icon, name) }, label = { Text(name, fontSize = 11.sp) })
                     } }
@@ -301,7 +304,33 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
         }
     }
 }
-@Composable private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, open: () -> Unit, toggle: () -> Unit, close: () -> Unit) { Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 3.dp) { Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).clickable(onClick = open).padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Column(Modifier.weight(1f).padding(12.dp)) { playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1) }; Text(playback.details?.video?.author.orEmpty(), maxLines = 1, style = MaterialTheme.typography.bodySmall) }; IconButton(onClick = toggle) { Icon(if(playback.playing) Icons.Default.Pause else Icons.Default.PlayArrow, if(playback.playing) "Pause" else "Play") }; IconButton(onClick = close) { Icon(Icons.Default.Close, "Close player") } } } }
+@Composable
+private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, controller: MediaController?, open: () -> Unit, toggle: () -> Unit, close: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 3.dp) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 80.dp).testTag("mini-player")
+            .padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(112.dp, 63.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black)
+                .clickable(onClickLabel = "Open player", onClick = open).testTag("mini-player-preview")) {
+                if (playback.videoEnabled) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
+                else playback.details?.video?.let { video ->
+                    AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
+                        Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = ContentScale.Crop)
+                }
+            }
+            Column(Modifier.weight(1f).clickable(onClickLabel = "Open player", onClick = open).padding(horizontal = 8.dp)) {
+                playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1) }
+                Text(playback.details?.video?.author.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+            }
+            val ended = playback.playerState == Player.STATE_ENDED
+            IconButton(onClick = toggle, enabled = playback.canPlay, modifier = Modifier.size(48.dp)) {
+                Icon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play")
+            }
+            IconButton(onClick = close, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, "Close player") }
+        }
+    }
+}
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, controller: androidx.media3.session.MediaController?, modifier: Modifier, fullscreen: () -> Unit, settings: () -> Unit, settingsOpen: Boolean, add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
     val comments by vm.comments.collectAsStateWithLifecycle(); val error by vm.commentError.collectAsStateWithLifecycle(); val subscriptions by vm.subscriptions.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
@@ -319,16 +348,15 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Text("${count(details.video.views)} views · ${details.video.published}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Row(verticalAlignment = Alignment.CenterVertically) { Text(details.video.author, Modifier.weight(1f).clickable { channel(details.video.channelId) }, fontWeight = FontWeight.SemiBold); FilledTonalButton(onClick = { if(vm.account.value == null) vm.message.value = "Sign in from the account button to subscribe." else vm.toggleSubscribe(details.video.channelId) }) { Text(if(subscriptions.any { it.id == details.video.channelId }) "Subscribed" else "Subscribe") } }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
                         AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
+                        AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
                     }
+                    if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { vm.queueOpen.value = true }) { Text("Playback queue") }
                     ChannelBlockingButton(vm, details.video.channelId, details.video.author, signIn)
                     blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                    TextButton(onClick = { vm.openDeArrow(details.video.id) }) { Text("Suggest / vote on titles") }
-                    TextButton(onClick = { vm.openSponsorBlock(details.video.channelId) }) { Text("Channel SponsorBlock settings") }
-                    if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                     TextButton(onClick = { description = !description }) { Text(if(description) "Hide description" else "Show description") }
                     if(description) Text(details.description, style = MaterialTheme.typography.bodyMedium)
                     if (prefs.showYoutubeComments) TextButton(onClick = { showingComments = !showingComments; if(showingComments) vm.loadComments() }) { Text(if(showingComments) "Hide comments" else "Comments") }

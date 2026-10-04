@@ -688,3 +688,42 @@ PATCH allowlist extension before saving `continue`, `continue_autoplay` and
 unsupported setting writes explain the required server update. This extension
 uses existing preferences/scopes, with no migration or token renewal. No production
 deployment, signed release or publication was performed.
+
+## Visible playback and watch actions — 4 October 2026
+
+The watch, fullscreen, PiP and browsing mini-player now share one video-surface
+component connected to the existing service controller. Each attached view requests
+`keepScreenOn` during ready/buffering playback in video mode while its activity is
+visible (STARTED, including PiP). Pause, completion, errors, audio-only mode, stopped
+activities and released surfaces clear the request. Matching media/details prevent
+stale or closed playback from keeping the screen awake.
+
+The mini-player has an 80dp minimum height, a live 112×63dp preview on the left,
+thumbnail artwork for audio-only playback, and separate open/play/pause/close
+actions. The watch actions row scrolls horizontally and places **DeArrow Title**
+immediately after Share, opening the existing contribution sheet. The watch-page
+channel SponsorBlock shortcut was removed; Settings and channel-page entries remain.
+
+| Check | Result |
+| --- | --- |
+| Android unit tests | 126 passed, including 5 new playback visibility scenarios |
+| Debug APK build | Passed |
+| Instrumentation APK build | Passed |
+| Android debug lint | Passed; 0 errors, 40 warnings; none in the new source/test files |
+| Native runtime, real screen timeout, layout and screenshots | Unverified; no connected devices and both emulator startup attempts exited with SIGSEGV (139) before boot |
+
+`PlaybackVisibilitySmokeTest` adds five compiled device scenarios: moving mini-player
+frames and watch/mini surface transitions preserving controller/position/tracks/queue;
+audio-only artwork and independent controls; fullscreen/PiP/pause/background/settings
+wake ownership; queue advancement/completion/replay; and a 5-second system timeout
+exceeded by 12 seconds of uninterrupted playback. Its fifth scenario covers 320dp
+and 390dp widths, light/dark mode, long titles and enlarged text, writing screenshots
+to `/data/local/tmp/mobivious-playback-visibility-screenshots/`. Device settings changed
+by these tests are restored in `finally` blocks. Existing DeArrow and SponsorBlock
+tests now use the new button and retained channel-page entry respectively.
+
+Device scenarios have **not executed**. The read-only Pixel_8_Pro AVD failed both
+with SwiftShader and with GPU/Vulkan disabled. `adb devices -l` listed no device
+after either attempt. Run `scripts/test-android.sh` on a working emulator/device
+to verify real video frames, inactivity, PiP and layouts. No production server,
+release signing configuration, database or stored preference format was changed.

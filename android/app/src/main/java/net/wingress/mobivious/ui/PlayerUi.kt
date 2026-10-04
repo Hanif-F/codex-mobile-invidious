@@ -43,12 +43,10 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.TrackGroup
 import androidx.media3.session.MediaController
-import androidx.media3.ui.PlayerView
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
@@ -121,11 +119,7 @@ internal fun VideoPlayer(
     LaunchedEffect(feedbackGeneration) { if (feedback != null) { delay(800); feedback = null } }
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
     Box(modifier.background(Color.Black).testTag("player-surface")) {
-        AndroidView(
-            factory = { PlayerView(it).apply { useController = false; player = controller; setShowBuffering(PlayerView.SHOW_BUFFERING_NEVER) } },
-            update = { it.player = controller; it.useController = false },
-            onRelease = { it.player = null }, modifier = Modifier.fillMaxSize(),
-        )
+        PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
         Box(Modifier.matchParentSize().testTag("player-gestures")
         .pointerInput(playback.mediaId, controls) {
             if (controls) coroutineScope {

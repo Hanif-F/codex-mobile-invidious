@@ -123,8 +123,8 @@ class DeArrowSmokeTest {
 
     @Test fun contributionsGuidelinesFailuresAndPrivateIdentity() {
         login(); openVideo(original)
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasText("Suggest / vote on titles"))
-        compose.onNodeWithText("Suggest / vote on titles").performClick()
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
+        compose.onNodeWithText("DeArrow Title").performScrollTo().performClick()
         until { activity.model.dearrowContribution.value.loaded }
         compose.onNodeWithTag("dearrow-contributions-list").performScrollToNode(hasContentDescription("Downvote: Locked community title"))
         compose.onNodeWithContentDescription("Downvote: Locked community title").assertIsNotEnabled()
