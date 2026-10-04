@@ -23,7 +23,7 @@ This is a source audit, not a new native runtime or production acceptance test. 
 | 02 | Popular and trending discovery, with regional/category selection | Partial | Popular and trending tabs; editable trending region. | Trending category selector, such as Music/Gaming/Movies. |
 | 03 | Custom homepage and configurable feed navigation | Partial | Default homepage selection across existing Popular, Trending, Search, Subscriptions and Playlists destinations; shared feed-menu priorities order native navigation and Home discovery chips. Guests fall back to public browsing for account-only homepages. | Full web menu visibility/removal: native core navigation destinations remain reachable and Popular/Trending share Home. |
 | 04 | Search across videos, channels and playlists, with filters | Partial | Videos remain the default; Playlists & mixes uses typed playlist search, pagination, source labels and preserved mix seeds. Video relevance/views, date/duration filters, links and content-visibility controls remain available. | Channel search result cards and the remaining advanced web filters. |
-| 05 | Channel browsing and specialized tabs | Partial | Name, subscriber count, plain-text description; available Videos/Streams/Playlists tabs, continuation pagination, selected-tab restoration after search, and playlist Last added/Newest/Oldest sorting; channel subscribe/unsubscribe and RSS. | Shorts, Podcasts, Releases, Courses, Clips, Posts and related Channels tabs; video sorting; banner/avatar/verification/pronoun presentation and expandable rich description. Tabs depend on channel availability. |
+| 05 | Channel browsing and specialized tabs | Partial | Avatar, name, subscriber count, plain-text description; available Videos/Streams/Playlists tabs, continuation pagination, selected-tab restoration after search, and playlist Last added/Newest/Oldest sorting; channel subscribe/unsubscribe and RSS. | Shorts, Podcasts, Releases, Courses, Clips, Posts and related Channels tabs; video sorting; banner/verification/pronoun presentation and expandable rich description. Tabs depend on channel availability. |
 | 06 | Search within a channel or the subscription library | Implemented | Search fields on channel and Subscriptions screens; public paginated channel video search independent of Videos/Streams; authenticated full-library title/channel subscription search, original-page pagination and saved search visibility controls. Clear restores the selected channel tab or configured feed. Icon, keyboard Search and physical Enter share submission, including pasted links on general Search. | — for the core capability; subscription search requires the sibling API update and renewed native tokens. Native runtime/layout acceptance remains unverified. |
 | 07 | Community posts and post comments | Not implemented | — | Community/post pages, media/polls and their read-only comment threads. |
 | 08 | Hashtag browsing | Not implemented | — | Hashtag result pages and navigable hashtag links. |
@@ -288,3 +288,23 @@ remain unverified; see `VERIFICATION.md`.
 
 [a-comments]: android/app/src/main/java/net/wingress/mobivious/data/Comments.kt
 [a-comments-ui]: android/app/src/main/java/net/wingress/mobivious/ui/CommentsUi.kt
+
+## Channel avatar visibility — 4 October 2026
+
+Android now displays circular avatars in channel/watch headers, subscription chips,
+comments/replies and creator hearts, shared video cards (including recommendations,
+history, playlists and queues), and YouTube playlist creator rows. Video titles
+retain their full width; thin mode omits avatars and a channel's own upload/stream
+lists suppress repeated owner images. The same author action handles image/name
+navigation. Missing/loading/failed images retain a themed initial or person icon.
+
+Existing JSON responses gain optional `authorThumbnails` from supplied metadata or
+the existing migration 21 cache, with batched page/nested-entry reads and no extra
+YouTube metadata requests. Images use the selected instance's `/ggpht` proxy with
+query preservation, a shared native cache, and no credentials or redirects. No
+additional migration, endpoint or token scope is introduced. Install a new app
+build and deploy the additive server API update for full cached-list coverage.
+Row 05 remains Partial for the remaining channel-page capabilities.
+
+Validation and outstanding native device/screenshot checks are recorded in
+VERIFICATION.md. No installation, deployment or release publication was performed.

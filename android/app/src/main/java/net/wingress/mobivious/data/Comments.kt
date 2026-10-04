@@ -26,9 +26,8 @@ data class CommentPage(val items: List<Comment>, val continuation: String = "", 
         fun parse(json: JSONObject): CommentPage = CommentPage(json.optJSONArray("comments")?.objects().orEmpty().map { c ->
             val replies = c.optJSONObject("replies")
             Comment(c.text("author").ifBlank { "Unknown author" }, c.text("content"), c.text("publishedText"), c.optLong("likeCount").coerceAtLeast(0),
-                c.text("commentId"), c.text("authorId"), c.text("authorUrl"), c.text("authorThumbnail").ifBlank {
-                    c.optJSONArray("authorThumbnails")?.objects()?.lastOrNull()?.text("url").orEmpty()
-                }, c.text("contentHtml"), c.optBoolean("isEdited"), c.optBoolean("verified"),
+                c.text("commentId"), c.text("authorId"), c.text("authorUrl"), Avatars.parse(c),
+                c.text("contentHtml"), c.optBoolean("isEdited"), c.optBoolean("verified"),
                 c.optBoolean("authorIsChannelOwner"), c.optBoolean("isPinned"), c.optBoolean("isSponsor"),
                 c.optJSONObject("creatorHeart")?.let { CreatorHeart(it.text("creatorName"), it.text("creatorThumbnail")) },
                 replies?.optInt("replyCount")?.coerceAtLeast(0) ?: 0, replies?.text("continuation").orEmpty())

@@ -91,6 +91,16 @@ Search action and physical Enter submit through the same handler; general Search
 also retains pasted-link timestamp handling. Subscription search and organized
 history require the sibling API update. After deployment, sign out and sign in for
 the new subscription-search token scope; history needs no new scope or migration.
+Channel avatars appear in channel/watch headers, subscription channels, comments,
+video author rows, recommendations, history, queues and YouTube playlist creators.
+Missing or failed images retain a themed initial or person icon. Thin mode omits
+avatars, and a channel's own upload/stream lists avoid repeating its image.
+Avatar images use only the selected instance's existing `/ggpht` proxy, with a
+shared image cache and no credentials or redirects. No extra YouTube channel/video
+metadata requests are added. Cached listings gain optional avatar URLs through the
+sibling API update and existing migration 21; no new token scope is needed.
+Older servers remain usable with available response images and placeholders.
+
 The service-owned player supports adaptive streams, seeking, speed/quality/audio
 selection, background playback, system media controls, mini-player, fullscreen,
 audio only and picture in picture. The embedded and fullscreen player share fading

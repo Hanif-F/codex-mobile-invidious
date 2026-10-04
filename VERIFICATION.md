@@ -843,3 +843,75 @@ are saved by the interaction tests to
 `/data/local/tmp/mobivious-comments-screenshots/`; inspect them and repeat the drawer
 flow in landscape. No production deployment, app installation, release/version
 change, server API change, migration or new token permission was performed.
+
+## Channel avatar visibility — 4 October 2026
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 156 passed, including 10 avatar tests; zero failures/errors |
+| Debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed: zero errors; no findings in the new avatar files |
+| Focused Crystal avatar specs | Nine passed |
+| Normal and API-only Invidious executable builds | Passed |
+| Production frontend/native avatar cache fixtures | Passed, including zero-added-metadata-request assertions |
+| Disposable localhost avatar API/image fixture | Passed |
+| New native Compose scenarios | Eight compiled; not executed |
+| Native runtime, layout and screenshots | Unverified: `adb devices -l` returned no connected devices |
+
+Android tests cover singular/array/malformed avatar metadata across videos,
+channels, playlists and comments; history retention; fixed-instance URL mapping;
+path/query preservation; uniform sizing; instance-specific cache keys; Unicode
+initials/person fallback; thin mode and owner suppression; unchanged metadata
+request count; credential-free image requests and redirect refusal.
+
+Crystal specs verify a single unique-ID cache lookup across nested response
+records, supplied-image precedence and sharing, optional cache read/write failure
+isolation, invalid-image rejection, preservation of other metadata and occurrence
+indexes, and unchanged query values during image sizing. The production-template
+fixture uses the real optional cache services and the existing metadata spy to
+verify native response enrichment/cache learning without upstream requests. It
+also retains the existing web avatar request-budget and failure checks.
+
+The HTTP fixture validates discovery, channel, watch/recommendation, subscription,
+playlist, history and comment avatar payloads. Metadata requests do not fetch
+images. Explicit image requests preserve queries, use public cache headers, omit
+bearer/cookie credentials, and return a controlled failure when requested. These
+checks use local media and do not establish live YouTube image availability.
+
+Four new presentation scenarios cover light/dark themes, 200% fonts at narrow
+width, merged author navigation, fixed avatar sizes, thin-mode suppression and
+creator-heart readability. Four interaction scenarios cover browsing/channel/watch
+and queue reuse, comments/replies/hearts, subscription/history/playlist cards and
+headers, and thin-mode/image failures. They have compiled but have **not executed**.
+Screenshots are configured under `/data/local/tmp/mobivious-avatar-screenshots/`
+when run on a working device. Native layout, accessibility and interactions remain
+acceptance checks; compilation is not a substitute for those checks.
+
+Repeat Android checks:
+
+```bash
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+```
+
+Run `python3 scripts/check-avatar-fixture.py` from this repository after generating
+local test media with the existing Android fixture script. With a working device,
+run `scripts/test-android.sh` and inspect the avatar screenshots.
+
+Repeat focused backend checks in the sibling Invidious checkout:
+
+```bash
+crystal spec spec/invidious/frontend/channel_avatars_spec.cr spec/invidious/jsonify/channel_avatars_spec.cr
+crystal run tests/frontend/render_fixtures.cr
+crystal build src/invidious.cr -o /tmp/invidious-avatars
+crystal build src/invidious.cr -D api_only -o /tmp/invidious-avatars-api
+```
+
+Full cached-list coverage needs the additive server API update and the existing
+migration 21 cache, plus installation of a new app build. This change adds no new
+migration, endpoint, token scope or sign-in requirement. Older servers retain
+available response images and placeholders. Ordinary `/ggpht` downloads can still
+contact YouTube's image CDN; no additional channel/video metadata lookup is added.
+No production deployment, app installation, version change or release publication
+was performed.

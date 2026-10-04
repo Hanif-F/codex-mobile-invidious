@@ -7,7 +7,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 data class Video(val id: String, val title: String, val author: String = "", val channelId: String = "",
     val thumbnail: String = "", val duration: Long = 0, val views: Long = 0, val published: String = "",
     val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false,
-    val history: HistoryMetadata? = null, val playlistIndex: Int? = null)
+    val history: HistoryMetadata? = null, val playlistIndex: Int? = null, val authorAvatar: String = "")
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,
@@ -26,7 +26,7 @@ data class Channel(val id: String, val name: String, val description: String = "
 }
 data class Playlist(val id: String, val title: String, val count: Int, val privacy: String = "public", val description: String = "",
     val thumbnail: String = "", val author: String = "", val channelId: String = "", val owned: Boolean = false,
-    val saved: Boolean = false, val seedVideoId: String? = null) {
+    val saved: Boolean = false, val seedVideoId: String? = null, val authorAvatar: String = "") {
     val mix get() = id.startsWith("RD")
     val sourceLabel get() = if (owned) "My playlist" else if (mix) "Mix" else if (id.startsWith("IV")) "Invidious playlist" else "YouTube playlist"
 }
@@ -82,7 +82,7 @@ object ApiParser {
         json.text("authorId", json.text("channel_id")), thumbnail(json),
         json.optLong("lengthSeconds", json.optLong("length_seconds")), json.optLong("viewCount"),
         json.text("publishedText", json.text("latest_watched")), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title") || json.text("author") == "[Deleted video]" || json.text("title") in listOf("[Deleted video]", "[Private video]"), json.opt("isMember") == true,
-        playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null)
+        playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null, authorAvatar = Avatars.parse(json))
     fun videos(array: JSONArray): List<Video> = array.objects().filter { it.text("videoId", it.text("video_id")).isNotBlank() }.map(::video)
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",
@@ -111,10 +111,10 @@ object ApiParser {
         return Playlist(id, json.text("title"), json.optInt("videoCount", if (id.startsWith("RD")) -1 else 0),
             json.text("privacy", if (owned) "private" else "public").lowercase(), json.text("description"),
             thumbnail, json.text("author"), json.text("authorId"), owned,
-            json.optBoolean("isSaved", legacyOwned && !id.startsWith("IV")), seed)
+            json.optBoolean("isSaved", legacyOwned && !id.startsWith("IV")), seed, Avatars.parse(json))
     }
     fun playlists(array: JSONArray) = array.objects().filter { it.text("playlistId", it.text("mixId")).isNotBlank() }.map { playlist(it) }
     fun channel(json: JSONObject) = Channel(json.text("authorId"), json.text("author"), json.text("description"), json.text("subCountText", json.optLong("subCount").toString()),
-        json.optJSONArray("authorThumbnails")?.objects()?.lastOrNull()?.text("url") ?: "",
+        Avatars.parse(json),
         json.optJSONArray("tabs")?.let { tabs -> (0 until tabs.length()).mapNotNull { tabs.opt(it) as? String } } ?: emptyList())
 }

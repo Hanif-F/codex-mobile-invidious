@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -28,9 +27,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -41,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import net.wingress.mobivious.data.*
@@ -65,6 +63,7 @@ internal fun CommentsEntry(state: CommentsState, open: () -> Unit) {
 @Composable
 internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Modifier,
     channel: (String) -> Unit, link: (String) -> Unit) {
+    val prefs by vm.preferences.collectAsStateWithLifecycle()
     val mainList = remember(state.videoId, state.context, state.sort) {
         LazyListState(state.feed.position.index, state.feed.position.offset)
     }
@@ -102,13 +101,13 @@ internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Mo
             LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag(if (thread == null) "comments-list" else "comment-replies-list"),
                 state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
                 if (thread != null) item(key = "parent") {
-                    CommentRow(thread.parent, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link, parent = true)
+                    CommentRow(thread.parent, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link, parent = true, thinMode = prefs.thinMode)
                     Text("Replies", Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() },
                         style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
                 items(feed.page.items, key = { "comment:${it.key}" }) { comment ->
                     CommentRow(comment, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link,
-                        replies = if (thread == null) ({ vm.openReplies(comment) }) else null)
+                        replies = if (thread == null) ({ vm.openReplies(comment) }) else null, thinMode = prefs.thinMode)
                 }
                 if (feed.loading) item { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(Modifier.size(28.dp)); Text("Loading ${if (thread == null) "comments" else "replies"}…", Modifier.padding(top = 12.dp))
@@ -139,25 +138,20 @@ internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Mo
 
 @Composable
 internal fun CommentRow(comment: Comment, server: String, videoId: String, channel: (String) -> Unit,
-    link: (String) -> Unit, replies: (() -> Unit)? = null, parent: Boolean = false) {
+    link: (String) -> Unit, replies: (() -> Unit)? = null, parent: Boolean = false, thinMode: Boolean = false) {
     val validAuthor = ContentVisibility.validChannel(comment.authorId)
     val canOpenAuthor = validAuthor || CommentLinks.resolve(comment.authorUrl, server, videoId) != null && comment.authorUrl.isNotBlank()
     val authorClick = { if (validAuthor) channel(comment.authorId) else if (comment.authorUrl.isNotBlank()) link(comment.authorUrl) }
-    val authorModifier = if (canOpenAuthor) Modifier.clickable(onClickLabel = "Open ${comment.author}'s channel", onClick = authorClick) else Modifier
     Column(Modifier.fillMaxWidth().background(if (parent) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
         .testTag(if (parent) "comment-parent" else "comment-row-${comment.key}")) {
         Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer).then(authorModifier),
-                contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Person, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                if (comment.avatar.isNotBlank()) AsyncImage(resolved(server, comment.avatar), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (comment.pinned) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Default.PushPin, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Pinned", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text(comment.author, authorModifier, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.labelLarge)
+                ChannelAuthor(server, comment.avatar, comment.author, !thinMode, size = 40.dp,
+                    modifier = Modifier.fillMaxWidth(), tag = "comment-avatar-${comment.key}", onClick = authorClick.takeIf { canOpenAuthor })
                 if (comment.creator || comment.verified || comment.member) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (comment.creator) Text("Creator", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                     if (comment.verified) Icon(Icons.Default.Verified, "Verified author", Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
@@ -175,7 +169,7 @@ internal fun CommentRow(comment: Comment, server: String, videoId: String, chann
                     comment.heart?.let { heart -> Row(Modifier.semantics(mergeDescendants = true) {
                         contentDescription = "Hearted by ${heart.name.ifBlank { "the creator" }}"
                     }, verticalAlignment = Alignment.CenterVertically) {
-                        if (heart.thumbnail.isNotBlank()) AsyncImage(resolved(server, heart.thumbnail), null, Modifier.size(18.dp).clip(CircleShape))
+                        if (!thinMode && heart.thumbnail.isNotBlank()) ChannelAvatar(server, heart.thumbnail, heart.name, 18.dp, "comment-heart-avatar-${comment.key}")
                         Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     } }
                 }

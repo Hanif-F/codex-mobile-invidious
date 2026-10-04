@@ -35,7 +35,8 @@ def rich_formats():
     return formats
 video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', author='Mobivious Studio',
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
-             videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')])
+             videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
+             authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
 default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
                      autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
@@ -46,14 +47,14 @@ default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=F
 prefs = default_prefs.copy()
 state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0,
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
-             originalMode='unlocked', titleLookups={}, contributions=[])
+             originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
 def reset_comments():
     state.update(commentRequests=[], commentFailNext=False, commentDelayNext=0, commentEmpty=False)
 reset_comments()
 
 def fixture_comment(id, author='Viewer', text=None, **extra):
     return dict(commentId=id, author=author, authorId=video['authorId'], authorUrl='/channel/' + video['authorId'],
-                authorThumbnail='/media/thumbnail.jpg', content=text or ('Comment body ' + id), likeCount=3,
+                authorThumbnail='/ggpht/commenter=s48', content=text or ('Comment body ' + id), likeCount=3,
                 publishedText='today', **extra)
 
 def source_playlist(id='PLlive'):
@@ -63,7 +64,7 @@ def source_playlist(id='PLlive'):
                     videos=[dict(video, index=0), dict(recommended, index=1)])
     return dict(type='playlist', playlistId=id, title=state['sourceTitle'], videoCount=2, privacy='unlisted',
                 isOwned=False, isSaved=id in state['savedPlaylists'], author='Source owner', authorId=video['authorId'],
-                playlistThumbnail='/media/thumbnail.jpg', videos=[dict(video, index=0), dict(recommended, index=1)])
+                playlistThumbnail='/media/thumbnail.jpg', authorThumbnails=video['authorThumbnails'], videos=[dict(video, index=0), dict(recommended, index=1)])
 
 replacement = 'A calm scene'
 recommended = dict(video, videoId='testvideo02', title='Another original title')
@@ -143,7 +144,7 @@ class Handler(BaseHTTPRequestHandler):
             time.sleep(min(5000, max(0, delay['millis'])) / 1000)
         try:
             if tab == 'metadata':
-                return self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description='Fixture channel', subCount=42, tabs=tabs))
+                return self.respond(dict(author='Mobivious Studio', authorId=video['authorId'], description='Fixture channel', subCount=42, tabs=tabs, authorThumbnails=video['authorThumbnails']))
             if token is not None and not token.strip():
                 return self.respond(dict(error='Error: non 200 status code. Youtube API returned status code 400.'), 500)
             if state['channelFailNext']:
@@ -190,7 +191,21 @@ class Handler(BaseHTTPRequestHandler):
         p = url.path
         if p.startswith(('/api/v1/auth/dearrow/', '/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels', '/api/v1/auth/subscriptions/search')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
-        if p.startswith('/media/'):
+        if p.startswith('/ggpht/'):
+            state['avatarRequests'].append(dict(path=self.path, authorized=bool(self.headers.get('Authorization')), cookie=bool(self.headers.get('Cookie'))))
+            if state['avatarFail']: return self.respond({}, 404)
+            # Serve only local test media; no upstream requests are possible.
+            file = args.media_dir / 'thumbnail.jpg'
+            if not file.is_file(): return self.respond({}, 404)
+            data = file.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Cache-Control', 'public, max-age=86400')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            try: self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError): pass
+        elif p.startswith('/media/'):
             state['mediaRequests'] += 1
             root = args.media_dir.resolve()
             file = (root / p.removeprefix('/media/')).resolve()
@@ -240,7 +255,7 @@ class Handler(BaseHTTPRequestHandler):
         elif p.endswith('/submissions') and p.startswith('/api/v1/auth/dearrow/'):
             self.respond(dict(error='Fixture submissions unavailable') if state['failSubmissions'] else dict(titles=submissions()), 502 if state['failSubmissions'] else 200)
         elif p == '/api/v1/auth/preferences': self.respond(prefs)
-        elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId=video['authorId'])])
+        elif p == '/api/v1/auth/subscriptions': self.respond([dict(author='Mobivious Studio', authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])])
         elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
         elif p == '/api/v1/auth/feed/rss': self.respond(dict(feedPath='/feed/private?token=fixture-rss-secret'))
         elif p == '/api/v1/auth/subscriptions/export':
@@ -277,7 +292,7 @@ class Handler(BaseHTTPRequestHandler):
             state['historyRequests'].append(dict(q=q, page=page))
             catalog = {v['videoId']: v for v in [video, recommended, unknown_video, live_video]}
             saved = {e['video_id']: e for e in state['historyEntries']}
-            entries = [saved.get(id, dict(video_id=id, title=catalog.get(id, {}).get('title'), channel_name=video['author'], channel_id=video['authorId'], length_seconds=catalog.get(id, {}).get('lengthSeconds', 0))) for id in reversed(state['watched'])]
+            entries = [saved.get(id, dict(video_id=id, title=catalog.get(id, {}).get('title'), channel_name=video['author'], channel_id=video['authorId'], length_seconds=catalog.get(id, {}).get('lengthSeconds', 0), authorThumbnails=video['authorThumbnails'])) for id in reversed(state['watched'])]
             organized = params.get('organized') == ['true'] and not state['historyLegacy']
             if organized:
                 entries = [e for e in entries if not q or q in (e.get('title') or '').lower() or q in (e.get('channel_name') or '').lower()]
@@ -318,7 +333,7 @@ class Handler(BaseHTTPRequestHandler):
         parent = fixture_comment('parent', author='Fixture creator', text='A test comment. Jump to 0:30. 😀',
             contentHtml='<b>A test comment.</b><br>Jump to <a href="/watch?v=' + video_id + '&amp;t=30">0:30</a>. 😀 <img src="/media/thumbnail.jpg" alt=":wave:" />',
             authorIsChannelOwner=True, verified=True, isPinned=True, isEdited=True, isSponsor=True,
-            creatorHeart=dict(creatorName='Mobivious Studio', creatorThumbnail='/media/thumbnail.jpg'),
+            creatorHeart=dict(creatorName='Mobivious Studio', creatorThumbnail='/ggpht/studio=s88'),
             replies=dict(replyCount=3, continuation='replies+/page=1%&'))
         replies = [fixture_comment('reply1', author='First reply'), fixture_comment('reply2', author='Second reply')]
         if token == 'replies+/page=1%&':
@@ -346,10 +361,14 @@ class Handler(BaseHTTPRequestHandler):
             state['playlists'] = [dict(playlistId='IVqueue', title='Queue fixture', privacy='private', videoCount=3, videos=[dict(video, indexId='A', index=0), dict(video, indexId='B', index=1), dict(recommended, indexId='C', index=2)])]
             state['failPlaylistSave'] = bool(data.get('failSave', False))
             return self.respond(state)
+        elif p == '/test/avatars':
+            state['avatarFail'] = data.get('fail', False)
+            state['avatarRequests'] = []
+            return self.respond(status=204)
         elif p == '/test/reset':
             state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
-                         originalMode='unlocked', titleLookups={}, contributions=[])
+                         originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
             prefs.clear()
             prefs.update(default_prefs)
             reset_sponsorblock()

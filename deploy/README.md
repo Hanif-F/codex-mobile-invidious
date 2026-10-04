@@ -109,3 +109,18 @@ Sign out and sign in after the server update to obtain the exact
 scope. This update adds no database migration, secret, or key rotation. On older
 servers the app retains basic history viewing and explains why history search or
 subscription search needs an update. Building the APK does not deploy the server.
+
+## Channel avatar API coverage
+
+Deploy the additive avatar response update from the sibling Invidious checkout
+and install a new Android build for avatars across the native app. The server
+reuses the existing **migration 21** `channel_avatars` cache; ensure that existing
+migration has run on installations still using an earlier schema. No additional
+migration, endpoint, token scope or sign-out/sign-in is required by this update.
+
+Response-provided images retain priority; cache misses and cache failures use
+placeholders without fetching channel/video metadata. Images use the existing
+fixed-host `/ggpht` proxy, which now preserves query parameters. Normal image
+requests may still reach YouTube's image CDN. Older servers remain usable with
+available response images/placeholders. Native runtime and screenshot acceptance
+are pending; see `../VERIFICATION.md` for validation and repeat commands.

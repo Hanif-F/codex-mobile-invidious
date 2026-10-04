@@ -13,6 +13,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import net.wingress.mobivious.data.Playlist
+import net.wingress.mobivious.data.Avatars
+import net.wingress.mobivious.data.ContentVisibility
 
 @Composable
 internal fun PlaylistSubscriptionButton(vm: AppViewModel, list: Playlist, signIn: () -> Unit) {
@@ -48,7 +50,7 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
                     Text(list.title, fontWeight = FontWeight.SemiBold)
                     Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    if (list.author.isNotBlank()) Text(list.author, style = MaterialTheme.typography.bodySmall)
+                    if (list.author.isNotBlank()) PlaylistAuthor(vm, list, prefs.thinMode)
                     if (!list.mix && list.count >= 0) Text("${list.count} videos", style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -59,13 +61,14 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
 
 @Composable
 internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, edit: () -> Unit, delete: () -> Unit, signIn: () -> Unit) {
+    val prefs by vm.preferences.collectAsStateWithLifecycle()
     val library by vm.playlists.collectAsStateWithLifecycle()
     val owned = list.owned || library.any { it.id == list.id && it.owned }
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
     Column(Modifier.padding(horizontal = 16.dp).testTag("playlist-header")) {
         Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-        if (list.author.isNotBlank()) Text(list.author)
+        if (list.author.isNotBlank()) PlaylistAuthor(vm, list, prefs.thinMode)
         if (!list.mix && list.count >= 0) Text("${list.count} videos")
         if (list.description.isNotBlank()) Text(list.description, style = MaterialTheme.typography.bodySmall)
         Row(Modifier.horizontalScroll(rememberScrollState())) {
@@ -78,4 +81,12 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
             }
         }
     }
+}
+
+@Composable
+private fun PlaylistAuthor(vm: AppViewModel, list: Playlist, thinMode: Boolean) {
+    val valid = ContentVisibility.validChannel(list.channelId)
+    ChannelAuthor(vm.store.server, list.authorAvatar, list.author, valid && Avatars.show(thinMode, list.channelId),
+        modifier = Modifier.fillMaxWidth(), tag = "playlist-avatar-${list.id}",
+        onClick = if (valid) ({ vm.navigate(vm.tab, "channel:${list.channelId}") }) else null)
 }
