@@ -1213,3 +1213,21 @@ session tables and requires no new migration. Deploy the sibling server update
 and renew mobile sign-in for the explicit management scopes before production use.
 No production account, deployment, migration, signing version or release publishing
 was changed.
+
+
+## Mobivious 0.5.0 release preparation — 4 October 2026
+
+The release version is 0.5.0 with version code 7. `scripts/build-release.sh`
+passed all 184 unit/API tests, built the signed release APK and passed release
+lint (zero errors, 42 warnings). `apksigner verify --print-certs` verified the APK
+and confirmed the same signer certificate as the published 0.4.0 APK, preserving
+in-place updates. APK metadata confirms `net.wingress.mobivious`, Android 8+
+(minimum SDK 26), target SDK 37 and all four supported CPU architectures.
+
+Release files are `artifacts/Mobivious-0.5.0.apk` and its `.apk.sha256` file.
+The APK SHA-256 is
+`73609c994bb2f4a61a8e61c1f80a9ddfe87fcd1a3da930a8636f6db028eeb072`.
+The planned GitHub tag is `v0.5.0`; release notes include changes since 0.4.0,
+server compatibility, renewed sign-in requirements and the device-validation
+limitation. Native runtime acceptance remains unverified as described above.
+Preparing or publishing this APK does not deploy the sibling server.
