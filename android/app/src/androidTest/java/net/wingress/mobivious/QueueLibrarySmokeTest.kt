@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.test.*
 import androidx.media3.common.C
+import androidx.media3.common.Timeline
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -42,7 +43,10 @@ class QueueLibrarySmokeTest {
         waitFor { !activity.model.queue.value.loading && activity.model.playback.value.playing }
     }
     private fun finishCurrent() { ui { activity.model.seekTo(119_700) } }
-    private fun showQueue() = compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+    private fun showQueue() {
+        waitFor { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+    }
     private fun recreateActivity() {
         val old = activity
         ui { old.recreate() }
@@ -122,6 +126,33 @@ class QueueLibrarySmokeTest {
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
         assertFalse(activity.model.queue.value.hasExplicitQueue)
         compose.onNodeWithTag("playback-queue").assertDoesNotExist()
+    }
+    @Test fun invalidQueueDurationsKeepTheServiceTimelineAndPlaybackUsable() {
+        ui { activity.model.play("testvideo01"); activity.sharedVideo.value = true }
+        waitFor { activity.model.playback.value.playing }
+        val active = activity.model.queue.value.currentKey
+        listOf(-1L, Long.MAX_VALUE, 0L, 120L).forEach { duration ->
+            val size = activity.model.queue.value.items.size
+            ui { activity.model.insertQueue(Video("testvideo02", "Duration $duration", duration = duration), false) }
+            waitFor {
+                var visible = false
+                ui {
+                    visible = activity.model.queue.value.items.size == size + 1 &&
+                        activity.model.controller.value?.currentTimeline?.windowCount == size + 1
+                }
+                visible
+            }
+            ui {
+                val timeline = activity.model.controller.value!!.currentTimeline
+                val window = timeline.getWindow(size, Timeline.Window())
+                assertEquals(if (duration == 120L) 120_000_000L else C.TIME_UNSET, window.durationUs)
+            }
+            assertEquals(active, activity.model.queue.value.currentKey)
+            assertTrue(activity.model.playback.value.playing)
+        }
+        ui { activity.model.selectQueue(activity.model.queue.value.items[1].key) }
+        waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
+        assertNull(activity.model.playback.value.error)
     }
     @Test fun playlistLaunchLinkDoesNotRestartTheQueueOnRecreation() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()

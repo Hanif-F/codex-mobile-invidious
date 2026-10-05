@@ -2,7 +2,6 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.*
@@ -15,7 +14,7 @@ import java.net.URL
 @RunWith(AndroidJUnit4::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class VisibilitySmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val first = "UC" + "a".repeat(22)
     private fun until(condition: () -> Boolean) = compose.waitUntil(30_000, condition)

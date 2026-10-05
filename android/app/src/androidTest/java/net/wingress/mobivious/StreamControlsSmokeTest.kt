@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.content.Intent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -26,7 +25,7 @@ import java.net.URL
 @RunWith(AndroidJUnit4::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class StreamControlsSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private fun until(condition: () -> Boolean) = compose.waitUntil(40_000, condition)
     private fun command(path: String, body: String = "{}") {
@@ -100,8 +99,12 @@ class StreamControlsSmokeTest {
         compose.runOnUiThread { activity.model.refreshBuffer() }
         until { activity.model.playback.value.playerState == Player.STATE_READY }
         assertEquals(videoKey, selected(C.TRACK_TYPE_VIDEO)?.key); assertEquals(audioKey, selected(C.TRACK_TYPE_AUDIO)?.key)
+        val detailsBeforeRetry = state().getJSONArray("videoDetailRequests").length()
         compose.runOnUiThread { activity.model.retryPlayback() }
-        until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_VIDEO)?.key == videoKey }
+        until { state().getJSONArray("videoDetailRequests").length() > detailsBeforeRetry }
+        until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
+            selected(C.TRACK_TYPE_VIDEO)?.key == videoKey && selected(C.TRACK_TYPE_AUDIO)?.key == audioKey &&
+            activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
         assertEquals(audioKey, selected(C.TRACK_TYPE_AUDIO)?.key)
         assertEquals(.25f, activity.model.playback.value.speed)
         assertFalse(activity.model.playback.value.playWhenReady)

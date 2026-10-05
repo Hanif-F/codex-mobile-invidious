@@ -2,7 +2,6 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
@@ -18,7 +17,7 @@ import java.net.URL
 @RunWith(AndroidJUnit4::class)
 @OptIn(coil.annotation.ExperimentalCoilApi::class)
 class AvatarsSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val server = "http://127.0.0.1:18080"
     private fun until(condition: () -> Boolean) = compose.waitUntil(20_000, condition)
@@ -87,7 +86,7 @@ class AvatarsSmokeTest {
         until { activity.model.queue.value.hasExplicitQueue && activity.model.queueExpanded.value }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
         compose.onNodeWithTag("playback-queue-items").performScrollToNode(hasTestTag("queue-occurrence-${activity.model.queue.value.currentKey}"))
-        compose.onAllNodesWithTag("video-avatar-testvideo01", true).assertCountEquals(1)
+        compose.onAllNodes(hasTestTag("video-avatar-testvideo01") and hasAnyAncestor(hasTestTag("playback-queue-items")), true).assertCountEquals(1)
         compose.waitForIdle()
         assertEquals(before, state().getJSONArray("avatarRequests").length())
         screenshot("queue")

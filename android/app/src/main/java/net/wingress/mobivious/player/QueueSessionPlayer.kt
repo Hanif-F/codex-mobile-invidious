@@ -5,6 +5,10 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import net.wingress.mobivious.data.*
 
+/** Unresolved queue metadata must fit Media3's duration contract without overflow. */
+internal fun queueDurationUs(seconds: Long): Long =
+    if (seconds > 0 && seconds <= Long.MAX_VALUE / 1_000_000) seconds * 1_000_000 else C.TIME_UNSET
+
 /** A logical timeline with one lazily resolved ExoPlayer item. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordinator,
@@ -22,7 +26,7 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
             // Keep the real active window, including live-edge timing and manifest state.
             val real = base.playlist.getOrNull(base.currentMediaItemIndex).takeIf { active }
             (real?.buildUpon()?.setUid(entry.key) ?: MediaItemData.Builder(entry.key)
-                .setIsSeekable(true).setDurationUs(entry.video.duration * 1_000_000))
+                .setIsSeekable(true).setDurationUs(queueDurationUs(entry.video.duration)))
                 .setMediaItem(item).setMediaMetadata(item.mediaMetadata).build()
         }.toMutableList()
         val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0

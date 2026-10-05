@@ -6,7 +6,6 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
@@ -21,7 +20,7 @@ import java.net.URL
 /** Requires scripts/fixture-server.py on port 18080 and `adb reverse tcp:18080 tcp:18080`. */
 @RunWith(AndroidJUnit4::class)
 class AppSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     @Before fun launchActivity() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -92,6 +91,26 @@ class AppSmokeTest {
         instrumentation.uiAutomation.executeShellCommand("screencap -p /data/local/tmp/mobivious-player-screenshots/$name-$mode.png").let { descriptor ->
             android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { it.readBytes() }
         }
+    }
+    @Test fun repeatedRecommendationsRenderOnceAndKeepPlaybackUsable() {
+        command("reset")
+        command("stream", """{"type":"dash","duplicateRecommendations":true}""")
+        compose.runOnUiThread {
+            activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences(thinMode = true))
+            activity.model.refreshSharedSettings()
+            activity.model.play("testvideo01")
+            activity.sharedVideo.value = true
+        }
+        waitFor(40_000) { activity.model.playback.value.playing }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-up-next"))
+        compose.onAllNodesWithTag("video-card-testvideo02").assertCountEquals(1)
+        compose.onNodeWithTag("video-card-testvideo03").assertExists()
+        assertEquals(listOf("testvideo02", "testvideo03"), activity.model.playback.value.details!!.recommendations.map { it.id })
+        assertTrue(activity.model.playback.value.playing)
+        compose.onNode(hasText("Another original title") and hasAnyAncestor(hasTestTag("video-card-testvideo02")))
+            .performScrollTo().performClick()
+        waitFor(40_000) { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
+        assertNull(activity.model.playback.value.error)
     }
     @Test fun unifiedControlsGesturesAndFullscreen() {
         openFixture()

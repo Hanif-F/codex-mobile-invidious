@@ -1943,3 +1943,98 @@ JAVA_HOME=/opt/android-studio/jbr "$HOME/Android/Sdk/build-tools/36.0.0/apksigne
 cd artifacts
 sha256sum -c Mobivious-0.5.4.apk.sha256
 ```
+
+## General follow-up and renewed crash priority — 5 October 2026
+
+The general suite finished with **149 of 174 device tests passing**. The next
+focused follow-up finished with **44 of 55 passing**, eleven assertion, timeout
+or Compose test-hierarchy failures, and no fatal entries in its individual test
+logs. Reports are `general-resumed-device-run.xml` and
+`general-followup-device-run.xml` under
+`artifacts/quality-review-2026-10-05/`. These runs do not establish complete device
+acceptance.
+
+Before the user narrowed the current priority to crashes, a delayed account
+preferences regression reproduced unwanted navigation from Library/history to
+Subscriptions. Preference completion now checks the navigation revision before
+applying the default home. The history-preservation and untouched-default-home
+regressions passed; the companion explicit-discovery/playback test still failed
+its watch-details rendering assertion. Service activity tests consistently use
+the queued Compose dispatcher, and targeted selectors/waits were tightened. The
+remaining general failures are retained in `remaining-device-checks.md` and are
+deferred while crash investigation takes priority. The broader general goal
+remains active.
+
+A new focused queue regression then reproduced an actual **main-thread fatal
+exception in `net.wingress.mobivious.debug`**: a queued video with negative
+`lengthSeconds` reached `SimpleBasePlayer.MediaItemData.Builder.setDurationUs`
+through `QueueSessionPlayer.getState`. The exception can occur again in the
+player listener after an initial command update, so catching the queue command
+alone would not resolve it. Baseline XML, build output and logcat are preserved
+as `duration-crash-before-fix*` in the same artifact directory.
+
+Unresolved queue durations now use Media3's unknown-duration value when metadata
+is zero, negative or too large to convert from seconds to microseconds. Positive
+representable values retain their duration, and the active manifest timeline
+retains its decoded duration. A JVM regression exercises numeric boundaries
+through the actual Media3 builder; a device regression checks insertion,
+continued playback and advancement with negative, overflowing, unknown and
+normal metadata.
+
+The crash-focused follow-up passed **9 of 9 device tests**, including the new
+duration regression and the eight previously passing crash scenarios. All
+**237 JVM tests** and debug lint passed; the complete focused build succeeded.
+None of the nine individual test logs contains a fatal entry. The expected
+before-fix crash remains in Android's historical crash buffer and is not a new
+after-fix failure. The device XML, per-test crash audit and successful build log
+are saved as `crash-duration-after-fix-device-run.xml`,
+`crash-duration-after-fix-audit.json` and `crash-duration-after-fix-build.log` in
+the same artifact directory. Testing used the user-started `emulator-5554`; no
+emulator was launched or restarted and no live account was used. The general
+goal remains active, with further work prioritized around reproducible crashes.
+
+## Repeated recommendation crash — 5 October 2026
+
+The next crash review reproduced another duplicate-key failure using a fixture
+video response with two recommendations for `testvideo02`. The watch list uses
+video IDs as its item keys, while the detail parser previously retained both
+results. The before-fix device regression threw `Key "testvideo02" was already
+used` during list layout.
+
+The same fixture response was checked outside instrumentation: the debug app
+launched normally with guest localhost settings and then exited with a
+main-thread `AndroidRuntime` fatal exception for the duplicate key (PID 22992).
+This confirms a production rendering failure, separately from the earlier
+instrumentation frame-clock exception. Baseline XML, build output, test logcat
+and native logcat are saved as `recommendations-crash-before-fix*` in
+`artifacts/quality-review-2026-10-05/`.
+
+Video detail parsing now retains only the first recommendation for each video
+ID, preserving server order and first-result metadata. General video parsing
+still retains distinct playlist occurrences. A JVM regression checks both
+contracts, and the fixture-backed device regression checks rendering,
+continued playback and opening the recommended video. Its first after-fix run
+passed the rendering assertions and the nine other crash tests, but timed out
+after tapping the card container; the test now taps the actual video title.
+
+The completed rerun passed **10 of 10 crash-focused device regressions**, all
+**238 JVM tests**, and debug lint. None of the ten per-test logs contains a fatal
+entry. The native app was then launched again outside instrumentation against
+the same raw response (`testvideo02`, `testvideo02`, `testvideo03`). The process
+remained alive and its media session reported `PLAYING`, position 109047 ms,
+speed 1.0 and no error. Native screenshot, process logcat, media-session dump and
+fixture-response audit are saved as `recommendations-native-after-fix*` in the
+same directory. The passing device XML, crash audit and build output are saved
+as `recommendations-crash-after-fix*`.
+
+The native check stopped only the temporary debug app and fixture and removed
+its reverse mapping. The user-started emulator and installed release package
+were not restarted or replaced. This is a source/debug verification; the broader
+general device suite still has outstanding failures, and its goal remains
+active with crash errors taking priority.
+
+The user subsequently defined this round as achieved once the test runs were
+finished. No test or fixture process remained active, and the goal was marked
+complete for now. This closes the crash-focused round; the 24 broader failing
+scenarios remain recorded in `remaining-device-checks.md`. Complete device-suite
+acceptance is still unproven.

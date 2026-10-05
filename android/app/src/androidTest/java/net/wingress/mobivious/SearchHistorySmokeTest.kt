@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.content.Intent
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.*
@@ -18,7 +17,7 @@ import java.time.LocalDate
 @RunWith(AndroidJUnit4::class)
 @OptIn(ExperimentalTestApi::class)
 class SearchHistorySmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val vm get() = activity.model
     private fun until(condition: () -> Boolean) = compose.waitUntil(20_000, condition)

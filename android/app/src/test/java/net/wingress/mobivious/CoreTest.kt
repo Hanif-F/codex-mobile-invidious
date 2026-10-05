@@ -54,6 +54,18 @@ class CoreTest {
         val details = ApiParser.details(JSONObject("""{"videoId":"abcdefghijk","title":"Video","captions":[{"label":"English","language_code":"en","url":"/captions"}],"recommendedVideos":[]}"""))
         assertEquals("en", details.captions.first().language)
     }
+    @Test fun recommendationsKeepTheFirstRankedVideoWithoutCollapsingPlaylistOccurrences() {
+        val raw = JSONArray("""[{"videoId":"abcdefghijk","title":"First ranked title","index":0},
+            {"videoId":"abcdefghijk","title":"Repeated result","index":1},
+            {"videoId":"bbbbbbbbbbb","title":"Next video"}]""")
+        val details = ApiParser.details(JSONObject().put("recommendedVideos", raw))
+        assertEquals(listOf("abcdefghijk", "bbbbbbbbbbb"), details.recommendations.map { it.id })
+        assertEquals(listOf("First ranked title", "Next video"), details.recommendations.map { it.title })
+        // Repeated video IDs at distinct playlist positions are separate occurrences.
+        val occurrences = ApiParser.videos(raw)
+        assertEquals(3, occurrences.size)
+        assertEquals(listOf(0, 1), occurrences.take(2).map { it.playlistIndex })
+    }
     @Test fun rejectInsecureAndCredentialBearingInstances() {
         assertEquals("https://instance.test", InvidiousApi.normalizeServer("https://instance.test/", false))
         listOf("http://instance.test", "https://user:secret@instance.test", "https://instance.test/path").forEach { value -> assertThrows(IllegalArgumentException::class.java) { InvidiousApi.normalizeServer(value, false) } }

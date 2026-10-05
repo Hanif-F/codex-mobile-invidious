@@ -2,6 +2,7 @@ package net.wingress.mobivious
 
 import androidx.media3.common.*
 import net.wingress.mobivious.player.SessionTimeline
+import net.wingress.mobivious.player.queueDurationUs
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -40,5 +41,19 @@ class SessionTimelineTest {
         assertEquals(3000L, item.elapsedRealtimeEpochOffsetMs)
         assertEquals(5000L, item.liveConfiguration!!.targetOffsetMs)
         assertTrue(item.isDynamic)
+    }
+
+    @Test fun queueMetadataProducesValidSessionDurationsAtNumericBoundaries() {
+        val largestSeconds = Long.MAX_VALUE / 1_000_000
+        listOf(Long.MIN_VALUE, -1L, 0L, largestSeconds + 1, Long.MAX_VALUE).forEach { seconds ->
+            val item = SimpleBasePlayer.MediaItemData.Builder("queue-item")
+                .setDurationUs(queueDurationUs(seconds)).build()
+            assertEquals(C.TIME_UNSET, item.durationUs)
+        }
+        listOf(1L, 120L, largestSeconds).forEach { seconds ->
+            val item = SimpleBasePlayer.MediaItemData.Builder("queue-item")
+                .setDurationUs(queueDurationUs(seconds)).build()
+            assertEquals(seconds * 1_000_000, item.durationUs)
+        }
     }
 }

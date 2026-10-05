@@ -14,7 +14,6 @@ import android.view.ViewGroup
 import androidx.compose.ui.test.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.media3.common.C
 import androidx.media3.common.Player
@@ -38,7 +37,7 @@ import java.util.concurrent.TimeUnit
 @RunWith(AndroidJUnit4::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackVisibilitySmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private var originalBackground = false
     private var originalPip = false
@@ -442,6 +441,10 @@ class PlaybackVisibilitySmokeTest {
     }
 
     @Test fun narrowLayoutsKeepActionsAndMiniPlayerAccessibleWithLargeTitles() {
+        ui { activity.model.action { activity.model.login("Fixture", "transient-password") } }
+        until { activity.model.account.value != null && activity.model.tab == "Account" && !activity.model.accountBusy.value }
+        compose.onNodeWithTag("navigation-Home").performClick()
+        until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
         openVideo()
         ui { activity.model.controller.value!!.pause() }
         val originalSize = shell("wm size").lineSequence().firstOrNull { it.startsWith("Override size:") }?.substringAfter(":")?.trim()
@@ -467,7 +470,8 @@ class PlaybackVisibilitySmokeTest {
                 shell("wm size ${width * 3}x2100")
                 resumed(width)
                 for (mode in listOf("light", "dark")) {
-                    ui { activity.model.store.guestDeArrow(AccountPreferences(darkMode = mode)); activity.model.refreshSharedSettings() }
+                    command("preferences", """{"dark_mode":"$mode"}""")
+                    ui { activity.model.refreshSharedSettings() }
                     until { activity.model.preferences.value.darkMode == mode }
                     ui {
                         val state = activity.model.playback.value

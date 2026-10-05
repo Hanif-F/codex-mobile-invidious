@@ -47,6 +47,39 @@ class AccountNavigationSmokeTest {
     }
     @After fun close() { if (::activity.isInitialized) compose.runOnUiThread { vm.closePlayer(); vm.store.save(null); activity.finishAndRemoveTask() } }
 
+    private fun signInWithDelayedPreferences() {
+        command("preferences", """{"default_home":"Subscriptions","delayNextMillis":1200}""")
+        compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)) }
+        until {
+            val requests = JSONObject(URL("http://127.0.0.1:18080/test/state").readText()).getJSONArray("preferencesRequests")
+            (0 until requests.length()).any { !requests.getJSONObject(it).getBoolean("completed") }
+        }
+    }
+
+    @Test fun delayedAccountPreferencesKeepThePageOpenedWhileTheyLoad() {
+        signInWithDelayedPreferences()
+        compose.runOnUiThread { vm.navigate("Library", "history") }
+        until { !vm.browse.value.loading && vm.browse.value.history != null }
+        until { vm.preferences.value.defaultHome == "Subscriptions" }
+        assertEquals("Library" to "history", vm.navigation.value)
+        compose.onNodeWithTag("history-search").assertExists()
+    }
+
+    @Test fun delayedAccountPreferencesApplyDefaultHomeWithoutNavigation() {
+        signInWithDelayedPreferences()
+        until { vm.preferences.value.defaultHome == "Subscriptions" && vm.tab == "Subscriptions" && !vm.browse.value.loading }
+        assertEquals("Subscriptions" to "", vm.navigation.value)
+    }
+
+    @Test fun delayedAccountPreferencesKeepExplicitDiscoveryAndPlayback() {
+        signInWithDelayedPreferences()
+        compose.runOnUiThread { vm.selectDiscovery("trending"); vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { vm.preferences.value.defaultHome == "Subscriptions" && vm.playback.value.playing }
+        assertEquals("Home" to "", vm.navigation.value)
+        assertEquals("trending", vm.discovery.value)
+        compose.onNodeWithTag("watch-details-list").assertExists()
+    }
+
     @Test fun fourTabsGuestSettingsAndSearchCancellationAndReturn() {
         listOf("Home", "Subscriptions", "Library", "Account").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
         compose.onNodeWithTag("main-search").assertDoesNotExist()

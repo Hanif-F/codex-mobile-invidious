@@ -4,7 +4,6 @@ import android.content.Intent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -18,7 +17,7 @@ import java.net.URL
 /** Uses the disposable API/media fixture through adb reverse; no YouTube account is required. */
 @RunWith(AndroidJUnit4::class)
 class CommentsSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private fun until(condition: () -> Boolean) = compose.waitUntil(20_000, condition)
     private fun fixture() = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())

@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.content.Intent
 import android.os.Bundle
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.session.SessionCommand
 import androidx.media3.session.SessionResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -20,7 +19,7 @@ import java.net.URL
 @RunWith(AndroidJUnit4::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class SponsorBlockSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val title = "A quiet moment · playback fixture"
     private val id = "UC" + "a".repeat(22)

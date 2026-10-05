@@ -148,6 +148,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var browseGeneration = 0
     private var requestedVideo: String? = null
     private var homeAppliedContext: ApiContext? = null
+    private var navigationRevision = 0L
     private data class BrowseReturn(val tab: String, val route: String, val browse: BrowseState,
         val channel: Channel?, val channelTab: ChannelTab?, val playlist: Playlist?, val seed: String?,
         val playlistSort: String, val videoSort: ChannelSort, val postDetail: PostDetailState, val postComments: CommentsState,
@@ -311,10 +312,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (context.account == null) { preferencesContext = context; preferences.value = store.guestDeArrow(); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return }
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
+        val navigationAtRequest = navigationRevision
         action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
             val membersChanged = value.showMemberVideos != preferences.value.showMemberVideos
             preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
-            if (homeAppliedContext != context) { homeAppliedContext = context; if (tab != "Account" && signInReturn == null) openDefaultHome() }
+            val applyHome = homeAppliedContext != context && navigationRevision == navigationAtRequest && tab != "Account" && signInReturn == null
+            homeAppliedContext = context
+            if (applyHome) openDefaultHome()
             else if (tab == "Subscriptions" || route == "history" || membersChanged && route.startsWith("playlist:")) refresh()
         } }
         viewModelScope.launch {
@@ -363,6 +367,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun navigate(tab: String, route: String = "", loadContent: Boolean = true, rememberOrigin: Boolean = false) {
+        navigationRevision++
         dismissLinkResolution()
         if (this.route != route && (rememberOrigin || (this.route.startsWith("channel:") || this.route.startsWith("post:") || this.route.startsWith("hashtag:")) &&
             (route.startsWith("channel:") || route.startsWith("post:") || route.startsWith("playlist:") || route.startsWith("hashtag:")))) browseReturns += captureBrowse()
@@ -378,6 +383,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; playlistLink = null; channelPlaylistSort.value = "last"; channelVideoSort.value = ChannelSort.NEWEST; if (loadContent) refresh()
     }
     private fun restoreBrowse(saved: BrowseReturn, afterSignIn: Boolean = false) {
+        navigationRevision++
         dismissLinkResolution()
         if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Home"); return }
         browseJob?.cancel(); browseGeneration++
@@ -549,7 +555,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun openDefaultHome() { val target = PreferenceRules.destination(preferences.value.defaultHome, account.value != null); discovery.value = target.second; navigate(target.first) }
     fun selectDiscovery(value: String) {
-        if (value !in listOf("popular", "trending") || discovery.value == value) return
+        if (value !in listOf("popular", "trending")) return
+        navigationRevision++
+        if (discovery.value == value) return
         discovery.value = value
         refresh()
     }
@@ -718,6 +726,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun play(id: String, explicit: Long? = null, source: String? = null, index: Int? = null, audio: Boolean = false, seed: String? = null) {
+        navigationRevision++
         cancelAccumulatedSeek(false)
         val linked = playlistLink?.takeIf { source != null && it.playlistId == source && route == "playlist:$source" }
         if (linked != null) playlistLink = null
@@ -735,6 +744,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             playlistLink = link
             return false
         }
+        navigationRevision++
         cancelAccumulatedSeek(false)
         queueCommand(PlaybackService.QUEUE_START) {
             putString("id", link.id); link.playlistId?.let { putString("source", it) }; link.index?.let { putInt("index", it) }

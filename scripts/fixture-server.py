@@ -84,7 +84,8 @@ recommended = dict(video, videoId='testvideo02', title='Another original title')
 unknown_video = dict(video, videoId='unknownvid1', title='Unknown duration fixture', lengthSeconds=0)
 live_video = dict(video, videoId='streamvid01', title='Live indicator fixture', liveNow=True)
 def reset_playback():
-    state.update(positions={}, playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False)
+    state.update(positions={}, playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False,
+                 duplicateRecommendations=False)
 reset_playback()
 
 visibility_member = dict(recommended, videoId='membervid01', title='Members-only fixture video', isMember=True, authorId='UC' + 'b' * 22)
@@ -131,7 +132,7 @@ def reset_search_history():
 reset_search_history()
 
 def reset_accounts():
-    state.update(accountUsername='Fixture', registrationEnabled=True, accountRevoked=False,
+    state.update(accountUsername='Fixture', registrationEnabled=True, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[],
                  accountSessions=[dict(id='current', type='api', issuedAt=1700000000, expiresAt=9999999999, current=True),
                                   dict(id='browser', type='browser', issuedAt=1700000001, expiresAt=9999999999, current=False)])
 reset_accounts()
@@ -152,6 +153,13 @@ def submissions():
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
+
+    def handle(self):
+        try:
+            super().handle()
+        except (BrokenPipeError, ConnectionResetError):
+            # Canceled app requests close their sockets while delayed fixtures respond.
+            pass
 
     def respond(self, data=None, status=200):
         self.send_response(status)
@@ -346,7 +354,9 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(**selected, **info,
                               dashUrl=dash, adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
-                              recommendedVideos=[recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended]), liveNow=state['liveNow'], isMember=state['memberCurrent']))
+                              recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
+                                                 if state['duplicateRecommendations'] else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
+                              liveNow=state['liveNow'], isMember=state['memberCurrent']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]
             state['titleLookups'][video_id] = state['titleLookups'].get(video_id, 0) + 1
@@ -355,7 +365,15 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(ready=state['identityReady'], configured=state['identityConfigured']))
         elif p.endswith('/submissions') and p.startswith('/api/v1/auth/dearrow/'):
             self.respond(dict(error='Fixture submissions unavailable') if state['failSubmissions'] else dict(titles=submissions()), 502 if state['failSubmissions'] else 200)
-        elif p == '/api/v1/auth/preferences': self.respond(prefs)
+        elif p == '/api/v1/auth/preferences':
+            event = dict(completed=False)
+            state['preferencesRequests'].append(event)
+            delay = state['preferencesDelayNext']; state['preferencesDelayNext'] = 0
+            try:
+                if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+                self.respond(prefs)
+            finally:
+                event['completed'] = True
         elif p == '/api/v1/auth/subscriptions':
             event = dict(completed=False, authorized=self.headers.get('Authorization') == 'Bearer fixture-token')
             state['subscriptionRequests'].append(event)
@@ -535,6 +553,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/preferences':
+            if 'delayNextMillis' in data: state['preferencesDelayNext'] = data.pop('delayNextMillis')
             prefs.update(data)
             return self.respond(prefs)
         if p == '/test/media-reset':
@@ -588,6 +607,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == '/test/stream':
             state['stream'] = data['type']
             state['videoFailNext'] = bool(data.get('failNext', False))
+            if 'duplicateRecommendations' in data: state['duplicateRecommendations'] = bool(data['duplicateRecommendations'])
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))

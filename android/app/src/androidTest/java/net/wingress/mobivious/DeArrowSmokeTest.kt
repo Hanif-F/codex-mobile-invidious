@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.content.Intent
 import androidx.media3.common.C
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -19,7 +18,7 @@ import java.net.URL
 /** Uses only the disposable localhost fixture; never sends real contributions. */
 @RunWith(AndroidJUnit4::class)
 class DeArrowSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val original = "A quiet moment · playback fixture"
     private val replacement = "A calm scene"
@@ -104,7 +103,7 @@ class DeArrowSmokeTest {
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNodeWithText("Subscriptions").performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
-        compose.onNodeWithText("Mobivious Studio").performClick()
+        compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("video-card-testvideo01"))).performClick()
         until { activity.model.channel.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNodeWithText("Library").performClick()
         until { compose.onAllNodesWithText("DeArrow fixture playlist").fetchSemanticsNodes().isNotEmpty() }

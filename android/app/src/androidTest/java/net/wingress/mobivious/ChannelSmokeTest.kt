@@ -2,7 +2,6 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.AccountPreferences
@@ -16,7 +15,7 @@ import java.net.URL
 /** Requires the disposable localhost fixture and adb reverse, like AppSmokeTest. */
 @RunWith(AndroidJUnit4::class)
 class ChannelSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private fun until(condition: () -> Boolean) = compose.waitUntil(20_000, condition)
     private fun fixture() = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())

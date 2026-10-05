@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -18,7 +17,7 @@ import java.net.URL
 /** Uses only the disposable localhost API/media fixture. */
 @RunWith(AndroidJUnit4::class)
 class CommunitySmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val owner = "UC" + "a".repeat(22)
     private fun ui(action: () -> Unit) = compose.runOnUiThread(action)

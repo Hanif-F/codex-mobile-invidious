@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.Player
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -20,7 +19,7 @@ import java.net.URL
 /** Real service-owned playback, using only the localhost fixture and generated media. */
 @RunWith(AndroidJUnit4::class)
 class ChaptersSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val base = "http://127.0.0.1:18080"
     private fun ui(block: () -> Unit) = compose.runOnUiThread(block)

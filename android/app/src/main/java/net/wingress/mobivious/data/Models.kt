@@ -76,7 +76,7 @@ object ApiParser {
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",
         json.optJSONArray("captions")?.objects()?.map { Caption(it.text("label"), it.text("languageCode", it.text("language_code")), it.text("url")) } ?: emptyList(),
-        json.optJSONArray("recommendedVideos")?.let(::videos) ?: emptyList(),
+        json.optJSONArray("recommendedVideos")?.let { videos(it).distinctBy { video -> video.id } } ?: emptyList(),
         (json.optJSONArray("adaptiveFormats")?.objects().orEmpty() + json.optJSONArray("formatStreams")?.objects().orEmpty()).map(::streamFormat),
         descriptionHtml = json.text("descriptionHtml"), likes = (json.opt("likeCount") as? Number)?.toLong()?.takeIf { it >= 0 },
         authorVerified = json.opt("authorVerified") as? Boolean, subscribers = json.text("subCountText").takeUnless { it == "-" }.orEmpty(),
