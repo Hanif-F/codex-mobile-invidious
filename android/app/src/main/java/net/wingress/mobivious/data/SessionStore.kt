@@ -29,6 +29,13 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     var background: Boolean
         get() = prefs.getBoolean("background", true)
         set(value) { prefs.edit().putBoolean("background", value).apply() }
+    fun chatAppearance(): ChatAppearance = runCatching { ChatAppearance.parse(JSONObject(prefs.getString("chat.appearance.$server", "{}")!!)) }.getOrDefault(ChatAppearance())
+    fun chatAppearance(value: ChatAppearance) { prefs.edit().putString("chat.appearance.$server", value.bounded().json().toString()).apply() }
+    fun chatTiming(videoId: String, context: ApiContext): Int = prefs.getInt("chat.timing.${context.server}.$videoId", 0).coerceIn(-3_600_000, 3_600_000)
+    fun chatTiming(videoId: String, value: Int, context: ApiContext) {
+        require(context.account == null && value in -3_600_000..3_600_000)
+        prefs.edit().putInt("chat.timing.${context.server}.$videoId", value).apply()
+    }
     var pip: Boolean
         get() = prefs.getBoolean("pip", true)
         set(value) { prefs.edit().putBoolean("pip", value).apply() }

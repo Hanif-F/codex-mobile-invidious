@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.session.MediaController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -125,20 +126,29 @@ internal fun PlayerPresentationHost(
     vm: AppViewModel, playback: PlaybackState, controller: MediaController?, state: PlayerPresentationState,
     pip: Boolean, hidden: Boolean, modal: Boolean, occurrence: String?,
     close: () -> Unit, collapse: () -> Unit, restore: () -> Unit, fullscreen: () -> Unit, settings: () -> Unit,
-    chapters: () -> Unit,
+    chapters: () -> Unit, chat: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateFlow.collectAsState()
+    val replay by vm.chatReplay.collectAsStateWithLifecycle()
+    val appearance by vm.chatAppearance.collectAsStateWithLifecycle()
+    var chatSettings by rememberSaveable(replay.context?.server, replay.occurrence) { mutableStateOf(false) }
+    val chatVisible = !hidden && !pip && state.watch && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
+    LaunchedEffect(chatVisible) { vm.presentChat(chatVisible) }
+    LaunchedEffect(chatVisible, replay.open) { if (!chatVisible || !replay.open) chatSettings = false }
+    val docked = chatVisible && replay.open && !appearance.overlay
     LaunchedEffect(windowSize, playback.mediaId, occurrence, pip, hidden, modal, lifecycleState) { state.cancelMotion() }
     DisposableEffect(state) { onDispose { state.cancelMotion() } }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         content()
         val full = Rect(0f, 0f, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         fun bounds(mode: PlayerPresentation): Rect = when (mode) {
-            PlayerPresentation.FULLSCREEN -> full
+            PlayerPresentation.FULLSCREEN -> if (!docked) full else if (full.width > full.height)
+                Rect(0f, 0f, full.width * (1f - appearance.besideFraction), full.height)
+                else Rect(0f, 0f, full.width, full.height * (1f - appearance.belowFraction))
             PlayerPresentation.WATCH -> state.watchBounds.takeUnless { it.isEmpty } ?: full
             else -> state.miniBounds.takeUnless { it.isEmpty } ?: Rect(8 * density.density,
                 state.navigationBounds.top - 72 * density.density, 120 * density.density, state.navigationBounds.top - 9 * density.density)
@@ -159,13 +169,38 @@ internal fun PlayerPresentationHost(
                     .clip(RoundedCornerShape(if (pip || state.fullscreen) 0.dp else (8 + 8 * state.watchAlpha).dp)),
                 fullscreen = state.fullscreen, controls = !pip && state.watch, settingsOpen = modal,
                 presentation = state.mode, drag = drag,
-                gesturesEnabled = !pip && !modal && (!state.active || state.dragging) && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
+                gesturesEnabled = !pip && !modal && !chatSettings && (!state.active || state.dragging) && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
                 chromeVisible = !state.active, gestureKey = windowSize to occurrence,
                 onCollapse = collapse, onRestore = restore, onDismiss = close,
-                onFullscreen = fullscreen, onSettings = settings, onChapters = chapters,
+                onFullscreen = fullscreen, onSettings = settings, onChapters = chapters, onChat = chat,
                 surfaceAlpha = if (dismissing) 1f - state.fraction else 1f)
+            if (chatVisible && replay.open && !state.active) {
+                if (appearance.overlay) {
+                    // Anchor normalized geometry to the fitted picture, excluding letterbox bars.
+                    val ratio = playback.geometry.ratio ?: 16f / 9f
+                    val fittedWidth = minOf(rect.width, rect.height * ratio)
+                    val fittedHeight = minOf(rect.height, rect.width / ratio)
+                    ChatOverlay(vm, Modifier.offset { IntOffset((rect.left + (rect.width - fittedWidth) / 2).roundToInt(),
+                        (rect.top + (rect.height - fittedHeight) / 2).roundToInt()) }
+                        .size(with(density) { fittedWidth.toDp() }, with(density) { fittedHeight.toDp() }), { chatSettings = true })
+                }
+                else if (state.fullscreen) {
+                    val side = full.width > full.height
+                    ChatReplayPanel(vm, Modifier.offset { IntOffset(if (side) rect.right.roundToInt() else 0, if (side) 0 else rect.bottom.roundToInt()) }
+                        .size(with(density) { (if (side) full.width - rect.width else full.width).toDp() },
+                            with(density) { (if (side) full.height else full.height - rect.height).toDp() }), { chatSettings = true })
+                }
+            }
+            if (chatSettings && chatVisible && replay.open) ChatSettings(vm) { chatSettings = false }
         }
     }
+}
+
+@Composable internal fun WatchChatPanel(vm: AppViewModel, modifier: Modifier) {
+    val state by vm.chatReplay.collectAsStateWithLifecycle()
+    var settings by rememberSaveable(state.context?.server, state.occurrence) { mutableStateOf(false) }
+    ChatReplayPanel(vm, modifier, { settings = true })
+    if (settings && state.open) ChatSettings(vm) { settings = false }
 }
 
 internal fun Modifier.playerAnchor(update: (Rect) -> Unit): Modifier = onGloballyPositioned {

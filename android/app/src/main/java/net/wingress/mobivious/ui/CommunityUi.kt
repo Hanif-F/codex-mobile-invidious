@@ -1,8 +1,5 @@
 package net.wingress.mobivious.ui
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -14,6 +11,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUpOffAlt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -49,19 +48,22 @@ internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Bool
 }
 
 @Composable
-internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, detail: Boolean = false, open: () -> Unit = {},
+internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, comments: () -> Unit, detail: Boolean = false,
     channel: (String) -> Unit, link: (String) -> Unit, play: (Video) -> Unit, playlist: (Playlist) -> Unit, signIn: () -> Unit) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val body = post.comment
-    val action = if (detail || !PostLinks.validId(post.id)) Modifier else Modifier.clickable(onClickLabel = "Open community post", onClick = open)
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).then(action).testTag("post-${post.key}")) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("post-${post.key}")) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ChannelAuthor(vm.store.server, body.avatar, body.author, !prefs.thinMode, size = 40.dp,
                 tag = "post-avatar-${post.key}", onClick = body.authorId.takeIf(ContentVisibility::validChannel)?.let { { channel(it) } })
             if (body.verified) Text("Verified author", style = MaterialTheme.typography.labelSmall)
             val published = listOfNotNull(body.published.takeIf { it.isNotBlank() }, "Edited".takeIf { body.edited }).joinToString(" · ")
             if (published.isNotBlank()) Text(published, style = MaterialTheme.typography.bodySmall)
-            RichCommentText(body, vm.store.server, "", link, collapsedLines = if (detail) Int.MAX_VALUE else 6, tag = "post-body-${post.key}")
+            RichCommentText(body, vm.store.server, "", link, collapsedLines = if (detail) Int.MAX_VALUE else 6,
+                tag = "post-body-${post.key}", expansionControl = { expanded, toggle ->
+                    PostExpansionButton(post.key, expanded, toggle)
+                })
             when (val attachment = post.attachment) {
                 is PostAttachment.Images -> PostGallery(attachment.images, vm.store.server, "post-media-${post.key}")
                 is PostAttachment.VideoItem -> VideoCard(vm, attachment.video, vm.store.server,
@@ -83,14 +85,46 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, detail: Bo
                 PostAttachment.Unavailable -> Text("Attachment unavailable", style = MaterialTheme.typography.bodyMedium)
                 null -> Unit
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.semantics(mergeDescendants = true) { contentDescription = "${body.likes} likes" }) {
+            PostActions(post, comments, share = {
+                runCatching {
+                    context.startActivity(postShareIntent(vm.store.server, post))
+                }.onFailure { vm.message.value = "No app could share this post." }
+            })
+        }
+    }
+}
+
+internal fun postShareIntent(server: String, post: CommunityPost): Intent = Intent.createChooser(
+    Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, PostLinks.url(server, post)), "Share post")
+
+@Composable
+internal fun PostExpansionButton(key: String, expanded: Boolean, toggle: () -> Unit) {
+    OutlinedButton(onClick = toggle, modifier = Modifier.heightIn(min = 48.dp).testTag("post-expand-$key")) {
+        Text(if (expanded) "Show less" else "Read more")
+    }
+}
+
+@Composable
+internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () -> Unit) {
+    val validId = PostLinks.validId(post.id)
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(Modifier.fillMaxWidth().testTag("post-actions-${post.key}"), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "${post.comment.likes} likes" },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Icons.Default.ThumbUpOffAlt, null, Modifier.size(18.dp))
-                Text(java.text.NumberFormat.getIntegerInstance().format(body.likes), style = MaterialTheme.typography.labelMedium)
+                Text(java.text.NumberFormat.getIntegerInstance().format(post.comment.likes), style = MaterialTheme.typography.labelMedium)
             }
-            if (!detail) TextButton(onClick = open, enabled = PostLinks.validId(post.id), modifier = Modifier.testTag("post-open-${post.key}")) {
-                Text(post.commentCount?.let { "View post · $it comments" } ?: "View post")
+            Spacer(Modifier.weight(1f))
+            IconButton(onClick = share, enabled = validId,
+                modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).testTag("post-share-${post.key}")) {
+                Icon(Icons.Default.Share, "Share post")
             }
+        }
+        FilledTonalButton(onClick = comments, enabled = validId && ContentVisibility.validChannel(post.channelId),
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("post-comments-${post.key}")) {
+            Icon(Icons.Default.ChatBubbleOutline, null, Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(post.commentCount?.let { "Comments (${java.text.NumberFormat.getIntegerInstance().format(it)})" } ?: "Comments")
         }
     }
 }
@@ -98,25 +132,11 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, detail: Bo
 @Composable
 internal fun PostDetailScreen(vm: AppViewModel, state: PostDetailState, list: LazyListState, channel: (String) -> Unit,
     link: (String) -> Unit, play: (Video) -> Unit, playlist: (Playlist) -> Unit, signIn: () -> Unit) {
-    val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize().testTag("post-detail"), state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
         state.post?.let { post ->
-            item { CommunityPostCard(vm, post, detail = true, channel = channel, link = link, play = play, playlist = playlist, signIn = signIn) }
             item {
-                FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledTonalButton(onClick = vm::openPostComments, enabled = ContentVisibility.validChannel(post.channelId),
-                        modifier = Modifier.testTag("post-comments-open")) { Text(post.commentCount?.let { "Comments ($it)" } ?: "Comments") }
-                    TextButton(onClick = {
-                        (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager)
-                            .setPrimaryClip(ClipData.newPlainText("Community post", PostLinks.url(vm.store.server, post)))
-                        vm.message.value = "Post link copied"
-                    }, modifier = Modifier.testTag("post-copy")) { Text("Copy link") }
-                    TextButton(onClick = {
-                        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"; putExtra(Intent.EXTRA_TEXT, PostLinks.url(vm.store.server, post))
-                        }, "Share post"))
-                    }, modifier = Modifier.testTag("post-share")) { Text("Share") }
-                }
+                CommunityPostCard(vm, post, comments = { vm.openPostComments() }, detail = true,
+                    channel = channel, link = link, play = play, playlist = playlist, signIn = signIn)
             }
         }
         if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }

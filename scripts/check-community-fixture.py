@@ -71,6 +71,11 @@ def main():
         except HTTPError as error:
             assert error.code == 503
         assert api('/api/v1/post/Ugpost1')['comments']
+        api('/test/community', {'postLongText': True})
+        long_post = api(channel_path + '/posts')['comments'][0]
+        assert long_post['content'].count('\n') == 12 and 'Long post line 12' in long_post['contentHtml']
+        assert long_post == api('/api/v1/post/Ugpost1')['comments'][0]
+        api('/test/community', {'postLongText': False})
         comments_path = '/api/v1/post/Ugpost1/comments?'
         query = {'ucid': owner, 'sort_by': 'top'}
         comments = api(comments_path + urlencode(query))

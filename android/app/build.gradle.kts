@@ -36,6 +36,7 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 dependencies {
+    implementation("com.google.re2j:re2j:1.8")
     implementation(platform("androidx.compose:compose-bom:2026.03.00"))
     implementation("androidx.activity:activity-compose:1.12.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")

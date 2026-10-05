@@ -89,6 +89,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val postDetail by vm.postDetail.collectAsStateWithLifecycle()
     val postNavigation by vm.postNavigation.collectAsStateWithLifecycle()
     val postComments by vm.postComments.collectAsStateWithLifecycle()
+    val chat by vm.chatReplay.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val linkResolution by vm.linkResolution.collectAsStateWithLifecycle()
     val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
@@ -144,10 +145,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     var dialog by remember { mutableStateOf("") }
     fun openChapters() {
-        vm.cancelAccumulatedSeek(); vm.closeComments(); dialog = ""
+        vm.cancelAccumulatedSeek(); vm.closeComments(); vm.closeChat(); dialog = ""
         chapterPanel.show(chapters, playback.position)
     }
-    fun backWatch() { if (chapterPanel.open) chapterPanel.close() else if (!vm.backComments()) collapsePlayer() }
+    fun toggleChat() { if (vm.chatReplay.value.open) vm.closeChat() else { chapterPanel.close(); dialog = ""; vm.openChat() } }
+    fun backWatch() { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else if (!vm.backComments()) collapsePlayer() }
     LaunchedEffect(chapters, playback.loading) { if (!playback.loading && chapters.isEmpty()) chapterPanel.close() }
     LaunchedEffect(dialog) { if (dialog.isNotEmpty()) chapterPanel.close() }
     var settingsPage by rememberSaveable { mutableStateOf("") }
@@ -255,14 +257,14 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         channelDescriptionOpen = false; vm.closePostComments()
     } }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
-    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
+    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
     BackHandler(accountBusy) { }
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
             fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null,
-            queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters) {
+            queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) {
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
                 modifier = Modifier.hiddenPlayerContent(pip || fullscreen && !presentation.active),
@@ -412,7 +414,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             PlaylistCard(vm, list, { browsePlayer(); vm.openPlaylist(list) }, { signIn() })
                         }
                         items(state.posts, key = { "post:${it.key}" }) { post ->
-                            CommunityPostCard(vm, post, open = { browsePlayer(); vm.openPost(PostLink(post.id, post.channelId)) },
+                            CommunityPostCard(vm, post, comments = { vm.openPostComments(post) },
                                 channel = { id -> navigate(tab, "channel:$id") }, link = ::openRichLink, play = { play(it) },
                                 playlist = { list -> browsePlayer(); vm.openPlaylist(list) }, signIn = { signIn() })
                         }
@@ -471,7 +473,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (channelDescriptionOpen && !pip && channel != null && route == "channel:${channel!!.id}")
                 ChannelDescriptionSheet(channel!!, vm.store.server, ::openRichLink) { channelDescriptionOpen = false }
             if (postComments.open && !watch && !pip && settingsPage.isEmpty() && postComments.context == vm.api.context() &&
-                route == "post:${(postComments.target as? CommentTarget.Post)?.id}")
+                (postComments.target as? CommentTarget.Post)?.let(vm::isPostCommentsSource) == true)
                 PostCommentsSheet(vm, postComments, { id -> vm.closePostComments(); navigate(tab, "channel:$id") }, ::openRichLink)
             when(dialog) {
                 "filters" -> FiltersDialog(vm, { dialog = "" })
@@ -623,6 +625,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     resize: WatchPlayerResizeState, chapterPanel: ChapterPanelState, openChapters: () -> Unit,
     description: Boolean, describe: (Boolean) -> Unit,
     add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
+    val chat by vm.chatReplay.collectAsStateWithLifecycle()
+    val chatAppearance by vm.chatAppearance.collectAsStateWithLifecycle()
     val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val account by vm.account.collectAsStateWithLifecycle()
@@ -641,7 +645,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     }
     val chapters = playback.chapters
     val commentsOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
-    val drawerOpen = commentsOpen || chapterPanel.open
+    val chatDocked = chat.open && chat.available && !chatAppearance.overlay
+    val drawerOpen = commentsOpen || chapterPanel.open || chatDocked
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).testTag("watch-content")
         .pointerInput(Unit) {
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
@@ -651,13 +656,14 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
         val expandedHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false)
         val compactHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f)
         val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight > compactHeight && !drawerOpen)
-        val playerHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
+        val playerHeight = if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
                 .playerAnchor { presentation.watchBounds = it })
             if (chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,
                 playback.seekable && !playback.loading && playback.error == null, chapterPanel::close, vm::seekTo,
                 Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
+            else if (chatDocked) WatchChatPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
             else if (commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
@@ -682,6 +688,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                         blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                         if (prefs.showYoutubeComments) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
+                        ChatReplayEntry(chat) { chapterPanel.close(); vm.openChat() }
                         ChaptersEntry(chapters, playback.position, openChapters)
                         ActionRow(if (description) "Hide description" else "Show description",
                             modifier = Modifier.testTag("watch-description-toggle").semantics { stateDescription = if (description) "Expanded" else "Collapsed" },

@@ -5,7 +5,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class AccountPreferences(
-    val watchHistory: Boolean = true, val savePosition: Boolean = false,
+    val watchHistory: Boolean = true, val savePosition: Boolean = false, val chat: ChatPreferences = ChatPreferences(),
     val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true,
     val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings(),
     val autoplay: Boolean = true, val listen: Boolean = false, val local: Boolean = true,
@@ -19,6 +19,7 @@ data class AccountPreferences(
     val notificationsOnly: Boolean = false, val defaultPlaylist: String = "", val showMemberVideos: Boolean = false
 ) {
     fun json() = sponsorBlock.json().apply {
+        chat.json().let { c -> c.keys().forEach { put(it, c.get(it)) } }
         put("watch_history", watchHistory); put("save_player_pos", savePosition)
         put("dearrow_enabled", dearrowEnabled); put("dearrow_show_original", dearrowShowOriginal)
         put("autoplay", autoplay); put("listen", listen); put("local", local)
@@ -35,7 +36,7 @@ data class AccountPreferences(
     fun changesFrom(before: AccountPreferences) = JSONObject().apply {
         val old = before.json(); val current = json()
         current.keys().forEach { key ->
-            if (!key.startsWith("sponsorblock_") && current.get(key).toString() != old.get(key).toString()) put(key, current.get(key))
+            if (!key.startsWith("sponsorblock_") && !key.startsWith("chat_") && current.get(key).toString() != old.get(key).toString()) put(key, current.get(key))
         }
         sponsorBlock.patch(before.sponsorBlock, this)
     }
@@ -58,7 +59,7 @@ data class AccountPreferences(
             val defaults = AccountPreferences()
             val rawSpeed = j.optDouble("speed", 1.0).toFloat()
             return AccountPreferences(
-                watchHistory = j.optBoolean("watch_history", true), savePosition = j.optBoolean("save_player_pos", false),
+                watchHistory = j.optBoolean("watch_history", true), savePosition = j.optBoolean("save_player_pos", false), chat = ChatPreferences.parse(j),
                 dearrowEnabled = j.optBoolean("dearrow_enabled", false), dearrowShowOriginal = j.optBoolean("dearrow_show_original", true), sponsorBlock = SponsorBlockSettings.parse(j),
                 autoplay = j.optBoolean("autoplay", true), listen = j.optBoolean("listen", false), local = j.optBoolean("local", true),
                 continueNext = j.optBoolean("continue", false), continueAutoplay = j.optBoolean("continue_autoplay", true), videoLoop = j.optBoolean("video_loop", false),

@@ -40,7 +40,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
              authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
-default_prefs = dict(watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
+default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
                      autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', video_codec='auto', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
@@ -54,6 +54,29 @@ state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRs
 def reset_comments():
     state.update(commentRequests=[], commentFailNext=False, commentDelayNext=0, commentEmpty=False)
 reset_comments()
+
+def reset_chat():
+    state.update(chatReplay=False, chatRequests=[], chatTimingRequests=[], chatPreferenceWrites=[], chatTimings={},
+                 chatFailNext=False, chatDelayNext=0, chatTimingDelayNext=0, chatSaveFail=False,
+                 chatUnavailable=False, chatRepeatCursor=False, chatSparse=False, chatScopeFail=False)
+reset_chat()
+
+def chat_chunk(offset, token):
+    start = int(token.split(':')[1]) if token else max(0, offset - 15000)
+    stop = min(120000, start + 20000)
+    messages = [dict(id='chat-' + str(i), offsetMs=i * 5000, author='Viewer ' + str(i),
+                     authorChannelId='UC' + 'a' * 22, authorHandle='@viewer' + str(i),
+                     text=('Hidden word spam' if i == 2 else 'Replay message ' + str(i)),
+                     kind=('membership' if i == 1 else 'paid' if i == 3 else 'text'), amount='$5' if i == 3 else '')
+                for i in range(24) if start <= i * 5000 < stop]
+    removed = []
+    if start >= 20000:
+        removed = ['chat-0']
+        messages.append(dict(id='chat-1', offsetMs=5000, author='Member', authorChannelId='', authorHandle='@member', text='Updated membership', kind='membership', amount=''))
+    continuation = 'chat:' + str(stop) if stop < 120000 else None
+    if state['chatRepeatCursor'] and token: continuation = token
+    if state['chatSparse'] and not token: messages = []
+    return dict(messages=messages, removedIds=removed, continuation=continuation)
 
 def reset_content_links():
     state.update(videoInformation=False, resolveRequests=[], resolveFailNext=False, resolveDelayNext=0,
@@ -106,7 +129,7 @@ def reset_sponsorblock():
 reset_sponsorblock()
 
 def reset_channels():
-    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None, channelRichHeader=False, postRequests=[], postFailNext=False, postDelayNext=0, postEmpty=False)
+    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None, channelRichHeader=False, postRequests=[], postFailNext=False, postDelayNext=0, postEmpty=False, postLongText=False)
 reset_channels()
 
 def community_posts():
@@ -116,9 +139,14 @@ def community_posts():
                    dict(type='poll', totalVotes=42, choices=[dict(text='First choice', image=image), dict(text='Second choice')]),
                    dict(type='quiz', totalVotes=12, choices=[dict(text='Correct choice', isCorrect=True), dict(text='Other choice', isCorrect=False)]),
                    dict(type='unknown', error='Unrecognized attachment type.')]
-    return [dict(fixture_comment('Ugpost' + str(i + 1), author='Community creator', text='Community post ' + str(i + 1),
+    posts = [dict(fixture_comment('Ugpost' + str(i + 1), author='Community creator', text='Community post ' + str(i + 1),
                   contentHtml='<b>Community post ' + str(i + 1) + '</b><br><a href="/post/Ugpost2">Another post</a>',
                   isEdited=True, replyCount=1234), attachment=attachment) for i, attachment in enumerate(attachments)]
+    if state['postLongText']:
+        lines = [f'Long post line {index}' for index in range(1, 13)]
+        posts[0].update(content='\n'.join(lines) + '\nAnother post',
+                        contentHtml='<br>'.join(f'<b>{line}</b>' for line in lines) + '<br><a href="/post/Ugpost2">Another post</a>')
+    return posts
 
 def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
@@ -287,6 +315,26 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
             except (BrokenPipeError, ConnectionResetError):
                 pass
+        elif p.startswith('/api/v1/live_chat/'):
+            chat_params = parse_qs(url.query)
+            event = dict(video=p.rsplit('/', 1)[-1], offset=int(chat_params.get('offset_ms', ['0'])[0]), continuation=chat_params.get('continuation', [''])[0], authorization=self.headers.get('Authorization'))
+            state['chatRequests'].append(event)
+            delay = state['chatDelayNext']; state['chatDelayNext'] = 0
+            if delay: time.sleep(delay / 1000)
+            if state['chatUnavailable'] or not state['chatReplay']: return self.respond(dict(error='Chat replay is unavailable'), 404)
+            if state['chatFailNext']:
+                state['chatFailNext'] = False
+                return self.respond(dict(error='Chat replay could not be loaded'), 503)
+            return self.respond(chat_chunk(event['offset'], event['continuation']))
+        elif p.startswith('/api/v1/auth/chat_timing/'):
+            if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 401)
+            if state['chatScopeFail']: return self.respond(dict(error='Invalid scope'), 403)
+            id = p.rsplit('/', 1)[-1]
+            state['chatTimingRequests'].append(dict(method='GET', video=id))
+            offset = state['chatTimings'].get(id, 0)
+            delay = state['chatTimingDelayNext']; state['chatTimingDelayNext'] = 0
+            if delay: time.sleep(delay / 1000)
+            return self.respond(dict(offsetMs=offset))
         elif p == '/test/state': self.respond(dict(state, preferences=prefs))
         elif p.startswith('/api/v1/sponsorblock/'):
             state['sponsorRequests'] += 1
@@ -319,6 +367,7 @@ class Handler(BaseHTTPRequestHandler):
         elif p.rsplit('/', 1)[-1] in ('portrait001', 'square00001', 'landscape01', 'ultrawide01') and p.startswith('/api/v1/videos/'):
             name = {'portrait001':'portrait', 'square00001':'square', 'landscape01':'landscape', 'ultrawide01':'ultrawide'}[p.rsplit('/', 1)[-1]]
             return self.respond(dict(video, videoId=p.rsplit('/', 1)[-1], title=name + ' geometry fixture',
+                                     liveChatReplay=state['chatReplay'],
                                      formatStreams=[dict(url='/media/shapes/' + name + '.mp4', type='video/mp4', quality='medium')],
                                      description='Real ratio fixture', recommendedVideos=[recommended]))
         elif p == '/api/v1/resolveurl':
@@ -356,7 +405,7 @@ class Handler(BaseHTTPRequestHandler):
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
                                                  if state['duplicateRecommendations'] else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
-                              liveNow=state['liveNow'], isMember=state['memberCurrent']))
+                              liveNow=state['liveNow'], isMember=state['memberCurrent'], liveChatReplay=state['chatReplay']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]
             state['titleLookups'][video_id] = state['titleLookups'].get(video_id, 0) + 1
@@ -529,9 +578,15 @@ class Handler(BaseHTTPRequestHandler):
             reset_visibility()
             reset_search_history()
             reset_comments()
+            reset_chat()
             reset_content_links()
             reset_chapters()
             reset_accounts()
+            return self.respond({})
+        if p == '/test/chat':
+            state['chatReplay'] = data.get('chatReplay', True)
+            for key in ('chatFailNext', 'chatDelayNext', 'chatTimingDelayNext', 'chatSaveFail', 'chatUnavailable', 'chatRepeatCursor', 'chatSparse', 'chatScopeFail', 'chatTimings'):
+                if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/chapters':
             state['chapters'] = data.get('enabled', True)
@@ -577,7 +632,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p in ('/test/channel', '/test/community'):
             if p == '/test/community': state.update(channelTabs=['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'playlists', 'posts', 'channels'], channelRichHeader=True)
-            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext', 'postFailNext', 'postDelayNext', 'postEmpty'):
+            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext', 'postFailNext', 'postDelayNext', 'postEmpty', 'postLongText'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':
@@ -666,6 +721,22 @@ class Handler(BaseHTTPRequestHandler):
             if p.endswith('/username'): state['accountUsername'] = data['username']
             state['accountSessions'] = [entry for entry in state['accountSessions'] if entry['current']]
             return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999))
+        elif p == '/api/v1/auth/chat_preferences' or p.startswith('/api/v1/auth/chat_timing/'):
+            if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 401)
+            if state['chatScopeFail']: return self.respond(dict(error='Invalid scope'), 403)
+            if state['chatSaveFail']: return self.respond(dict(error='Chat settings could not be saved'), 503)
+            if p.endswith('/chat_preferences'):
+                allowed = ('chat_show_timestamps', 'chat_user_blacklist', 'chat_word_blacklist')
+                if not data or any(key not in allowed for key in data): return self.respond(dict(error='Invalid chat settings'), 400)
+                state['chatPreferenceWrites'].append(data)
+                prefs.update(data)
+                return self.respond(prefs)
+            offset = data.get('offsetMs')
+            if type(offset) is not int or not -3600000 <= offset <= 3600000: return self.respond(dict(error='Invalid timing'), 400)
+            id = p.rsplit('/', 1)[-1]
+            state['chatTimings'][id] = offset
+            state['chatTimingRequests'].append(dict(method='PUT', video=id, offsetMs=offset))
+            return self.respond(dict(offsetMs=offset))
         elif p == '/api/v1/auth/preferences':
             if state['failPreferences']: return self.respond(dict(error='Fixture settings could not be saved'), 503)
             for key, value in data.items():

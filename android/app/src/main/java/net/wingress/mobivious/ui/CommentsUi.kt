@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -257,19 +258,22 @@ private fun richContent(text: String, htmlSource: String, server: String, video:
 
 @Composable
 internal fun RichCommentText(comment: Comment, server: String, video: String, link: (String) -> Unit,
-    collapsedLines: Int = 6, tag: String = "comment-body-${comment.key}") = NativeRichText(comment.text, comment.html, comment.key, server, video, link, collapsedLines, tag)
+    collapsedLines: Int = 6, tag: String = "comment-body-${comment.key}",
+    expansionControl: (@Composable (expanded: Boolean, toggle: () -> Unit) -> Unit)? = null) =
+    NativeRichText(comment.text, comment.html, comment.key, server, video, link, collapsedLines, tag, expansionControl)
 
 @Composable
 internal fun NativeRichText(text: String, html: String, key: String, server: String, video: String, link: (String) -> Unit,
-    collapsedLines: Int = Int.MAX_VALUE, tag: String = "rich-text") {
+    collapsedLines: Int = Int.MAX_VALUE, tag: String = "rich-text",
+    expansionControl: (@Composable (expanded: Boolean, toggle: () -> Unit) -> Unit)? = null) {
     val color = MaterialTheme.colorScheme.primary
     val onLink by rememberUpdatedState(link)
     val content = remember(html, text, server, video, color) {
         runCatching { richContent(text, html, server, video, color) { onLink(it) } }
             .getOrElse { RichContent(AnnotatedString(text), emptyMap()) }
     }
-    var expanded by remember(key) { mutableStateOf(false) }
-    var truncated by remember(key) { mutableStateOf(false) }
+    var expanded by rememberSaveable(server, key, tag, collapsedLines) { mutableStateOf(false) }
+    var truncated by remember(server, key, text, html, collapsedLines) { mutableStateOf(false) }
     val inline = content.emoji.mapValues { (_, emoji) ->
         var failed by remember(emoji.url) { mutableStateOf(false) }
         val width = if (failed) (emoji.alt.length * .6f).coerceIn(1.2f, 12f).em else 1.2.em
@@ -283,8 +287,12 @@ internal fun NativeRichText(text: String, html: String, key: String, server: Str
             maxLines = if (expanded) Int.MAX_VALUE else collapsedLines,
             onTextLayout = { if (!expanded) truncated = it.hasVisualOverflow })
     }
-    if (truncated || expanded) TextButton(onClick = { expanded = !expanded }, contentPadding = PaddingValues(horizontal = 8.dp)) {
-        Text(if (expanded) "Show less" else "Read more")
+    if (collapsedLines != Int.MAX_VALUE && (truncated || expanded)) {
+        val toggle = { expanded = !expanded }
+        if (expansionControl != null) expansionControl(expanded, toggle)
+        else TextButton(onClick = toggle, contentPadding = PaddingValues(horizontal = 8.dp)) {
+            Text(if (expanded) "Show less" else "Read more")
+        }
     }
 }
 

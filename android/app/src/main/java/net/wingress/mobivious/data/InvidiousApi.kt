@@ -56,12 +56,15 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
             val body = response.body
             if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
             if (!response.isSuccessful) {
+                val chatSettings = path == "api/v1/auth/chat_preferences" || path.startsWith("api/v1/auth/chat_timing/")
                 val invalidPassword = path.startsWith("api/v1/auth/account/") &&
                     runCatching { JSONObject(body).text("code") == "invalid_password" }.getOrDefault(false)
-                if (response.code == 401 && auth && !invalidPassword && target == this@InvidiousApi.context()) expired()
+                // Optional chat sync must not revoke the active playback owner on an auth failure.
+                if (response.code == 401 && auth && !invalidPassword && !chatSettings && target == this@InvidiousApi.context()) expired()
                 val error = runCatching { JSONObject(body).text("error") }.getOrDefault("")
-                if (auth && response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired")) && target == this@InvidiousApi.context()) expired()
+                if (auth && !chatSettings && response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired")) && target == this@InvidiousApi.context()) expired()
                 throw ApiException(response.code, when {
+                    chatSettings && (response.code == 401 || response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired"))) -> "Sign out and sign in again to restore chat settings sync. Playback can continue."
                     response.code == 429 -> "Too many attempts. Try again after ${response.header("Retry-After") ?: "a few"} seconds."
                     response.code == 404 && path == "api/v1/mobile/login" -> "This server needs the Mobivious native sign-in update."
                     response.code in listOf(404, 405) && error != "Session no longer exists." && (path.startsWith("api/v1/mobile/registration") || path == "api/v1/mobile/register" || path.startsWith("api/v1/auth/account/")) -> "Update this server to enable native registration and account management."
@@ -74,6 +77,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     response.code == 403 && error == "Invalid scope" && path == "api/v1/auth/subscriptions/search" -> "Sign out and sign in again to enable subscription search with an updated token."
                     response.code in listOf(404, 405) && (path.startsWith("api/v1/auth/saved_playlists/") || path == "api/v1/auth/feed/rss" || path == "api/v1/auth/subscriptions/export" || path.endsWith("/feed")) -> "This server needs the Mobivious playlist/RSS API update."
                     response.code == 403 && error == "Invalid scope" && (path.startsWith("api/v1/auth/saved_playlists/") || path == "api/v1/auth/feed/rss" || path == "api/v1/auth/subscriptions/export") -> "Sign out and sign in again to enable playlist subscriptions and RSS exports with an updated token."
+                    response.code == 403 && error == "Invalid scope" && (path == "api/v1/auth/chat_preferences" || path.startsWith("api/v1/auth/chat_timing/")) -> "Sign out and sign in again to enable chat settings and timing with an updated token."
+                    response.code in listOf(404, 405) && (path == "api/v1/auth/chat_preferences" || path.startsWith("api/v1/auth/chat_timing/")) -> "This server needs the Mobivious chat settings and timing API update."
                     error.isNotBlank() -> error.take(300)
                     response.code >= 500 -> "The server could not complete this request. Try again."
                     else -> "Request failed (${response.code})."
@@ -271,6 +276,19 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun addToPlaylist(id: String, video: String, context: ApiContext = context()): Video = ApiParser.video(JSONObject(scopedPlaylistWrite("api/v1/auth/playlists/$id/videos", "POST", context, JSONObject().put("videoId", video))))
     suspend fun removeFromPlaylist(id: String, index: String, context: ApiContext = context()) { require(index.matches(Regex("^[A-Fa-f0-9]+$"))) { "Missing playlist occurrence ID." }; scopedPlaylistWrite("api/v1/auth/playlists/$id/videos/$index", "DELETE", context) }
     suspend fun preferences(context: ApiContext = context()): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context)))
+    suspend fun chatReplay(id: String, offsetMs: Long, continuation: String, context: ApiContext): ChatChunk {
+        require(id.matches(Regex("[A-Za-z0-9_-]{11}")) && offsetMs >= 0 && continuation.toByteArray(Charsets.UTF_8).size <= 4096)
+        return ChatChunk.parse(JSONObject(scopedRead("api/v1/live_chat/$id", buildMap {
+            put("offset_ms", offsetMs.toString()); if (continuation.isNotEmpty()) put("continuation", continuation)
+        }, false, context)))
+    }
+    suspend fun chatPreferences(changes: JSONObject, context: ApiContext): AccountPreferences =
+        ApiParser.preferences(JSONObject(request("api/v1/auth/chat_preferences", "PATCH", changes, true, context = context)))
+    suspend fun chatTiming(id: String, context: ApiContext): Int = JSONObject(request("api/v1/auth/chat_timing/$id", auth = true, context = context)).getInt("offsetMs")
+    suspend fun chatTiming(id: String, value: Int, context: ApiContext) {
+        require(value in -3_600_000..3_600_000)
+        request("api/v1/auth/chat_timing/$id", "PUT", JSONObject().put("offsetMs", value), true, context = context)
+    }
     suspend fun preferences(changes: JSONObject, context: ApiContext): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", "PATCH", changes, true, context = context)))
     suspend fun dearrowTitle(id: String, context: ApiContext = context()): String? = JSONObject(request("api/v1/dearrow/$id", context = context)).text("title").trim().takeIf { it.isNotEmpty() }
     suspend fun dearrowIdentity(context: ApiContext = context()) = JSONObject(request("api/v1/auth/dearrow/identity", auth = true, context = context)).let { DeArrowIdentity(it.getBoolean("ready"), it.getBoolean("configured")) }

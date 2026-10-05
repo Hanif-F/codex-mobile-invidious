@@ -85,9 +85,20 @@ For instance owners, the [deployment guide](deploy/README.md) covers server setu
 migrations and token renewal. The [feature checklist](FEATURE_PARITY.md) records
 individual capabilities and their dependencies.
 
+Archived livestreams with `liveChatReplay` support offer on-demand chat replay
+through the player chat button or watch-page entry. Replay follows playback and
+seeks, with docked and movable/resizable overlay modes. Chat settings provide
+appearance controls, user/word/RE2 regex filters, and a per-video timing offset;
+positive timing delays chat. Signed-in timestamps, filters and offsets sync with
+Invidious, while appearance stays on the device. Guests save settings per instance.
+Deploy the sibling native token-scope update and renew sign-in for account chat
+sync. RE2 excludes lookaround/backreferences; unsupported imported patterns are
+reported and skipped. Older instances without the availability flag remain usable
+without chat. Chat is read-only.
+
 ### Current limitations
 
-Chat replay, clips, downloads, casting, upload notifications and timeline
+Clips, downloads, casting, upload notifications and timeline
 thumbnail previews are not implemented. Comments, polls and quizzes are read-only;
 RSS support provides links and exports rather than an in-app feed reader.
 

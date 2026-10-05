@@ -114,6 +114,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         { video, sort, continuation, context -> api.comments(video, sort, continuation, context) }, ::friendly)
     val comments = commentController.state
     val preferences = MutableStateFlow(store.guestDeArrow())
+    val chatAppearance = MutableStateFlow(store.chatAppearance())
+    private val chatController = ChatReplayController(viewModelScope, api::context, api::chatReplay,
+        { id, ctx -> if (ctx.account == null) store.chatTiming(id, ctx) else api.chatTiming(id, ctx) },
+        { id, offset, ctx -> if (ctx.account == null) store.chatTiming(id, offset, ctx) else api.chatTiming(id, offset, ctx) }, ::friendly)
+    val chatReplay = chatController.state
+    private var chatAppearanceServer = store.server
     val sponsorBlock = MutableStateFlow(SponsorBlockPlayback())
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
     fun openSponsorBlock(channelId: String = "") { sponsorSettingsChannel.value = channelId; refreshSharedSettings() }
@@ -178,7 +184,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     addListener(object : Player.Listener {
                         override fun onEvents(player: Player, events: Player.Events) { updatePlayback() }
                         override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) { updatePlayback() }
-                        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) { cancelAccumulatedSeek() }
+                        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) { cancelAccumulatedSeek(); chatController.update(newPosition.positionMs, controller.value?.duration?.coerceAtLeast(0) ?: 0, true) }
                         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
                             if (pendingSeek.value?.mediaId != mediaItem?.mediaId) cancelAccumulatedSeek(false)
                         }
@@ -212,9 +218,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             }
-            syncComments(); state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
+            syncComments(); syncChat(); state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
         } }
         viewModelScope.launch { account.collect {
+            chatController.bind("", "", false)
             commentController.bind(null, false)
             subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput()
             dismissLinkResolution(); browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
@@ -251,7 +258,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             else dearrowTitles.clear()
             syncDeArrowMetadata()
         } }
-        viewModelScope.launch { preferences.collect { syncComments(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
+        viewModelScope.launch { preferences.collect { syncComments(); syncChat(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
         refresh()
     }
     private fun receiveSponsorState(args: Bundle) {
@@ -293,6 +300,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             canSetSpeed = p.isCommandAvailable(Player.COMMAND_SET_SPEED_AND_PITCH),
             canSelectTracks = p.isCommandAvailable(Player.COMMAND_SET_TRACK_SELECTION_PARAMETERS),
             canRefresh = p.mediaItemCount > 0 && p.isCommandAvailable(Player.COMMAND_STOP) && p.isCommandAvailable(Player.COMMAND_PREPARE), geometry = geometry)
+        syncChat()
+        if (p.currentMediaItem?.mediaId == chatReplay.value.videoId) chatController.update(playback.value.position, playback.value.duration)
     }
     fun refreshAccount() {
         refreshSharedSettings()
@@ -455,9 +464,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         return false
     }
     fun openPostComments() {
-        val detail = postDetail.value
-        val post = detail.post ?: return
-        if (detail.context != api.context() || !ContentVisibility.validChannel(post.channelId)) return
+        postDetail.value.post?.let(::openPostComments)
+    }
+    fun isPostCommentsSource(target: CommentTarget.Post): Boolean = when {
+        route == "post:${target.id}" -> postDetail.value.context == api.context() &&
+            postDetail.value.post?.let { it.id == target.id && it.channelId == target.channelId } == true
+        route == "channel:${target.channelId}" -> channel.value?.id == target.channelId &&
+            channelTab.value == ChannelTab.POSTS && scopedSearch.value.submitted.isBlank()
+        else -> false
+    }
+    fun openPostComments(post: CommunityPost) {
+        if (!PostLinks.validId(post.id) || !ContentVisibility.validChannel(post.channelId)) return
+        val target = CommentTarget.Post(post.id, post.channelId)
+        if (!isPostCommentsSource(target)) return
+        val current = if (route.startsWith("post:")) postDetail.value.post == post else post in browse.value.posts
+        if (!current) return
         postCommentController.bind(CommentTarget.Post(post.id, post.channelId)); postCommentController.open()
     }
     fun closePostComments() = postCommentController.close()
@@ -543,6 +564,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun submitSearch(scoped: Boolean) {
         val input = if (scoped) scopedSearch else searchInput
+        postCommentController.bind(null)
         if (scoped && route.startsWith("channel:") && input.value.submitted.isBlank() && input.value.draft.isNotBlank())
             channelSearchOrigin = captureBrowse().copy(scopedSearch = SearchInput(), channelSearchOrigin = null)
         input.value = input.value.copy(submitted = input.value.draft.trim())
@@ -579,6 +601,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectChannelTab(value: ChannelTab) {
         val info = channel.value ?: return
         if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value && scopedSearch.value.submitted.isBlank()) return
+        postCommentController.bind(null)
         if (value == channelTab.value && channelSearchOrigin != null) { clearScopedSearch(); return }
         channelSearchOrigin = null; scopedSearch.value = SearchInput()
         channelTab.value = value
@@ -770,7 +793,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun nextQueue(direction: Int) { cancelAccumulatedSeek(false); if (direction > 0) controller.value?.seekToNextMediaItem() else controller.value?.seekToPreviousMediaItem() }
     fun repeatQueue(value: QueueRepeat) { controller.value?.repeatMode = when(value) { QueueRepeat.ONE -> Player.REPEAT_MODE_ONE; QueueRepeat.ALL -> Player.REPEAT_MODE_ALL; else -> Player.REPEAT_MODE_OFF } }
     fun retryPlayback() { cancelAccumulatedSeek(); queueCommand(PlaybackService.QUEUE_RETRY) }
-    fun closePlayer() { commentController.bind(null, false); cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueExpanded.value = false }
+    fun closePlayer() { chatController.bind("", "", false); commentController.bind(null, false); cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueExpanded.value = false }
     fun undoBlock(value: BlockUndo) {
         if (value != blockUndo.value || value.context != api.context() || SystemClock.elapsedRealtime() > value.expires) return
         blockUndo.value = null
@@ -913,7 +936,38 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun autoAudio() { controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
         .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build() } }
     private fun syncComments() = commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
-    fun openComments() { syncComments(); commentController.open() }
+    fun openComments() { closeChat(); syncComments(); commentController.open() }
+    private fun syncChat() {
+        if (chatAppearanceServer != store.server) { chatAppearanceServer = store.server; chatAppearance.value = store.chatAppearance() }
+        val q = queue.value
+        val details = q.details
+        if (details != null) chatController.bind(details.video.id, q.currentKey.orEmpty(), details.chatAvailable && !playback.value.live)
+        else if (q.currentKey != chatReplay.value.occurrence || chatReplay.value.context != api.context()) chatController.bind("", q.currentKey.orEmpty(), false)
+        chatController.configure(preferences.value.chat)
+    }
+    fun openChat() { closeComments(); syncChat(); chatController.open() }
+    fun closeChat() = chatController.close()
+    fun presentChat(visible: Boolean) = chatController.present(visible)
+    fun retryChat() = chatController.retry()
+    fun followChat() = chatController.follow()
+    fun olderChat() = chatController.older()
+    fun chatPosition(position: CommentPosition, following: Boolean, occurrence: String, context: ApiContext?) {
+        if (chatReplay.value.occurrence == occurrence && chatReplay.value.context == context) chatController.position(position, following)
+    }
+    fun chatTiming(value: Int) = chatController.timing(value)
+    fun retryChatTiming() = chatController.retryTiming()
+    fun setChatAppearance(value: ChatAppearance) { chatAppearance.value = value.bounded(); store.chatAppearance(chatAppearance.value) }
+    suspend fun saveChatPreferences(value: ChatPreferences, before: ChatPreferences, context: ApiContext) = preferenceWrites.withLock {
+        ChatFilters.validateChanges(value, before)
+        if (api.context() != context) throw CancellationException("Account or instance changed")
+        val patch = JSONObject(); val old = before.json(); val changed = value.json()
+        changed.keys().forEach { if (old.get(it) != changed.get(it)) patch.put(it, changed.get(it)) }
+        if (patch.length() == 0) return@withLock
+        preferenceGeneration++
+        val saved = if (context.account == null) preferences.value.merge(patch).also { store.guestDeArrow(it) }
+            else api.chatPreferences(patch, context)
+        if (api.context() == context) { preferenceGeneration++; preferencesContext = context; preferences.value = saved }
+    }
     fun closeComments() = commentController.close()
     fun backComments() = commentController.back()
     fun sortComments(sort: CommentSort) = commentController.sort(sort)

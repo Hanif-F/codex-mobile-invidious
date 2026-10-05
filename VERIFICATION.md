@@ -2038,3 +2038,157 @@ finished. No test or fixture process remained active, and the goal was marked
 complete for now. This closes the crash-focused round; the 24 broader failing
 scenarios remain recorded in `remaining-device-checks.md`. Complete device-suite
 acceptance is still unproven.
+
+## Post cards and direct comments — 5 October 2026
+
+Channel post cards now show read-only likes and a Share icon on the same row,
+followed by a full-width tonal Comments button with a formatted count. The button
+opens the post-comments sheet over the existing Posts feed, preserving its route,
+pagination and scroll position. Card backgrounds no longer open a separate post;
+Copy link and the standalone Share text action have been removed. Incoming,
+pasted and rich-text post links retain the dedicated detail screen and use the
+same card actions.
+
+Feed text previews retain six lines. Outlined Read more/Show less buttons expand
+and collapse the loaded rich text inside the card, with saveable per-post state
+across scrolling and Activity recreation. Attachments, image viewing, selectable
+text and embedded links retain their native interactions. The shared rich-text
+renderer accepts an optional expansion control; existing comment presentation
+keeps its current control style.
+
+The final focused emulator run passed **22 of 22 tests** in
+`CommunityPresentationTest`, `CommunitySmokeTest` and
+`CommentsPresentationTest` on the already-running `emulator-5554`
+(Pixel_8_Pro, Android 16). This covered direct feed comments without a post-detail
+request, background-card semantics, cursor-preserving retry and feed position,
+sorting and paginated replies, same-post reopening, switching targets, invalid
+and stale card sources, channel/tab/search changes, delayed account/instance
+responses, independent video comments/playback, shared-link recreation, native
+share-chooser launch and URL payload, and long-text scrolling/restoration/links.
+Presentation checks covered formatted, zero and unknown counts, independent
+likes/share semantics, full-width buttons, 48 dp targets, narrow layouts, large
+fonts and both themes. Native screenshots of gallery card actions, the comments
+sheet, and collapsed/expanded long posts were visually inspected.
+
+All **238 JVM tests** passed. Debug app/test APK assembly and debug lint passed;
+lint reported **24 warnings and no errors**. The extended disposable community
+fixture passed, including matching full long-text bodies in feed/detail responses.
+An initial incremental compile could not resolve unchanged UI declarations;
+recompiling with `-Pkotlin.incremental=false` passed, as did subsequent normal builds.
+The account-switch regression follows the existing preference-driven return to
+the home screen before re-entering Posts for the instance-switch check.
+
+Local evidence is saved under the ignored `artifacts/post-cards-overhaul/`:
+build/device logs, passing device XML, JVM totals, lint XML, and four native
+screenshots in `mobivious-posts-screenshots/`. The debug APK is
+`android/app/build/outputs/apk/debug/app-debug.apk` and was explicitly installed
+after instrumentation cleanup as `net.wingress.mobivious.debug` for manual use.
+This change required no server updates. The broader device suite was not run.
+
+To repeat the focused runtime checks using the existing fixture runner:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.CommunityPresentationTest,net.wingress.mobivious.CommunitySmokeTest,net.wingress.mobivious.CommentsPresentationTest
+```
+
+
+## Livestream archive chat replay — 5 October 2026
+
+Feature 23 now opens read-only chat on demand for archived videos whose optional
+`liveChatReplay` flag is true. Live/upcoming videos and older responses without
+the flag do not offer chat. Public replay requests omit bearer credentials and
+encode opaque cursors. The ViewModel controller follows actual service position,
+including pause, speed, repeat, seeks and SponsorBlock discontinuities. Positive
+timing delays chat. Paging handles stable IDs, replacements/removals, sparse
+pages, failed cursors and repeated-token loops; cache limits are 5,000 messages,
+24 seek segments and 120 displayed rows, with 30-second prefetch and at least
+800 ms between continuation requests. A stopped loop does not falsely mark
+future positions as covered.
+
+Dock size is device-local (30–70%, default 60% below / 35% beside). Normal watch
+and portrait fullscreen dock below; landscape fullscreen docks beside the sole
+aspect-fitting video surface. Overlay geometry is normalized within the fitted
+picture, clamped on size/orientation changes, and edited with Move/Resize,
+Save/Cancel, accessible movement/size actions and settings sliders. Background
+opacity leaves text opaque. Defaults show timestamps and user IDs, use 100%
+font scale / 75% overlay opacity, empty filters and zero timing. Manual scrolling
+freezes the reading window and exposes Return to playback; rotation/recreation
+and miniplayer/PiP/background restoration retain the same occurrence's state.
+Comments and chapters replace chat, and a new occurrence starts closed.
+
+Only timestamps and user/word filters are shared through dedicated sparse chat
+preference PATCHes, coordinated with other account preference writes. Timing
+uses the existing GET/PUT endpoint and ±3,600,000 ms range, with failed-save retry
+and protection against delayed reads overwriting newer edits or form drafts.
+Optional chat authentication errors retain the current playback owner and prompt
+sign-in renewal. Appearance stays device-local per instance. Guest settings/timing stay local
+per instance and are not copied into an account. RE2/J 1.8 provides
+case-insensitive `/pattern/` tokens alongside substring word tokens and channel
+ID/handle filters. New invalid filters are rejected; unsupported imported
+patterns/oversized fields are reported and skipped while their saved values
+remain intact, including when changing another setting. Limits are 1,024 UTF-8
+bytes per field and 128 characters per token.
+
+Validation:
+
+- **267 JVM/API tests passed**, including 29 replay tests for optional availability,
+  typed parsing, cursor encoding/credentials, synchronization, offsets, seeks,
+  cache pruning/eviction, replacement ordering in frozen windows, pagination
+  errors/loops, filters/imports, sparse shared
+  patches, context/occurrence isolation and delayed responses.
+- **15 distinct replay device scenarios passed** on the already-running
+  `emulator-5554` (Pixel_8_Pro, Android 16): fourteen in the full replay run and
+  the delayed timing-edit case in a subsequent three-test persistence run.
+  Coverage includes on-demand loading and paused seeks, paid messages, retries,
+  unavailable/live gating, both dock orientations, overlay drag/resize
+  Save/Cancel and fullscreen clamping, accessible movement, 300% chat fonts and
+  both themes, reading/resync and recreation, occurrence/panel transitions,
+  guest/account isolation and saves, old-token scopes, invalid regex, and
+  miniplayer/PiP/background suspension/restoration at the current position.
+- **11 related native presentation regressions passed** across player controls,
+  chapters and comments. Fullscreen Back ordering uses the Activity Back
+  dispatcher because shell screenshot capture left this Android 16 AVD without
+  reliable input focus for synthetic hardware Back; system Back in the modal
+  settings flow was also exercised.
+- Debug app and instrumentation APK assembly and debug lint passed. Lint
+  reported **0 errors and 26 warnings**; no release build or publication was
+  performed for this change.
+- `python3 scripts/check-chat-fixture.py` passed using a disposable port and
+  isolated data. Its HTTP checks cover timed/sparse chunks, replacements,
+  removals, errors, authentication/scopes, sparse settings and timing isolation.
+- Sibling Invidious checks passed: **6 replay specs**, **2 native scope specs**,
+  and normal/API-only executable builds. Native login grants
+  `PATCH:chat_preferences` and `GET;PUT:chat_timing/*`; Android exposes the matching
+  permission group. Existing endpoints/tables are reused; no new migration.
+
+Native portrait/landscape dock, overlay and light/dark large-font screenshots
+were visually inspected. Evidence is saved in ignored `artifacts/chat-replay/`:
+passing replay/timing/presentation XML and logs, JVM results, lint results,
+server check logs and screenshots. APKs are under
+`android/app/build/outputs/apk/debug/` and
+`android/app/build/outputs/apk/androidTest/debug/`. The finished debug APK was installed on the connected emulator for manual use.
+Existing uncommitted changes were preserved. The runner used the user-started device and cleaned up only
+its own localhost fixture and ADB reverse mapping.
+
+Compatibility/runtime limits: account sync requires deployment of the sibling
+native scope update and renewed sign-in tokens. RE2 syntax excludes browser
+lookaround/backreferences. Older instances without replay availability remain
+usable without chat; chat failures leave playback usable. Production accounts,
+real upstream archives, arbitrary desktop/multiwindow resizing, a complete
+TalkBack session, and the wider device suite were not exercised. Server
+deployment, release signing/publication and sending live chat remain outside
+this implementation.
+
+Repeat on an already-running device (no emulator is started by this script):
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline --max-workers=1 \
+  -Dorg.gradle.jvmargs=-Xmx768m \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveChatSmokeTest,net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.ChaptersPresentationTest,net.wingress.mobivious.CommentsPresentationTest
+python3 scripts/check-chat-fixture.py
+cd ../invidious
+CRYSTAL_CACHE_DIR=/tmp/mobivious-chat-crystal crystal spec spec/invidious/videos/live_chat_spec.cr spec/native_chat_scopes_spec.cr
+CRYSTAL_CACHE_DIR=/tmp/mobivious-chat-crystal crystal build src/invidious.cr -Dskip_videojs_download -o /tmp/invidious-chat-replay
+CRYSTAL_CACHE_DIR=/tmp/mobivious-chat-crystal crystal build src/invidious.cr -Dapi_only -Dskip_videojs_download -o /tmp/invidious-chat-replay-api
+```

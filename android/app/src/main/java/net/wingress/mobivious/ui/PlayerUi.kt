@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -76,12 +77,14 @@ internal fun VideoPlayer(
     gesturesEnabled: Boolean = true, chromeVisible: Boolean = true, gestureKey: Any? = null,
     onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
+    onChat: (() -> Unit)? = null,
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
     val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
     val sponsorState by vm.sponsorBlock.collectAsStateWithLifecycle()
+    val replay by vm.chatReplay.collectAsStateWithLifecycle()
     val sponsor = sponsorState.takeIf { it.mediaId == playback.mediaId } ?: SponsorBlockPlayback()
     val chapters = playback.chapters
     var visible by remember(playback.mediaId, controls) { mutableStateOf(true) }
@@ -240,10 +243,10 @@ internal fun VideoPlayer(
                             if (scrub != null) PlayerSeekSponsorLabels(sponsorLabels,
                                 Modifier.align(Alignment.TopCenter).offset(y = (-24).dp))
                         }
-                        PlayerControlFooter(playback, timelinePosition, fullscreen, controller != null,
+                        PlayerControlFooterWithChat(playback, timelinePosition, fullscreen, controller != null,
                             onSettings = { vm.cancelAccumulatedSeek(); interact(); onSettings() },
                             onFullscreen = { interact(); onFullscreen() },
-                            onChapters = { vm.cancelAccumulatedSeek(); interact(); onChapters() })
+                            onChapters = { vm.cancelAccumulatedSeek(); interact(); onChapters() }, onChat = onChat, chatOpen = replay.open)
                     }
                     PlayerPlaybackButton(playback, compactPlay) { vm.togglePlay(); interact() }
                 }
@@ -307,6 +310,12 @@ internal fun BoxScope.PlayerPlaybackButton(playback: PlaybackState, compact: Boo
 @Composable
 internal fun PlayerControlFooter(playback: PlaybackState, positionMs: Long, fullscreen: Boolean, settingsEnabled: Boolean,
     onSettings: () -> Unit, onFullscreen: () -> Unit, onChapters: () -> Unit) {
+    PlayerControlFooterWithChat(playback, positionMs, fullscreen, settingsEnabled, onSettings, onFullscreen, onChapters)
+}
+
+@Composable
+internal fun PlayerControlFooterWithChat(playback: PlaybackState, positionMs: Long, fullscreen: Boolean, settingsEnabled: Boolean,
+    onSettings: () -> Unit, onFullscreen: () -> Unit, onChapters: () -> Unit, onChat: (() -> Unit)? = null, chatOpen: Boolean = false) {
     val chapters = playback.chapters
     Row(Modifier.fillMaxWidth().testTag("player-footer"), verticalAlignment = Alignment.CenterVertically) {
         // Measure the fixed icon targets first; long timestamps must leave a clickable chapter target.
@@ -320,6 +329,8 @@ internal fun PlayerControlFooter(playback: PlaybackState, positionMs: Long, full
                 if (chapters.isNotEmpty()) PlayerChapterTitle(chapters, positionMs, Modifier.weight(1f).padding(start = 8.dp), onChapters)
             }
         }
+        if (onChat != null && playback.details?.chatAvailable == true && !playback.live) IconButton(onClick = onChat,
+            modifier = Modifier.testTag("player-chat").semantics { selected = chatOpen }) { Icon(Icons.AutoMirrored.Filled.Chat, if (chatOpen) "Hide chat replay" else "Show chat replay", tint = Color.White) }
         IconButton(onClick = onSettings, enabled = settingsEnabled) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }
         IconButton(onClick = onFullscreen) { Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
             if (fullscreen) "Exit full screen" else "Full screen", tint = Color.White) }

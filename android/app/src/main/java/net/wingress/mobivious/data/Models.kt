@@ -19,7 +19,8 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
     val subscribers: String = "", val upcoming: Boolean? = null, val premiereTimestamp: Long? = null,
     val listed: Boolean? = null, val genre: String = "", val genreUrl: String = "", val license: String? = null,
     val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
-    val music: List<MusicCredit> = emptyList(), val notice: String = "") {
+    val music: List<MusicCredit> = emptyList(), val notice: String = "", val liveChatReplay: Boolean = false) {
+    val chatAvailable: Boolean get() = liveChatReplay && !video.live && upcoming != true
     val chapters: List<VideoChapter> = ChapterRules.parse(description, video.duration, video.live)
 }
 data class MusicCredit(val song: String, val artist: String, val album: String, val license: String = "")
@@ -85,7 +86,7 @@ object ApiParser {
         familyFriendly = json.opt("isFamilyFriendly") as? Boolean, allowedRegions = json.optJSONArray("allowedRegions")?.let { a ->
             (0 until a.length()).mapNotNull { (a.opt(it) as? String)?.takeIf { code -> code.matches(Regex("[A-Z]{2}")) } }.distinct() },
         music = json.optJSONArray("musicTracks")?.objects().orEmpty().map { MusicCredit(it.text("song"), it.text("artist"), it.text("album"), it.text("license")) }
-            .filter { it.song.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }, notice = json.text("error"))
+            .filter { it.song.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }, notice = json.text("error"), liveChatReplay = json.opt("liveChatReplay") == true)
     fun streamFormat(j: JSONObject): StreamFormat {
         val size = j.text("size").split('x')
         val type = j.text("type", j.text("mimeType"))

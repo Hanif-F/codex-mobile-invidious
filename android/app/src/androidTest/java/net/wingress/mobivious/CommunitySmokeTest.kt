@@ -2,7 +2,12 @@ package net.wingress.mobivious
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.app.Activity
+import android.app.Instrumentation
+import android.content.IntentFilter
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -60,9 +65,34 @@ class CommunitySmokeTest {
         until { !activity.model.postDetail.value.loading && activity.model.postDetail.value.post?.id == id }
     }
     private fun comments() {
-        compose.onNodeWithTag("post-detail").performScrollToNode(hasTestTag("post-comments-open"))
-        compose.onNodeWithTag("post-comments-open").performClick()
+        val tag = "post-comments-${activity.model.postDetail.value.post!!.key}"
+        compose.onNodeWithTag("post-detail").performScrollToNode(hasTestTag(tag))
+        compose.onNodeWithTag(tag).performClick()
         until { activity.model.postComments.value.feed.loaded }
+    }
+    private fun feedComments(id: String) {
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-comments-$id"))
+        compose.onNodeWithTag("post-comments-$id").performClick()
+        until { activity.model.postComments.value.target == CommentTarget.Post(id, owner) && activity.model.postComments.value.feed.loaded }
+    }
+    private fun recreate() {
+        val old = activity
+        ui { old.recreate() }
+        until { old.isDestroyed }
+        ui { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
+    }
+    private fun postBodyLayout(id: String): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithTag("post-body-$id").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+    private fun screenshot(name: String) {
+        compose.waitForIdle()
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        for (command in listOf("mkdir -p /data/local/tmp/mobivious-posts-screenshots",
+            "screencap -p /data/local/tmp/mobivious-posts-screenshots/$name.png")) {
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+        }
     }
 
     @Test fun specializedTabsSortAndRestoreAfterSearchAndChildNavigation() {
@@ -116,11 +146,18 @@ class CommunitySmokeTest {
         assertEquals(9, activity.model.browse.value.posts.size); assertTrue(activity.model.browse.value.end)
         val requests = events("channelRequests").filter { it.getString("tab") == "posts" }
         assertEquals(listOf(null, "posts+/page=2%&", "posts+/page=2%&"), requests.map { if (it.isNull("continuation")) null else it.getString("continuation") })
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-open-Ugpost3"))
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-comments-Ugpost3"))
         val original = activity.model.browse.value.position
-        compose.onNodeWithTag("post-open-Ugpost3").performClick()
-        until { activity.model.postDetail.value.post?.id == "Ugpost3" }
-        back(); until { activity.model.route == "channel:$owner" }
+        compose.onNodeWithTag("post-Ugpost3").assert(hasClickAction().not())
+        screenshot("gallery-card-actions")
+        compose.onNodeWithTag("post-comments-Ugpost3").performClick()
+        until { activity.model.postComments.value.feed.loaded }
+        compose.onNodeWithTag("post-comments-sheet").assertIsDisplayed()
+        screenshot("comments-over-feed")
+        assertEquals("channel:$owner", activity.model.route)
+        assertNull(activity.model.postDetail.value.post); assertTrue(events("postRequests").isEmpty())
+        back(); until { !activity.model.postComments.value.open }
+        compose.onNodeWithTag("post-detail").assertDoesNotExist()
         assertEquals(ChannelTab.POSTS, activity.model.channelTab.value); assertEquals(9, activity.model.browse.value.posts.size)
         until { activity.model.browse.value.position == original }
     }
@@ -145,7 +182,7 @@ class CommunitySmokeTest {
 
     @Test fun postCommentsSheetSortsRepliesRetriesAndIgnoresVideoCommentVisibility() {
         ui { activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, comments = emptyList())); activity.model.refreshSharedSettings() }
-        post("Ugpost1"); comments()
+        choose(ChannelTab.POSTS); feedComments("Ugpost1")
         compose.onNodeWithTag("post-comments-sheet").assertIsDisplayed()
         compose.onNodeWithTag("comments-list").performScrollToNode(hasTestTag("comment-replies-parent"))
         compose.onNodeWithTag("comment-replies-parent").performClick()
@@ -163,8 +200,127 @@ class CommunitySmokeTest {
         assertEquals("newest", activity.model.postComments.value.feed.page.items.first().id)
         val count = events("commentRequests").size
         compose.onNodeWithContentDescription("Close comments").performClick()
-        comments(); assertEquals(count, events("commentRequests").size)
+        feedComments("Ugpost1"); assertEquals(count, events("commentRequests").size)
         assertTrue(events("commentRequests").all { it.getBoolean("isPost") && !it.getBoolean("authorized") && it.getString("ucid") == owner })
+        assertTrue(events("postRequests").isEmpty())
+    }
+
+    @Test fun feedCommentsSwitchTargetsRejectStaleCardsAndResetWhenLeavingPosts() {
+        choose(ChannelTab.POSTS)
+        val first = activity.model.browse.value.posts.first()
+        ui {
+            activity.model.openPostComments(first.copy(channelId = "UC" + "b".repeat(22)))
+            activity.model.openPostComments(first.copy(comment = first.comment.copy(id = "bad/id")))
+            activity.model.openPostComments(first.copy(comment = first.comment.copy(text = "Stale body")))
+        }
+        assertFalse(activity.model.postComments.value.open); assertTrue(events("commentRequests").isEmpty())
+        command("comments", """{"commentDelayNext":1200}""")
+        ui { activity.model.openPostComments(first) }
+        until { events("commentRequests").any { !it.getBoolean("completed") } }
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        feedComments("Ugpost2")
+        until { events("commentRequests").all { it.getBoolean("completed") } }
+        assertEquals(CommentTarget.Post("Ugpost2", owner), activity.model.postComments.value.target)
+        ui { activity.model.selectChannelTab(ChannelTab.VIDEOS) }
+        until { !activity.model.browse.value.loading }
+        assertFalse(activity.model.postComments.value.open); assertNull(activity.model.postComments.value.target)
+        ui { activity.model.openPostComments(first) }
+        assertFalse(activity.model.postComments.value.open)
+        choose(ChannelTab.POSTS); feedComments("Ugpost1")
+        ui { activity.model.editSearch("fixture", true); activity.model.submitSearch(true) }
+        until { !activity.model.browse.value.loading }
+        assertNull(activity.model.postComments.value.target)
+        ui { activity.model.openPostComments(first) }
+        assertFalse(activity.model.postComments.value.open)
+        ui { activity.model.clearScopedSearch() }
+        until { activity.model.scopedSearch.value.submitted.isBlank() }
+        feedComments("Ugpost1")
+        ui { activity.model.navigate("Home", "channel:UC${"b".repeat(22)}") }
+        assertNull(activity.model.postComments.value.target)
+        ui { activity.model.openPostComments(first) }
+        assertFalse(activity.model.postComments.value.open)
+    }
+
+    @Test fun longFeedPostsExpandInlineAcrossScrollingRecreationAndComments() {
+        command("community", """{"postLongText":true}""")
+        choose(ChannelTab.POSTS)
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-expand-Ugpost1"))
+        assertEquals(6, postBodyLayout("Ugpost1").lineCount)
+        screenshot("long-post-collapsed")
+        compose.onNodeWithTag("post-expand-Ugpost1").assertTextEquals("Read more").performClick()
+        assertTrue(postBodyLayout("Ugpost1").lineCount > 6)
+        screenshot("long-post-expanded")
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-comments-Ugpost8"))
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-expand-Ugpost1"))
+        compose.onNodeWithTag("post-expand-Ugpost1").assertTextEquals("Show less")
+        recreate()
+        compose.onNodeWithTag("post-expand-Ugpost1").assertTextEquals("Show less")
+        assertEquals("channel:$owner", activity.model.route)
+        assertTrue(events("postRequests").isEmpty())
+        feedComments("Ugpost1")
+        recreate()
+        compose.onNodeWithTag("post-comments-sheet").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-expand-Ugpost1"))
+        compose.onNodeWithTag("post-expand-Ugpost1").performClick()
+        assertEquals(6, postBodyLayout("Ugpost1").lineCount)
+        compose.onNodeWithTag("post-expand-Ugpost1").performClick()
+        val layout = postBodyLayout("Ugpost1")
+        val offset = layout.layoutInput.text.text.indexOf("Another post")
+        compose.onNodeWithTag("post-body-Ugpost1").performTouchInput { click(layout.getBoundingBox(offset).center) }
+        until { activity.model.postDetail.value.post?.id == "Ugpost2" }
+        assertEquals("post:Ugpost2", activity.model.route)
+    }
+
+    @Test fun feedShareLaunchesTheAndroidChooserWithoutOpeningPostDetails() {
+        choose(ChannelTab.POSTS)
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val monitor = instrumentation.addMonitor(IntentFilter(Intent.ACTION_CHOOSER), Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null), true)
+        try {
+            compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-share-Ugpost1"))
+            compose.onNodeWithTag("post-share-Ugpost1").performClick()
+            assertEquals(1, monitor.hits)
+            assertEquals("channel:$owner", activity.model.route)
+            assertTrue(events("postRequests").isEmpty())
+            compose.onNodeWithTag("post-copy").assertDoesNotExist()
+            compose.onNodeWithTag("post-open-Ugpost1").assertDoesNotExist()
+        } finally { instrumentation.removeMonitor(monitor) }
+    }
+
+    @Test fun feedCommentsPreserveVideoStateAndRejectLateAccountAndInstanceResponses() {
+        choose(ChannelTab.POSTS)
+        ui { activity.model.play("testvideo01") }
+        until { activity.model.playback.value.details != null && activity.model.playback.value.canPlay }
+        ui { activity.model.openComments() }
+        until { activity.model.comments.value.feed.loaded }
+        val videoComments = activity.model.comments.value
+        val token = activity.model.queue.value.token
+        feedComments("Ugpost1")
+        assertEquals(videoComments.target, activity.model.comments.value.target)
+        assertEquals(videoComments.feed, activity.model.comments.value.feed)
+        assertEquals(token, activity.model.queue.value.token)
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        val second = activity.model.browse.value.posts[1]
+        command("comments", """{"commentDelayNext":1200}""")
+        ui { activity.model.openPostComments(second) }
+        until { events("commentRequests").any { !it.getBoolean("completed") } }
+        ui { activity.model.store.save(Account("fixture-token", "Fixture", 9999999999, activity.model.store.server)) }
+        until { activity.model.postComments.value.target == null && !activity.model.browse.value.loading }
+        until { events("commentRequests").all { it.getBoolean("completed") } }
+        assertFalse(activity.model.postComments.value.open)
+        // Account preferences intentionally return to the configured home; re-enter Posts for the instance check.
+        until { activity.model.route.isEmpty() && !activity.model.browse.value.loading }
+        ui { activity.model.navigate("Home", "channel:$owner") }
+        until { activity.model.channel.value?.id == owner && !activity.model.browse.value.loading }
+        choose(ChannelTab.POSTS)
+        feedComments("Ugpost1")
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        command("comments", """{"commentDelayNext":1200}""")
+        ui { activity.model.openPostComments(activity.model.browse.value.posts[1]) }
+        until { events("commentRequests").any { !it.getBoolean("completed") } }
+        ui { activity.model.switchServer("http://localhost:18080") }
+        until { events("commentRequests").all { it.getBoolean("completed") } }
+        assertNull(activity.model.postComments.value.target); assertFalse(activity.model.postComments.value.open)
     }
 
     @Test fun delayedPostsAndCommentsCannotOverwriteAnotherRouteOrInstance() {

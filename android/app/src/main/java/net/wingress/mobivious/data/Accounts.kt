@@ -24,6 +24,7 @@ object AccountPermissions {
     val groups = linkedMapOf(
         "Read preferences" to listOf("GET:preferences"),
         "Change preferences" to listOf("PATCH:preferences"),
+        "Manage chat replay settings" to listOf("PATCH:chat_preferences", "GET;PUT:chat_timing/*"),
         "Read subscriptions and feed" to listOf("GET:feed", "GET:subscriptions", "GET:subscriptions/search"),
         "Manage subscriptions" to listOf("POST;DELETE:subscriptions/*"),
         "Read history and progress" to listOf("GET:history", "GET:playback", "GET:playback/*"),
