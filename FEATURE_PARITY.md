@@ -3,7 +3,7 @@
 Reviewed on **5 October 2026** against the local source checkouts:
 
 - Web: `../invidious` at `42e4fee6` plus the additive public video-license field. Includes this fork's custom features and native API extensions.
-- Android: `e7c4f49` plus working-tree rich video information, content-link and chapter changes. Current configured release version: `0.5.1` (version code 8); these changes are in the debug build and have not been released.
+- Android: `68eedbb` plus release metadata. Release version: `0.5.2` (version code 9), including channel/community, rich video information, content-link and chapter changes.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 
@@ -11,7 +11,7 @@ Reviewed on **5 October 2026** against the local source checkouts:
 - **Partial:** some parts exist; the last two columns identify what exists and what is missing.
 - **Not implemented:** no corresponding Android flow was found in the reviewed source.
 
-The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 230 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, localhost chapter/content-link fixture checks, the Invidious build and production serializer checks. Eleven new chapter device scenarios and ten rich-information/link scenarios compile but remain unexecuted because the installed emulator crashes before boot. Signed 0.5.1 checks predate these changes. Production requires deployment of the sibling license field to display licenses; older servers remain usable with unknown optional fields hidden. This audit does not verify the live server or the earlier account/API rollout.
+The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 230 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, signed 0.5.2 release build/lint/signature checks, localhost chapter/content-link fixture checks, the Invidious build and production serializer checks. Eleven new chapter device scenarios and ten rich-information/link scenarios compile but remain unexecuted because the installed emulator crashes before boot. Production requires deployment of the sibling license field to display licenses; older servers remain usable with unknown optional fields hidden. This audit does not verify the live server or the earlier account/API rollout.
 
 **Summary: 48 broad feature areas — 28 implemented, 11 partial, 9 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
 

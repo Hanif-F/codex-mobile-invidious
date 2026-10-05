@@ -1575,3 +1575,46 @@ media and localhost fixture and runs the native checks, including
 remain subject to that device verification. Row 18 is Partial; timeline thumbnail
 previews are deferred to avoid YouTube image-CDN requests. The signed 0.5.1 release
 predates this change; no release or deployment was performed.
+
+## Signed release 0.5.2 — 5 October 2026
+
+The signed 0.5.2 APK includes the channel/community, rich video information,
+content-link and chapter changes since 0.5.1. Version code is 9; application ID
+remains `net.wingress.mobivious`. The APK supports Android 8+ (minimum SDK 26,
+target SDK 37), includes arm64-v8a/armeabi-v7a/x86/x86_64 and is not debuggable.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 230 passed; zero failures, errors or skips |
+| Signed release build | Passed with the existing local signing key |
+| Release lint | Passed; zero errors, 36 warnings |
+| APK package/version/SDK/ABI metadata | Passed |
+| APK signature | Passed; certificate SHA-256 matches signed 0.5.1 |
+| APK checksum file | Passed with `sha256sum -c` |
+| Native device acceptance | Still unverified: the previously documented emulator crash prevents boot |
+
+APK SHA-256:
+`23f0ede5d3bce29da5e6065ede7077a09d8f022c75c4556b2d6df763799ab52c`.
+Signing certificate SHA-256:
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+Build log: `/tmp/mobivious-release-0.5.2-build.log`.
+Local verification metadata: `artifacts/release-verification-0.5.2.json`.
+The [0.5.2 release](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.5.2)
+provides the signed APK and its checksum file.
+
+Reproduction:
+
+```sh
+scripts/build-release.sh
+JAVA_HOME=/opt/android-studio/jbr "$HOME/Android/Sdk/build-tools/36.0.0/apksigner" \
+  verify --print-certs artifacts/Mobivious-0.5.2.apk
+cd artifacts
+sha256sum -c Mobivious-0.5.2.apk.sha256
+```
+
+Chapters still use only the loaded description; thumbnail previews remain
+deferred and the web preview is unchanged. This release does not deploy the
+sibling server. Its additive license field remains a separate deployment
+requirement for displaying video licenses; older instances retain optional-field
+fallbacks. Historical unreleased/version statements above describe the earlier
+implementation stages.

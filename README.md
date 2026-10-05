@@ -50,7 +50,7 @@ local. For each release, update `versionName` and increment `versionCode` in
 
 ```sh
 # Match versionName for this release.
-release_version=0.5.1
+release_version=0.5.2
 scripts/build-release.sh
 
 # Confirm the APK's signature before publishing.
