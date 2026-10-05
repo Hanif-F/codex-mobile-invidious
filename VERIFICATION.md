@@ -1688,3 +1688,62 @@ With a working Android device, run `scripts/test-android.sh` to supply the local
 fixture and execute playback scenarios. Also install the signed release as an
 update to 0.5.2, force-stop and reopen it, and tap videos with and without chapters
 to confirm playback without a fatal exception.
+
+## Compact player controls and description metadata — 2026-10-05
+
+The watch/fullscreen footer now places playback time, the clickable chapter title,
+settings and fullscreen on one row below the timeline. The chapter chevron and
+separate chapter row are removed. Long chapter titles use a single-line ellipsis;
+fixed icon targets and a minimum chapter target take priority when space is tight.
+Play/pause/replay stays centered on the video, using a smaller button for short
+players. SponsorBlock scrub labels remain temporary timeline feedback.
+
+Video metadata follows the description text and shares its existing expansion
+toggle. The separate Video details heading, toggle and expansion state are removed.
+Genre links, region expansion and music credits remain available.
+
+| Check | Result |
+| --- | --- |
+| Android JVM unit tests | Passed: 231 tests, no failures or errors |
+| Debug application and instrumentation APK builds | Passed |
+| Debug lint | Passed: 0 errors, 26 warnings |
+| Focused connected presentation tests | Unverified: `No connected devices!` |
+| Native player layout, interactions and screenshots | Unverified: emulator crashed before Android booted |
+
+Four new control presentation scenarios cover footer ordering, long-title
+ellipsis, RTL and large fonts, normal/fullscreen layouts, short-player centering,
+chapter updates and keyboard actions, playback states, and absent chapters/live
+duration labels. Two new description scenarios cover shared metadata visibility,
+genre links, empty descriptions and absent metadata. Existing chapter/information
+presentation and content-link smoke scenarios were updated, and a new playback
+smoke scenario checks the actual player footer and center button across fullscreen.
+These device scenarios compile but **have not executed**.
+
+The read-only Pixel_8_Pro emulator (37.2.12) exited with SIGSEGV (139) despite a
+cold boot, software graphics and disabled Vulkan. Host crash diagnostics identify
+`qemu-system-x86_64-headless` as the crashing process; `emulator -accel-check`
+reports KVM installed and usable. The underlying emulator crash cause is not
+established. This happened before the application could be installed or run.
+
+Build, emulator and connected-test logs are
+`/tmp/mobivious-compact-player-checks.log`,
+`/tmp/mobivious-compact-player-emulator.log` and
+`/tmp/mobivious-compact-player-connected-checks.log`.
+
+Reproduction:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug \
+  :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.ChaptersPresentationTest,net.wingress.mobivious.VideoInformationPresentationTest \
+  --offline --console=plain
+cd ..
+```
+
+With a connected Android device, run `scripts/test-android.sh` for the fixture-backed
+playback and content-link checks. Inspect normal/fullscreen controls and expanded
+descriptions at narrow widths, large fonts and RTL before claiming visual acceptance.

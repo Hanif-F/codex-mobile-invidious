@@ -4,16 +4,17 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.*
 import java.text.DateFormat
@@ -46,40 +47,44 @@ internal fun VideoNotices(details: VideoDetails) {
 }
 
 @Composable
+internal fun VideoDescription(details: VideoDetails, occurrence: String, server: String, expanded: Boolean, link: (String) -> Unit) {
+    AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
+        exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
+        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            NativeRichText(details.description, details.descriptionHtml, occurrence, server, details.video.id, link, tag = "watch-description-text")
+            VideoInformation(details, occurrence, server, link)
+        }
+    }
+}
+
+@Composable
 internal fun VideoInformation(details: VideoDetails, occurrence: String, server: String, link: (String) -> Unit) {
     val hasInfo = details.genre.isNotBlank() || details.license != null || details.familyFriendly != null || details.allowedRegions != null || details.music.isNotEmpty()
     if (!hasInfo) return
-    var expanded by rememberSaveable(occurrence) { mutableStateOf(false) }
     var regions by rememberSaveable(occurrence) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().testTag("video-information")) {
-        ActionRow("Video details", trailingIcon = Icons.Default.ExpandMore,
-            modifier = Modifier.testTag("video-information-toggle").semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }) { expanded = !expanded }
-        AnimatedVisibility(expanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                if (details.genre.isNotBlank()) {
-                    if (details.genreUrl.isNotBlank() && ContentLinks.resolve(details.genreUrl, server) != null)
-                        TextButton(onClick = { link(details.genreUrl) }, contentPadding = PaddingValues(0.dp)) { Text("Genre: ${details.genre}") }
-                    else Text("Genre: ${details.genre}")
+    Column(Modifier.fillMaxWidth().testTag("video-information"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (details.genre.isNotBlank()) {
+            if (details.genreUrl.isNotBlank() && ContentLinks.resolve(details.genreUrl, server) != null)
+                TextButton(onClick = { link(details.genreUrl) }, contentPadding = PaddingValues(0.dp)) { Text("Genre: ${details.genre}") }
+            else Text("Genre: ${details.genre}")
+        }
+        details.license?.let { Text("License: ${it.ifBlank { "Standard YouTube license" }}", Modifier.testTag("video-license")) }
+        details.familyFriendly?.let { Text("Family friendly: ${if (it) "Yes" else "No"}") }
+        details.allowedRegions?.let { allowed ->
+            if (allowed.isEmpty()) Text("No allowed regions reported")
+            else {
+                TextButton(onClick = { regions = !regions }, contentPadding = PaddingValues(0.dp), modifier = Modifier.testTag("video-regions-toggle")) {
+                    Text("${if (regions) "Hide" else "Show"} allowed regions (${allowed.size})")
                 }
-                details.license?.let { Text("License: ${it.ifBlank { "Standard YouTube license" }}", Modifier.testTag("video-license")) }
-                details.familyFriendly?.let { Text("Family friendly: ${if (it) "Yes" else "No"}") }
-                details.allowedRegions?.let { allowed ->
-                    if (allowed.isEmpty()) Text("No allowed regions reported")
-                    else {
-                        TextButton(onClick = { regions = !regions }, contentPadding = PaddingValues(0.dp), modifier = Modifier.testTag("video-regions-toggle")) {
-                            Text("${if (regions) "Hide" else "Show"} allowed regions (${allowed.size})")
-                        }
-                        if (regions) Text(allowed.joinToString(", ") { code -> "${Locale.Builder().setRegion(code).build().displayCountry.ifBlank { code }} ($code)" }, Modifier.testTag("video-regions"))
-                    }
-                }
-                if (details.music.isNotEmpty()) Text("Music in this video", style = MaterialTheme.typography.titleMedium)
-                details.music.forEach { music ->
-                    Column(Modifier.fillMaxWidth().testTag("video-music-credit")) {
-                        if (music.song.isNotBlank()) Text(music.song, style = MaterialTheme.typography.titleSmall)
-                        listOf(music.artist, music.album).filter(String::isNotBlank).joinToString(" · ").takeIf(String::isNotEmpty)?.let { Text(it) }
-                        if (music.license.isNotBlank()) Text(music.license, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+                if (regions) Text(allowed.joinToString(", ") { code -> "${Locale.Builder().setRegion(code).build().displayCountry.ifBlank { code }} ($code)" }, Modifier.testTag("video-regions"))
+            }
+        }
+        if (details.music.isNotEmpty()) Text("Music in this video", style = MaterialTheme.typography.titleMedium)
+        details.music.forEach { music ->
+            Column(Modifier.fillMaxWidth().testTag("video-music-credit")) {
+                if (music.song.isNotBlank()) Text(music.song, style = MaterialTheme.typography.titleSmall)
+                listOf(music.artist, music.album).filter(String::isNotBlank).joinToString(" · ").takeIf(String::isNotEmpty)?.let { Text(it) }
+                if (music.license.isNotBlank()) Text(music.license, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

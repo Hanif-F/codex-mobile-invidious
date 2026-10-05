@@ -42,13 +42,54 @@ class VideoInformationPresentationTest {
         compose.onNodeWithText("Unlisted").assertExists()
         compose.onNodeWithText("Verified channel").assertExists()
         compose.onNodeWithText("12.3K subscribers").assertExists()
-        compose.onNodeWithTag("video-information-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("video-information-toggle").assertDoesNotExist()
+        compose.onNodeWithText("Video details").assertDoesNotExist()
         compose.onNodeWithText("License: Standard YouTube license").assertExists()
         compose.onNodeWithText("Family friendly: No").assertExists()
         compose.onNodeWithText("Song").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Artist · Album").assertExists()
         compose.onNodeWithTag("video-regions-toggle").performScrollTo().performClick()
         compose.onNodeWithTag("video-regions").assertTextContains("(ID)", substring = true)
+    }
+
+    @Test fun descriptionOwnsMetadataVisibilityAndGenreLinksStillWork() {
+        val expanded = mutableStateOf(false)
+        val clicked = mutableListOf<String>()
+        compose.setContent { MaterialTheme {
+            Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
+                VideoDescription(details.copy(genreUrl = "/hashtag/music"), "occurrence", "https://instance.test", expanded.value) { clicked += it }
+            }
+        } }
+        compose.onNodeWithTag("watch-description-text").assertDoesNotExist()
+        compose.onNodeWithTag("video-information").assertDoesNotExist()
+        compose.runOnIdle { expanded.value = true }
+        compose.onNodeWithTag("watch-description-text").assertTextContains("Plain")
+        val description = compose.onNodeWithTag("watch-description-text").getUnclippedBoundsInRoot()
+        val information = compose.onNodeWithTag("video-information").getUnclippedBoundsInRoot()
+        assertTrue(information.top >= description.bottom)
+        compose.onNodeWithText("Genre: Music").performClick()
+        assertEquals(listOf("/hashtag/music"), clicked)
+        compose.onNodeWithTag("video-regions-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("video-regions").assertExists()
+        compose.runOnIdle { expanded.value = false }
+        compose.onNodeWithTag("watch-description-text").assertDoesNotExist()
+        compose.onNodeWithTag("video-information").assertDoesNotExist()
+        compose.runOnIdle { expanded.value = true }
+        compose.onNodeWithTag("video-license").assertExists()
+    }
+
+    @Test fun emptyDescriptionsStillShowMetadataAndMissingMetadataAddsNoSection() {
+        val current = mutableStateOf(details.copy(description = ""))
+        compose.setContent { MaterialTheme {
+            Column(Modifier.width(320.dp).verticalScroll(rememberScrollState())) {
+                VideoDescription(current.value, "occurrence", "https://instance.test", true) {}
+            }
+        } }
+        compose.onNodeWithTag("video-license").assertExists()
+        compose.onNodeWithTag("video-information-toggle").assertDoesNotExist()
+        compose.runOnIdle { current.value = details.copy(genre = "", license = null, familyFriendly = null, allowedRegions = null, music = emptyList()) }
+        compose.onNodeWithTag("watch-description-text").assertTextContains("Plain")
+        compose.onNodeWithTag("video-information").assertDoesNotExist()
     }
 
     @Test fun richDescriptionPreservesFormattingAndNativeLinkTargets() {

@@ -3,13 +3,8 @@ package net.wingress.mobivious.ui
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
@@ -692,12 +687,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                             modifier = Modifier.testTag("watch-description-toggle").semantics { stateDescription = if (description) "Expanded" else "Collapsed" },
                             trailingIcon = Icons.Default.ExpandMore,
                             trailingRotation = animateFloatAsState(if (description) 180f else 0f, tween(200), label = "description-chevron").value) { describe(!description) }
-                        AnimatedVisibility(description, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
-                            exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
-                            NativeRichText(details.description, details.descriptionHtml, queue.currentKey.orEmpty(), vm.store.server, details.video.id, ::openWatchLink, tag = "watch-description-text")
-                        }
+                        VideoDescription(details, queue.currentKey.orEmpty(), vm.store.server, description, ::openWatchLink)
                         if (queue.current?.linkPlayback?.invalidEnd == true) Text("Invalid end boundary ignored.", style = MaterialTheme.typography.bodySmall)
-                        VideoInformation(details, queue.currentKey.orEmpty(), vm.store.server, ::openWatchLink)
                     } }
                 }
                 if (queue.hasExplicitQueue) item(key = "watch:queue") { PlaybackQueuePanel(vm, signIn, channel) }

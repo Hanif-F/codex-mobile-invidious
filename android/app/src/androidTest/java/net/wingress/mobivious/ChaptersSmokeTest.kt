@@ -82,10 +82,33 @@ class ChaptersSmokeTest {
         ui { activity.model.togglePlay() }; until { !activity.model.playback.value.playWhenReady }
         compose.onNodeWithTag("player-timeline").performTouchInput { down(center); moveTo(center.copy(x = width * .4f)); up() }
         until { activity.model.playback.value.position in 44000L..52000L }
-        compose.onNodeWithTag("player-current-chapter").assertTextEquals("日本語 & details")
+        compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertTextEquals("日本語 & details")
         assertEquals(occurrence, activity.model.queue.value.currentKey)
         assertEquals(metadata, metadataRequests()); assertEquals(imageCount, images())
         assertEquals(0, fixture().getJSONArray("chapterAssetRequests").length())
+    }
+
+    @Test fun inlineFooterAndCenteredPlaybackStayInPlaceAcrossFullscreen() {
+        incoming("/watch?v=testvideo01&autoplay=0"); ready()
+        fun checkControls(fullscreen: Boolean) {
+            val surface = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+            val button = compose.onNodeWithTag("player-play-pause").getUnclippedBoundsInRoot()
+            assertEquals((surface.left + surface.right).value / 2, (button.left + button.right).value / 2, .5f)
+            assertEquals((surface.top + surface.bottom).value / 2, (button.top + button.bottom).value / 2, .5f)
+            val timeline = compose.onNodeWithTag("player-timeline").getUnclippedBoundsInRoot()
+            val time = compose.onNodeWithTag("player-time").getUnclippedBoundsInRoot()
+            val chapter = compose.onNodeWithTag("player-chapter-title").getUnclippedBoundsInRoot()
+            val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
+            val expand = compose.onNodeWithContentDescription(if (fullscreen) "Exit full screen" else "Full screen").getUnclippedBoundsInRoot()
+            assertTrue(time.top >= timeline.bottom)
+            assertTrue(chapter.top >= timeline.bottom)
+            assertTrue(time.right <= chapter.left && chapter.right <= settings.left && settings.right <= expand.left)
+        }
+        checkControls(false)
+        compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()
+        checkControls(true)
+        compose.onNodeWithTag("player-chapter-title").performClick()
+        compose.onNodeWithTag("chapters-panel").assertIsDisplayed()
     }
 
     @Test fun fullscreenUsesChapterSheetAndBackClosesItBeforeLeavingFullscreen() {

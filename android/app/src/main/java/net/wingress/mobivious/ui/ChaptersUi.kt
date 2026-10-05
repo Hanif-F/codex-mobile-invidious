@@ -17,16 +17,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.LayoutDirection
 import net.wingress.mobivious.data.ChapterRules
 import net.wingress.mobivious.data.VideoChapter
 
@@ -68,22 +65,16 @@ internal fun ChaptersEntry(chapters: List<VideoChapter>, positionMs: Long, open:
         modifier = Modifier.testTag("chapters-entry"), actionLabel = "Open chapters", onClick = open)
 }
 
-/** Chapter and SponsorBlock scrub labels share one row instead of overlapping tooltips. */
+/** The title takes only the space available beside the playback time. */
 @Composable
-internal fun PlayerChapterTitle(chapters: List<VideoChapter>, positionMs: Long, sponsorLabels: List<String>, open: () -> Unit) {
-    if (chapters.isEmpty() && sponsorLabels.isEmpty()) return
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
-        .then(if (chapters.isNotEmpty()) Modifier.clickable(role = Role.Button, onClickLabel = "Open chapters", onClick = open) else Modifier)
-        .testTag("player-chapter-title").padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            if (chapters.isNotEmpty()) Text(ChapterRules.current(chapters, positionMs)?.title ?: "Chapters",
-                Modifier.testTag("player-current-chapter"), color = Color.White, style = MaterialTheme.typography.labelLarge,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (sponsorLabels.isNotEmpty()) Text(sponsorLabels.joinToString(", "), Modifier.testTag("player-seek-sponsor-labels"),
-                color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (chapters.isNotEmpty()) Icon(Icons.Default.ChevronRight, null, Modifier.graphicsLayer { scaleX = if (rtl) -1f else 1f }, tint = Color.White)
+internal fun PlayerChapterTitle(chapters: List<VideoChapter>, positionMs: Long, modifier: Modifier = Modifier, open: () -> Unit) {
+    if (chapters.isEmpty()) return
+    Box(modifier.heightIn(min = 48.dp)
+        .clickable(role = Role.Button, onClickLabel = "Open chapters", onClick = open)
+        .testTag("player-chapter-title").padding(horizontal = 4.dp, vertical = 4.dp), contentAlignment = Alignment.CenterStart) {
+        Text(ChapterRules.current(chapters, positionMs)?.title ?: "Chapters",
+            Modifier.testTag("player-current-chapter"), color = Color.White, style = MaterialTheme.typography.labelLarge,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

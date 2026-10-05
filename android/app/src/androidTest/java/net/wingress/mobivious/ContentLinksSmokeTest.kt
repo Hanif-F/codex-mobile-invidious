@@ -76,9 +76,14 @@ class ContentLinksSmokeTest {
         ui { activity.model.openContent(ContentLinks.resolve("/watch?v=testvideo01&t=30", activity.model.store.server, "testvideo01")!!) }
         until { activity.model.playback.value.position == 30000L }
         assertEquals(key, activity.model.queue.value.currentKey)
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-information-toggle"))
-        compose.onNodeWithTag("video-information-toggle").performClick()
+        compose.onNodeWithTag("video-information-toggle").assertDoesNotExist()
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-license"))
         compose.onNodeWithText("License: Standard YouTube license").assertExists()
+        compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("watch-description-text").assertDoesNotExist()
+        compose.onNodeWithTag("video-information").assertDoesNotExist()
+        compose.onNodeWithTag("watch-description-toggle").performClick()
+        compose.onNodeWithTag("video-license").assertExists()
     }
     @Test fun boundsPauseWithoutAdvancingAndReplayStartsAtTheRequestedTime() {
         incoming("/watch?v=testvideo01&list=PLlive&t=2.345&end=5.678&autoplay=1&continue_autoplay=1")
