@@ -1897,3 +1897,49 @@ suite. Reports and the successful build log are saved as
 `crash-regression-device-run.xml` and `crash-regression-build.log` in the same
 artifact directory. The emulator was never launched, restarted or stopped by the
 agent, and live account credentials were not used.
+
+## Signed 0.5.4 release — 5 October 2026
+
+The 0.5.4 APK includes the player/chapter presentation, codec-selection guard,
+HLS VOD session-timeline crash fix, network cancellation and account/library
+reliability changes committed since 0.5.3. Version code is 11; the application ID
+remains `net.wingress.mobivious`.
+
+| Check | Result |
+| --- | --- |
+| JVM unit/API tests | Passed: 236 tests, 0 failures/errors/skips |
+| Signed release build | Passed with the existing local signing key |
+| Release lint | Passed: 0 errors, 34 warnings |
+| APK metadata | Passed: version 0.5.4/code 11, minimum SDK 26, target SDK 37, not debuggable |
+| CPU architectures | arm64-v8a, armeabi-v7a, x86 and x86_64 |
+| APK signature | Passed; certificate SHA-256 matches published 0.5.3 |
+| Previous published binary | Local 0.5.3 APK SHA-256 matches GitHub's asset digest |
+| Release checksum | Passed; copied APK matches the Gradle output |
+
+APK SHA-256:
+`ef71fa790dcd314e71cebcc57d9fd694a820978cda80d67253949056b2d53743`.
+
+Release assets are `artifacts/Mobivious-0.5.4.apk` and its `.apk.sha256` file.
+The GitHub tag is `v0.5.4`; notes cover changes since 0.5.3. Build and local
+verification evidence are `/tmp/mobivious-release-0.5.4-build.log` and
+`artifacts/release-verification-0.5.4.json`.
+
+The preceding crash-focused review passed eight selected device regressions.
+This release build does not rerun the device suite; the complete suite still has
+outstanding failures, and physical-device acceptance remains unverified. The
+crash-focused follow-up above records those limits. No server deployment or live
+account mutation was performed for this release.
+
+Reproduction:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleRelease :app:lintRelease \
+  --offline --max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m --console=plain
+cd ..
+JAVA_HOME=/opt/android-studio/jbr "$HOME/Android/Sdk/build-tools/36.0.0/apksigner" \
+  verify --print-certs artifacts/Mobivious-0.5.4.apk
+cd artifacts
+sha256sum -c Mobivious-0.5.4.apk.sha256
+```
