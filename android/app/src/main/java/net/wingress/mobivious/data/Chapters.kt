@@ -4,8 +4,10 @@ data class VideoChapter(val startMs: Long, val title: String)
 
 /** Matches the web fork's manual description chapters; requires no upstream lookup. */
 object ChapterRules {
-    private val timestamp = Regex("(?U)^\\s*(?:[-*•]\\s+)?([0-9]+):([0-9]{2})(?::([0-9]{2}))?(?:\\s+|\\s*[-–—|]\\s*)(.+?)\\s*$")
-    private val separator = Regex("^[-–—|:]\\s*")
+    // Android's ICU regex engine rejects (?U); spell out Unicode whitespace for both runtimes.
+    private const val whitespace = "[\\p{Z}\\u0009-\\u000D\\u0085]"
+    private val timestamp = Regex("^$whitespace*(?:[-*•]$whitespace+)?([0-9]+):([0-9]{2})(?::([0-9]{2}))?(?:$whitespace+|$whitespace*[-–—|]$whitespace*)(.+?)$whitespace*$")
+    private val separator = Regex("^[-–—|:]$whitespace*")
 
     fun parse(description: String, durationSeconds: Long, live: Boolean = false): List<VideoChapter> {
         if (live || durationSeconds <= 0) return emptyList()

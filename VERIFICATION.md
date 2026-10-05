@@ -1618,3 +1618,73 @@ sibling server. Its additive license field remains a separate deployment
 requirement for displaying video licenses; older instances retain optional-field
 fallbacks. Historical unreleased/version statements above describe the earlier
 implementation stages.
+
+## Video-opening crash fix and signed 0.5.3 APK — 5 October 2026
+
+The 0.5.2 chapter timestamp regex uses the JVM-only `(?U)` flag. Android's ICU
+regex backend rejects that pattern. Every `VideoDetails` construction initializes
+`ChapterRules`, including videos without chapters or descriptions, so the invalid
+pattern can raise `ExceptionInInitializerError` during video loading. Desktop JVM
+tests passed because their regex engine accepts the flag. The user's handset
+stack trace was not available; the regex incompatibility was reproduced locally.
+
+0.5.3 replaces that flag and implicit Unicode whitespace matching with the
+portable class `[\p{Z}\u0009-\u000D\u0085]`. Chapter extraction, timestamps,
+ordering, duplicate handling and validation remain covered by existing tests.
+One new unit test covers non-breaking spaces, em spaces, tabs, NEL and Japanese
+titles. Six new `ChaptersRuntimeTest` instrumentation scenarios construct video
+details on Android with missing, empty and ordinary descriptions, manual chapters,
+Unicode whitespace and live videos. They require no Activity, server or media
+fixture.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 231 passed; zero failures, errors or skips |
+| Debug and instrumentation APK builds | Passed; six new runtime regression tests compile |
+| Debug lint | Passed; zero errors, 26 warnings; none in the changed parser or new runtime test |
+| Signed release build and release lint | Passed; zero lint errors, 36 warnings |
+| ICU 77 regex reproduction | Original pattern rejected with `U_REGEX_RULE_SYNTAX`; both fixed patterns compile; six representative matching cases passed |
+| APK package/version/SDK/ABI metadata | Passed: `net.wingress.mobivious`, version 0.5.3/code 10, minimum SDK 26, target SDK 37, four supported ABIs, not debuggable |
+| APK signature | Passed; certificate SHA-256 matches signed 0.5.2 |
+| APK checksum file | Passed with `sha256sum -c` |
+| Android runtime, cold launch and video-tap acceptance | Unverified: emulator exited with SIGSEGV (139) before boot; focused connected tests failed with `No connected devices!` |
+
+The emulator attempt used the existing read-only Pixel_8_Pro AVD without snapshots,
+window, audio, cameras or GPU rendering, with Vulkan disabled. Android parser tests,
+`AppSmokeTest` video-opening checks and `ChaptersSmokeTest` playback checks were
+selected for connected execution, but none could run without a device. The host
+ICU probe is additional compatibility evidence, not Android runtime acceptance.
+
+APK SHA-256:
+`c760b1ce260f7dddcc8c94cc486dc674d6b5c2c773f6fc720a9ef5fcc62a6b37`.
+Signing certificate SHA-256:
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+The existing signing key was reused. Local artifacts are
+`artifacts/Mobivious-0.5.3.apk`, `artifacts/Mobivious-0.5.3.apk.sha256` and
+`artifacts/release-verification-0.5.3.json`. No GitHub publication or server change
+was performed.
+
+Build logs are `/tmp/mobivious-release-0.5.3-build.log` and
+`/tmp/mobivious-crash-0.5.3-debug-checks.log`; runtime-attempt logs are
+`/tmp/mobivious-crash-0.5.3-emulator.log` and
+`/tmp/mobivious-crash-0.5.3-connected-checks.log`. The ICU probe log is
+`/tmp/mobivious-crash-0.5.3-icu-check.log`.
+
+Reproduction:
+
+```sh
+scripts/build-release.sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:assembleDebug \
+  :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+# This parser-only run needs a connected Android device, but no fixture server.
+JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:connectedDebugAndroidTest \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.ChaptersRuntimeTest \
+  --offline --console=plain
+cd ..
+```
+
+With a working Android device, run `scripts/test-android.sh` to supply the localhost
+fixture and execute playback scenarios. Also install the signed release as an
+update to 0.5.2, force-stop and reopen it, and tap videos with and without chapters
+to confirm playback without a fatal exception.

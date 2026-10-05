@@ -15,6 +15,10 @@ class ChaptersTest {
         val chapters = ChapterRules.parse(" • 1:03 — 日本語\r\n- 1:01 Intro\n* 1:02|Middle\n1:01 duplicate", 100)
         assertEquals(listOf(VideoChapter(61000, "Intro"), VideoChapter(62000, "Middle"), VideoChapter(63000, "日本語")), chapters)
     }
+    @Test fun unicodeWhitespaceAroundBulletsTimestampsAndTitlesIsPreserved() {
+        val text = "\u00a0•\u20030:00\u00a0Intro\u2003\n\u2003-\t1:00\u0085—\u2003日本語\u00a0"
+        assertEquals(listOf(VideoChapter(0, "Intro"), VideoChapter(60000, "日本語")), ChapterRules.parse(text, 120))
+    }
     @Test fun malformedOverflowingMissingAndOutOfDurationEntriesAreRejected() {
         val text = "0:60 Bad\n1:99:00 Bad\n1:02:99 Bad\n999999999999999999999:00 Bad\n2147483648:00 Bad\n0:01\n0:02 -\n-1:03 Bad\n3:00 End\n0:10 Good\n0:20 Also good"
         assertEquals(listOf(10000L, 20000L), ChapterRules.parse(text, 180).map { it.startMs })
