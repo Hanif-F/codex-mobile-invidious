@@ -4,7 +4,6 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import androidx.compose.ui.test.*
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -21,11 +20,15 @@ import java.net.URL
 /** Account mutations and real media only target the disposable localhost fixture. */
 @RunWith(AndroidJUnit4::class)
 class AccountNavigationSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val vm get() = activity.model
     private fun until(condition: () -> Boolean) = compose.waitUntil(40_000, condition)
-    private fun back() = compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+    private fun back() {
+        compose.waitForIdle()
+        compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+    }
     private fun command(path: String, body: String = "{}") {
         (URL("http://127.0.0.1:18080/test/$path").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) }; inputStream.close(); disconnect()
@@ -45,7 +48,7 @@ class AccountNavigationSmokeTest {
     @After fun close() { if (::activity.isInitialized) compose.runOnUiThread { vm.closePlayer(); vm.store.save(null); activity.finishAndRemoveTask() } }
 
     @Test fun fourTabsGuestSettingsAndSearchCancellationAndReturn() {
-        listOf("Home", "Subscriptions", "Library", "Account").forEach { compose.onNodeWithContentDescription(it).assertExists() }
+        listOf("Home", "Subscriptions", "Library", "Account").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
         compose.onNodeWithTag("main-search").assertDoesNotExist()
         val original = vm.browse.value
         compose.onNodeWithTag("global-search").performClick()
@@ -62,14 +65,14 @@ class AccountNavigationSmokeTest {
         compose.onNodeWithTag("main-search").assertTextContains("fixture")
         back(); assertEquals("Search", vm.tab)
         back(); until { vm.tab == "Home" }; assertEquals(original.videos, vm.browse.value.videos)
-        compose.onNodeWithContentDescription("Account").performClick()
+        compose.onNodeWithTag("navigation-Account").performClick()
         compose.onNodeWithTag("account-settings").performClick()
         compose.onNodeWithTag("settings-root").assertExists()
         back(); compose.onNodeWithTag("account-screen").assertExists()
     }
 
     @Test fun contextualSignupReturnsToLibraryAndCredentialChangesRetainSignIn() {
-        compose.onNodeWithContentDescription("Library").performClick()
+        compose.onNodeWithTag("navigation-Library").performClick()
         compose.onNodeWithText("Sign in").performClick()
         compose.onNodeWithText("Create account").performClick()
         compose.onNodeWithTag("account-username").performTextInput("NewViewer")
@@ -77,7 +80,7 @@ class AccountNavigationSmokeTest {
         compose.onNodeWithTag("account-confirm-password").performTextInput("an uncommon signup password")
         compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
         until { vm.account.value != null && vm.tab == "Library" }
-        compose.onNodeWithContentDescription("Account").performClick()
+        compose.onNodeWithTag("navigation-Account").performClick()
         compose.onNodeWithText("Change username").performClick()
         compose.onNodeWithTag("account-current-password").performTextInput("wrong")
         compose.onNodeWithTag("account-new-username").performTextReplacement("RenamedViewer")
@@ -148,7 +151,7 @@ class AccountNavigationSmokeTest {
                     val surface = activity.window.decorView
                     assertEquals(expected.coerceIn(1f / 2.39f, 2.39f), surface.width.toFloat() / surface.height, .15f)
                 }
-                val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("am start -n ${activity.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top")
+                val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")
                 FileInputStream(descriptor.fileDescriptor).use { it.readBytes() }; descriptor.close()
                 until { !activity.isInPictureInPictureMode }
             }

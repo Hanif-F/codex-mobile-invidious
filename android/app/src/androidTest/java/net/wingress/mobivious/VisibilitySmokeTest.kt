@@ -49,14 +49,15 @@ class VisibilitySmokeTest {
     }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("VisibilityViewer", "fixture-password") } }
-        until { activity.model.account.value != null && activity.model.blocked.value.loaded && !activity.model.blocked.value.loading }
+        until { activity.model.account.value != null && activity.model.blocked.value.loaded && !activity.model.blocked.value.loading && activity.model.tab == "Account" }
+        navigate("Home")
     }
     private fun navigate(tab: String, route: String = "") {
         compose.runOnUiThread { activity.model.query = "fixture"; activity.model.navigate(tab, route) }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun manager() {
-        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Blocked channels", substring = false).performClick()
         compose.onNodeWithTag("blocked-channel-manager").assertIsDisplayed()
@@ -76,12 +77,13 @@ class VisibilitySmokeTest {
 
     @Test fun guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts() {
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Show members-only videos", substring = false).performClick()
         compose.onNodeWithTag("settings-save").performClick()
         until { activity.model.preferences.value.showMemberVideos }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
+        compose.onNodeWithTag("navigation-Home").performClick()
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-membervid01"))
         compose.onNodeWithTag("video-members-membervid01", useUnmergedTree = true).assertIsDisplayed()
         save(activity.model.preferences.value.copy(thinMode = true, uiDensity = "compact", darkMode = "dark"))
@@ -164,7 +166,7 @@ class VisibilitySmokeTest {
         until { activity.model.playback.value.details != null && activity.model.playback.value.duration > 0 }
         compose.onNodeWithTag("video-members-testvideo01", useUnmergedTree = true).assertExists()
         assertFalse(activity.model.preferences.value.showMemberVideos)
-        val media = activity.model.controller.value!!.currentMediaItem!!.mediaId
+        val media = activity.model.playback.value.mediaId
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
         compose.onNodeWithTag("watch-actions-menu").assertDoesNotExist()
         compose.onNodeWithContentDescription("Video actions").assertDoesNotExist()
@@ -177,18 +179,18 @@ class VisibilitySmokeTest {
         until { activity.model.blocked.value.actionErrors[first] != null }
         compose.onNodeWithTag("channel-block-$first").assertDoesNotExist()
         compose.onNodeWithTag("channel-block-error-$first").performScrollTo().assertIsDisplayed()
-        assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)
+        assertEquals(media, activity.model.playback.value.mediaId)
         command("""{"failBlockedWrite":false}""")
         compose.onNodeWithTag("channel-actions-$first").performScrollTo().performClick()
         compose.onNodeWithTag("channel-block-$first").performClick()
         until { first in activity.model.blocked.value.ids }
-        assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)
+        assertEquals(media, activity.model.playback.value.mediaId)
         compose.onNodeWithTag("mini-player-preview").performClick()
         compose.onNodeWithTag("watch-details-list").assertExists()
         assertTrue(activity.model.visibleVideos(activity.model.playback.value.details!!.recommendations, ContentSurface.RECOMMENDATIONS).none { it.channelId == first || it.membersOnly })
         save(activity.model.preferences.value.copy(showMemberVideos = true))
         assertTrue(fixture().getJSONObject("preferences").getBoolean("show_member_videos"))
-        assertEquals(media, activity.model.controller.value!!.currentMediaItem!!.mediaId)
+        assertEquals(media, activity.model.playback.value.mediaId)
     }
     @Test fun savedSearchOverridesAndSnapshotsAreOwnedByEachAccountAndInstance() {
         val store = activity.model.store

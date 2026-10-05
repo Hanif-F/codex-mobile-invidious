@@ -4,6 +4,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -49,9 +50,11 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         builder.method(method, if (method in listOf("POST", "PUT", "PATCH")) (data ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()) else null)
         val cacheKey = if (method == "GET" && path in listOf("api/v1/popular", "api/v1/trending", "api/v1/search", "api/v1/auth/feed")) "$address|${if (auth) target.account?.token else "public"}" else null
         val transport = if (method != "GET") contributionClient else client
-        try { transport.newCall(builder.build()).execute().use { response ->
-            val body = response.body?.string().orEmpty()
-            if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
+        try {
+            val response = transport.newCall(builder.build()).awaitBody()
+            coroutineContext.ensureActive()
+            val body = response.body
+            if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
             if (!response.isSuccessful) {
                 val invalidPassword = path.startsWith("api/v1/auth/account/") &&
                     runCatching { JSONObject(body).text("code") == "invalid_password" }.getOrDefault(false)
@@ -76,9 +79,15 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     else -> "Request failed (${response.code})."
                 }, response.header("Retry-After"))
             }
-            if (cacheKey != null) { cache?.write(cacheKey, body); onOffline(false) }
+            if (cacheKey != null) {
+                val valid = runCatching { if (path == "api/v1/auth/feed") JSONObject(body) else JSONArray(body) }.isSuccess
+                if (!valid) throw ApiException(502, "The instance returned an invalid feed. Try again.")
+                cache?.write(cacheKey, body); onOffline(false)
+            }
             body
-        } } catch (e: IOException) {
+        } catch (e: IOException) {
+            coroutineContext.ensureActive()
+            if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
             if (e is ApiException && e.status < 500) throw e
             val saved = cacheKey?.let { cache?.read(it) } ?: throw e
             onOffline(true)

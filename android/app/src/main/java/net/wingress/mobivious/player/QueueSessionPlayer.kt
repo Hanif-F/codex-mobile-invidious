@@ -11,7 +11,8 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
     private val snapshot: () -> PlaybackQueueSnapshot) : ForwardingSimpleBasePlayer(player) {
     fun refresh() = invalidateState()
     override fun getState(): State {
-        val base = super.getState()
+        val base = super.getState().buildUpon()
+            .setPlaylist(SessionTimeline(player.currentTimeline), player.currentTracks, player.mediaMetadata).build()
         val state = snapshot()
         if (state.items.isEmpty() || state.currentIndex < 0) return base
         val entries = state.items.map { entry ->

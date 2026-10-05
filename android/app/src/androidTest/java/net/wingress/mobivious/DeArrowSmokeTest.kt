@@ -35,8 +35,8 @@ class DeArrowSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
-            activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
+            activity.model.store.save(null); activity.model.closePlayer(); activity.model.switchServer("http://127.0.0.1:18080")
+            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Home")
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -44,12 +44,26 @@ class DeArrowSmokeTest {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
-    private fun settings() { compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
+    private fun settings() { compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
-    private fun save() { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
+    private fun save() {
+        compose.onNodeWithTag("settings-save").performClick()
+        until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Back from Settings").performClick()
+        compose.onNodeWithTag("navigation-Home").performClick()
+        if (activity.model.playback.value.details != null)
+            compose.onNodeWithTag("mini-player-preview").performClick()
+    }
+    private fun controllerTitle(): String? {
+        var title: String? = null
+        compose.runOnUiThread { title = activity.model.controller.value?.mediaMetadata?.title?.toString() }
+        return title
+    }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null }
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "Account" }
+        compose.onNodeWithTag("navigation-Home").performClick()
+        until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun openVideo(title: String) { compose.onNodeWithText(title).performClick(); until(40_000) { activity.model.playback.value.playing } }
     private fun screenshot(name: String) {
@@ -98,17 +112,17 @@ class DeArrowSmokeTest {
         until { activity.model.playlist.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         openVideo(replacement)
         until { state().getJSONArray("watched").length() == 1 }
-        until { activity.model.controller.value?.mediaMetadata?.title?.toString() == replacement }
+        until { controllerTitle() == replacement }
         assertEquals(original, activity.model.playback.value.details!!.video.title)
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(30_000); activity.model.speed(1.5f); activity.model.quality(720) }
         until { activity.model.playback.value.selection?.overrides?.values?.any { it.type == C.TRACK_TYPE_VIDEO } == true }
         val watchedBefore = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }
         settings(); toggle("Replace video titles with DeArrow"); save()
-        until { activity.model.controller.value?.mediaMetadata?.title?.toString() == original }
+        until { controllerTitle() == original }
         assertEquals(30_000L, activity.model.playback.value.position); assertEquals(1.5f, activity.model.playback.value.speed)
-        assertFalse(activity.model.controller.value!!.playWhenReady)
+        assertFalse(activity.model.playback.value.playWhenReady)
         settings(); toggle("Replace video titles with DeArrow"); save()
-        until { activity.model.controller.value?.mediaMetadata?.title?.toString() == replacement }
+        until { controllerTitle() == replacement }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasText("Another calm scene"))
         compose.onNodeWithText("Another calm scene").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
@@ -118,7 +132,7 @@ class DeArrowSmokeTest {
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 }
         val watchedAfter = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }
         assertEquals(watchedBefore, watchedAfter)
-        val videoOverride = activity.model.controller.value!!.trackSelectionParameters.overrides.values.single { it.type == C.TRACK_TYPE_VIDEO }
+        val videoOverride = activity.model.playback.value.selection!!.overrides.values.single { it.type == C.TRACK_TYPE_VIDEO }
         assertEquals(360, videoOverride.mediaTrackGroup.getFormat(videoOverride.trackIndices.single()).height)
     }
 

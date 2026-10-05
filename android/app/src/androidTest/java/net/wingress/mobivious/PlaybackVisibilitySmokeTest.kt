@@ -134,7 +134,7 @@ class PlaybackVisibilitySmokeTest {
         until { activity.model.playback.value.position == 30_000L && activity.model.playback.value.playerState == Player.STATE_READY }
         val token = activity.model.queue.value.token
         val key = activity.model.queue.value.currentKey
-        val selection = controller.trackSelectionParameters
+        val selection = activity.model.playback.value.selection!!
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-description-toggle"))
         compose.onNodeWithTag("watch-description-toggle").performClick()
         playerDrag(dy = 96f)
@@ -171,7 +171,7 @@ class PlaybackVisibilitySmokeTest {
         ui { view = playerViews().single(); controller.pause(); activity.model.seekTo(4_000); activity.model.speed(1.5f) }
         until { activity.model.playback.value.position == 4_000L && activity.model.playback.value.playerState == Player.STATE_READY }
         val token = activity.model.queue.value.token
-        val selection = controller.trackSelectionParameters
+        val selection = activity.model.playback.value.selection!!
         val content = compose.onNodeWithTag("watch-content").getUnclippedBoundsInRoot()
         val contentHeight = (content.bottom - content.top).value
         val density = activity.resources.displayMetrics.density
@@ -239,7 +239,7 @@ class PlaybackVisibilitySmokeTest {
     @Test fun claimedPresentationDragCancelsAccumulatedSeekAndRestoresPlayingIntent() {
         openVideo()
         val controller = activity.model.controller.value!!
-        val position = controller.currentPosition
+        val position = activity.model.playback.value.position
         ui { activity.model.accumulateSeek(1) }
         assertNotNull(activity.model.pendingSeek.value)
         playerDrag(dy = 96f, duration = 100)
@@ -321,7 +321,7 @@ class PlaybackVisibilitySmokeTest {
     }
 
     private fun foreground() {
-        shell("am start -n ${activity.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top")
+        shell("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")
         until { !activity.isInPictureInPictureMode && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
     }
 
@@ -334,7 +334,7 @@ class PlaybackVisibilitySmokeTest {
         awake(false)
         val token = activity.model.queue.value.token
         val occurrence = activity.model.queue.value.currentKey
-        val selection = controller.trackSelectionParameters
+        val selection = activity.model.playback.value.selection!!
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithTag("mini-player").assertExists().assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(80f))
         ui {
@@ -352,7 +352,7 @@ class PlaybackVisibilitySmokeTest {
         val second = frame()
         assertFalse("Mini-player must show moving video, not a frozen frame", first.sameAs(second))
         first.recycle(); second.recycle()
-        val position = controller.currentPosition
+        val position = activity.model.playback.value.position
         compose.onNodeWithTag("mini-player-preview").performTouchInput { click() }
         compose.onNodeWithTag("watch-details-list").assertExists()
         awake(true)
@@ -401,7 +401,7 @@ class PlaybackVisibilitySmokeTest {
         awake(false)
         ui { assertTrue(activity.model.controller.value!!.playWhenReady) }
         foreground(); awake(true)
-        compose.onNodeWithContentDescription("Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
         awake(false)
         ui { assertTrue(playerViews().isEmpty()) }
         compose.onNodeWithContentDescription("Back from Settings").performClick()

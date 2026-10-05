@@ -65,7 +65,7 @@ internal class PlayerPresentationState(initial: PlayerPresentation, private val 
     fun present(next: PlayerPresentation, animate: Boolean = true, closed: () -> Unit = {}) {
         if (next == mode && !active) return
         cancelMotion()
-        if (!animate || next == PlayerPresentation.FULLSCREEN || mode == PlayerPresentation.CLOSED) {
+        if (!animate || next == PlayerPresentation.FULLSCREEN || mode == PlayerPresentation.FULLSCREEN || mode == PlayerPresentation.CLOSED) {
             mode = next
             if (next == PlayerPresentation.CLOSED) closed()
         } else {

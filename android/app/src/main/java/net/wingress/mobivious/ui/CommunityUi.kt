@@ -171,7 +171,7 @@ internal fun PostGallery(images: List<PostImage>, server: String, tag: String) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Image ${largePager.currentPage + 1} of ${images.size}", Modifier.weight(1f).padding(16.dp))
-                    IconButton(onClick = { viewer = false }) { Icon(Icons.Default.Close, "Close image") }
+                    IconButton(onClick = { viewer = false }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close image") }
                 }
                 HorizontalPager(largePager, Modifier.weight(1f)) { index ->
                     PostMediaImage(images[index], server, "Image ${index + 1} of ${images.size}", Modifier.fillMaxSize())

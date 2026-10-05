@@ -37,6 +37,18 @@ class PlaylistRssSmokeTest {
     }
     @After fun close() { if (::activity.isInitialized) compose.runOnUiThread { vm.closePlayer(); activity.finishAndRemoveTask() } }
 
+    @Test fun pendingSubscriptionAtSignInKeepsOwnedAndSubscribedPlaylists() {
+        val source = Playlist("PLlive", "Live owner playlist", 2)
+        compose.runOnUiThread { vm.preparePlaylistSubscription(source) }
+        signIn()
+        until { source.id !in vm.playlistBusy.value && vm.playlists.value.any { it.owned } &&
+            vm.playlists.value.any { it.id == source.id && it.saved } }
+        compose.runOnUiThread { vm.navigate("Library") }
+        until { !vm.browse.value.loading }
+        compose.onNodeWithText("My playlists (1)").assertExists()
+        compose.onNodeWithText("Subscribed playlists (1)").assertExists()
+    }
+
     @Test fun libraryGroupsAndReadOnlySubscriptionsFollowOwnerUpdates() {
         signIn()
         val source = Playlist("IVother", "Live owner playlist", 2)

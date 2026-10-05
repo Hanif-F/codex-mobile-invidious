@@ -2,7 +2,6 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -17,7 +16,7 @@ import java.net.URL
 
 @RunWith(AndroidJUnit4::class)
 class ContentLinksSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private var background = false
     private val owner = "UC" + "a".repeat(22)

@@ -68,6 +68,7 @@ class ChannelDescriptionPresentationTest {
         compose.onNodeWithTag("channel-description-sheet").assertDoesNotExist()
         open()
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.waitUntil(5000) { compose.onAllNodesWithTag("channel-description-sheet").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("channel-description-sheet").assertDoesNotExist()
         compose.onNodeWithTag("channel-page").assertIsDisplayed()
     }

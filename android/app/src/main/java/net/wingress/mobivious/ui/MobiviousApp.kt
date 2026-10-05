@@ -294,9 +294,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         ::restorePlayer, vm::togglePlay, ::closePlayer,
                         gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link == null)
                     NavigationBar(Modifier.playerAnchor { presentation.navigationBounds = it }) { PreferenceRules.navigation(prefs.feedMenu).map { name -> name to when(name) { "Home" -> Icons.Default.Home; "Account" -> Icons.Default.AccountCircle; "Subscriptions" -> Icons.Default.Subscriptions; else -> Icons.Default.VideoLibrary } }.forEach { (name, icon) ->
-                        NavigationBarItem(enabled = !accountBusy, selected = tab == name && !watch, onClick = {
+                        NavigationBarItem(modifier = Modifier.testTag("navigation-$name"), enabled = !accountBusy, selected = tab == name && !watch, onClick = {
                             vm.clearNavigationReturns(); originWatch = false; authWatchId = ""; authSettings = ""; navigate(name)
-                        }, icon = { Icon(icon, name) }, label = { Text(name, fontSize = 11.sp) })
+                        }, icon = { Icon(icon, null) }, label = { Text(name, fontSize = 11.sp) })
                     } }
                 } }
             ) { padding ->
@@ -498,7 +498,7 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val watched by vm.watched.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
-    val context = ApiContext(server, account)
+    val context = ApiContext(server, account, vm.store.contextGeneration)
     val indicator = WatchedIndicators.forVideo(video, watched.takeIf { it.context == context } ?: WatchedState())
     val compact = prefs.uiDensity == "compact"
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp)

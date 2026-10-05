@@ -42,7 +42,11 @@ class ChaptersSmokeTest {
         activity.startActivity(Intent(activity, MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_TEXT, base + path))
     }
-    private fun ready() = until { !activity.model.queue.value.loading && activity.model.playback.value.playerState == Player.STATE_READY }
+    private fun ready() = until {
+        !activity.model.queue.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
+            activity.model.queue.value.details != null && activity.model.playback.value.details == activity.model.queue.value.details &&
+            compose.onAllNodesWithTag("player-play-pause").fetchSemanticsNodes().isNotEmpty()
+    }
     private fun reacquire() = until {
         var resumed: MainActivity? = null
         ui { resumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().firstOrNull() }
@@ -168,7 +172,10 @@ class ChaptersSmokeTest {
     @Test fun repeatedVideoQueueOccurrencesAndMinimizationDismissChapters() {
         incoming("/watch?v=testvideo01&list=PLfixture&index=0&autoplay=0"); ready(); chapters()
         val first = activity.model.queue.value.currentKey
-        ui { activity.model.selectQueue(activity.model.queue.value.items[2].key) }; ready()
+        val next = activity.model.queue.value.items[2].key
+        ui { activity.model.selectQueue(next) }
+        until { activity.model.queue.value.currentKey == next }
+        ready()
         assertEquals("testvideo01", activity.model.playback.value.details!!.video.id)
         assertNotEquals(first, activity.model.queue.value.currentKey)
         compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
@@ -191,10 +198,11 @@ class ChaptersSmokeTest {
         Assume.assumeTrue(activity.supportsPip())
         ui { activity.enterPip() }
         until { activity.isInPictureInPictureMode }
+        until { compose.onAllNodesWithTag("chapters-panel").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
-            "am start -n ${instrumentation.targetContext.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top")).use { it.readBytes() }
+            "am start --windowingMode 1 -n ${instrumentation.targetContext.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")).use { it.readBytes() }
         reacquire(); until { !activity.isInPictureInPictureMode }
         compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
     }

@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
+import android.graphics.Rect
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -26,6 +27,8 @@ class MainActivity : ComponentActivity() {
     val model: AppViewModel by viewModels()
     private val pipMode = mutableStateOf(false)
     private var pipWatching = false
+    private var pipSource: Rect? = null
+    private var pipUpdatePending = false
     val sharedVideo = mutableStateOf(false)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,8 +61,21 @@ class MainActivity : ComponentActivity() {
             .setActions(listOf(action("Back 10 seconds", android.R.drawable.ic_media_rew, "mobivious.rewind", 1),
                 action(if (playing) "Pause" else "Play", if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, "mobivious.toggle", 2),
                 action("Forward 10 seconds", android.R.drawable.ic_media_ff, "mobivious.forward", 3)))
+        pipSource?.let { params.setSourceRectHint(it) }
         if (Build.VERSION.SDK_INT >= 31) params.setAutoEnterEnabled(active && playing).setSeamlessResizeEnabled(true)
         setPictureInPictureParams(params.build())
+    }
+    fun updatePipSource(bounds: Rect) {
+        if (bounds.isEmpty || bounds == pipSource || isInPictureInPictureMode) return
+        pipSource = Rect(bounds)
+        // Window parameter updates must run after Compose's current layout pass.
+        if (!pipUpdatePending) {
+            pipUpdatePending = true
+            window.decorView.post {
+                pipUpdatePending = false
+                if (!isDestroyed && !isInPictureInPictureMode) updatePip(pipWatching)
+            }
+        }
     }
     fun supportsPip() = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)
     fun setFullscreen(fullscreen: Boolean) {

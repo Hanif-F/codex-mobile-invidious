@@ -90,16 +90,26 @@ export ANDROID_SERIAL=emulator-5554  # Replace with your device's serial.
 scripts/test-android.sh
 ```
 
-The runner generates local test media, starts the fixture on localhost port 18080,
-reverses that port through ADB, and runs unit tests, device tests and debug lint.
+The runner selects an already connected device, generates local test media, waits
+for the fixture on localhost port 18080, reverses that port through ADB, and runs
+unit tests, device tests and debug lint. It never starts or restarts an emulator.
+It stops its own fixture and removes only the ADB reverse mapping it created.
 Stop any earlier fixture using the same port before starting it. The fixture tests
 use generated media and local accounts rather than production accounts or YouTube
 requests. Generated files stay in the ignored `.tools/` directory.
 
 See [repeat Android checks](../VERIFICATION.md#repeat-android-checks) and the
 feature-specific sections of the verification record for focused scenarios.
-Recent device checks remain unexecuted after emulator startup failures; distinguish
-compiled checks from runtime acceptance when recording results.
+Pass additional Gradle options to run focused checks, for example:
+
+```sh
+scripts/test-android.sh --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
+```
+
+On a busy host, add `--max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m` to limit build
+resource use. Distinguish compiled checks from runtime acceptance when recording
+results; the complete device suite is not yet green.
 
 ## Signed releases
 

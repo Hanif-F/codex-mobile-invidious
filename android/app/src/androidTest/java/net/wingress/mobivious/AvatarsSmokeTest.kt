@@ -69,7 +69,7 @@ class AvatarsSmokeTest {
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null }
         compose.onNodeWithTag("watch-channel-avatar", true).assertExists()
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-avatar-testvideo02"))
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-card-testvideo02"))
         compose.onNodeWithTag("video-avatar-testvideo02", true).assertExists()
         val images = state().getJSONArray("avatarRequests")
         assertTrue(images.length() > 0)
@@ -155,7 +155,7 @@ class AvatarsSmokeTest {
         }
         until { !activity.model.preferences.value.thinMode && state().getJSONArray("avatarRequests").length() > 0 }
         compose.onNodeWithTag("channel-header-avatar", true).assertExists()
-        compose.onNodeWithText("Mobivious Studio").assertExists()
+        compose.onAllNodesWithText("Mobivious Studio").onFirst().assertIsDisplayed()
         screenshot("failed-avatar")
     }
 }

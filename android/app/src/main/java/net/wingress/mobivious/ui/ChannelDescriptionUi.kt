@@ -28,7 +28,7 @@ internal fun ChannelDescriptionSheet(channel: Channel, server: String = "", link
                     Text("Channel description", style = MaterialTheme.typography.titleLarge)
                     Text(channel.name, style = MaterialTheme.typography.bodyMedium)
                 }
-                IconButton(onClick = dismiss) { Icon(Icons.Default.Close, "Close channel description") }
+                IconButton(onClick = dismiss, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close channel description") }
             }
             Column(Modifier.weight(1f, fill = false).fillMaxWidth()
                 .verticalScroll(rememberScrollState()).testTag("channel-description-scroll")) {

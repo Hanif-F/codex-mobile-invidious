@@ -3,7 +3,6 @@ package net.wingress.mobivious
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.C
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -20,7 +19,7 @@ import java.net.URL
 /** Local generated media only; scripts/test-android.sh starts the fixture. */
 @RunWith(AndroidJUnit4::class)
 class QueueLibrarySmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private fun command(name: String, body: String = "{}") {
         (URL("http://127.0.0.1:18080/test/$name").openConnection() as java.net.HttpURLConnection).apply {
@@ -77,7 +76,7 @@ class QueueLibrarySmokeTest {
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
         assertFalse(activity.model.queueExpanded.value)
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
-        ui { activity.model.navigate("Home") }
+        compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithTag("mini-player-preview").performClick()
         showQueue()
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
@@ -163,12 +162,12 @@ class QueueLibrarySmokeTest {
         compose.onAllNodesWithTag("video-actions-testvideo01").onFirst().performClick()
         compose.onNodeWithText("Audio mode").performClick()
         waitFor { activity.model.playback.value.playing }
-        assertTrue(C.TRACK_TYPE_VIDEO in activity.model.controller.value!!.trackSelectionParameters.disabledTrackTypes)
+        ui { assertTrue(C.TRACK_TYPE_VIDEO in activity.model.controller.value!!.trackSelectionParameters.disabledTrackTypes) }
         ui { activity.model.insertQueue(Video("testvideo02", "Next audio"), true) }
         waitFor { activity.model.queue.value.items.size == 2 }
         finishCurrent()
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
-        assertTrue(C.TRACK_TYPE_VIDEO in activity.model.controller.value!!.trackSelectionParameters.disabledTrackTypes)
+        ui { assertTrue(C.TRACK_TYPE_VIDEO in activity.model.controller.value!!.trackSelectionParameters.disabledTrackTypes) }
         assertFalse(activity.model.preferences.value.listen)
     }
     @Test fun duplicateOccurrencesAutomaticAdvanceAndRepeatAll() {

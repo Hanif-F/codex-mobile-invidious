@@ -1773,3 +1773,127 @@ For the fixture-backed checks, first generate the local media, start
 `adb reverse tcp:18080 tcp:18080`, as in `scripts/test-android.sh`. Stop the
 temporary fixture and remove its reverse connection after testing. The user's
 emulator was left running.
+
+## General quality review — 5 October 2026
+
+This review used the user's already running `emulator-5554`, Android 16 / API 36.
+No emulator was launched, restarted or stopped by the agent. Account mutations
+used disposable localhost fixture accounts; the supplied live account was not
+needed. The server checkout has no changes from this review.
+
+Changes address existing behavior:
+
+- HLS VOD playback could crash the service when Media3 built the logical queue
+  timeline. Its VOD window exposed an epoch start time without live configuration.
+  Session timeline snapshots now normalize those epoch fields while retaining
+  seek geometry, periods, the manifest and actual live-window timing.
+- Account/instance generations were omitted from video and queue card context
+  comparisons, hiding watched/progress indicators after signing in. Cards now
+  compare the complete context.
+- HTTP requests now cancel their OkHttp call when a coroutine is canceled, including
+  during response-body reads. Late results from an old account or instance cannot
+  publish feed snapshots or offline status. Successful HTML/error pages cannot
+  overwrite a valid cached feed, and mutation calls disable transport retries.
+- Retrying an initial metadata failure preserves the requested autoplay or paused
+  intent and the queue occurrence. Opening a playlist sends one initial request.
+- Fullscreen exit commits its mode before Android rotation can cancel animation.
+  PiP receives a measured source rectangle, with window updates posted after layout.
+- Channel descriptions, image viewers and comment panels have 48 dp close targets.
+  Navigation tabs use their visible labels for accessibility and stable test tags.
+- Media-controller connection waits suspend without blocking an IO worker. Backup
+  rules explicitly exclude app data from cloud backups and device transfers.
+- The device-test runner checks a connected device and fixture readiness, rejects
+  port conflicts, and cleans up only its own fixture/reverse mapping. Test selectors,
+  lifecycle synchronization and main-thread controller reads were corrected.
+
+| Check | Result |
+| --- | --- |
+| Final JVM unit/API tests | Passed: 236 tests, 0 failures/errors/skips |
+| Final debug lint | Passed: 0 errors, 24 warnings; remaining warnings concern dependency updates, intentional media-service export and KTX style |
+| Debug and instrumentation compilation | Passed, including the revised service-test dispatcher |
+| Release APK packaging | Passed; no version bump, publication or deployment |
+| Full device run during review | Executed 172 tests: 110 passed, 62 failed; this was an intermediate revision, not final acceptance |
+| Subsequent focused device run | 23 of 29 passed; account navigation, HLS, playlist links, descriptions and community close targets passed |
+| Retry regression and navigation/playback rerun | 9 passed, 2 failed before a Compose test-layout crash stopped instrumentation; all 5 AppSmokeTest scenarios passed, including failed initial retries with autoplay enabled and disabled |
+| Live public browsing | Default-instance home feed inspected visually; no live account mutations |
+| Runner/fixture syntax and diff checks | Passed |
+
+The complete device suite is **not green**. PiP entry succeeds, but the shell-driven
+return check still times out. It needs verification through Android's actual PiP
+expand control. Several earlier failures were obsolete selectors, missing fixture
+content or unsynchronized transitions. Watched-card selectors and account-return
+setup were corrected, but those scenarios still need a complete rerun.
+
+The recurring `performMeasureAndLayout called during measure layout` stack ran
+through Compose's test frame clock. Service tests now explicitly use a
+`StandardTestDispatcher` so effects queue rather than resume inline; this harness
+change compiles but has not been verified on the device. Earlier speculative app
+scroll changes were removed. The user-started emulator subsequently disconnected
+from ADB during direct UI inspection. Host process and port checks confirmed it
+had exited, and it was not relaunched. A separate host build
+executor timed out under load; the final checks passed with one worker and a
+768 MB Gradle heap.
+
+Run the affected checks first after the user reopens the emulator:
+
+```sh
+export ANDROID_SERIAL=emulator-5554
+scripts/test-android.sh --offline --max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AccountNavigationSmokeTest,net.wingress.mobivious.AppSmokeTest,net.wingress.mobivious.ContentLinksSmokeTest,net.wingress.mobivious.WatchedIndicatorsSmokeTest,net.wingress.mobivious.QueueLibrarySmokeTest
+```
+
+Then run `scripts/test-android.sh` without the class filter to audit the other
+remaining device failures. Intermediate XML reports, the final build log and the
+public-home screenshot are saved locally in the ignored
+`artifacts/quality-review-2026-10-05/` directory. These results do not establish
+physical-device, production-account or final complete-suite acceptance.
+
+Follow-up review while the emulator remained disconnected identified a library
+race: a pending subscription can increment the playlist revision during the
+initial account read, causing that read to be discarded and owned playlists to
+remain absent. Confirmed subscribe/unsubscribe mutations now trigger a fresh
+playlist-only read with the current revision. A new fixture-backed sign-in
+regression checks that both owned and subscribed lists appear together; its
+runtime check remains pending.
+
+Additional smoke checks now return explicitly from Account to Home before
+expecting browse content, wait for the settings root after saving SponsorBlock,
+and read media IDs through playback snapshots. Settings tests also reset the
+guest/account state before launch. The latest recorded failing scenarios are
+listed in `artifacts/quality-review-2026-10-05/remaining-device-checks.md` to guide
+the next complete run. The follow-up JVM tests, lint, debug/instrumentation builds
+and release packaging also passed with the library changes included.
+
+The fixture now records search completion even when its response raises
+`BrokenPipeError` after client cancellation. A host-side check reproduced the
+previous unfinished event and verified completion for successful, HTTP-error and
+disconnected responses. The corresponding delayed-search device test still needs
+a rerun.
+
+## Crash-focused follow-up — 5 October 2026
+
+The user reopened `emulator-5554`. The pending focused run finished with 44 of
+51 tests passing and seven failures. Its XML is saved as
+`artifacts/quality-review-2026-10-05/resumed-focused-device-run.xml`. The HLS,
+pending-subscription sign-in and delayed-search cancellation regressions passed.
+The recurring Compose layout exception appeared in the account recreation test,
+which still used the default test dispatcher; it now uses the same explicitly
+queued service-test dispatcher as the other affected classes.
+
+The user then narrowed the goal to errors that cause crashes. Further PiP-return,
+selector, history grouping and playlist navigation investigation was deferred.
+A crash regression run passed **8 of 8 tests**, covering HLS VOD with captions and
+audio mode, player gestures/fullscreen, decoded geometry and activity recreation,
+both formerly crashing content-link cases, watched-history removal, background
+queue recreation and duplicate-occurrence advancement/repeat. All 236 JVM tests
+and debug lint also passed. No new Mobivious fatal exception appeared in Android's
+crash buffer during this follow-up.
+
+The confirmed app crash fix is the HLS VOD session-timeline normalization described
+above. The Compose change addresses instrumentation frame-clock reentrancy; it
+does not establish a separate production crash. The eight passing scenarios prove
+the known crash regressions, not complete acceptance of the remaining device
+suite. Reports and the successful build log are saved as
+`crash-regression-device-run.xml` and `crash-regression-build.log` in the same
+artifact directory. The emulator was never launched, restarted or stopped by the
+agent, and live account credentials were not used.

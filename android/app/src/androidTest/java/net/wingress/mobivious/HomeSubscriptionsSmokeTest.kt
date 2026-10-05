@@ -53,7 +53,7 @@ class HomeSubscriptionsSmokeTest {
         until { activity.model.account.value != null && activity.model.subscriptionChannels.value.loaded && activity.model.dearrowIdentity.value != null }
     }
     private fun subscriptions() {
-        compose.onNodeWithContentDescription("Subscriptions").performClick()
+        compose.onNodeWithTag("navigation-Subscriptions").performClick()
         until { activity.model.route.isEmpty() && activity.model.tab == "Subscriptions" && !activity.model.browse.value.loading }
     }
     private fun directory() {
@@ -101,7 +101,7 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithTag("discovery-popular").performClick()
         until { !activity.model.browse.value.loading }
         compose.onNodeWithContentDescription("Search").performClick()
-        compose.onNodeWithContentDescription("Home").performClick()
+        compose.onNodeWithTag("navigation-Home").performClick()
         compose.onNodeWithTag("discovery-popular").assertIsSelected()
         recreate(); compose.onNodeWithTag("discovery-popular").assertIsSelected()
         screenshot("home-selection")

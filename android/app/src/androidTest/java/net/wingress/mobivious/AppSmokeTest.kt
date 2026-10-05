@@ -26,7 +26,13 @@ class AppSmokeTest {
     @Before fun launchActivity() {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        compose.runOnUiThread { activity.model.store.defaultSpeed = 1f; activity.model.store.maxHeight = Int.MAX_VALUE; activity.model.store.pip = true }
+        compose.runOnUiThread {
+            activity.model.closePlayer(); activity.model.store.save(null)
+            activity.model.switchServer("http://127.0.0.1:18080")
+            activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences())
+            activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.store.defaultSpeed = 1f; activity.model.store.maxHeight = Int.MAX_VALUE; activity.model.store.pip = true
+        }
     }
     @After fun closeActivity() {
         if (::activity.isInitialized) InstrumentationRegistry.getInstrumentation().runOnMainSync {
@@ -38,6 +44,28 @@ class AppSmokeTest {
     private fun fixture(): JSONObject = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
     private fun command(path: String, body: String = "{}") {
         (URL("http://127.0.0.1:18080/test/$path").openConnection() as java.net.HttpURLConnection).apply { requestMethod = "POST"; doOutput = true; outputStream.use { it.write(body.toByteArray()) }; inputStream.close(); disconnect() }
+    }
+
+    @Test fun failedInitialPlaybackRetryPreservesAutoplayAndPausedIntent() {
+        command("reset")
+        for (autoplay in listOf(true, false)) {
+            command("stream", """{"type":"dash","failNext":true}""")
+            compose.runOnUiThread {
+                activity.model.openLink(net.wingress.mobivious.data.VideoLinks.parse(
+                    "http://127.0.0.1:18080/watch?v=testvideo01&autoplay=${if (autoplay) 1 else 0}",
+                    activity.model.store.server)!!)
+                activity.sharedVideo.value = true
+            }
+            waitFor { activity.model.queue.value.error != null && !activity.model.queue.value.loading }
+            val token = activity.model.queue.value.token
+            val occurrence = activity.model.queue.value.currentKey
+            compose.runOnUiThread { activity.model.retryPlayback() }
+            waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY &&
+                !activity.model.queue.value.loading && activity.model.queue.value.error == null }
+            assertEquals(token, activity.model.queue.value.token)
+            assertEquals(occurrence, activity.model.queue.value.currentKey)
+            assertEquals(autoplay, activity.model.playback.value.playWhenReady)
+        }
     }
     private fun showControls() {
         if (compose.onAllNodesWithContentDescription("Player settings").fetchSemanticsNodes().isEmpty()) {
@@ -83,7 +111,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("player-surface").performTouchInput { doubleClick(Offset(width * .85f, height * .25f)) }
         waitFor { activity.model.playback.value.position == 40_000L }
         val accessibleSeek = compose.onNodeWithTag("player-gestures").fetchSemanticsNode().config[SemanticsActions.CustomActions]
-        assertEquals(listOf("Back 10 seconds", "Forward 10 seconds"), accessibleSeek.map { it.label })
+        assertEquals(listOf("Back 10 seconds", "Forward 10 seconds", "Minimize player"), accessibleSeek.map { it.label })
         compose.runOnUiThread { assertTrue(accessibleSeek[1].action()) }
         waitFor { activity.model.playback.value.position == 50_000L }
         compose.runOnUiThread { assertTrue(accessibleSeek[0].action()) }
@@ -227,12 +255,12 @@ class AppSmokeTest {
         command("reset")
         compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080") }
         waitFor { activity.model.browse.value.videos.isNotEmpty() }
-        compose.onNodeWithContentDescription("Account").performClick()
+        compose.onNodeWithTag("navigation-Account").performClick()
         compose.onNodeWithText("Username").performTextInput("EmulatorViewer")
         compose.onNodeWithText("Password").performTextInput("fixture-password")
         compose.onNodeWithTag("account-auth-submit").performClick()
         waitFor { activity.model.account.value != null }
-        compose.onNodeWithContentDescription("Home").performClick()
+        compose.onNodeWithTag("navigation-Home").performClick()
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
         assertNull(activity.model.playback.value.error)
@@ -247,7 +275,7 @@ class AppSmokeTest {
         compose.runOnUiThread { assertEquals(1.5f, activity.model.controller.value!!.playbackParameters.speed) }
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Pause").assertExists()
-        compose.onNodeWithContentDescription("Library", useUnmergedTree = true).performClick()
+        compose.onNodeWithTag("navigation-Library").performClick()
         compose.onNodeWithText("New playlist").performClick()
         compose.onNodeWithText("Title").performTextInput("Emulator playlist")
         compose.onNodeWithText("Save", useUnmergedTree = true).performClick()

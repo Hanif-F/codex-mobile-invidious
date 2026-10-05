@@ -91,9 +91,9 @@ Chat replay, clips, downloads, casting, upload notifications and timeline
 thumbnail previews are not implemented. Comments, polls and quizzes are read-only;
 RSS support provides links and exports rather than an in-app feed reader.
 
-Recent native interaction and layout checks remain unverified because of emulator
-startup failures. See the dated [verification record](VERIFICATION.md) for completed
-checks, outstanding device acceptance and reproduction instructions.
+Native interaction and playback checks run on an already started emulator. See the
+dated [verification record](VERIFICATION.md) for completed checks, remaining device
+acceptance and reproduction instructions.
 
 ## Development and documentation
 

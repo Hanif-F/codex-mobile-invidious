@@ -153,7 +153,8 @@ class ContentVisibilityTest {
                 assertTrue(f.repo.state.value.ids.isEmpty())
                 try { f.repo.setBlocked(old, second, "Beta", true); fail() } catch (_: CancellationException) { }
             } finally { release.countDown() }
-            refresh.await(); assertTrue(f.repo.state.value.ids.isEmpty()); assertEquals(1, f.server.requestCount)
+            try { refresh.await(); fail("Former account read was accepted") } catch (_: CancellationException) { }
+            assertTrue(f.repo.state.value.ids.isEmpty()); assertEquals(1, f.server.requestCount)
             f.account = old.account; f.repo.reset(); assertEquals(setOf(first), f.repo.state.value.ids)
             f.address = "https://another.instance"; f.repo.reset(); assertTrue(f.repo.state.value.ids.isEmpty())
             f.account = null; f.repo.reset(); assertTrue(f.repo.state.value.ids.isEmpty())

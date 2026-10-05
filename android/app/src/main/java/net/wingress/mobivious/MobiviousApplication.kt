@@ -34,7 +34,7 @@ class MobiviousApplication : Application() {
         dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }
         watched = WatchedRepository(api, store)
         blocked = BlockedRepository(api, store)
-        store.onContextChanged = { watched.reset(it); blocked.reset(it); dearrowTitles.clear(); playbackContext.value = it }
+        store.onContextChanged = { watched.reset(it); blocked.reset(it); dearrowTitles.clear(); offline.value = false; playbackContext.value = it }
         playbackContext.value = api.context()
         blocked.reset()
         watched.reset()

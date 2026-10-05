@@ -38,6 +38,7 @@ class ActionControlsPresentationTest {
             }
         } }
         compose.onNodeWithTag("actions").performClick()
+        compose.onNodeWithText("Edit playlist").assertIsDisplayed()
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
         compose.onNodeWithText("Edit playlist").assertDoesNotExist()
         assertEquals(0, opened)

@@ -50,7 +50,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
         toggle = { vm.queueExpanded.value = !vm.queueExpanded.value }, previous = { vm.nextQueue(-1) }, next = { vm.nextQueue(1) },
         repeat = vm::repeatQueue, retry = vm::retryPlayback, more = { vm.queueCommand(PlaybackService.QUEUE_MORE) }) { entry ->
         val indicator = WatchedIndicators.forVideo(entry.video,
-            watched.takeIf { it.context == ApiContext(vm.store.server, account) } ?: WatchedState())
+            watched.takeIf { it.context == ApiContext(vm.store.server, account, vm.store.contextGeneration) } ?: WatchedState())
         val eligible = QueueRules.eligible(entry, prefs.showMemberVideos)
         QueueVideoRow(entry, entry.key == state.currentKey, vm.store.server, prefs.thinMode, indicator, eligible,
             hiddenMember = entry.video.membersOnly && !prefs.showMemberVideos,

@@ -27,6 +27,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private var pendingSelection: Selection? = null
     private var selectionPending = false
     private var decoderError = false
+    private var requestedPlayWhenReady = false
     private var baseRepeat = QueueRepeat.OFF
     private var enforcingBound = false
     private val playlistWrites = Mutex()
@@ -48,7 +49,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         player.replaceMediaItem(0, item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setTitle(title).setExtras(extras).build()).build())
     }
     fun playerError(message: String?) {
-        if (message != null) { decoderError = true; update(state.copy(loading = false, error = message)) }
+        if (message != null) { requestedPlayWhenReady = player.playWhenReady; decoderError = true; update(state.copy(loading = false, error = message)) }
         else if (decoderError) { decoderError = false; update(state.copy(error = null)) }
     }
     private fun valid(token: String, context: ApiContext) = state.token == token && state.context == context && app.api.context() == context
@@ -71,6 +72,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         player.pause()
         val context = app.api.context()
         if (prefsContext != context) { prefs = app.store.guestDeArrow(); prefsContext = context }
+        requestedPlayWhenReady = !paused && (linkPlayback?.options?.autoplay ?: prefs.autoplay)
         val token = UUID.randomUUID().toString()
         val seed = id.takeIf { it.isNotEmpty() }?.let { QueueOccurrence.local(Video(it, it)).copy(sourceIndex = index, linkPlayback = linkPlayback) }
         update(PlaybackQueueSnapshot(token, context, source?.let { QueueSource(it, seedVideoId = sourceSeed) }, items = listOfNotNull(seed), currentKey = seed?.key, loading = true,
@@ -155,6 +157,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                 speed = state.carriedOptions.speed?.let { captured.speed })))
         }
         else selection = null
+        requestedPlayWhenReady = playing
         beforeChange(); player.pause()
         update(state.copy(currentKey = entry.key, details = null, loading = true, error = null))
         if (!fresh && !sameOccurrence) {
@@ -375,7 +378,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     fun retry() {
         val entry = state.current ?: return
         val position = if (player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == entry.key) player.currentPosition else null
-        val playing = player.playWhenReady
+        val playing = if (state.error != null) requestedPlayWhenReady else player.playWhenReady
         launch { token, context -> load(entry, token, context, playing = playing, positionMs = position) }
     }
     fun more() { launch(sourceOnly = true) { token, context ->

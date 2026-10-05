@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
@@ -76,6 +77,7 @@ internal fun VideoPlayer(
     onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
 ) {
+    val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
     val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
@@ -116,7 +118,11 @@ internal fun VideoPlayer(
     LaunchedEffect(feedbackGeneration) { if (feedback != null) { delay(800); feedback = null } }
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
     BoxWithConstraints(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
-        .onGloballyPositioned { inputOrigin = it.positionInRoot() }) {
+        .onGloballyPositioned {
+            inputOrigin = it.positionInRoot()
+            val bounds = it.boundsInWindow()
+            activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
+        }) {
         val compactPlay = maxHeight < 180.dp || !fullscreen && !settingsOpen && sponsor.active != null
         val showTimeline = maxHeight >= 96.dp
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())

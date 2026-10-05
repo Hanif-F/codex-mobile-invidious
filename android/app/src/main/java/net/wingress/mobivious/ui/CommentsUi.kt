@@ -95,12 +95,12 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
         color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (thread != null) IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
+                if (thread != null) IconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
                 else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() },
                     style = MaterialTheme.typography.titleLarge)
                 if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
-                IconButton(onClick = close) { Icon(Icons.Default.Close, "Close comments") }
+                IconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
             }
             if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,

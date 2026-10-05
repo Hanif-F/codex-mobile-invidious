@@ -24,6 +24,8 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import org.json.JSONObject
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
@@ -137,7 +139,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     var date = ""
     var durationFilter = ""
     private var browseJob: Job? = null
-    private var videoJob: Job? = null
     private var contributionJob: Job? = null
     private var preferenceGeneration = 0L
     private val preferenceWrites = Mutex()
@@ -295,6 +296,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun refreshAccount() {
         refreshSharedSettings()
         refreshSubscriptions()
+        refreshPlaylists()
+    }
+    private fun refreshPlaylists() {
         val context = api.context(); val revision = playlistRevision
         action { val lists = api.playlists(context); if (api.context() == context && revision == playlistRevision) playlists.value = lists }
     }
@@ -462,7 +466,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun openSignIn() { if (tab != "Account") signInReturn = captureBrowse(); navigate("Account") }
     fun openPlaylist(list: Playlist) {
-        navigate("Library", "playlist:${list.id}")
+        navigate("Library", "playlist:${list.id}", loadContent = false)
         playlistSeed = list.seedVideoId
         playlist.value = list.copy(owned = list.owned || playlists.value.any { it.id == list.id && it.owned }, saved = listsSubscribed(list.id))
         refresh()
@@ -483,6 +487,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     playlists.value = playlists.value.filterNot { it.id == list.id } + listOfNotNull(result)
                     if (playlist.value?.id == list.id) playlist.value = (result ?: playlist.value!!).copy(saved = subscribe)
                     message.value = if (subscribe) "Playlist subscribed" else "Playlist unsubscribed"
+                    // An initial account read may have been fenced out by this mutation.
+                    // Reload after confirmation so owned and subscribed lists are both retained.
+                    refreshPlaylists()
                 }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (context == api.context()) playlistErrors.value += list.id to friendly(e) }
@@ -1047,4 +1054,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     override fun onCleared() { cancelAccumulatedSeek(); MediaController.releaseFuture(future) }
     private fun friendly(e: Exception) = if (e is ApiException || e is IllegalArgumentException) e.message ?: "Request failed." else "Cannot reach this instance. Check the address and connection, then retry."
 }
-private suspend fun com.google.common.util.concurrent.ListenableFuture<MediaController>.awaitController(): MediaController = withContext(Dispatchers.IO) { get() }
+private suspend fun ListenableFuture<MediaController>.awaitController(): MediaController = suspendCancellableCoroutine { continuation ->
+    // Cancelling one queued action must not cancel the controller shared by the whole ViewModel.
+    addListener({
+        try { continuation.resume(get()) }
+        catch (e: Exception) { continuation.resumeWithException(e) }
+    }, com.google.common.util.concurrent.MoreExecutors.directExecutor())
+}

@@ -79,7 +79,7 @@ class CommentsSmokeTest {
         compose.onNodeWithTag("player-surface").assertIsDisplayed()
         compose.onNodeWithTag("comments-drawer").assertIsDisplayed()
         compose.onNodeWithText("Fixture creator").assertExists()
-        compose.onNodeWithContentDescription("3 likes").assert(hasClickAction().not())
+        compose.onAllNodesWithContentDescription("3 likes", useUnmergedTree = true).assertAll(hasClickAction().not())
         compose.onNodeWithContentDescription("Verified author").assertExists()
         compose.onNodeWithText("Pinned").assertExists()
         compose.onNodeWithText("Creator", substring = false).assertExists()

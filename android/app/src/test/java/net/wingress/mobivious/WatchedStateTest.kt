@@ -148,7 +148,7 @@ class WatchedStateTest {
                 f.repo.reset(); assertTrue(f.repo.state.value.watched.isEmpty()); assertFalse(f.repo.state.value.loading)
                 f.repo.configure(f.context, true); f.repo.refresh()
             } finally { release.countDown() }
-            old.await()
+            try { old.await(); fail("Former account read was accepted") } catch (_: CancellationException) { }
             assertEquals(setOf(second), f.repo.state.value.watched); assertEquals(mapOf(second to 20L), f.repo.state.value.positions)
         }
     }

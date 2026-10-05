@@ -230,8 +230,10 @@ class Handler(BaseHTTPRequestHandler):
             else: items = [recommended if q == 'second' else video] if page == 1 else []
         fail = state['searchFailNext']; state['searchFailNext'] = False
         if delay: time.sleep(min(5000, max(0, delay)) / 1000)
-        self.respond(dict(error='Fixture search temporarily unavailable') if fail else items, 503 if fail else 200)
-        event['completed'] = True
+        try:
+            self.respond(dict(error='Fixture search temporarily unavailable') if fail else items, 503 if fail else 200)
+        finally:
+            event['completed'] = True
 
     def do_GET(self):
         url = urlparse(self.path)
@@ -324,6 +326,9 @@ class Handler(BaseHTTPRequestHandler):
             state['hashtagRequests'].append(dict(tag=tag, page=page, authorized=self.headers.get('Authorization') is not None))
             return self.respond(dict(results=[dict(video, videoId='hashvid%04d' % i, title='Hashtag video ' + str(i)) for i in range(60)] if page == 1 else [recommended]))
         elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03'):
+            if state.get('videoFailNext'):
+                state['videoFailNext'] = False
+                return self.respond(dict(error='Fixture video temporarily unavailable'), 503)
             selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
             codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
             dash = f'/media/codec/{codec_manifest}' if codec_manifest else '/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd'
@@ -494,7 +499,7 @@ class Handler(BaseHTTPRequestHandler):
             state['avatarRequests'] = []
             return self.respond(status=204)
         elif p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
+            state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
             prefs.clear()
@@ -517,6 +522,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/content-links':
             state['videoInformation'] = True
+            state['playlistRss'] = True
+            state['channelTabs'] = ['videos', 'shorts', 'streams']
             for key in ('resolveFailNext', 'resolveDelayNext'):
                 if key in data: state[key] = data[key]
             return self.respond({})
@@ -580,6 +587,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/stream':
             state['stream'] = data['type']
+            state['videoFailNext'] = bool(data.get('failNext', False))
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))

@@ -4,7 +4,6 @@ import android.content.Intent
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.AccountPreferences
@@ -18,7 +17,7 @@ import java.net.URL
 @RunWith(AndroidJUnit4::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class WatchedIndicatorsSmokeTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     private val first = "testvideo01"
     private val second = "testvideo02"
@@ -51,7 +50,8 @@ class WatchedIndicatorsSmokeTest {
     }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("IndicatorViewer", "fixture-password") } }
-        until { activity.model.account.value != null && activity.model.preferences.value.savePosition && !activity.model.watched.value.loading }
+        until { activity.model.account.value != null && activity.model.preferences.value.savePosition && !activity.model.watched.value.loading && activity.model.tab == "Account" }
+        navigate("Home")
     }
     private fun navigate(tab: String, route: String = "") {
         compose.runOnUiThread { activity.model.query = "fixture"; activity.model.navigate(tab, route) }
@@ -91,10 +91,12 @@ class WatchedIndicatorsSmokeTest {
         }
         compose.onAllNodesWithText("Mark watched").assertCountEquals(0)
         compose.onAllNodesWithText("Mark unwatched").assertCountEquals(0)
+        compose.runOnUiThread { activity.model.preferences.value = activity.model.preferences.value.copy(thinMode = false) }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-card-$second"))
-        watched(second).assertExists(); progress(second).assertExists(); screenshot("recommendations")
+        compose.onNode(hasTestTag("video-watched-$second") and hasAnyAncestor(hasTestTag("watch-details-list")), true).assertExists()
+        compose.onNode(hasTestTag("video-progress-$second") and hasAnyAncestor(hasTestTag("watch-details-list")), true).assertExists(); screenshot("recommendations")
     }
 
     @Test fun guestsUseLocalProgressOnlyWhenResumeIsEnabled() {
@@ -154,8 +156,8 @@ class WatchedIndicatorsSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand("input keyevent KEYCODE_HOME")).use { it.readBytes() }
         until { (activity.model.watched.value.positions[first] ?: 0) >= 55 }
-        activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) as MainActivity
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
+            "am start -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")).use { it.readBytes() }
         until { activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.seekTo(119_000) }
         until { first !in activity.model.watched.value.positions }

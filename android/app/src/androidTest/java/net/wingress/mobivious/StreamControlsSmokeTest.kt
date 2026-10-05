@@ -104,7 +104,7 @@ class StreamControlsSmokeTest {
         until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_VIDEO)?.key == videoKey }
         assertEquals(audioKey, selected(C.TRACK_TYPE_AUDIO)?.key)
         assertEquals(.25f, activity.model.playback.value.speed)
-        assertFalse(activity.model.controller.value!!.playWhenReady)
+        assertFalse(activity.model.playback.value.playWhenReady)
         assertTrue(activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT))
         recreate()
         assertEquals(videoKey, selected(C.TRACK_TYPE_VIDEO)?.key)
@@ -124,7 +124,7 @@ class StreamControlsSmokeTest {
     private fun state() = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
     private fun codecStart(codec: String, quality: String = "auto", source: String = "codec") {
         compose.runOnUiThread { activity.model.closePlayer() }
-        until { activity.model.controller.value?.mediaItemCount == 0 }
+        until { activity.model.queue.value.token.isEmpty() }
         command("stream", """{"type":"$source"}"""); command("media-reset")
         compose.runOnUiThread {
             activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, videoCodec = codec, qualityDash = quality))
@@ -164,7 +164,7 @@ class StreamControlsSmokeTest {
         until { activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_VIDEO)?.key == manual.key }
         compose.runOnUiThread { activity.model.retryPlayback() }
         until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_VIDEO)?.key == manual.key }
-        assertFalse(activity.model.controller.value!!.playWhenReady); assertEquals(1.5f, activity.model.playback.value.speed)
+        assertFalse(activity.model.playback.value.playWhenReady); assertEquals(1.5f, activity.model.playback.value.speed)
         recreate(); until { selected(C.TRACK_TYPE_VIDEO)?.key == manual.key }
         // A preference refresh updates future defaults while the open occurrence
         // retains its captured AV1 policy, including an explicit return to Auto.
@@ -218,12 +218,12 @@ class StreamControlsSmokeTest {
     }
     @Test fun consecutiveSingleTapsAccumulateAndOppositeTapResets() {
         tap(true, true); tap(true); tap(true)
-        compose.runOnUiThread { assertEquals(30_000L, activity.model.pendingSeek.value?.offset); assertEquals(40_000L, activity.model.controller.value!!.currentPosition) }
+        compose.runOnUiThread { assertEquals(30_000L, activity.model.pendingSeek.value?.offset); assertEquals(40_000L, activity.model.playback.value.position) }
         compose.onNodeWithText("+30 seconds").assertExists()
         tap(false)
-        compose.runOnUiThread { assertEquals(-10_000L, activity.model.pendingSeek.value?.offset); assertEquals(40_000L, activity.model.controller.value!!.currentPosition) }
+        compose.runOnUiThread { assertEquals(-10_000L, activity.model.pendingSeek.value?.offset); assertEquals(40_000L, activity.model.playback.value.position) }
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 30_000L }
-        assertFalse(activity.model.controller.value!!.playWhenReady)
+        assertFalse(activity.model.playback.value.playWhenReady)
         tap(false, true); tap(false); tap(true)
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 40_000L }
         compose.runOnUiThread { activity.model.seekTo(115_000) }
@@ -234,11 +234,11 @@ class StreamControlsSmokeTest {
         compose.runOnUiThread { activity.model.controller.value!!.play() }
         until { activity.model.playback.value.playing }
         tap(true, true)
-        compose.runOnUiThread { assertNotNull(activity.model.pendingSeek.value); assertFalse(activity.model.controller.value!!.playWhenReady) }
+        compose.runOnUiThread { assertNotNull(activity.model.pendingSeek.value); assertFalse(activity.model.playback.value.playWhenReady) }
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(40_000); activity.model.accumulateSeek(1); activity.model.refreshBuffer() }
         until { activity.model.playback.value.playerState == Player.STATE_READY }
-        assertNull(activity.model.pendingSeek.value); assertEquals(40_000L, activity.model.controller.value!!.currentPosition)
+        assertNull(activity.model.pendingSeek.value); assertEquals(40_000L, activity.model.playback.value.position)
         compose.runOnUiThread { activity.model.accumulateSeek(1); activity.model.seekTo(15_000) }
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 15_000L }
         compose.runOnUiThread { activity.model.accumulateSeek(1); activity.model.controller.value!!.seekTo(25_000) }
@@ -250,7 +250,7 @@ class StreamControlsSmokeTest {
         compose.runOnUiThread { activity.model.accumulateSeek(1) }
         recreate()
         until { activity.model.pendingSeek.value == null }
-        assertEquals(35_000L, activity.model.controller.value!!.currentPosition)
+        assertEquals(35_000L, activity.model.playback.value.position)
     }
     @Test fun fullscreenKeepsAccumulationAndPipEntryCancelsIt() {
         showControls()
@@ -258,7 +258,7 @@ class StreamControlsSmokeTest {
         compose.onNodeWithContentDescription("Full screen").performClick()
         until { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 50_000L }
-        assertFalse(activity.model.controller.value!!.playWhenReady)
+        assertFalse(activity.model.playback.value.playWhenReady)
         showControls(); compose.onNodeWithContentDescription("Player settings").performClick()
         compose.onNodeWithText("Quality").performClick(); screenshot("quality-landscape")
         compose.onNodeWithContentDescription("Close player settings").performClick()
@@ -266,7 +266,7 @@ class StreamControlsSmokeTest {
             compose.runOnUiThread { activity.model.accumulateSeek(1); activity.enterPip() }
             until { activity.isInPictureInPictureMode }
             assertNull(activity.model.pendingSeek.value)
-            assertEquals(50_000L, activity.model.controller.value!!.currentPosition)
+            assertEquals(50_000L, activity.model.playback.value.position)
         }
     }
 }

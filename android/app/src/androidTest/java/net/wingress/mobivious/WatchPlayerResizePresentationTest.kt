@@ -127,6 +127,7 @@ class WatchPlayerResizePresentationTest {
         assertEquals(progress, resize.progress, .001f)
         assertEquals(partial, height(), 1f)
         compose.runOnIdle { occurrence.value = "next" }
+        compose.waitForIdle()
         assertEquals(0f, resize.progress, .001f)
         assertTrue(height() > partial)
     }
