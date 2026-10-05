@@ -3,7 +3,7 @@
 Reviewed on **5 October 2026** against the local source checkouts:
 
 - Web: `../invidious` at `42e4fee6` plus the additive public video-license field. Includes this fork's custom features and native API extensions.
-- Android: `e7c4f49` plus working-tree rich video information and content-link changes. Current configured release version: `0.5.1` (version code 8); these changes are in the debug build and have not been released.
+- Android: `e7c4f49` plus working-tree rich video information, content-link and chapter changes. Current configured release version: `0.5.1` (version code 8); these changes are in the debug build and have not been released.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 
@@ -11,9 +11,9 @@ Reviewed on **5 October 2026** against the local source checkouts:
 - **Partial:** some parts exist; the last two columns identify what exists and what is missing.
 - **Not implemented:** no corresponding Android flow was found in the reviewed source.
 
-The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 224 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, localhost content-link fixture checks, the Invidious build and production serializer checks. Ten new rich-information/link device scenarios compile but remain unexecuted because the installed emulator crashes before boot. Signed 0.5.1 checks predate these changes. Production requires deployment of the sibling license field to display licenses; older servers remain usable with unknown optional fields hidden. This audit does not verify the live server or the earlier account/API rollout.
+The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 230 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, localhost chapter/content-link fixture checks, the Invidious build and production serializer checks. Eleven new chapter device scenarios and ten rich-information/link scenarios compile but remain unexecuted because the installed emulator crashes before boot. Signed 0.5.1 checks predate these changes. Production requires deployment of the sibling license field to display licenses; older servers remain usable with unknown optional fields hidden. This audit does not verify the live server or the earlier account/API rollout.
 
-**Summary: 48 broad feature areas — 28 implemented, 10 partial, 10 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
+**Summary: 48 broad feature areas — 28 implemented, 11 partial, 9 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
 
 ## Discovery and channels
 
@@ -43,7 +43,7 @@ Evidence: [web routing][w-routing], [web trending][w-trending], [web search filt
 | 15 | Video information and rich descriptions | Implemented | Selectable native rich description formatting, safe links, clickable timestamps and hashtags, with plain-text fallback; title/author/avatar, views/publication/member labels, optional likes, channel verification and subscribers, upcoming/premiere/unlisted notices. Expandable genre, license, family-friendly status, localized allowed regions and supplied music credits. Same-video timestamps seek the current occurrence; content links navigate natively or open an external handler. | — for the core capability; license display requires the additive sibling video API field. Missing optional metadata stays hidden; device/layout acceptance remains unverified. |
 | 16 | Related/recommended videos | Implemented | Recommended video list on the watch screen; manual selection, channel navigation and a shared visibility preference. | —; automatic advancement is tracked separately. |
 | 17 | Automatic next-video playback, playlist queue and repeat | Implemented | Service-owned next-recommendation playback; public/private playlists and dynamic mixes; source occurrence context, overlapping-page loading, previous/next and queue selection; temporary Play next/Add to queue; local queue removal and separate owned-playlist deletion; session Off/One/All repeat (All for finite queues). Explicit queues open inline before Up next, with bounded compact rows, current-occurrence following and animated collapse retained across navigation/Activity recreation. Shared next/autoplay-next/loop defaults; background/audio/PiP advancement. | — for the core capability; native runtime/layout acceptance remains unverified. Queues last for the current service session; shuffle and restart restoration are outside scope. |
-| 18 | Chapters and timeline thumbnail previews | Not implemented | — | Chapter navigation/markers and storyboard previews while seeking. |
+| 18 | Chapters and timeline thumbnail previews | Partial | Manual chapters parsed from the already loaded description; timeline divisions and tappable current/scrub chapter title, watch entry, Comments-style watch drawer and fullscreen player sheet. Timestamp selection retains paused/playing intent; active highlighting, independent list scroll, Back and occurrence/instance restoration rules. No additional metadata or image requests. | Storyboard previews while seeking are deliberately deferred to avoid YouTube image-CDN downloads. Native runtime/layout acceptance remains unverified because the emulator crashes before boot. |
 | 19 | Searchable transcripts | Not implemented | — | Transcript panel, language choice, text search and timestamp navigation. Captions alone do not provide this flow. |
 | 20 | Playback diagnostics and buffer recovery | Partial | Playback errors and Retry in both embedded/fullscreen modes; Retry reloads stream details and resumes at the current position. A dedicated Refresh buffer action reloads the current source while retaining paused/playing state, speed, quality, captions and audio-only mode; live playback returns to the live edge. | Web's detailed playback statistics/copy action. |
 | 21 | Legacy annotations and VR/360° viewing | Not implemented | — | Annotation overlays/toggles and specialized VR projection controls. |
@@ -130,6 +130,8 @@ Links are repository-relative so this checklist works with the documented siblin
 [a-dearrow-ui]: android/app/src/main/java/net/wingress/mobivious/ui/DeArrowUi.kt
 [a-dearrow]: android/app/src/main/java/net/wingress/mobivious/data/DeArrow.kt
 [a-player]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerUi.kt
+[a-chapters]: android/app/src/main/java/net/wingress/mobivious/data/Chapters.kt
+[a-chapters-ui]: android/app/src/main/java/net/wingress/mobivious/ui/ChaptersUi.kt
 [a-channel-description]: android/app/src/main/java/net/wingress/mobivious/ui/ChannelDescriptionUi.kt
 [a-gestures]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerGestures.kt
 [a-presentation]: android/app/src/main/java/net/wingress/mobivious/ui/PlayerPresentation.kt
@@ -487,6 +489,35 @@ three presentation scenarios compile; actual intents, chooser behavior, bounds,
 background/recreation playback, layout and screenshots remain unverified because
 the emulator exited with SIGSEGV (139) before boot. The totals are 28 implemented,
 10 partial and 10 not implemented. See [VERIFICATION.md](VERIFICATION.md).
+
+### Chapters — 5 October 2026
+
+Row 18 is Partial: [manual description chapters][a-chapters] and [native chapter
+navigation][a-chapters-ui] are implemented. The parser matches the web fork's
+timestamp rules rather than YouTube's stricter creator publishing requirements;
+automatic chapters and live videos are excluded. The current chapter title opens
+a list beneath the player using the Comments drawer's sizing and styling; fullscreen
+uses the existing player bottom-sheet pattern. Selection seeks without changing
+playing intent or closing the list. Timeline divisions and chapter/SponsorBlock
+scrub labels share the existing controls. List state survives rotation and
+watch/fullscreen transitions and resets on new queue occurrences or instances;
+minimization, PiP and Back close the list appropriately.
+
+Thumbnail previews mean scene images while hovering or seeking. The web player
+supports storyboard previews, and deployed static preview assets matched this
+checkout during investigation. A relative-image-URL resolution bug was reproduced
+locally; that does not establish the cause of the reported blank rectangle.
+Storyboard metadata comes from normal video loading, but preview images require
+separate image-CDN downloads through Invidious. Previews and web repairs remain
+deferred under the user's request limit; no server code, endpoint, scope or
+migration changed for chapters.
+
+All 230 Android unit/API tests, debug/instrumentation APK builds, lint and local
+chapter/content-link fixture checks passed. Four chapter presentation and seven
+service/playback scenarios compile but remain unexecuted: the emulator exited
+with SIGSEGV (139) before boot. Native layout, interaction and request-count
+assertions still require device acceptance. Totals are 28 implemented, 11 partial
+and 9 not implemented. See [VERIFICATION.md](VERIFICATION.md).
 
 ## Intentionally excluded parity
 

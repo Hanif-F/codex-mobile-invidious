@@ -122,6 +122,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val watch = presentation.watch
     val fullscreen = presentation.fullscreen
     val queue by vm.queue.collectAsStateWithLifecycle()
+    val chapters = playback.chapters
+    val chapterPanel = key(vm.store.server, queue.token, queue.currentKey) { rememberChapterPanelState() }
     val watchList = key(queue.currentKey) { rememberLazyListState() }
     val watchResize = key(queue.currentKey) { rememberWatchPlayerResizeState() }
     val watchDefaults = queue.effective(prefs)
@@ -146,6 +148,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         previousQueueToken = queue.token
     }
     var dialog by remember { mutableStateOf("") }
+    fun openChapters() {
+        vm.cancelAccumulatedSeek(); vm.closeComments(); dialog = ""
+        chapterPanel.show(chapters, playback.position)
+    }
+    fun backWatch() { if (chapterPanel.open) chapterPanel.close() else if (!vm.backComments()) collapsePlayer() }
+    LaunchedEffect(chapters, playback.loading) { if (!playback.loading && chapters.isEmpty()) chapterPanel.close() }
+    LaunchedEffect(dialog) { if (dialog.isNotEmpty()) chapterPanel.close() }
     var settingsPage by rememberSaveable { mutableStateOf("") }
     var accountPage by rememberSaveable(account?.username, vm.store.server) { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
@@ -245,20 +254,20 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         activity.setFullscreen(fullscreen && !pip)
         onDispose { activity.setFullscreen(false); activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
-    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
+    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { chapterPanel.close(); vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
     LaunchedEffect(watch, pip, settingsPage) { if (watch || pip || settingsPage.isNotEmpty()) {
         channelDescriptionOpen = false; vm.closePostComments()
     } }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
-    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> collapsePlayer(); watch -> { if (!vm.backComments()) { collapsePlayer() } }; else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
+    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
     BackHandler(accountBusy) { }
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
-            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null,
-            queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { dialog = "player" }) {
+            fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null,
+            queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters) {
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
                 modifier = Modifier.hiddenPlayerContent(pip || fullscreen && !presentation.active),
@@ -270,7 +279,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     else if (route == "subscription-channels") Text("Subscribed channels", maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else if (route.isNotEmpty()) Text(channel?.name ?: playlist?.title ?: state.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("Mobivious", fontWeight = FontWeight.Bold) }
-                }, navigationIcon = { if (searchOpen || watch || route.isNotEmpty() || vm.hasBrowseBack) IconButton(enabled = !accountBusy, onClick = { vm.cancelAccumulatedSeek(); if (searchOpen) { searchOpen = false; keyboard?.hide() } else if (watch) { if (!vm.backComments()) collapsePlayer() } else vm.backBrowse() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
+                }, navigationIcon = { if (searchOpen || watch || route.isNotEmpty() || vm.hasBrowseBack) IconButton(enabled = !accountBusy, onClick = { vm.cancelAccumulatedSeek(); if (searchOpen) { searchOpen = false; keyboard?.hide() } else if (watch) backWatch() else vm.backBrowse() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
                     if (!watch && account != null && route.isEmpty() && tab == "Subscriptions") {
                         OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
                             DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
@@ -454,12 +463,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         bottom = (padding.calculateBottomPadding() - miniPadding).coerceAtLeast(0.dp))
                     WatchScreen(vm, playback, Modifier.padding(watchPadding).graphicsLayer { alpha = presentation.watchAlpha }
                         .hiddenPlayerContent(!watch || presentation.active),
-                        presentation, watchList, watchResize, watchDescription, { watchDescription = it }, vm::openSave,
+                        presentation, watchList, watchResize, chapterPanel, ::openChapters, watchDescription, { watchDescription = it }, vm::openSave,
                         { id -> navigate("Home", "channel:$id") }, { play(it) }, { signIn() })
                 }
                 }
             }
           }
+            if (fullscreen && !pip && chapterPanel.open && chapters.isNotEmpty()) ChaptersSheet(chapters, playback, chapterPanel, vm::seekTo)
             LinkResolutionDialog(linkResolution, vm::retryLinkResolution,
                 { url -> openExternalContent(context, url) { vm.message.value = "No app could open this link." } }, vm::dismissLinkResolution)
             RssSheet(vm)
@@ -615,7 +625,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
 }
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, modifier: Modifier,
     presentation: PlayerPresentationState, detailsList: androidx.compose.foundation.lazy.LazyListState,
-    resize: WatchPlayerResizeState,
+    resize: WatchPlayerResizeState, chapterPanel: ChapterPanelState, openChapters: () -> Unit,
     description: Boolean, describe: (Boolean) -> Unit,
     add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
     val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
@@ -634,7 +644,9 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             else -> { vm.closeComments(); if (!vm.openContent(target)) presentation.present(PlayerPresentation.MINI, animate = false) }
         }
     }
-    val drawerOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
+    val chapters = playback.chapters
+    val commentsOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
+    val drawerOpen = commentsOpen || chapterPanel.open
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).testTag("watch-content")
         .pointerInput(Unit) {
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
@@ -648,7 +660,10 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
                 .playerAnchor { presentation.watchBounds = it })
-            if (drawerOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
+            if (chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,
+                playback.seekable && !playback.loading && playback.error == null, chapterPanel::close, vm::seekTo,
+                Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
+            else if (commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
                     item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -671,7 +686,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         }
                         if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                         blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                        if (prefs.showYoutubeComments) CommentsEntry(comments, vm::openComments)
+                        if (prefs.showYoutubeComments) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
+                        ChaptersEntry(chapters, playback.position, openChapters)
                         ActionRow(if (description) "Hide description" else "Show description",
                             modifier = Modifier.testTag("watch-description-toggle").semantics { stateDescription = if (description) "Expanded" else "Collapsed" },
                             trailingIcon = Icons.Default.ExpandMore,

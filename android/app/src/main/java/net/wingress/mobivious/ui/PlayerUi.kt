@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
@@ -56,8 +57,9 @@ import net.wingress.mobivious.player.PlaybackService
 import net.wingress.mobivious.player.StreamCatalog
 import net.wingress.mobivious.player.AudioSection
 import net.wingress.mobivious.data.PreferenceRules
+import net.wingress.mobivious.data.ChapterRules
 
-private fun playerTime(ms: Long): String {
+internal fun playerTime(ms: Long): String {
     val seconds = ms.coerceAtLeast(0) / 1000
     return if (seconds >= 3600) String.format(Locale.US, "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
     else String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
@@ -73,21 +75,23 @@ internal fun VideoPlayer(
     presentation: PlayerPresentation = PlayerPresentation.WATCH, drag: PlayerDragHandler? = null,
     gesturesEnabled: Boolean = true, chromeVisible: Boolean = true, gestureKey: Any? = null,
     onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
-    onFullscreen: () -> Unit, onSettings: () -> Unit,
+    onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
 ) {
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
     val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
     val sponsorState by vm.sponsorBlock.collectAsStateWithLifecycle()
     val sponsor = sponsorState.takeIf { it.mediaId == playback.mediaId } ?: SponsorBlockPlayback()
+    val chapters = playback.chapters
     val compactPlay = !fullscreen && !settingsOpen && sponsor.active != null
     var visible by remember(playback.mediaId, controls) { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
-    var scrub by remember(playback.mediaId, controls) { mutableStateOf<Float?>(null) }
+    var scrub by remember(playback.mediaId, gestureKey, controls) { mutableStateOf<Float?>(null) }
     var feedback by remember(playback.mediaId, controls) { mutableStateOf<String?>(null) }
     var feedbackGeneration by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
     var inputOrigin by remember { mutableStateOf(Offset.Zero) }
+    var footerHeightPx by remember { mutableIntStateOf(0) }
     val exploring = rememberPlayerTouchExploration()
     fun interact() { interaction++; visible = true }
     fun toggleControls() { vm.cancelAccumulatedSeek(); visible = !visible; interaction++ }
@@ -116,8 +120,11 @@ internal fun VideoPlayer(
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
     BoxWithConstraints(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
         .onGloballyPositioned { inputOrigin = it.positionInRoot() }) {
-        val shortPlayer = maxHeight < 180.dp
+        val density = LocalDensity.current
+        val footerHeight = with(density) { footerHeightPx.toDp() }
+        val shortPlayer = maxHeight < 180.dp || footerHeight > 0.dp && maxHeight - footerHeight < 96.dp
         val showTimeline = maxHeight >= 96.dp
+        val showSeekLabels = maxHeight >= 96.dp + 48.dp * density.fontScale.coerceAtLeast(1f)
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
         else playback.details?.video?.let { video ->
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
@@ -190,7 +197,7 @@ internal fun VideoPlayer(
                     if (!shortPlayer && !playback.loading && playback.error == null) {
                         IconButton(
                             onClick = { vm.togglePlay(); interact() }, enabled = playback.canPlay,
-                            modifier = Modifier.align(Alignment.Center).offset(y = if (fullscreen) 0.dp else if (compactPlay) (-12).dp else (-24).dp)
+                            modifier = Modifier.align(Alignment.Center).offset(y = if (footerHeight > 112.dp) -footerHeight / 2 else if (fullscreen) 0.dp else if (compactPlay) (-12).dp else (-24).dp)
                                 .size(if (compactPlay) 48.dp else 64.dp).clip(CircleShape).background(Color.Black.copy(alpha = .35f)),
                         ) {
                             val ended = playback.playerState == Player.STATE_ENDED
@@ -199,8 +206,14 @@ internal fun VideoPlayer(
                         }
                     }
                     Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                        .onSizeChanged { footerHeightPx = it.height }
                         .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)) else Modifier)
                         .padding(horizontal = 12.dp)) {
+                        val timelinePosition = scrub?.toLong() ?: playback.position
+                        val sponsorLabels = sponsor.segments.filter { it.start <= timelinePosition && timelinePosition < it.end }
+                            .map { it.category.label }.distinct()
+                        if (showTimeline && showSeekLabels) PlayerChapterTitle(chapters, timelinePosition,
+                            if (scrub != null) sponsorLabels else emptyList()) { vm.cancelAccumulatedSeek(); interact(); onChapters() }
                         if (showTimeline) Box(Modifier.fillMaxWidth()) {
                             Slider(
                                 value = scrub ?: playback.position.coerceAtMost(playback.duration).toFloat(),
@@ -226,17 +239,21 @@ internal fun VideoPlayer(
                                                 Offset(size.width * segment.start / end, size.height / 2),
                                                 Offset(size.width * minOf(segment.end, playback.duration) / end, size.height / 2), size.height, StrokeCap.Butt)
                                         }
+                                        // Separators stay visible over played, buffered and SponsorBlock ranges.
+                                        chapters.filter { it.startMs > 0 }.forEach { chapter ->
+                                            val x = size.width * chapter.startMs / end
+                                            drawLine(Color.Black.copy(alpha = .8f), Offset(x, 0f), Offset(x, size.height), 2.dp.toPx())
+                                        }
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().height(48.dp).testTag("player-timeline").semantics {
                                     contentDescription = "Playback position"
-                                    stateDescription = sponsor.segments.filter { it.start <= (scrub?.toLong() ?: playback.position) && (scrub?.toLong() ?: playback.position) < it.end }
-                                        .map { it.category.label }.distinct().joinToString(", ")
+                                    stateDescription = (listOfNotNull(ChapterRules.current(chapters, timelinePosition)?.title) + sponsorLabels).joinToString(", ")
                                 },
                             )
-                            if (scrub != null) {
-                                val labels = sponsor.segments.filter { it.start <= scrub!!.toLong() && scrub!!.toLong() < it.end }.map { it.category.label }.distinct()
-                                if (labels.isNotEmpty()) Text(labels.joinToString(", "), Modifier.align(Alignment.TopCenter).offset(y = (-20).dp).background(Color.Black.copy(alpha = .85f)).padding(4.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                            if (scrub != null && !showSeekLabels && sponsorLabels.isNotEmpty()) {
+                                Text(sponsorLabels.joinToString(", "), Modifier.align(Alignment.TopCenter).offset(y = (-20).dp).background(Color.Black.copy(alpha = .85f)).padding(4.dp),
+                                    color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

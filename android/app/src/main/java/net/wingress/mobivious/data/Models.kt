@@ -19,7 +19,9 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
     val subscribers: String = "", val upcoming: Boolean? = null, val premiereTimestamp: Long? = null,
     val listed: Boolean? = null, val genre: String = "", val genreUrl: String = "", val license: String? = null,
     val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
-    val music: List<MusicCredit> = emptyList(), val notice: String = "")
+    val music: List<MusicCredit> = emptyList(), val notice: String = "") {
+    val chapters: List<VideoChapter> = ChapterRules.parse(description, video.duration, video.live)
+}
 data class MusicCredit(val song: String, val artist: String, val album: String, val license: String = "")
 enum class ChannelTab(val path: String, val label: String) {
     VIDEOS("videos", "Videos"), SHORTS("shorts", "Shorts"), STREAMS("streams", "Streams"),

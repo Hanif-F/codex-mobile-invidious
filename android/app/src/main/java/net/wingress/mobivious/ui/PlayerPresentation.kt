@@ -125,6 +125,7 @@ internal fun PlayerPresentationHost(
     vm: AppViewModel, playback: PlaybackState, controller: MediaController?, state: PlayerPresentationState,
     pip: Boolean, hidden: Boolean, modal: Boolean, occurrence: String?,
     close: () -> Unit, collapse: () -> Unit, restore: () -> Unit, fullscreen: () -> Unit, settings: () -> Unit,
+    chapters: () -> Unit,
     content: @Composable () -> Unit,
 ) {
     val density = LocalDensity.current
@@ -161,7 +162,7 @@ internal fun PlayerPresentationHost(
                 gesturesEnabled = !pip && !modal && (!state.active || state.dragging) && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
                 chromeVisible = !state.active, gestureKey = windowSize to occurrence,
                 onCollapse = collapse, onRestore = restore, onDismiss = close,
-                onFullscreen = fullscreen, onSettings = settings,
+                onFullscreen = fullscreen, onSettings = settings, onChapters = chapters,
                 surfaceAlpha = if (dismissing) 1f - state.fraction else 1f)
         }
     }

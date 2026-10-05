@@ -82,6 +82,13 @@ Home popular/trending, filtered search and shared content links; channel browsin
 available Videos/Shorts/Streams/Podcasts/Releases/Courses/Playlists/Posts/Channels tabs;
 native account registration and session management; subscription feed and subscribe/unsubscribe; playlists and
 watch history; descriptions, captions, read-only comments and recommendations.
+Manual chapter timestamps in video descriptions provide timeline divisions,
+a tappable current chapter title and a chapter list. The list uses a drawer
+beneath the watch player and a bottom sheet in fullscreen; selecting a timestamp
+keeps it open and preserves paused/playing intent. Chapter and SponsorBlock seek
+labels share the player controls. Chapters use only the loaded description;
+storyboard thumbnail previews are deferred to avoid additional YouTube image
+requests. No server update is required for chapters.
 The four bottom tabs are Home, Subscriptions, Library and Account. Account contains
 Sign in/Create account, the selected instance, Settings, credential changes,
 Sessions & API tokens, Sign out and Delete account. Signup follows instance

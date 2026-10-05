@@ -60,6 +60,11 @@ def reset_content_links():
                  hashtagRequests=[], videoDetailRequests=[])
 reset_content_links()
 
+def reset_chapters():
+    state.update(chapters=False, chapterAssetRequests=[],
+                 chapterDescription='0:00 Introduction\n0:30 日本語 & details\n1:00 Final section')
+reset_chapters()
+
 def fixture_comment(id, author='Viewer', text=None, **extra):
     return dict(commentId=id, author=author, authorId=video['authorId'], authorUrl='/channel/' + video['authorId'],
                 authorThumbnail='/ggpht/commenter=s48', content=text or ('Comment body ' + id), likeCount=3,
@@ -231,6 +236,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
+        if p.startswith(('/api/v1/storyboards/', '/sb/')):
+            state['chapterAssetRequests'].append(p)
+            return self.respond(dict(error='Storyboard requests are forbidden in the chapter fixture'), 404)
         if p == '/api/v1/mobile/registration':
             return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=None))
         if p == '/api/v1/auth/account/sessions':
@@ -326,6 +334,10 @@ class Handler(BaseHTTPRequestHandler):
                             descriptionHtml='<b>Rich description</b><br><a href="/watch?v=' + selected['videoId'] + '&amp;t=30">0:30</a> <a href="/@fixture/shorts">Creator</a> <a href="/hashtag/music">#music</a>',
                             likeCount=42, authorVerified=True, subCountText='12.3K', isListed=False, genre='Music',
                             license='', isFamilyFriendly=True, allowedRegions=['ID', 'US'], musicTracks=[dict(song='Song', artist='Artist', album='Album', license='Music license')])
+            if state['chapters']:
+                info.update(description=state['chapterDescription'], storyboards=[dict(url='/api/v1/storyboards/' + selected['videoId'],
+                            templateUrl='/sb/fixture/M$M.jpg', width=160, height=90, count=12, interval=10000,
+                            storyboardWidth=5, storyboardHeight=5, storyboardCount=1)])
             self.respond(dict(**selected, **info,
                               dashUrl=dash, adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
@@ -495,7 +507,13 @@ class Handler(BaseHTTPRequestHandler):
             reset_search_history()
             reset_comments()
             reset_content_links()
+            reset_chapters()
             reset_accounts()
+            return self.respond({})
+        if p == '/test/chapters':
+            state['chapters'] = data.get('enabled', True)
+            state['chapterAssetRequests'] = []
+            if 'description' in data: state['chapterDescription'] = data['description']
             return self.respond({})
         if p == '/test/content-links':
             state['videoInformation'] = True

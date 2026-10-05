@@ -1512,3 +1512,66 @@ No migration, authentication scope, dependency, signing/version metadata,
 production deployment or release publication changed. The signed 0.5.1 APK
 predates these working-tree changes. License display needs the sibling update
 deployed; older servers remain usable with that optional metadata hidden.
+
+## Manual chapters — 5 October 2026
+
+Chapters are derived from the description in the existing video details response.
+There are no chapter API calls, automatic-chapter lookups, storyboard downloads,
+new dependencies, server changes, authentication scopes or migrations. The web
+preview investigation reproduced a relative-URL resolution bug locally and
+confirmed that deployed static preview assets match the checkout; it did not
+establish the cause of the reported blank image. The web player is unchanged.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 230 passed; zero failures, errors or skips, including six chapter tests |
+| Debug and instrumentation APK builds | Passed; four chapter presentation and seven service/playback scenarios compile |
+| Android debug lint | Passed; zero errors, existing dependency/style warnings |
+| Localhost chapter fixture | Passed: loaded description, optional storyboard metadata, unchanged legacy responses and forbidden-preview request tracing |
+| Existing localhost content-link fixture | Passed: rich video metadata, resolution/retry, hashtag pagination and request tracing |
+| Native chapter scenarios and screenshots | Unverified: Android Emulator 37.2.12 exited with SIGSEGV (139) before boot; no connected device |
+
+Unit tests cover minute/hour timestamps, bullets and separators, Unicode titles,
+sorting and first-duplicate precedence, overflow/malformed/missing/out-of-duration
+entries, insufficient chapters, live videos, plain-text titles, ignored automatic
+chapter/storyboard fields, exact current-chapter boundaries and runtime duration
+filtering. The parser preserves the web fork's two-chapter minimum and later-start
+support rather than YouTube's creator publishing rules.
+
+Compiled presentation scenarios cover revealing the active chapter on open,
+timestamp selection without closing the list, manual scroll without automatic
+playback scrolling, save/restore, distinct occurrences of the same video and
+instance resets, long/RTL/200%-font titles, separated SponsorBlock labels,
+keyboard selection and disabled seek actions. Compiled service scenarios cover
+paused/playing intent, real timeline scrubbing, fullscreen sheet/Back, Activity
+recreation and presentation transitions, Comments/Chapters replacement,
+duplicate queue occurrences, minimization, live exclusion and PiP dismissal.
+The request-count scenario asserts no added video-detail, storyboard or image
+requests when opening, selecting and scrubbing. It configures the localhost
+instance before Activity creation so test startup cannot browse the live server.
+
+These eleven native scenarios have **not executed**. No new native screenshots
+were produced or inspected. Layout, gestures, keyboard/TalkBack behavior,
+paused/playing transitions, restoration and per-action request counts still need
+device acceptance. The standalone fixture check validates the response and tracer,
+not the Android UI; its two intentional forbidden-preview probes are entirely
+local and are refused without any upstream access.
+
+Reproduction:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug \
+  :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+cd ..
+python3 scripts/check-chapters-fixture.py
+python3 scripts/check-content-links-fixture.py
+```
+
+On a working emulator/device, `scripts/test-android.sh` supplies the generated
+media and localhost fixture and runs the native checks, including
+`ChaptersPresentationTest` and `ChaptersSmokeTest`. The new runtime scenarios
+remain subject to that device verification. Row 18 is Partial; timeline thumbnail
+previews are deferred to avoid YouTube image-CDN requests. The signed 0.5.1 release
+predates this change; no release or deployment was performed.
