@@ -2192,3 +2192,63 @@ CRYSTAL_CACHE_DIR=/tmp/mobivious-chat-crystal crystal spec spec/invidious/videos
 CRYSTAL_CACHE_DIR=/tmp/mobivious-chat-crystal crystal build src/invidious.cr -Dskip_videojs_download -o /tmp/invidious-chat-replay
 CRYSTAL_CACHE_DIR=/tmp/mobivious-chat-crystal crystal build src/invidious.cr -Dapi_only -Dskip_videojs_download -o /tmp/invidious-chat-replay-api
 ```
+
+
+## Signed 0.6.0 minor release — 5 October 2026
+
+Version is 0.6.0 (code 12), advancing the minor component from 0.5.4 and resetting
+the patch component to zero. The release includes archive chat replay, community
+post-card/comments improvements, queue-duration and duplicate-recommendation
+crash fixes, and delayed-preference navigation protection. The application ID
+remains `net.wingress.mobivious`.
+
+| Check | Result |
+| --- | --- |
+| JVM unit/API tests | Passed: 267 tests, 0 failures/errors/skips |
+| Signed release build | Passed with the existing local signing key |
+| Release lint | Passed: 0 errors, 26 warnings |
+| APK metadata | Passed: version 0.6.0/code 12, minimum SDK 26, target SDK 37, not debuggable |
+| CPU architectures | arm64-v8a, armeabi-v7a, x86 and x86_64 |
+| APK signature | Passed; certificate SHA-256 matches published 0.5.4 |
+| Previous published binary | Local 0.5.4 APK SHA-256 matches GitHub's asset digest |
+| Release checksum | Passed; copied APK matches the Gradle output |
+
+APK SHA-256:
+`7c3b92cae96ff1944a1f2f34942b694cc3b23d97e015c82c192cbd3218ec36e7`.
+
+Assets are `artifacts/Mobivious-0.6.0.apk` and its `.apk.sha256` file, with release
+notes in `artifacts/release-notes-0.6.0.md`. The release tag is `v0.6.0`. Local
+evidence is `/tmp/mobivious-release-0.6.0-build.log` and
+`artifacts/release-verification-0.6.0.json`, plus release signature and badging
+reports in `artifacts/`.
+
+The first incremental release compilation could not resolve unchanged shared
+declarations. Full Kotlin compilation with `-Pkotlin.incremental=false` passed;
+no application-source changes were needed to resolve the cache issue.
+
+The preceding implementation checks passed 15 distinct replay device scenarios
+and 11 related presentation regressions, as recorded above. Those were debug
+runtime checks. No additional release-device run was performed; ADB listed no
+connected devices during release preparation. The earlier complete device suite
+has outstanding failures, and physical-device, production-account and real
+upstream replay acceptance remain unverified.
+
+Account chat sync requires the sibling native login-scope update and renewed
+sign-in. Older instances without the availability flag remain usable without
+chat. No server deployment or live account mutation was performed for this
+release.
+
+Reproduction:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleRelease :app:lintRelease \
+  --offline --max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m \
+  -Pkotlin.incremental=false --console=plain
+cd ..
+JAVA_HOME=/opt/android-studio/jbr "$HOME/Android/Sdk/build-tools/36.0.0/apksigner" \
+  verify --print-certs artifacts/Mobivious-0.6.0.apk
+cd artifacts
+sha256sum -c Mobivious-0.6.0.apk.sha256
+```
