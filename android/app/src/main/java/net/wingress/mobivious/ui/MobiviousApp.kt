@@ -54,7 +54,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
@@ -95,7 +94,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val postDetail by vm.postDetail.collectAsStateWithLifecycle()
     val postNavigation by vm.postNavigation.collectAsStateWithLifecycle()
     val postComments by vm.postComments.collectAsStateWithLifecycle()
-    val uriHandler = LocalUriHandler.current
+    val context = LocalContext.current
+    val linkResolution by vm.linkResolution.collectAsStateWithLifecycle()
     val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val discovery by vm.discovery.collectAsStateWithLifecycle()
@@ -124,7 +124,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val queue by vm.queue.collectAsStateWithLifecycle()
     val watchList = key(queue.currentKey) { rememberLazyListState() }
     val watchResize = key(queue.currentKey) { rememberWatchPlayerResizeState() }
-    var watchDescription by rememberSaveable(queue.currentKey, prefs.extendDescription) { mutableStateOf(prefs.extendDescription) }
+    val watchDefaults = queue.effective(prefs)
+    var watchDescription by rememberSaveable(queue.currentKey, watchDefaults.extendDescription) { mutableStateOf(watchDefaults.extendDescription) }
     fun browsePlayer() = presentation.present(if (playback.details != null) PlayerPresentation.MINI else PlayerPresentation.CLOSED, animate = false)
     fun restorePlayer() { vm.cancelAccumulatedSeek(); presentation.present(PlayerPresentation.WATCH) }
     fun collapsePlayer() {
@@ -204,15 +205,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val scope = rememberCoroutineScope()
     fun navigate(selected: String, path: String = "") { searchOpen = false; vm.cancelAccumulatedSeek(); tab = selected; route = path; browsePlayer(); vm.navigate(selected, path) }
     fun openRichLink(raw: String) {
-        val target = CommentLinks.resolve(raw, vm.store.server, "") ?: return
+        val target = ContentLinks.resolve(raw, vm.store.server) ?: return
         channelDescriptionOpen = false; vm.closePostComments()
-        when (target) {
-            is CommentLink.Post -> { browsePlayer(); vm.openPost(target.link) }
-            is CommentLink.Channel -> navigate(tab, "channel:${target.id}")
-            is CommentLink.Video -> { if (vm.openLink(target.link)) restorePlayer() else browsePlayer() }
-            is CommentLink.Seek -> Unit
-            is CommentLink.External -> runCatching { uriHandler.openUri(target.url) }
-        }
+        if (target is ContentLink.External) openExternalContent(context, target.url) { vm.message.value = "No app could open this link." }
+        else if (vm.openContent(target)) restorePlayer() else browsePlayer()
     }
     fun signIn() {
         dialog = ""; searchOpen = false
@@ -227,10 +223,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         if (tab != "Search" || route.isNotEmpty() || watch) {
             originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset; originWatch = watch
         }
-        val postLink = PostLinks.parse(searchDraft, vm.store.server)
-        if (postLink != null) { browsePlayer(); vm.openPost(postLink); return }
-        val link = VideoLinks.parse(searchDraft, vm.store.server)
-        if (link != null) { if (vm.openLink(link)) restorePlayer() } else { browsePlayer(); vm.openGlobalSearch(searchDraft) }
+        val link = ContentLinks.parse(searchDraft, vm.store.server)
+        if (link != null) { if (vm.openContent(link)) restorePlayer() else browsePlayer() }
+        else { browsePlayer(); vm.openGlobalSearch(searchDraft) }
     }
     fun play(video: Video, source: Playlist? = null) { restorePlayer(); vm.playVideo(video, source) }
     LaunchedEffect(shared.value) { if (shared.value) { restorePlayer(); settingsPage = ""; shared.value = false } }
@@ -262,7 +257,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
-            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open,
+            dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { dialog = "player" }) {
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
@@ -293,7 +288,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 bottomBar = { Column {
                     if (presentation.mode != PlayerPresentation.CLOSED && playback.details != null) MiniPlayer(vm, playback, presentation,
                         ::restorePlayer, vm::togglePlay, ::closePlayer,
-                        gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open)
+                        gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link == null)
                     NavigationBar(Modifier.playerAnchor { presentation.navigationBounds = it }) { PreferenceRules.navigation(prefs.feedMenu).map { name -> name to when(name) { "Home" -> Icons.Default.Home; "Account" -> Icons.Default.AccountCircle; "Subscriptions" -> Icons.Default.Subscriptions; else -> Icons.Default.VideoLibrary } }.forEach { (name, icon) ->
                         NavigationBarItem(enabled = !accountBusy, selected = tab == name && !watch, onClick = {
                             vm.clearNavigationReturns(); originWatch = false; authWatchId = ""; authSettings = ""; navigate(name)
@@ -364,6 +359,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh) }
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(bottom = 12.dp)) {
+                        if (route.startsWith("hashtag:")) item { Text(state.title, Modifier.padding(16.dp), style = MaterialTheme.typography.headlineMedium) }
                         channel?.let { info -> item {
                             ChannelHeader(info, vm.store.server, prefs.thinMode, subscriptions.any { it.id == info.id }, actions = {
                                 OverflowMenu("Actions for channel ${info.name}", listOf(info.id, vm.api.context()), Modifier.testTag("channel-actions-${info.id}")) { close ->
@@ -464,6 +460,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 }
             }
           }
+            LinkResolutionDialog(linkResolution, vm::retryLinkResolution,
+                { url -> openExternalContent(context, url) { vm.message.value = "No app could open this link." } }, vm::dismissLinkResolution)
             RssSheet(vm)
             if (channelDescriptionOpen && !pip && channel != null && route == "channel:${channel!!.id}")
                 ChannelDescriptionSheet(channel!!, vm.store.server, ::openRichLink) { channelDescriptionOpen = false }
@@ -623,10 +621,19 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val account by vm.account.collectAsStateWithLifecycle()
-    val prefs by vm.preferences.collectAsStateWithLifecycle()
+    val savedPrefs by vm.preferences.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val prefs = queue.effective(savedPrefs)
+    fun openWatchLink(raw: String) {
+        when (val target = ContentLinks.resolve(raw, vm.store.server, playback.details?.video?.id.orEmpty())) {
+            is ContentLink.Seek -> vm.seekTo(target.milliseconds)
+            is ContentLink.External -> openExternalContent(context, target.url) { vm.message.value = "No app could open this link." }
+            null -> Unit
+            else -> { vm.closeComments(); if (!vm.openContent(target)) presentation.present(PlayerPresentation.MINI, animate = false) }
+        }
+    }
     val drawerOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
     BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).testTag("watch-content")
         .pointerInput(Unit) {
@@ -641,31 +648,25 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
                 .playerAnchor { presentation.watchBounds = it })
-            if (drawerOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel) { raw ->
-                when (val target = CommentLinks.resolve(raw, vm.store.server, playback.details?.video?.id.orEmpty())) {
-                    is CommentLink.Seek -> vm.seekTo(target.seconds.coerceAtMost(Long.MAX_VALUE / 1000) * 1000)
-                    is CommentLink.Video -> { vm.closeComments(); vm.openLink(target.link) }
-                    is CommentLink.Channel -> { vm.closeComments(); channel(target.id) }
-                    is CommentLink.Post -> { vm.closeComments(); presentation.present(PlayerPresentation.MINI, animate = false); vm.openPost(target.link) }
-                    is CommentLink.External -> runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(target.url))) }
-                        .onFailure { vm.message.value = "No app could open this link." }
-                    null -> Unit
-                }
-            }
+            if (drawerOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
                     item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
                         DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("${count(details.video.views)} views · ${details.video.published}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        VideoNotices(details)
+                        Text(listOf("${count(details.video.views)} views", details.likes?.let { "${count(it)} likes" }, details.video.published.takeIf(String::isNotBlank)).filterNotNull().joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         WatchChannelIdentity(details.video, vm.store.server, prefs.thinMode,
                             subscriptions.any { it.id == details.video.channelId }, subscribe = {
                                 if (vm.account.value == null) signIn()
                                 else vm.toggleSubscribe(details.video.channelId)
-                            }, channel = channel)
+                            }, channel = channel, verified = details.authorVerified == true, subscribers = details.subscribers)
                         FlowRow(Modifier.fillMaxWidth().testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
-                            AssistChip(onClick = { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "${vm.store.server}/watch?v=${details.video.id}&t=${playback.position / 1000}"), "Share video")) }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
+                            AssistChip(onClick = { VideoLinks.share(vm.store.server, vm.queue.value, vm.controller.value?.currentPosition ?: playback.position)?.let { url ->
+                                runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url), "Share video")) }
+                                    .onFailure { vm.message.value = "No app could share this link." }
+                            } }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
                             AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
                         }
                         if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
@@ -677,8 +678,10 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                             trailingRotation = animateFloatAsState(if (description) 180f else 0f, tween(200), label = "description-chevron").value) { describe(!description) }
                         AnimatedVisibility(description, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
                             exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
-                            Text(details.description, style = MaterialTheme.typography.bodyMedium)
+                            NativeRichText(details.description, details.descriptionHtml, queue.currentKey.orEmpty(), vm.store.server, details.video.id, ::openWatchLink, tag = "watch-description-text")
                         }
+                        if (queue.current?.linkPlayback?.invalidEnd == true) Text("Invalid end boundary ignored.", style = MaterialTheme.typography.bodySmall)
+                        VideoInformation(details, queue.currentKey.orEmpty(), vm.store.server, ::openWatchLink)
                     } }
                 }
                 if (queue.hasExplicitQueue) item(key = "watch:queue") { PlaybackQueuePanel(vm, signIn, channel) }

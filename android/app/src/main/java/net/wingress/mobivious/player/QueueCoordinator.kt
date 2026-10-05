@@ -27,6 +27,8 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private var pendingSelection: Selection? = null
     private var selectionPending = false
     private var decoderError = false
+    private var baseRepeat = QueueRepeat.OFF
+    private var enforcingBound = false
     private val playlistWrites = Mutex()
     private val mixContinuations = mutableSetOf<String>()
     var changed: () -> Unit = {}
@@ -64,32 +66,36 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         }
     }
     fun start(id: String, source: String? = null, index: Int? = null, seconds: Long? = null,
-        audio: Boolean = false, paused: Boolean = false, sourceSeed: String? = null) {
+        audio: Boolean = false, paused: Boolean = false, sourceSeed: String? = null, linkPlayback: LinkPlayback? = null) {
         beforeChange(); job?.cancel(); selection = null; decoderError = false; mixContinuations.clear()
         player.pause()
         val context = app.api.context()
         if (prefsContext != context) { prefs = app.store.guestDeArrow(); prefsContext = context }
         val token = UUID.randomUUID().toString()
-        val seed = id.takeIf { it.isNotEmpty() }?.let { QueueOccurrence.local(Video(it, it)).copy(sourceIndex = index) }
+        val seed = id.takeIf { it.isNotEmpty() }?.let { QueueOccurrence.local(Video(it, it)).copy(sourceIndex = index, linkPlayback = linkPlayback) }
         update(PlaybackQueueSnapshot(token, context, source?.let { QueueSource(it, seedVideoId = sourceSeed) }, items = listOfNotNull(seed), currentKey = seed?.key, loading = true,
-            sourceComplete = source == null, explicitQueue = source != null))
+            sourceComplete = source == null, explicitQueue = source != null, carriedOptions = (linkPlayback?.options?.carried() ?: PlaybackLinkOptions()).let { if (audio) it.copy(listen = true) else it }))
         launch { _, _ ->
             val version = settingsVersion
             val fetched = if (context.account == null) app.store.guestDeArrow() else try { app.api.preferences(context) }
                 catch (e: CancellationException) { throw e } catch (_: Exception) { prefs }
             check(token, context)
             if (version == settingsVersion) prefs = fetched
-            update(state.copy(repeat = if (prefs.videoLoop) QueueRepeat.ONE else QueueRepeat.OFF))
+            baseRepeat = if (prefs.videoLoop) QueueRepeat.ONE else QueueRepeat.OFF
+            update(state.copy(repeat = baseRepeat))
             var entry: QueueOccurrence? = null
             if (source != null) {
                 try {
                     readSource(token, context, index ?: 0, id.takeIf { it.isNotBlank() } ?: sourceSeed, initial = true)
-                    entry = if (id.isEmpty()) state.items.firstOrNull { QueueRules.eligible(it, prefs.showMemberVideos) }
+                    entry = if (id.isEmpty()) state.items.firstOrNull { (index == null || (it.sourceIndex ?: -1) >= index) && QueueRules.eligible(it, prefs.showMemberVideos) }
                         else state.items.firstOrNull { (index == null || it.sourceIndex == index) && it.video.id == id }
                             ?: state.items.firstOrNull { it.video.id == id }
                     val sourceMatch = state.items.firstOrNull { it.key != seed?.key && (index == null || it.sourceIndex == index) && (id.isEmpty() || it.video.id == id) }
                         ?: state.items.firstOrNull { it.key != seed?.key && it.video.id == id }
-                    if (id.isNotEmpty() && sourceMatch != null) { entry = sourceMatch; update(state.copy(items = QueueRules.resolveSeed(state.items, seed?.key, sourceMatch.key))) }
+                    if (id.isNotEmpty() && sourceMatch != null) {
+                        entry = sourceMatch.copy(linkPlayback = linkPlayback)
+                        update(state.copy(items = QueueRules.resolveSeed(state.items, seed?.key, sourceMatch.key).map { if (it.key == sourceMatch.key) entry else it }))
+                    }
                     while (entry == null && id.isEmpty() && !state.sourceComplete) {
                         val before = state.items.size
                         readSource(token, context, (state.items.mapNotNull { it.sourceIndex }.maxOrNull() ?: -1) + 1,
@@ -106,7 +112,11 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                 entry = seed
             }
             require(entry != null) { "No playable videos in this queue." }
-            load(entry, token, context, seconds, playing = !paused && prefs.autoplay, audio = audio, fresh = true)
+            if (id.isEmpty() && linkPlayback != null) {
+                entry = entry.copy(linkPlayback = linkPlayback)
+                update(state.copy(items = state.items.map { if (it.key == entry.key) entry else it }))
+            }
+            load(entry, token, context, seconds, playing = !paused && (linkPlayback?.options?.autoplay ?: prefs.autoplay), audio = audio, fresh = true)
         }
     }
     private suspend fun readSource(token: String, context: ApiContext, index: Int = 0, continuation: String? = null, initial: Boolean = false) {
@@ -134,10 +144,17 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         return Selection(selected(C.TRACK_TYPE_AUDIO), selected(C.TRACK_TYPE_TEXT), player.trackSelectionParameters, player.playbackParameters.speed)
     }
     private suspend fun load(entry: QueueOccurrence, token: String, context: ApiContext, seconds: Long? = null,
-        playing: Boolean = true, audio: Boolean = false, fresh: Boolean = false) {
+        playing: Boolean = true, audio: Boolean = false, fresh: Boolean = false, positionMs: Long? = null) {
         check(token, context)
         val sameOccurrence = !fresh && state.videoSelection.occurrence == entry.key
-        if (!fresh) selection = capture()
+        if (!fresh && player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == state.currentKey) {
+            val captured = capture()
+            selection = captured.takeIf { sameOccurrence }
+            if (!sameOccurrence) update(state.copy(carriedOptions = state.carriedOptions.copy(
+                listen = (C.TRACK_TYPE_VIDEO in captured.parameters.disabledTrackTypes).takeIf { state.carriedOptions.listen != null || it != prefs.listen },
+                speed = state.carriedOptions.speed?.let { captured.speed })))
+        }
+        else selection = null
         beforeChange(); player.pause()
         update(state.copy(currentKey = entry.key, details = null, loading = true, error = null))
         if (!fresh && !sameOccurrence) {
@@ -147,7 +164,11 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             check(token, context)
             if (version == settingsVersion) prefs = fetched
         }
-        val details = app.api.video(entry.video.id, prefs.local)
+        val prefs = state.effective(this.prefs)
+        val details = app.api.video(entry.video.id, prefs.local, entry.linkPlayback?.options?.region, context)
+        val bounded = entry.linkPlayback?.bounded(details.video.duration.takeIf { it in 1..Long.MAX_VALUE / 1000 }?.times(1000) ?: 0)
+        val repeat = bounded?.options?.loop?.let { if (it) QueueRepeat.ONE else QueueRepeat.OFF } ?: baseRepeat
+        update(state.copy(details = details, repeat = repeat, items = state.items.map { if (it.key == entry.key) it.copy(linkPlayback = bounded) else it }))
         check(token, context)
         val saved = if (!prefs.savePosition) 0 else if (context.account == null) app.store.position(entry.video.id, context)
             else try { app.api.position(entry.video.id, context) } catch (e: CancellationException) { throw e } catch (_: Exception) { app.store.position(entry.video.id, context) }
@@ -156,8 +177,9 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         fun resolve(url: String) = base.resolve(url)?.takeIf { it.isHttps || net.wingress.mobivious.BuildConfig.DEBUG && it.host in listOf("10.0.2.2", "127.0.0.1", "localhost") }?.toString().orEmpty()
         val raw = details.hls.ifBlank { details.dash }.ifBlank { details.fallback }
         val stream = resolve(raw).ifBlank { if (details.dash.isNotBlank() || !details.video.live) app.api.url("api/manifest/dash/id/${entry.video.id}", mapOf("local" to prefs.local.toString())).toString() else "" }
+        require(details.upcoming != true || details.video.live) { details.notice.ifBlank { "This video is upcoming. Retry when it starts." } }
         require(stream.isNotBlank()) { "No playable stream is available." }
-        val uri = stream.toHttpUrlOrNull()!!.newBuilder().setQueryParameter("local", prefs.local.toString()).build().toString()
+        val uri = stream.toHttpUrlOrNull()!!.newBuilder().setQueryParameter("local", prefs.local.toString()).apply { entry.linkPlayback?.options?.region?.let { setQueryParameter("region", it) } }.build().toString()
         val metadata = MediaMetadata.Builder().setTitle(details.video.title).setArtist(details.video.author)
             .setArtworkUri(Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
                 putString("occurrence", entry.key); putBoolean("history", context.account != null && prefs.watchHistory); putBoolean("savePosition", prefs.savePosition)
@@ -167,7 +189,9 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         val caption = PreferenceRules.caption(prefs.captions, details.captions)
         val item = MediaItem.Builder().setMediaId(entry.video.id).setUri(uri).setMediaMetadata(metadata)
             .setMimeType(if (details.hls.isNotBlank()) MimeTypes.APPLICATION_M3U8 else if (details.dash.isNotBlank() || details.fallback.isBlank()) MimeTypes.APPLICATION_MPD else MimeTypes.VIDEO_MP4)
-            .setSubtitleConfigurations(details.captions.map { track -> MediaItem.SubtitleConfiguration.Builder(Uri.parse(resolve(track.url)))
+            .setSubtitleConfigurations(details.captions.map { track ->
+                val captionUrl = resolve(track.url).toHttpUrlOrNull()?.newBuilder()?.apply { entry.linkPlayback?.options?.region?.let { setQueryParameter("region", it) } }?.build()?.toString().orEmpty()
+                MediaItem.SubtitleConfiguration.Builder(Uri.parse(captionUrl))
                 .setMimeType(MimeTypes.TEXT_VTT).setLanguage(track.language).setLabel(track.label).setSelectionFlags(if (track == caption) C.SELECTION_FLAG_DEFAULT else 0).build() }).build()
         val snapshot = selection
         val videoPolicy = if (sameOccurrence) state.videoSelection else VideoSelection.open(entry.key, prefs,
@@ -182,7 +206,10 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             .setPreferredTextLanguage(snapshot?.parameters?.preferredTextLanguages?.firstOrNull() ?: caption?.language).build()
         player.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
         pendingSelection = snapshot; selectionPending = true
-        player.setMediaItem(item, PlaybackRules.resume(saved, details.video.duration, seconds) * 1000)
+        val start = if (positionMs != null) positionMs else if (seconds != null) PlaybackRules.resume(saved, details.video.duration, seconds) * 1000
+            else if (fresh || !sameOccurrence) bounded?.startMs ?: PlaybackRules.resume(saved, details.video.duration, null) * 1000
+            else PlaybackRules.resume(saved, details.video.duration, null) * 1000
+        player.setMediaItem(item, LinkPlaybackRules.seek(start, details.video.duration.takeIf { it in 1..Long.MAX_VALUE / 1000 }?.times(1000) ?: 0, bounded?.endMs))
         player.prepare(); player.playWhenReady = playing
         update(state.copy(items = state.items.map { if (it.key == entry.key) it.copy(video = details.video.copy(indexId = it.video.indexId, playlistIndex = it.sourceIndex)) else it }, details = details, loading = false, error = null))
         if (prefs.dearrowEnabled) app.dearrowTitles.ensure(entry.video.id)
@@ -236,16 +263,16 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             .setOverrideForType(TrackSelectionOverride(choice.group, choice.index)).build()
         return true
     }
-    fun select(key: String, seconds: Long? = null) {
+    fun select(key: String, positionMs: Long? = null) {
         val entry = state.items.firstOrNull { it.key == key && !it.removed && !it.video.unavailable } ?: return
-        launch { token, context -> load(entry, token, context, seconds, playing = true) }
+        launch { token, context -> load(entry, token, context, playing = true, positionMs = positionMs ?: entry.linkPlayback?.startMs) }
     }
     fun advance(direction: Int = 1, automatic: Boolean = false) {
         if (state.loading) return
         launch { token, context ->
             if (automatic && state.repeat == QueueRepeat.ONE && state.current?.removed != true) {
                 val current = state.current ?: return@launch
-                load(current, token, context, 0, QueueRules.automaticStart(prefs)); return@launch
+                load(current, token, context, playing = QueueRules.automaticStart(state.effective(prefs)), positionMs = current.linkPlayback?.startMs ?: 0); return@launch
             }
             fun successor() = QueueRules.successor(state, direction, prefs.showMemberVideos,
                 if (state.explicitQueue) emptySet() else app.blocked.state.value.takeIf { it.context == context }?.ids.orEmpty())
@@ -274,7 +301,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                 if ((state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) readSource(token, context, 0)
                 next = state.items.firstOrNull { QueueRules.eligible(it, prefs.showMemberVideos) }
             }
-            if (next == null && direction > 0 && !state.explicitQueue && prefs.continueNext && prefs.relatedVideos) {
+            if (next == null && direction > 0 && !state.explicitQueue && state.effective(prefs).continueNext && state.effective(prefs).relatedVideos) {
                 val recommendation = ContentVisibility.filter(state.details?.recommendations.orEmpty(), ContentSurface.RECOMMENDATIONS,
                     prefs.showMemberVideos, blocked = app.blocked.state.value.takeIf { it.context == context }?.ids.orEmpty())
                     .firstOrNull { !it.unavailable && it.id != state.current?.video?.id }
@@ -282,7 +309,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             }
             if (next != null) load(next, token, context,
                 seconds = if (automatic && player.playbackState == Player.STATE_ENDED && next.video.id == state.current?.video?.id) 0 else null,
-                playing = !automatic || QueueRules.automaticStart(prefs))
+                playing = !automatic || QueueRules.automaticStart(state.effective(prefs)))
         }
     }
     fun insert(video: Video, next: Boolean) {
@@ -310,12 +337,46 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             }
         }
     }
-    fun repeat(value: QueueRepeat) { if (value != QueueRepeat.ALL || state.source?.mix != true) update(state.copy(repeat = value)) }
+    fun repeat(value: QueueRepeat) {
+        if (value == QueueRepeat.ALL && state.source?.mix == true) return
+        baseRepeat = value
+        update(state.copy(repeat = value, items = state.items.map { item ->
+            if (item.key == state.currentKey && item.linkPlayback != null) item.copy(linkPlayback = item.linkPlayback.copy(options = item.linkPlayback.options.copy(loop = null))) else item
+        }))
+    }
+    fun syncModeOverrides() {
+        if (state.loading || player.playbackState != Player.STATE_READY || player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return
+        val modes = state.carriedOptions.copy(
+            listen = state.carriedOptions.listen?.let { C.TRACK_TYPE_VIDEO in player.trackSelectionParameters.disabledTrackTypes },
+            speed = state.carriedOptions.speed?.let { player.playbackParameters.speed })
+        if (modes != state.carriedOptions) update(state.copy(carriedOptions = modes))
+    }
+    fun clampSeek(position: Long): Long = LinkPlaybackRules.seek(position, player.duration, state.current?.linkPlayback?.endMs)
+    fun enforceEnd(): Boolean {
+        if (state.loading || player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return false
+        val original = state.current?.linkPlayback ?: return false
+        val bounded = original.bounded(player.duration)
+        if (bounded != original) update(state.copy(items = state.items.map { if (it.key == state.currentKey) it.copy(linkPlayback = bounded) else it }))
+        val end = bounded.endMs ?: return false
+        if (player.currentPosition < end) return false
+        if (enforcingBound) return true
+        enforcingBound = true
+        try {
+            val playing = player.playWhenReady
+            if (state.repeat == QueueRepeat.ONE && playing) {
+                player.seekTo((bounded.startMs ?: 0).coerceAtMost(end - 1)); player.playWhenReady = true
+            } else {
+                player.pause()
+                if (player.currentPosition != end) player.seekTo(end)
+            }
+        } finally { enforcingBound = false }
+        return true
+    }
     fun retry() {
         val entry = state.current ?: return
-        val seconds = if (player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == entry.key) player.currentPosition / 1000 else null
+        val position = if (player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == entry.key) player.currentPosition else null
         val playing = player.playWhenReady
-        launch { token, context -> load(entry, token, context, seconds, playing) }
+        launch { token, context -> load(entry, token, context, playing = playing, positionMs = position) }
     }
     fun more() { launch(sourceOnly = true) { token, context ->
         mixContinuations.clear()

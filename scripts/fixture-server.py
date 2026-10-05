@@ -10,7 +10,7 @@ import time
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=18080)
@@ -54,6 +54,11 @@ state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRs
 def reset_comments():
     state.update(commentRequests=[], commentFailNext=False, commentDelayNext=0, commentEmpty=False)
 reset_comments()
+
+def reset_content_links():
+    state.update(videoInformation=False, resolveRequests=[], resolveFailNext=False, resolveDelayNext=0,
+                 hashtagRequests=[], videoDetailRequests=[])
+reset_content_links()
 
 def fixture_comment(id, author='Viewer', text=None, **extra):
     return dict(commentId=id, author=author, authorId=video['authorId'], authorUrl='/channel/' + video['authorId'],
@@ -298,11 +303,30 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(dict(video, videoId=p.rsplit('/', 1)[-1], title=name + ' geometry fixture',
                                      formatStreams=[dict(url='/media/shapes/' + name + '.mp4', type='video/mp4', quality='medium')],
                                      description='Real ratio fixture', recommendedVideos=[recommended]))
+        elif p == '/api/v1/resolveurl':
+            params = parse_qs(urlparse(self.path).query)
+            state['resolveRequests'].append(dict(url=params.get('url', [''])[0], authorized=self.headers.get('Authorization') is not None))
+            delay = state['resolveDelayNext']; state['resolveDelayNext'] = 0
+            fail = state['resolveFailNext']; state['resolveFailNext'] = False
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            if fail: return self.respond(dict(error='Fixture channel resolution failed'), 503)
+            return self.respond(dict(ucid=video['authorId'], browseId=video['authorId']))
+        elif p.startswith('/api/v1/hashtag/'):
+            tag = unquote(p.rsplit('/', 1)[-1]); page = int(parse_qs(urlparse(self.path).query).get('page', ['1'])[0])
+            state['hashtagRequests'].append(dict(tag=tag, page=page, authorized=self.headers.get('Authorization') is not None))
+            return self.respond(dict(results=[dict(video, videoId='hashvid%04d' % i, title='Hashtag video ' + str(i)) for i in range(60)] if page == 1 else [recommended]))
         elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03'):
             selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
             codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
             dash = f'/media/codec/{codec_manifest}' if codec_manifest else '/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd'
-            self.respond(dict(**selected, description='A generated test video. No YouTube access is involved.',
+            state['videoDetailRequests'].append(dict(videoId=selected['videoId'], query=parse_qs(urlparse(self.path).query)))
+            info = dict(description='A generated test video. No YouTube access is involved.')
+            if state['videoInformation']:
+                info.update(description='Intro 0:00. Jump 0:30. #music',
+                            descriptionHtml='<b>Rich description</b><br><a href="/watch?v=' + selected['videoId'] + '&amp;t=30">0:30</a> <a href="/@fixture/shorts">Creator</a> <a href="/hashtag/music">#music</a>',
+                            likeCount=42, authorVerified=True, subCountText='12.3K', isListed=False, genre='Music',
+                            license='', isFamilyFriendly=True, allowedRegions=['ID', 'US'], musicTracks=[dict(song='Song', artist='Artist', album='Album', license='Music license')])
+            self.respond(dict(**selected, **info,
                               dashUrl=dash, adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=[recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended]), liveNow=state['liveNow'], isMember=state['memberCurrent']))
@@ -470,7 +494,13 @@ class Handler(BaseHTTPRequestHandler):
             reset_visibility()
             reset_search_history()
             reset_comments()
+            reset_content_links()
             reset_accounts()
+            return self.respond({})
+        if p == '/test/content-links':
+            state['videoInformation'] = True
+            for key in ('resolveFailNext', 'resolveDelayNext'):
+                if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/accounts':
             if 'registrationEnabled' in data: state['registrationEnabled'] = bool(data['registrationEnabled'])

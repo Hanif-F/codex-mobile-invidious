@@ -141,6 +141,40 @@ metadata requests are added. Cached listings gain optional avatar URLs through t
 sibling API update and existing migration 21; no new token scope is needed.
 Older servers remain usable with available response images and placeholders.
 
+Watch descriptions preserve native formatting, selection, source links and
+clickable timestamps/hashtags, with a plain-text fallback on older instances.
+The watch page shows supplied likes, channel verification/subscribers,
+upcoming/premiere and unlisted notices. Video details expands genre, license,
+family-friendly status, allowed regions and music credits. Optional unavailable
+metadata stays hidden. Video licenses require the additive sibling public video
+API update; no migration or new token scope is needed.
+
+Shared, pasted and description/comment/channel/post links use the same native
+router for videos, playlists/mixes, channel IDs/handles/custom/user URLs, posts
+and hashtags. Channel aliases resolve through the selected instance with Retry
+and Open externally on failure; hashtags open paginated native results. Watch
+path aliases (`/watch/:id`, `/w/:id`, `/v/:id`, `/e/:id`), Shorts/Live/embed URLs,
+relative links and precise timestamps are supported. Recognized bundled-host
+paths also register as Android app links. Other web links open an external
+handler. Clip functions remain deferred; embed URLs open native video playback.
+
+Share opens the Android chooser directly using the current service position.
+It retains the matched playlist occurrence/index or mix continuation, active
+end boundary and URL overrides. Inserted videos and unresolved playlist seeds
+share as standalone videos. Bare playlist/mix links open browsing first and
+apply their link options when Play is chosen. `t`, `time_continue`, `start` and
+fragment timestamps use absolute video coordinates; `end` clamps seeking and
+pauses playback or loops back to the linked start. Invalid end ranges are
+ignored with feedback. Bounds survive refresh/retry and background controls.
+
+Link parameters can override `listen`, `speed`, `local`, `autoplay`, `continue`,
+`continue_autoplay`, `loop`, `quality_dash`, `video_codec`, `subtitles`, `region`,
+`comments`, `related_videos`, `extend_desc` and `save_player_pos`. They do not
+change saved preferences. Listen, speed and proxy carry through the current
+queue; other overrides and bounds remain on the linked occurrence. Explicit
+region is included in metadata, stream and caption requests. Supported comment
+sources still follow the native read-only YouTube scope.
+
 The service-owned player supports adaptive streams, seeking, speed/quality/audio
 selection, background playback, system media controls, mini-player, fullscreen,
 audio only and picture in picture. The embedded and fullscreen player share fading

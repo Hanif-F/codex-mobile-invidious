@@ -1,5 +1,9 @@
 package net.wingress.mobivious.player
 
+object LinkPlaybackRules {
+    fun seek(position: Long, duration: Long, end: Long?): Long = PlaybackRules.seek(position, duration).let { if (end == null) it else minOf(it, end) }
+}
+
 object PlaybackRules {
     fun seek(position: Long, duration: Long): Long = if (duration > 0) position.coerceIn(0, duration) else position.coerceAtLeast(0)
     fun resume(saved: Long, duration: Long, explicit: Long?): Long {

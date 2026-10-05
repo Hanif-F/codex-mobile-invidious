@@ -17,8 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import net.wingress.mobivious.data.VideoLinks
-import net.wingress.mobivious.data.PostLinks
+import net.wingress.mobivious.data.ContentLinks
 import net.wingress.mobivious.player.PlaybackService
 import net.wingress.mobivious.ui.AppViewModel
 import net.wingress.mobivious.ui.MobiviousApp
@@ -43,11 +42,9 @@ class MainActivity : ComponentActivity() {
     private fun handleLink(intent: Intent) {
         val text = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else intent.dataString
         if (text != null) {
-            val post = PostLinks.parse(text, model.store.server)
-            if (post != null) { sharedVideo.value = false; model.openPost(post); return }
-            val link = VideoLinks.parse(text, model.store.server)
-            if (link != null) { sharedVideo.value = model.openLink(link) }
-            else model.message.value = "Share a YouTube or configured Invidious video, playlist, mix or post link."
+            val link = ContentLinks.parse(text, model.store.server)
+            if (link != null) sharedVideo.value = model.openContent(link)
+            else model.message.value = "Share a YouTube or configured Invidious video, playlist, mix, channel, hashtag or post link."
         }
     }
     fun updatePip(watching: Boolean) {

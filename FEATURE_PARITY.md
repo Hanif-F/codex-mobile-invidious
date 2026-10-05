@@ -2,8 +2,8 @@
 
 Reviewed on **5 October 2026** against the local source checkouts:
 
-- Web: `../invidious` at `89c441b2`. Includes this fork's custom features and native API extensions.
-- Android: `ef2ab0d` plus working-tree channel/community changes, including player gestures (`cab1eda`), scroll-driven player resizing and complete channel descriptions (`a6848ee`). Current configured release version: `0.5.1` (version code 8); the new channel/community changes are in the debug build and have not been released.
+- Web: `../invidious` at `42e4fee6` plus the additive public video-license field. Includes this fork's custom features and native API extensions.
+- Android: `e7c4f49` plus working-tree rich video information and content-link changes. Current configured release version: `0.5.1` (version code 8); these changes are in the debug build and have not been released.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 
@@ -11,9 +11,9 @@ Reviewed on **5 October 2026** against the local source checkouts:
 - **Partial:** some parts exist; the last two columns identify what exists and what is missing.
 - **Not implemented:** no corresponding Android flow was found in the reviewed source.
 
-The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 213 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, plus community and avatar fixture checks on 5 October. Ten new community Compose scenarios compile but remain unexecuted because the installed emulator crashes before boot. Signed 0.5.1 checks predate the channel/community changes. The latest recorded production status still requires deployment of the native account/API extensions; this audit does not verify the live server. Public channel endpoint checks do not validate the production account rollout.
+The status is based on source and compiled checks, not new native runtime or production acceptance. Features can depend on instance configuration, upstream content availability, and device capabilities. [VERIFICATION.md](VERIFICATION.md) records 224 passing Android unit/API tests, successful debug/instrumentation APK builds and debug lint, localhost content-link fixture checks, the Invidious build and production serializer checks. Ten new rich-information/link device scenarios compile but remain unexecuted because the installed emulator crashes before boot. Signed 0.5.1 checks predate these changes. Production requires deployment of the sibling license field to display licenses; older servers remain usable with unknown optional fields hidden. This audit does not verify the live server or the earlier account/API rollout.
 
-**Summary: 48 broad feature areas — 26 implemented, 12 partial, 10 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
+**Summary: 48 broad feature areas — 28 implemented, 10 partial, 10 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
 
 ## Discovery and channels
 
@@ -40,7 +40,7 @@ Evidence: [web routing][w-routing], [web trending][w-trending], [web search filt
 | 12 | Audio-only listening and background playback | Implemented | Disable video tracks, background playback setting and service-owned playback. | — |
 | 13 | Captions/subtitles | Implemented | Load VTT captions, select available language, turn subtitles on/off through the unified player gear; available-track selection and active-selection display. Three saved language priorities select the first available caption when opening a video; preferences are shared with the account or saved locally for guests. | — for core captions; appearance controls are tracked in row 48 and caption-file export in row 46. Runtime acceptance of the defaults remains unverified. |
 | 14 | Remember playback position and resume | Implemented | Signed-in account positions shared with the website, local fallback, periodic saves, completion reset and explicit timestamp precedence. Guests can enable device-local resume; changing the preference updates active service-owned playback too. | — for core resume; runtime acceptance of guest resume remains unverified. |
-| 15 | Video information and rich descriptions | Partial | Title, author/avatar, views, publication text, member labels and animated expandable plain-text description. | Rendered description links and clickable timestamps/hashtags; video likes, channel verification/subscriber count on watch, premiere/unlisted notices, genre/license/family-friendly/region metadata and music credits. External source actions are tracked in rows 24 and 32. |
+| 15 | Video information and rich descriptions | Implemented | Selectable native rich description formatting, safe links, clickable timestamps and hashtags, with plain-text fallback; title/author/avatar, views/publication/member labels, optional likes, channel verification and subscribers, upcoming/premiere/unlisted notices. Expandable genre, license, family-friendly status, localized allowed regions and supplied music credits. Same-video timestamps seek the current occurrence; content links navigate natively or open an external handler. | — for the core capability; license display requires the additive sibling video API field. Missing optional metadata stays hidden; device/layout acceptance remains unverified. |
 | 16 | Related/recommended videos | Implemented | Recommended video list on the watch screen; manual selection, channel navigation and a shared visibility preference. | —; automatic advancement is tracked separately. |
 | 17 | Automatic next-video playback, playlist queue and repeat | Implemented | Service-owned next-recommendation playback; public/private playlists and dynamic mixes; source occurrence context, overlapping-page loading, previous/next and queue selection; temporary Play next/Add to queue; local queue removal and separate owned-playlist deletion; session Off/One/All repeat (All for finite queues). Explicit queues open inline before Up next, with bounded compact rows, current-occurrence following and animated collapse retained across navigation/Activity recreation. Shared next/autoplay-next/loop defaults; background/audio/PiP advancement. | — for the core capability; native runtime/layout acceptance remains unverified. Queues last for the current service session; shuffle and restart restoration are outside scope. |
 | 18 | Chapters and timeline thumbnail previews | Not implemented | — | Chapter navigation/markers and storyboard previews while seeking. |
@@ -49,7 +49,7 @@ Evidence: [web routing][w-routing], [web trending][w-trending], [web search filt
 | 21 | Legacy annotations and VR/360° viewing | Not implemented | — | Annotation overlays/toggles and specialized VR projection controls. |
 | 22 | Read-only YouTube comments (Reddit excluded) | Implemented | Spoiler-free entry without preview text; drawer beneath the visible player; Top/Newest sorting; independently paginated reply threads with Back and saved scroll positions; avatars, author/date/body hierarchy, thumb-up counts, creator/verified/pinned/member/heart metadata; expandable native rich text, links, timestamps and custom emoji; loading/empty/error states and cursor-preserving retry. | — for the requested YouTube capability. Reddit is deliberately excluded; posting and liking remain unsupported. Native runtime/layout acceptance remains unverified. |
 | 23 | Livestream archive chat replay | Not implemented | — | Replay synchronized to playback; docked/overlay chat; timestamp/font/size/opacity controls; user/word filters and saved timing offsets. This fork implements replay, not sending live chat messages. |
-| 24 | Sharing and opening content links | Partial | Android share sheet for the current video with timestamp; receive shared/pasted YouTube and configured-instance video, playlist and mix links, preserving list/index/timestamp context and normalizing YouTube indexes. `youtu.be`, Shorts, Live and embed video URLs are parsed. Bare source links open a browser with Play; public lists work for guests. Shared/pasted/rich-text `/post/<id>` and community/posts links carrying `lb` open native post details, resolving missing channel IDs; post Copy link and Share actions. Rich-text links additionally open valid `/channel/UC…` links natively. App-link registration includes `/watch`, `/playlist`, `/mix` and `/post` on bundled hosts, with launch-intent replay prevention on Activity recreation. Post-link parsers and requests passed; native intent/runtime acceptance remains unverified. | General shared/pasted channel links and handle/custom-channel resolution; clip links; web path aliases such as `/watch/:id`, `/w/:id`, `/v/:id` and `/e/:id`; bounded `end` playback and other per-link overrides. Outgoing watch shares omit playlist/index context that the web share URL retains. Parsing an embed URL does not supply a native embed-hosting flow. |
+| 24 | Sharing and opening content links | Implemented | Direct Android Share with service position, actual playlist occurrence/index, mix continuation, active end boundary and URL options. One router handles incoming/pasted/rich-text video, playlist/mix, channel, handle/custom/user channel, post/community and hashtag links; public channel resolution with loading/retry/external fallback and native hashtag pagination. Watch/w/v/e/Shorts/Live/embed aliases; millisecond timestamps, absolute end bounds, pause/replay/loop in the service, and per-link playback/visibility overrides without changing saved settings. Listen, speed and proxy carry through the queue; other overrides belong to the linked occurrence. Bundled-host app links and recreation replay prevention. | — for the accepted non-clip native scope. Clips remain row 39; embed hosting is intentionally excluded. Older instances may lack channel-resolution/hashtag APIs; native intent, playback and chooser acceptance remains unverified. |
 
 Evidence: [web watch page][w-watch], [web player component][w-player], [web player logic][w-player-js], [web stream controls][w-streams], [web playlist queue][w-watch-js], [web comments API][w-videos], [web comments UI][w-comments]; [Android watch UI][a-ui], [YouTube comment state][a-comments], [native comments drawer][a-comments-ui], [Android player controls/settings][a-player], [player gestures][a-gestures], [player presentation][a-presentation], [scroll resizing][a-scroll], [video surface/screen wake][a-surface], [native queue panel][a-queue-ui], [Android playback setup][a-vm], [Android playback service][a-service], [Android link parsing][a-models], [activity/PiP][a-activity], [manifest][a-manifest].
 
@@ -455,6 +455,39 @@ See [VERIFICATION.md](VERIFICATION.md) for commands and acceptance limits.
 [a-community-ui]: android/app/src/main/java/net/wingress/mobivious/ui/CommunityUi.kt
 [w-community]: ../invidious/src/invidious/channels/community.cr
 
+### Rich video information and content links — 5 October 2026
+
+Rows 15 and 24 are Implemented for the accepted non-clip native scope. Watch
+uses the existing native HTML subset with selection and plain-text fallback;
+timestamps seek without replacing the queue occurrence. Supplied likes,
+verification, subscribers, premiere/unlisted information, genre, license,
+family-friendly status, regions and music credits appear without inferring
+unknown metadata. The sibling public video serializer adds `license`; older
+servers omit that optional row. No migration or token scope is added.
+
+Shared, pasted and rich-text links use one origin-validated router. Channel
+handles/custom/user URLs resolve through the selected instance, with cancel,
+retry and external fallback. Hashtags use public paginated native video results.
+Relative links and watch aliases retain timestamp precision and normalized
+playlist indexes. Direct Share uses the current service position and matched
+source occurrence; inserted videos and unresolved seeds omit playlist context.
+
+End bounds remain in absolute video coordinates. The service clamps seeks,
+pauses at the end, replays from the linked start and loops when requested,
+including background/system controls. Link overrides do not write preferences.
+Listen, speed and proxy carry to successors; bounds and other overrides remain
+on the linked occurrence and survive refresh/retry. Bare source links retain
+browse-first behavior and apply options when Play is chosen. Clip functionality
+stays deferred in row 39; parsing embed URLs does not introduce embed hosting.
+
+All 224 unit/API tests, debug/instrumentation APK builds and debug lint passed.
+The localhost content-link fixture, normal Invidious build, three video extraction
+specs and production serializer/template fixtures passed. Seven link smoke and
+three presentation scenarios compile; actual intents, chooser behavior, bounds,
+background/recreation playback, layout and screenshots remain unverified because
+the emulator exited with SIGSEGV (139) before boot. The totals are 28 implemented,
+10 partial and 10 not implemented. See [VERIFICATION.md](VERIFICATION.md).
+
 ## Intentionally excluded parity
 
 These web capabilities are deliberately omitted from the Android product scope.
@@ -463,6 +496,7 @@ reasons to classify the related native feature as Partial.
 
 | Related rows | Excluded web capability | Android scope |
 | --- | --- | --- |
+| Row 24 | Hosting/exporting an embeddable player | Open embed video URLs in native playback; do not provide an embed-hosting flow. Clips stay deferred separately in row 39. |
 | Row 34 | Explicit mark-watched/mark-unwatched actions | Use automatic watched indicators and saved progress; retain the existing history-removal and clear-history actions. No separate manual watched-state controls are planned. |
 | Rows 36, 42 | Multiple visual themes (Modern Neon/Diary), scheduled random theme selection and alternative player skins | Use the native appearance with light/dark/system color mode, list density and thumbnail visibility. No visual-theme catalog, automatic theme rotation or player-skin selector is planned. |
 

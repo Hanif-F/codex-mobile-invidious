@@ -141,26 +141,19 @@ sealed interface CommentLink {
     data class Seek(val seconds: Long) : CommentLink
     data class Video(val link: VideoLink) : CommentLink
     data class Channel(val id: String) : CommentLink
+    data class ChannelAlias(val link: ChannelLink) : CommentLink
+    data class Hashtag(val tag: String) : CommentLink
     data class Post(val link: PostLink) : CommentLink
     data class External(val url: String) : CommentLink
 }
 object CommentLinks {
-    fun resolve(raw: String, instance: String, currentVideo: String): CommentLink? {
-        val base = instance.toHttpUrlOrNull() ?: return null
-        var url = base.resolve(raw.trim()) ?: return null
-        if (url.username.isNotEmpty() || url.password.isNotEmpty()) return null
-        val host = url.host.removePrefix("www.").removePrefix("m.")
-        if (host in listOf("youtube.com", base.host) && url.encodedPath == "/redirect") {
-            url = (url.queryParameter("q") ?: url.queryParameter("url"))?.toHttpUrlOrNull() ?: return null
-            if (url.username.isNotEmpty() || url.password.isNotEmpty()) return null
-        }
-        PostLinks.parse(url.toString(), instance)?.let { return CommentLink.Post(it) }
-        VideoLinks.parse(url.toString(), instance)?.let {
-            return if (it.id == currentVideo && it.seconds != null) CommentLink.Seek(it.seconds) else CommentLink.Video(it)
-        }
-        if (url.host.removePrefix("www.").removePrefix("m.") in listOf("youtube.com", base.host) && url.pathSegments.firstOrNull() == "channel") {
-            url.pathSegments.getOrNull(1)?.takeIf { ContentVisibility.validChannel(it) }?.let { return CommentLink.Channel(it) }
-        }
-        return CommentLink.External(url.toString())
+    fun resolve(raw: String, instance: String, currentVideo: String): CommentLink? = when (val target = ContentLinks.resolve(raw, instance, currentVideo)) {
+        is ContentLink.Seek -> CommentLink.Seek(target.milliseconds / 1000)
+        is ContentLink.Video -> CommentLink.Video(target.link)
+        is ContentLink.Channel -> target.link.id?.let { CommentLink.Channel(it) } ?: CommentLink.ChannelAlias(target.link)
+        is ContentLink.Post -> CommentLink.Post(target.link)
+        is ContentLink.Hashtag -> CommentLink.Hashtag(target.tag)
+        is ContentLink.External -> CommentLink.External(target.url)
+        null -> null
     }
 }

@@ -77,13 +77,20 @@ internal fun ChannelAuthor(server: String, image: String, name: String,
 
 @Composable
 internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolean, subscribed: Boolean,
-    subscribe: () -> Unit, channel: (String) -> Unit) {
+    subscribe: () -> Unit, channel: (String) -> Unit, verified: Boolean = false, subscribers: String = "") {
     val fontScale = LocalDensity.current.fontScale
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val author: @Composable (Modifier) -> Unit = { modifier ->
-            ChannelAuthor(server, video.authorAvatar, video.author.ifBlank { "Unknown channel" },
-                Avatars.show(thinMode, video.channelId), modifier = modifier, size = 40.dp, tag = "watch-channel-avatar",
-                onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
+            Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                ChannelAuthor(server, video.authorAvatar, video.author.ifBlank { "Unknown channel" },
+                    Avatars.show(thinMode, video.channelId), modifier = Modifier.fillMaxWidth(), size = 40.dp, tag = "watch-channel-avatar",
+                    onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
+                if (verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Icon(Icons.Default.Verified, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text("Verified channel", style = MaterialTheme.typography.labelSmall)
+                }
+                if (subscribers.isNotBlank()) Text("$subscribers subscribers", style = MaterialTheme.typography.bodySmall)
+            }
         }
         val button: @Composable () -> Unit = {
             FilledTonalButton(onClick = subscribe) { Text(if (subscribed) "Subscribed" else "Subscribe") }

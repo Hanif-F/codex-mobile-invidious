@@ -14,7 +14,13 @@ data class StreamFormat(val id: String, val mimeType: String, val codec: String,
     val width: Int, val height: Int, val fps: Float, val bitrate: Long, val bytes: Long,
     val audio: AudioIdentity? = null, val drc: Boolean? = null)
 data class VideoDetails(val video: Video, val description: String, val dash: String, val hls: String,
-    val fallback: String, val captions: List<Caption>, val recommendations: List<Video>, val formats: List<StreamFormat> = emptyList())
+    val fallback: String, val captions: List<Caption>, val recommendations: List<Video>, val formats: List<StreamFormat> = emptyList(),
+    val descriptionHtml: String = "", val likes: Long? = null, val authorVerified: Boolean? = null,
+    val subscribers: String = "", val upcoming: Boolean? = null, val premiereTimestamp: Long? = null,
+    val listed: Boolean? = null, val genre: String = "", val genreUrl: String = "", val license: String? = null,
+    val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
+    val music: List<MusicCredit> = emptyList(), val notice: String = "")
+data class MusicCredit(val song: String, val artist: String, val album: String, val license: String = "")
 enum class ChannelTab(val path: String, val label: String) {
     VIDEOS("videos", "Videos"), SHORTS("shorts", "Shorts"), STREAMS("streams", "Streams"),
     PODCASTS("podcasts", "Podcasts"), RELEASES("releases", "Releases"), COURSES("courses", "Courses"),
@@ -47,37 +53,6 @@ data class Account(val token: String, val username: String, val expiresAt: Long,
 data class ApiContext(val server: String, val account: Account?, val generation: Long = 0)
 data class DeArrowIdentity(val ready: Boolean, val configured: Boolean)
 data class DeArrowSubmission(val title: String, val original: Boolean, val votes: Int, val locked: Boolean, val uuid: String)
-data class VideoLink(val id: String, val seconds: Long? = null, val playlistId: String? = null, val index: Int? = null, val seedVideoId: String? = null)
-
-object VideoLinks {
-    private val idPattern = Regex("^[A-Za-z0-9_-]{11}$")
-    fun parse(text: String, instance: String): VideoLink? {
-        val candidate = Regex("https?://[^\\s]+").find(text)?.value?.trimEnd('.', ',', ')') ?: text.trim()
-        val url = candidate.toHttpUrlOrNull() ?: return null
-        val host = url.host.removePrefix("www.").removePrefix("m.")
-        val instanceHost = instance.toHttpUrlOrNull()?.host
-        if (host !in listOf("youtu.be", "youtube.com", "youtube-nocookie.com", instanceHost, "invidious.wingress.net", "mobivious.wingress.net")) return null
-        val id = when {
-            host == "youtu.be" -> url.pathSegments.firstOrNull()
-            host == "youtube.com" || host == "youtube-nocookie.com" || host == instanceHost || host == "invidious.wingress.net" || host == "mobivious.wingress.net" ->
-                url.queryParameter("v") ?: if (url.pathSegments.firstOrNull() in listOf("shorts", "embed", "live")) url.pathSegments.getOrNull(1) else null
-            else -> null
-        }
-        val list = url.queryParameter("list")?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) }
-        if (id == null && (list == null || url.pathSegments.firstOrNull() !in listOf("playlist", "mix", "watch"))) return null
-        if (id != null && !idPattern.matches(id)) return null
-        val youtube = host in listOf("youtu.be", "youtube.com", "youtube-nocookie.com")
-        val index = url.queryParameter("index")?.toIntOrNull()?.let { if (youtube) it - 1 else it }?.takeIf { it >= 0 }
-        val timestamp = url.queryParameter("t") ?: url.queryParameter("start") ?: url.fragment?.removePrefix("t=")
-        return VideoLink(id.orEmpty(), timestamp?.let(::timestampSeconds), list, index,
-            if (list?.startsWith("RD") == true) url.queryParameter("continuation")?.takeIf { idPattern.matches(it) } ?: id?.takeIf { idPattern.matches(it) } else null)
-    }
-    fun timestampSeconds(value: String): Long? {
-        value.removeSuffix("s").toLongOrNull()?.let { return it.takeIf { seconds -> seconds >= 0 } }
-        if (!Regex("^(?:\\d+h)?(?:\\d+m)?(?:\\d+s)?$").matches(value) || value.isEmpty()) return null
-        return runCatching { Regex("(\\d+)([hms])").findAll(value).sumOf { it.groupValues[1].toLong() * when(it.groupValues[2]) { "h" -> 3600; "m" -> 60; else -> 1 } } }.getOrNull()
-    }
-}
 
 fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull { optJSONObject(it) }
 fun JSONObject.text(key: String, fallback: String = ""): String = if (isNull(key)) fallback else optString(key, fallback)
@@ -100,7 +75,15 @@ object ApiParser {
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",
         json.optJSONArray("captions")?.objects()?.map { Caption(it.text("label"), it.text("languageCode", it.text("language_code")), it.text("url")) } ?: emptyList(),
         json.optJSONArray("recommendedVideos")?.let(::videos) ?: emptyList(),
-        (json.optJSONArray("adaptiveFormats")?.objects().orEmpty() + json.optJSONArray("formatStreams")?.objects().orEmpty()).map(::streamFormat))
+        (json.optJSONArray("adaptiveFormats")?.objects().orEmpty() + json.optJSONArray("formatStreams")?.objects().orEmpty()).map(::streamFormat),
+        descriptionHtml = json.text("descriptionHtml"), likes = (json.opt("likeCount") as? Number)?.toLong()?.takeIf { it >= 0 },
+        authorVerified = json.opt("authorVerified") as? Boolean, subscribers = json.text("subCountText").takeUnless { it == "-" }.orEmpty(),
+        upcoming = json.opt("isUpcoming") as? Boolean, premiereTimestamp = (json.opt("premiereTimestamp") as? Number)?.toLong()?.takeIf { it > 0 },
+        listed = json.opt("isListed") as? Boolean, genre = json.text("genre"), genreUrl = json.text("genreUrl"), license = json.opt("license") as? String,
+        familyFriendly = json.opt("isFamilyFriendly") as? Boolean, allowedRegions = json.optJSONArray("allowedRegions")?.let { a ->
+            (0 until a.length()).mapNotNull { (a.opt(it) as? String)?.takeIf { code -> code.matches(Regex("[A-Z]{2}")) } }.distinct() },
+        music = json.optJSONArray("musicTracks")?.objects().orEmpty().map { MusicCredit(it.text("song"), it.text("artist"), it.text("album"), it.text("license")) }
+            .filter { it.song.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }, notice = json.text("error"))
     fun streamFormat(j: JSONObject): StreamFormat {
         val size = j.text("size").split('x')
         val type = j.text("type", j.text("mimeType"))

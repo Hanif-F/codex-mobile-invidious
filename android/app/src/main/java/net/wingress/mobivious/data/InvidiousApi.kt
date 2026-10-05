@@ -148,7 +148,20 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         request(path, method, data, auth = true, context = context).also {
             if (context != this.context()) throw CancellationException("Account or instance changed")
         }
-    suspend fun video(id: String, local: Boolean = true) = ApiParser.details(JSONObject(request("api/v1/videos/$id", query = mapOf("local" to local.toString()))))
+    suspend fun video(id: String, local: Boolean = true, region: String? = null, context: ApiContext = context()) =
+        ApiParser.details(JSONObject(scopedRead("api/v1/videos/$id", buildMap { put("local", local.toString()); region?.let { put("region", it) } }, false, context)))
+    suspend fun resolveChannel(link: ChannelLink, context: ApiContext = context()): String {
+        link.id?.takeIf(ContentVisibility::validChannel)?.let { return it }
+        require(ContentLinks.parse(link.resolveUrl, context.server) is ContentLink.Channel) { "Invalid channel link." }
+        val j = JSONObject(scopedRead("api/v1/resolveurl", mapOf("url" to link.resolveUrl), false, context))
+        return sequenceOf(j.text("ucid"), j.text("browseId")).firstOrNull(ContentVisibility::validChannel)
+            ?: throw ApiException(404, "This channel could not be resolved.")
+    }
+    suspend fun hashtag(tag: String, page: Int, context: ApiContext = context()): List<Video> {
+        require(tag.isNotBlank() && tag.length <= 100 && '/' !in tag && tag.none(Char::isISOControl))
+        val path = "api/v1/hashtag/$tag"
+        return ApiParser.videos(JSONObject(scopedRead(path, mapOf("page" to page.toString()), false, context)).optJSONArray("results") ?: JSONArray())
+    }
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
     suspend fun channel(id: String, context: ApiContext = context()) =
         ApiParser.channel(JSONObject(scopedRead("api/v1/channels/$id", emptyMap(), false, context)))

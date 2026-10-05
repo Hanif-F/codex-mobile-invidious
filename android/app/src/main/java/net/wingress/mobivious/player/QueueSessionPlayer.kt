@@ -46,11 +46,16 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
                 val state = snapshot()
                 val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0
                 val entry = state.items.getOrNull(mediaItemIndex - prefix)
-                if (entry != null) queue.select(entry.key, positionMs.takeIf { it != C.TIME_UNSET }?.div(1000)) else queue.advance(if (mediaItemIndex < prefix) -1 else 1)
+                if (entry != null) queue.select(entry.key, positionMs.takeIf { it != C.TIME_UNSET }) else queue.advance(if (mediaItemIndex < prefix) -1 else 1)
             }
-            else -> return super.handleSeek(0, positionMs, seekCommand)
+            else -> return super.handleSeek(0, if (positionMs == C.TIME_UNSET) positionMs else queue.clampSeek(positionMs), seekCommand)
         }
         return Futures.immediateVoidFuture()
+    }
+    override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        val bound = snapshot().current?.linkPlayback
+        if (playWhenReady && bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0)
+        return super.handleSetPlayWhenReady(playWhenReady)
     }
     override fun handleSetRepeatMode(repeatMode: Int): ListenableFuture<*> {
         queue.repeat(when(repeatMode) { Player.REPEAT_MODE_ONE -> QueueRepeat.ONE; Player.REPEAT_MODE_ALL -> QueueRepeat.ALL; else -> QueueRepeat.OFF })

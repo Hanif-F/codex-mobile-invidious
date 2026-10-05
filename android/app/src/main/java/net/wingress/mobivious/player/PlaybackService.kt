@@ -101,7 +101,7 @@ class PlaybackService : MediaSessionService() {
                         if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
                         history = args.getBoolean("history") && owner != null
-                        savePosition = args.getBoolean("savePosition")
+                        savePosition = app.playbackQueue.value.current?.linkPlayback?.options?.savePosition ?: args.getBoolean("savePosition")
                         app.watched.configure(ownerContext!!, savePosition)
                         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                     }
@@ -138,17 +138,17 @@ class PlaybackService : MediaSessionService() {
                     recordHistory()
                 } else persist()
             }
-            override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { persist(ended = true); queue.advance(automatic = true) } }
+            override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { if (queue.enforceEnd()) persist() else { persist(ended = true); queue.advance(automatic = true) } } }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) { queue.playerError("Playback failed. Retry to refresh the stream.") }
             override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) { if (error == null) queue.playerError(null) }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
                 if (reason == Player.DISCONTINUITY_REASON_REMOVE) persist(item = oldPosition.mediaItem, position = oldPosition.positionMs)
                 else if (reason == Player.DISCONTINUITY_REASON_SEEK) persist()
             }
-            override fun onEvents(player: Player, events: Player.Events) { queue.applySelection(); evaluateSponsor() }
+            override fun onEvents(player: Player, events: Player.Events) { queue.applySelection(); queue.syncModeOverrides(); queue.enforceEnd(); evaluateSponsor() }
         })
         scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
-        scope.launch { while (isActive) { delay(100); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
+        scope.launch { while (isActive) { delay(100); queue.enforceEnd(); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
         scope.launch { app.playbackContext.collect { if (app.playbackQueue.value.context != null && app.playbackQueue.value.context != it) queue.close() } }
         scope.launch { app.dearrowTitles.titles.collect { queue.syncDisplayTitle() } }
@@ -165,7 +165,8 @@ class PlaybackService : MediaSessionService() {
                 if ((id.isNotEmpty() && !SponsorBlockRules.validVideo(id)) || (source != null && !source.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) || id.isEmpty() && source == null)
                     return SessionResult(SessionError.ERROR_BAD_VALUE)
                 queue.start(id, source, if (args.containsKey("index")) args.getInt("index") else null,
-                    if (args.containsKey("seconds")) args.getLong("seconds") else null, args.getBoolean("audio"), sourceSeed = args.getString("seed"))
+                    if (args.containsKey("seconds")) args.getLong("seconds") else null, args.getBoolean("audio"), sourceSeed = args.getString("seed"),
+                    linkPlayback = args.getString("linkPlayback")?.let { raw -> runCatching { LinkPlayback.parse(JSONObject(raw)) }.getOrNull() })
             }
             QUEUE_INSERT -> {
                 val video = runCatching { ApiParser.video(JSONObject(args.getString("video") ?: "{}")) }.getOrNull()
@@ -228,7 +229,7 @@ class PlaybackService : MediaSessionService() {
         var decision = sponsor.evaluate(player.currentPosition, player.duration)
         decision.seek?.let { position ->
             sponsorSeeking = true
-            try { player.seekTo(position) } finally { sponsorSeeking = false }
+            try { player.seekTo(queue.clampSeek(position)) } finally { sponsorSeeking = false }
             sponsorNotice = "Skipped ${decision.categories.joinToString(", ") { it.label }}"
             noticeUntil = SystemClock.elapsedRealtime() + 3000
             decision = sponsor.evaluate(player.currentPosition, player.duration)
@@ -255,7 +256,7 @@ class PlaybackService : MediaSessionService() {
                 else {
                     val end = minOf(active.end, player.duration)
                     if (end <= player.currentPosition) return SessionResult(SessionError.ERROR_INVALID_STATE)
-                    player.seekTo(end)
+                    player.seekTo(queue.clampSeek(end))
                 }
             }
         }
@@ -289,9 +290,9 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            "mobivious.toggle" -> if (player.playWhenReady) player.pause() else player.play()
-            "mobivious.rewind" -> player.seekTo((player.currentPosition - 10_000).coerceAtLeast(0))
-            "mobivious.forward" -> player.seekTo(player.currentPosition + 10_000)
+            "mobivious.toggle" -> if (player.playWhenReady) player.pause() else { val bound = app.playbackQueue.value.current?.linkPlayback; if (bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0); player.play() }
+            "mobivious.rewind" -> player.seekTo(queue.clampSeek(player.currentPosition - 10_000))
+            "mobivious.forward" -> player.seekTo(queue.clampSeek(player.currentPosition + 10_000))
             else -> return super.onStartCommand(intent, flags, startId)
         }
         return START_NOT_STICKY

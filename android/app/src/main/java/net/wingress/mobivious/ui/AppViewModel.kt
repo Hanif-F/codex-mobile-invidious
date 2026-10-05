@@ -48,6 +48,8 @@ data class BrowseState(val title: String = "For you", val videos: List<Video> = 
     val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false)
 data class PostDetailState(val link: PostLink? = null, val context: ApiContext? = null,
     val post: CommunityPost? = null, val loading: Boolean = false, val error: String? = null)
+data class LinkResolutionState(val link: ChannelLink? = null, val context: ApiContext? = null,
+    val loading: Boolean = false, val error: String? = null)
 data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean = false, val error: String? = null,
     val playing: Boolean = false, val position: Long = 0, val duration: Long = 0, val buffering: Boolean = false,
     val mediaId: String = "", val playWhenReady: Boolean = false, val playerState: Int = Player.STATE_IDLE,
@@ -72,6 +74,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val blocked = app.blocked.state
     val searchVisibility = MutableStateFlow(store.searchVisibility(api.context()))
     val browse = MutableStateFlow(BrowseState())
+    val linkResolution = MutableStateFlow(LinkResolutionState())
+    private var linkResolutionJob: Job? = null
     val searchInput = MutableStateFlow(SearchInput())
     val scopedSearch = MutableStateFlow(SearchInput())
     val browseReset = MutableStateFlow(0L)
@@ -98,6 +102,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var pendingPlaylistSubscription: Pair<String, Playlist>? = null
     private var playlistRevision = 0L
     private var playlistSeed: String? = null
+    private var playlistLink: VideoLink? = null
     private var rssJob: Job? = null
     private val subscriptionsController = SubscriptionsController(viewModelScope, api::context, api::subscriptions, ::friendly)
     val subscriptionChannels = subscriptionsController.state
@@ -146,10 +151,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val channel: Channel?, val channelTab: ChannelTab?, val playlist: Playlist?, val seed: String?,
         val playlistSort: String, val videoSort: ChannelSort, val postDetail: PostDetailState, val postComments: CommentsState,
         val scopedSearch: SearchInput, val discovery: String, val context: ApiContext,
-        val channelSearchOrigin: BrowseReturn?, val subscriptionParent: Boolean)
+        val channelSearchOrigin: BrowseReturn?, val subscriptionParent: Boolean, val playlistLink: VideoLink?)
     private fun captureBrowse() = BrowseReturn(tab, route, browse.value, channel.value, channelTab.value,
         playlist.value, playlistSeed, channelPlaylistSort.value, channelVideoSort.value, postDetail.value,
-        postComments.value, scopedSearch.value, discovery.value, api.context(), channelSearchOrigin, subscriptionChannelParent)
+        postComments.value, scopedSearch.value, discovery.value, api.context(), channelSearchOrigin, subscriptionChannelParent, playlistLink)
     private val browseReturns = mutableListOf<BrowseReturn>()
     private var channelSearchOrigin: BrowseReturn? = null
     private var searchReturn: BrowseReturn? = null
@@ -210,10 +215,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { account.collect {
             commentController.bind(null, false)
             subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput()
-            browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
+            dismissLinkResolution(); browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
             blockUndo.value = null
             playlistRevision++; playlistBusy.value = emptySet(); playlistErrors.value = emptyMap()
-            playlist.value = null; playlistSeed = null; playlists.value = emptyList()
+            playlist.value = null; playlistSeed = null; playlistLink = null; playlists.value = emptyList()
             postDetail.value = PostDetailState(); postCommentController.bind(null); browseReturns.clear(); channelSearchOrigin = null
             rssJob?.cancel(); rss.value = RssState()
             val pendingList = pendingPlaylistSubscription
@@ -353,9 +358,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
         }
     }
-    fun navigate(tab: String, route: String = "", loadContent: Boolean = true) {
-        if (this.route != route && (this.route.startsWith("channel:") || this.route.startsWith("post:")) &&
-            (route.startsWith("channel:") || route.startsWith("post:") || route.startsWith("playlist:"))) browseReturns += captureBrowse()
+    fun navigate(tab: String, route: String = "", loadContent: Boolean = true, rememberOrigin: Boolean = false) {
+        dismissLinkResolution()
+        if (this.route != route && (rememberOrigin || (this.route.startsWith("channel:") || this.route.startsWith("post:") || this.route.startsWith("hashtag:")) &&
+            (route.startsWith("channel:") || route.startsWith("post:") || route.startsWith("playlist:") || route.startsWith("hashtag:")))) browseReturns += captureBrowse()
         channelSearchOrigin = null
         if (this.tab == "Subscriptions" && this.route.isEmpty() && route == "subscription-channels") subscriptionFeedSearch = scopedSearch.value
         val returnToFeed = this.route == "subscription-channels" && tab == "Subscriptions" && route.isEmpty()
@@ -365,13 +371,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         postDetail.value = PostDetailState()
         this.tab = tab; navigation.value = tab to route; this.route = route
         scopedSearch.value = if (returnToFeed) subscriptionFeedSearch else SearchInput()
-        channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; channelPlaylistSort.value = "last"; channelVideoSort.value = ChannelSort.NEWEST; if (loadContent) refresh()
+        channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; playlistLink = null; channelPlaylistSort.value = "last"; channelVideoSort.value = ChannelSort.NEWEST; if (loadContent) refresh()
     }
     private fun restoreBrowse(saved: BrowseReturn, afterSignIn: Boolean = false) {
+        dismissLinkResolution()
         if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Home"); return }
         browseJob?.cancel(); browseGeneration++
         tab = saved.tab; route = saved.route; channel.value = saved.channel; channelTab.value = saved.channelTab
-        playlist.value = saved.playlist; playlistSeed = saved.seed; channelPlaylistSort.value = saved.playlistSort
+        playlist.value = saved.playlist; playlistSeed = saved.seed; playlistLink = saved.playlistLink; channelPlaylistSort.value = saved.playlistSort
         channelVideoSort.value = saved.videoSort; postDetail.value = saved.postDetail.copy(context = api.context(), loading = false)
         postCommentController.restore(saved.postComments)
         channelSearchOrigin = saved.channelSearchOrigin; subscriptionChannelParent = saved.subscriptionParent
@@ -403,6 +410,39 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         postDetail.value = PostDetailState(link, api.context())
         postNavigation.value++
         load(false)
+    }
+    fun dismissLinkResolution() { linkResolutionJob?.cancel(); linkResolutionJob = null; linkResolution.value = LinkResolutionState() }
+    fun retryLinkResolution() { linkResolution.value.link?.let(::openChannelLink) }
+    private fun openChannelLink(link: ChannelLink) {
+        dismissLinkResolution(); postNavigation.value++
+        if (link.id != null) {
+            navigate(tab, "channel:${link.id}", loadContent = false, rememberOrigin = true)
+            channelTab.value = link.tab; refresh(); return
+        }
+        val context = api.context()
+        linkResolution.value = LinkResolutionState(link, context, loading = true)
+        linkResolutionJob = viewModelScope.launch {
+            try {
+                val id = api.resolveChannel(link, context)
+                if (api.context() == context && linkResolution.value.link == link) {
+                    navigate(tab, "channel:$id", loadContent = false, rememberOrigin = true)
+                    channelTab.value = link.tab; refresh()
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (api.context() == context && linkResolution.value.link == link)
+                linkResolution.value = LinkResolutionState(link, context, error = friendly(e)) }
+        }
+    }
+    fun openContent(target: ContentLink): Boolean {
+        when (target) {
+            is ContentLink.Video -> { dismissLinkResolution(); return openLink(target.link) }
+            is ContentLink.Channel -> openChannelLink(target.link)
+            is ContentLink.Post -> openPost(target.link)
+            is ContentLink.Hashtag -> { postNavigation.value++; navigate(tab, "hashtag:${target.tag}", rememberOrigin = true) }
+            is ContentLink.Seek -> seekTo(target.milliseconds)
+            is ContentLink.External -> return false
+        }
+        return false
     }
     fun openPostComments() {
         val detail = postDetail.value
@@ -551,7 +591,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         val selectedPostLink = postDetail.value.link ?: selectedRoute.takeIf { it.startsWith("post:") }?.let { PostLink(it.substringAfter(':')) }
-        browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute.startsWith("post:")) "Post" else selectedTab)
+        browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
                 var continuation = ""
@@ -561,6 +601,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 var posts = emptyList<CommunityPost>()
                 var channels = emptyList<Channel>()
                 val videos = when {
+                    selectedRoute.startsWith("hashtag:") -> {
+                        val response = api.hashtag(selectedRoute.substringAfter(':'), page, context)
+                        hasMore = response.size >= 60; response
+                    }
                     selectedRoute.startsWith("post:") && selectedPostLink != null -> {
                         postDetail.value = PostDetailState(selectedPostLink, context, postDetail.value.post, loading = true)
                         val post = api.post(selectedPostLink, context)
@@ -668,12 +712,29 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun play(id: String, explicit: Long? = null, source: String? = null, index: Int? = null, audio: Boolean = false, seed: String? = null) {
         cancelAccumulatedSeek(false)
-        queueCommand(PlaybackService.QUEUE_START) { putString("id", id); (seed ?: playlist.value?.takeIf { it.id == source }?.seedVideoId)?.let { putString("seed", it) }; source?.let { putString("source", it) }; index?.let { putInt("index", it) }; explicit?.let { putLong("seconds", it) }; putBoolean("audio", audio) }
+        val linked = playlistLink?.takeIf { source != null && it.playlistId == source && route == "playlist:$source" }
+        if (linked != null) playlistLink = null
+        queueCommand(PlaybackService.QUEUE_START) {
+            putString("id", id); (seed ?: playlist.value?.takeIf { it.id == source }?.seedVideoId)?.let { putString("seed", it) }
+            source?.let { putString("source", it) }; (index ?: linked?.index)?.let { putInt("index", it) }
+            explicit?.let { putLong("seconds", it) }; putBoolean("audio", audio)
+            linked?.let { putString("linkPlayback", it.playback.copy(startMs = it.startMs).json().toString()) }
+        }
     }
     fun playVideo(video: Video, source: Playlist? = null, audio: Boolean = false) = play(video.id, source = source?.id, index = video.playlistIndex, audio = audio)
     fun openLink(link: VideoLink): Boolean {
-        if (link.id.isEmpty()) { openPlaylist(Playlist(link.playlistId!!, "Playlist", 0, seedVideoId = link.seedVideoId)); return false }
-        play(link.id, link.seconds, link.playlistId, link.index, seed = link.seedVideoId); return true
+        if (link.id.isEmpty()) {
+            openPlaylist(Playlist(link.playlistId!!, "Playlist", 0, seedVideoId = link.seedVideoId))
+            playlistLink = link
+            return false
+        }
+        cancelAccumulatedSeek(false)
+        queueCommand(PlaybackService.QUEUE_START) {
+            putString("id", link.id); link.playlistId?.let { putString("source", it) }; link.index?.let { putInt("index", it) }
+            link.seedVideoId?.let { putString("seed", it) }
+            putString("linkPlayback", link.playback.copy(startMs = link.startMs).json().toString())
+        }
+        return true
     }
     fun insertQueue(video: Video, next: Boolean) {
         queueCommand(PlaybackService.QUEUE_INSERT) {
@@ -733,7 +794,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun togglePlay() { cancelAccumulatedSeek(false); controller.value?.let {
-        if (it.playbackState == Player.STATE_ENDED) { it.seekToDefaultPosition(); it.play() }
+        if (it.playbackState == Player.STATE_ENDED) { val start = queue.value.current?.linkPlayback?.startMs; if (start != null) it.seekTo(start) else it.seekToDefaultPosition(); it.play() }
         else if (it.playWhenReady) it.pause() else it.play()
     } }
     fun seekTo(position: Long) { controller.value?.let { p ->
@@ -834,7 +895,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     } }
     fun autoAudio() { controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
         .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build() } }
-    private fun syncComments() = commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, preferences.value.showYoutubeComments)
+    private fun syncComments() = commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
     fun openComments() { syncComments(); commentController.open() }
     fun closeComments() = commentController.close()
     fun backComments() = commentController.back()

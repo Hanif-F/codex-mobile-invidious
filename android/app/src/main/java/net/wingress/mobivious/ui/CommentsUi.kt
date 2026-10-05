@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import net.wingress.mobivious.data.*
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Composable
 internal fun CommentsEntry(state: CommentsState, open: () -> Unit) {
@@ -197,11 +198,11 @@ private fun attribute(tag: String, name: String): String = Regex("""\b$name\s*=\
     .find(tag)?.let { it.groupValues[1].ifEmpty { it.groupValues[2] } }.orEmpty()
 
 /** Convert the server's HTML subset to native spans; HTML event handlers are never executed. */
-private fun richContent(comment: Comment, server: String, video: String, color: Color, link: (String) -> Unit): RichContent {
+private fun richContent(text: String, htmlSource: String, server: String, video: String, color: Color, link: (String) -> Unit): RichContent {
     val emoji = linkedMapOf<String, CommentEmoji>()
-    val plain: Spanned = if (comment.html.isBlank()) SpannableString(comment.text).also { Linkify.addLinks(it, Linkify.WEB_URLS) }
+    val plain: Spanned = if (htmlSource.isBlank()) SpannableString(text).also { Linkify.addLinks(it, Linkify.WEB_URLS) }
     else {
-        val html = Regex("(?is)<(script|style)\\b[^>]*>.*?</\\1\\s*>").replace(comment.html, "")
+        val html = Regex("(?is)<(script|style)\\b[^>]*>.*?</\\1\\s*>").replace(htmlSource, "")
         val withImages = Regex("(?is)<img\\b[^>]*>").replace(html) { match ->
             val alt = Html.fromHtml(attribute(match.value, "alt"), Html.FROM_HTML_MODE_COMPACT).toString().ifBlank { "Emoji" }
             val rawUrl = Html.fromHtml(attribute(match.value, "src"), Html.FROM_HTML_MODE_COMPACT).toString()
@@ -236,20 +237,39 @@ private fun richContent(comment: Comment, server: String, video: String, color: 
                 TextLinkStyles(SpanStyle(color = color, textDecoration = TextDecoration.Underline))) { link(span.url) }, start, end)
         }
     }
+    val linked = plain.getSpans(0, plain.length, URLSpan::class.java).map { plain.getSpanStart(it) until plain.getSpanEnd(it) }.toMutableList()
+    fun add(start: Int, end: Int, target: String) {
+        if (start >= end || linked.any { start < it.last + 1 && end > it.first } || ContentLinks.resolve(target, server, video) == null) return
+        builder.addLink(LinkAnnotation.Clickable(target, TextLinkStyles(SpanStyle(color = color, textDecoration = TextDecoration.Underline))) { link(target) }, offsets[start], offsets[end])
+        linked += start until end
+    }
+    val auto = SpannableString(plain.toString()).also { Linkify.addLinks(it, Linkify.WEB_URLS) }
+    auto.getSpans(0, auto.length, URLSpan::class.java).forEach { add(auto.getSpanStart(it), auto.getSpanEnd(it), it.url) }
+    if (video.isNotEmpty()) Regex("(?<![\\p{L}\\p{N}:])(?:\\d+:)?\\d{1,2}:\\d{2}(?![\\p{L}\\p{N}:])").findAll(plain.toString()).forEach {
+        VideoLinks.timestampSeconds(it.value)?.let { seconds -> add(it.range.first, it.range.last + 1, "/watch?v=$video&t=$seconds") }
+    }
+    Regex("(?<![\\p{L}\\p{N}_])#[\\p{L}\\p{N}_]+", RegexOption.IGNORE_CASE).findAll(plain.toString()).forEach {
+        val base = server.toHttpUrlOrNull()
+        if (base != null) add(it.range.first, it.range.last + 1, base.newBuilder().addPathSegment("hashtag").addPathSegment(it.value.drop(1)).build().toString())
+    }
     return RichContent(builder.toAnnotatedString(), emoji)
 }
 
 @Composable
 internal fun RichCommentText(comment: Comment, server: String, video: String, link: (String) -> Unit,
-    collapsedLines: Int = 6, tag: String = "comment-body-${comment.key}") {
+    collapsedLines: Int = 6, tag: String = "comment-body-${comment.key}") = NativeRichText(comment.text, comment.html, comment.key, server, video, link, collapsedLines, tag)
+
+@Composable
+internal fun NativeRichText(text: String, html: String, key: String, server: String, video: String, link: (String) -> Unit,
+    collapsedLines: Int = Int.MAX_VALUE, tag: String = "rich-text") {
     val color = MaterialTheme.colorScheme.primary
     val onLink by rememberUpdatedState(link)
-    val content = remember(comment.html, comment.text, server, video, color) {
-        runCatching { richContent(comment, server, video, color) { onLink(it) } }
-            .getOrElse { RichContent(AnnotatedString(comment.text), emptyMap()) }
+    val content = remember(html, text, server, video, color) {
+        runCatching { richContent(text, html, server, video, color) { onLink(it) } }
+            .getOrElse { RichContent(AnnotatedString(text), emptyMap()) }
     }
-    var expanded by remember(comment.key) { mutableStateOf(false) }
-    var truncated by remember(comment.key) { mutableStateOf(false) }
+    var expanded by remember(key) { mutableStateOf(false) }
+    var truncated by remember(key) { mutableStateOf(false) }
     val inline = content.emoji.mapValues { (_, emoji) ->
         var failed by remember(emoji.url) { mutableStateOf(false) }
         val width = if (failed) (emoji.alt.length * .6f).coerceIn(1.2f, 12f).em else 1.2.em

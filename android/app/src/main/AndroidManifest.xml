@@ -5,6 +5,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <queries><intent><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="https" /></intent></queries>
     <application android:name=".MobiviousApplication" android:label="Mobivious"
         android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher"
         android:allowBackup="false" android:usesCleartextTraffic="false"
@@ -15,14 +16,26 @@
             <intent-filter><action android:name="android.intent.action.SEND" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="text/plain" /></intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/post" />
-                <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/post" />
-                <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/watch" />
-                <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/watch" />
-                <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/playlist" />
-                <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/playlist" />
-                <data android:scheme="https" android:host="mobivious.wingress.net" android:pathPrefix="/mix" />
-                <data android:scheme="https" android:host="invidious.wingress.net" android:pathPrefix="/mix" />
+                <data android:scheme="https" />
+                <data android:host="mobivious.wingress.net" />
+                <data android:host="invidious.wingress.net" />
+                <data android:pathPrefix="/post" />
+                <data android:pathPrefix="/watch" />
+                <data android:pathPrefix="/playlist" />
+                <data android:pathPrefix="/mix" />
+                <data android:pathPrefix="/w/" />
+                <data android:pathPrefix="/v/" />
+                <data android:pathPrefix="/e/" />
+                <data android:pathPrefix="/shorts/" />
+                <data android:pathPrefix="/live/" />
+                <data android:pathPrefix="/embed/" />
+                <data android:pathPrefix="/channel/" />
+                <data android:pathPrefix="/@" />
+                <data android:pathPrefix="/c/" />
+                <data android:pathPrefix="/user/" />
+                <data android:pathPrefix="/hashtag/" />
+                <data android:pathPrefix="/profile" />
+                <data android:pathPrefix="/attribution_link" />
             </intent-filter>
         </activity>
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.rss"

@@ -1431,3 +1431,84 @@ Existing sibling APIs provide posts in `comments`, related channels in
 resolved channel ID as `ucid`. No server code, migration, token scope, dependency,
 signing/version metadata, production deployment or release publication was changed.
 The signed 0.5.1 release recorded above predates these working-tree changes.
+
+
+## Rich video information and content links — 5 October 2026
+
+Rows 15 and 24 now implement the accepted non-clip native scope. Watch renders
+selectable rich descriptions, links/timestamps/hashtags and optional likes,
+verification/subscribers, notices, genre, license, family-friendly/region metadata
+and music credits. Incoming, pasted and rich-text content use one router with
+native channel resolution and hashtag paging. Direct Share retains service
+position, matched source occurrence and active link overrides. End boundaries
+use absolute video coordinates, with service-owned clamp/pause/replay/loop.
+Listen, speed and proxy carry through queue successors; other URL overrides
+stay on the linked occurrence without writing saved preferences. Bare source
+links keep browsing first and apply their options when Play is chosen.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 224 passed; zero failures, errors or skips, including 9 content-link and 2 metadata tests |
+| Android debug and instrumentation APKs | Passed; seven new link smoke and three presentation scenarios compile |
+| Android debug lint | Passed; zero errors, existing dependency/style warnings |
+| Localhost content-link fixture | Passed: rich metadata, public channel resolution/retry, hashtag paging, local/region request tracing and older-response fallback |
+| Invidious normal build | Passed with `-Dskip_videojs_download` |
+| Invidious regular/scheduled video extraction specs | Three examples passed; zero failures |
+| Production video serializer and frontend template fixtures | Passed: empty/custom license, rich metadata and music-credit assertions plus existing fixture regressions |
+| Python fixture syntax and whitespace checks in both repositories | Passed |
+| Connected native tests and screenshot acceptance | Unverified: Pixel_8_Pro emulator 37.2.12 exited with SIGSEGV (139) before boot; the focused connected task failed with `No connected devices!` |
+
+Unit tests cover accepted/rejected origins, route aliases, YouTube index conversion,
+timestamp precedence/precision/overflow, explicit false/empty overrides, bounds,
+source duplicates/insertions/unresolved seeds, mix continuation, account-instance
+isolation, encoded public resolution/hashtag requests and unknown optional metadata.
+The production serializer assertions exercise the actual full video response and
+its empty Standard YouTube/custom license semantics. No extraction request is
+added by exposing the existing `Video.license` value.
+
+Compiled device scenarios cover shared channel aliases and retry without search,
+hashtag pagination with playback continuing, rich metadata and same-occurrence
+seeking, end pause/replay/refresh, bounded loop/background playback, Activity
+recreation and carried-only successor settings, and browse-first source links.
+Presentation scenarios cover narrow/dark/200%-font metadata and region/credit
+expansion, HTML link targets, plain-text timestamps/hashtags and script removal.
+These device scenarios have **not executed**. No new native screenshots were
+produced or inspected; real intents, Android choosers, navigation restoration,
+playback bounds, PiP/background controls and layout still need device acceptance.
+
+Reproduction:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
+  ./gradlew :app:testDebugUnitTest :app:assembleDebug \
+  :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
+cd ..
+python3 scripts/check-content-links-fixture.py
+cd ../invidious
+CRYSTAL_CACHE_DIR=/tmp/mobivious-rich-links-crystal-cache \
+  crystal build src/invidious.cr -Dskip_videojs_download -o /tmp/invidious-rich-links
+CRYSTAL_CACHE_DIR=/tmp/mobivious-rich-links-crystal-cache \
+  crystal spec spec/invidious/videos/regular_videos_extract_spec.cr \
+  spec/invidious/videos/scheduled_live_extract_spec.cr
+CRYSTAL_CACHE_DIR=/tmp/mobivious-rich-links-crystal-cache \
+  FRONTEND_FIXTURES=/tmp/invidious-rich-links-fixtures \
+  crystal run tests/frontend/render_fixtures.cr --error-trace
+```
+
+The Android build log is `/tmp/mobivious-rich-links-checks.log`. Server build,
+extraction and serializer logs use `/tmp/mobivious-rich-links-server-*.log`;
+the failed emulator startup is `/tmp/mobivious-rich-links-emulator.log` and the
+focused connected-task failure is `/tmp/mobivious-rich-links-connected.log`.
+On a working emulator/device, run `scripts/test-android.sh` to supply generated
+media and the local fixture, including `ContentLinksSmokeTest` and
+`VideoInformationPresentationTest`. The standalone fixture checker uses a
+temporary localhost server and shuts it down on exit.
+
+The sibling server adds only the optional public `license` video field. Existing
+public `/api/v1/resolveurl` and `/api/v1/hashtag/:tag` contracts supply navigation;
+older instances may lack them and will show the existing retry/error handling.
+No migration, authentication scope, dependency, signing/version metadata,
+production deployment or release publication changed. The signed 0.5.1 APK
+predates these working-tree changes. License display needs the sibling update
+deployed; older servers remain usable with that optional metadata hidden.
