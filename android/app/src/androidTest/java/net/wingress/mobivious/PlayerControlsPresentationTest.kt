@@ -5,8 +5,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
@@ -46,8 +49,10 @@ class PlayerControlsPresentationTest {
     private var chapterClicks = 0
     private var settingsClicks = 0
     private var playClicks = 0
+    private lateinit var inputModeManager: InputModeManager
 
     @Composable private fun Content() {
+        inputModeManager = LocalInputModeManager.current
         MaterialTheme {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue),
                 LocalLayoutDirection provides direction.value) {
@@ -113,8 +118,11 @@ class PlayerControlsPresentationTest {
         compose.runOnIdle { position.longValue = 35000 }
         compose.onNodeWithTag("player-time").assertTextEquals("0:35 / 2:00")
         compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertTextEquals("Second chapter")
-        compose.onNodeWithTag("player-chapter-title").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
+        compose.onNodeWithTag("player-chapter-title").performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+            .assertIsFocused()
             .performKeyInput { keyDown(Key.Enter); keyUp(Key.Enter) }
+        compose.waitForIdle()
         assertEquals(2, chapterClicks)
         compose.onNodeWithContentDescription("Player settings").performClick()
         assertEquals(1, settingsClicks)

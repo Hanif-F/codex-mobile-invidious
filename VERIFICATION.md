@@ -1707,8 +1707,9 @@ Genre links, region expansion and music credits remain available.
 | Android JVM unit tests | Passed: 231 tests, no failures or errors |
 | Debug application and instrumentation APK builds | Passed |
 | Debug lint | Passed: 0 errors, 26 warnings |
-| Focused connected presentation tests | Unverified: `No connected devices!` |
-| Native player layout, interactions and screenshots | Unverified: emulator crashed before Android booted |
+| Focused connected presentation tests | Passed: 13 tests on the user-started Pixel_8_Pro emulator, Android 16 / API 36 |
+| Fixture-backed playback and content-link smoke tests | Passed: 4 tests, including real normal/fullscreen control geometry, chapter selection/scrubbing, fullscreen sheet Back handling, and description links/visibility |
+| Native player layout, interactions and screenshots | Inspected normal/fullscreen playback and integrated description metadata; normal chapter title opened its panel with an ADB touch |
 
 Four new control presentation scenarios cover footer ordering, long-title
 ellipsis, RTL and large fonts, normal/fullscreen layouts, short-player centering,
@@ -1717,18 +1718,41 @@ duration labels. Two new description scenarios cover shared metadata visibility,
 genre links, empty descriptions and absent metadata. Existing chapter/information
 presentation and content-link smoke scenarios were updated, and a new playback
 smoke scenario checks the actual player footer and center button across fullscreen.
-These device scenarios compile but **have not executed**.
+All 17 focused device scenarios passed together with no failures, errors or skips.
+Keyboard scenarios explicitly enter keyboard input mode before requesting focus.
+The fullscreen geometry scenario waits for Android's landscape configuration and
+player bounds before tapping the chapter title; checking fullscreen chrome alone
+was insufficient to synchronize with the platform rotation.
+
+Device playback initially uncovered an independent `CodecAwareTrackSelector`
+array-bounds crash. Media3 supplies a format-support bucket for unmapped groups
+after the actual renderer buckets. The selector now leaves that bucket and
+non-video renderer supports unchanged, filtering only video renderer groups.
+The fixture DASH playback smoke tests passed after this guard was added.
 
 The read-only Pixel_8_Pro emulator (37.2.12) exited with SIGSEGV (139) despite a
 cold boot, software graphics and disabled Vulkan. Host crash diagnostics identify
 `qemu-system-x86_64-headless` as the crashing process; `emulator -accel-check`
 reports KVM installed and usable. The underlying emulator crash cause is not
 established. This happened before the application could be installed or run.
+The user's normal GUI launch subsequently booted successfully as `emulator-5554`,
+allowing APK installation, playback tests and screenshots. Android's first-time
+immersive-mode tutorial was dismissed during manual fullscreen inspection. The
+original headless-launch crash remains unexplained; it did not recur on this
+GUI-started emulator.
+
+Screenshots are stored locally in the ignored directory
+`.tools/verification/compact-player-2026-10-05/`: `normal.png`, `fullscreen.png`
+and `description.png`. Manual inspection used the emulator's native display
+and default font/layout direction. Narrow widths, large fonts and RTL were
+verified by the Compose presentation scenarios, rather than by manual screenshots.
+No physical-device or complete instrumentation-suite run was performed.
 
 Build, emulator and connected-test logs are
 `/tmp/mobivious-compact-player-checks.log`,
 `/tmp/mobivious-compact-player-emulator.log` and
-`/tmp/mobivious-compact-player-connected-checks.log`.
+`/tmp/mobivious-compact-player-connected-checks.log`. The successful final combined
+unit/build/lint/device run is `/tmp/mobivious-compact-player-final-checks.log`.
 
 Reproduction:
 
@@ -1739,11 +1763,13 @@ JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
   :app:assembleDebugAndroidTest :app:lintDebug --offline --console=plain
 JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME="$HOME/Android/Sdk" \
   ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.ChaptersPresentationTest,net.wingress.mobivious.VideoInformationPresentationTest \
+  '-Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.ChaptersPresentationTest,net.wingress.mobivious.VideoInformationPresentationTest,net.wingress.mobivious.ChaptersSmokeTest#inlineFooterAndCenteredPlaybackStayInPlaceAcrossFullscreen,net.wingress.mobivious.ChaptersSmokeTest#selectingAndScrubbingPreservePlaybackAndMakeNoPreviewOrMetadataRequests,net.wingress.mobivious.ChaptersSmokeTest#fullscreenUsesChapterSheetAndBackClosesItBeforeLeavingFullscreen,net.wingress.mobivious.ContentLinksSmokeTest#richWatchInformationAndTimestampSeekKeepTheQueueOccurrence' \
   --offline --console=plain
 cd ..
 ```
 
-With a connected Android device, run `scripts/test-android.sh` for the fixture-backed
-playback and content-link checks. Inspect normal/fullscreen controls and expanded
-descriptions at narrow widths, large fonts and RTL before claiming visual acceptance.
+For the fixture-backed checks, first generate the local media, start
+`scripts/fixture-server.py --media-dir .tools/test-media` and connect it using
+`adb reverse tcp:18080 tcp:18080`, as in `scripts/test-android.sh`. Stop the
+temporary fixture and remove its reverse connection after testing. The user's
+emulator was left running.

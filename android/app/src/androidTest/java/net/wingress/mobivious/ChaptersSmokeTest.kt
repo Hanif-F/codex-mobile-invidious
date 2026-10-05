@@ -1,6 +1,7 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import android.content.res.Configuration
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.Player
@@ -48,7 +49,11 @@ class ChaptersSmokeTest {
         if (resumed != null) activity = resumed!!
         resumed != null && activity.model.controller.value != null
     }
-    private fun chapters() { compose.onNodeWithTag("player-chapter-title").performClick(); compose.onNodeWithTag("chapters-panel").assertIsDisplayed() }
+    private fun chapters() {
+        compose.onNodeWithTag("player-chapter-title").performClick()
+        compose.waitUntil(5000) { runCatching { compose.onNodeWithTag("chapters-panel").assertIsDisplayed() }.isSuccess }
+        compose.onNodeWithTag("chapters-panel").assertIsDisplayed()
+    }
 
     @Before fun launch() {
         command("reset"); command("chapters")
@@ -106,9 +111,13 @@ class ChaptersSmokeTest {
         }
         checkControls(false)
         compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()
+        // Fullscreen chrome changes before Android finishes rotating the window.
+        until {
+            activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE &&
+                compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot().let { it.right - it.left > it.bottom - it.top }
+        }
         checkControls(true)
-        compose.onNodeWithTag("player-chapter-title").performClick()
-        compose.onNodeWithTag("chapters-panel").assertIsDisplayed()
+        chapters()
     }
 
     @Test fun fullscreenUsesChapterSheetAndBackClosesItBeforeLeavingFullscreen() {

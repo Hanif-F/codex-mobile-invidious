@@ -4,9 +4,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.InputMode
+import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -72,9 +75,11 @@ class ChaptersPresentationTest {
     }
 
     @Test fun inlineChapterAndScrubFeedbackKeepAccessibleLongRtlTitles() {
+        lateinit var inputModeManager: InputModeManager
         val longTitle = "عنوان طويل 日本語 ".repeat(15).trim()
         val entries = listOf(VideoChapter(0, longTitle), VideoChapter(10000, "Second"))
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
+            inputModeManager = LocalInputModeManager.current
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalLayoutDirection provides LayoutDirection.Rtl) {
                 val state = rememberChapterPanelState()
                 Column(Modifier.width(320.dp).height(600.dp)) {
@@ -92,8 +97,11 @@ class ChaptersPresentationTest {
         compose.onNodeWithTag("player-seek-sponsor-labels").assertTextEquals("Sponsor, Intro")
         compose.onNodeWithTag("chapter-0").assertIsSelected().assert(hasClickAction())
         compose.onNodeWithTag("chapters-list").performScrollToIndex(1)
-        compose.onNodeWithTag("chapter-10000").assertIsDisplayed().performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
+        compose.onNodeWithTag("chapter-10000").assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }.assertIsFocused()
         compose.onNodeWithTag("chapter-10000").performKeyInput { keyDown(Key.Enter); keyUp(Key.Enter) }
+        compose.waitForIdle()
         assertEquals(10000L, selected)
     }
 

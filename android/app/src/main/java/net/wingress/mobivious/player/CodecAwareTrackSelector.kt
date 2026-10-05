@@ -41,10 +41,13 @@ internal class CodecAwareTrackSelector(context: Context) : DefaultTrackSelector(
         // excluding other codecs only when a supported preferred codec exists.
         val allowed = resolved.adaptive(choices)
         val filtered = Array(rendererFormatSupports.size) { renderer ->
-            Array(rendererFormatSupports[renderer].size) { groupIndex ->
+            // Media3 includes an extra bucket for unmapped groups, which has no renderer.
+            if (renderer >= mappedTrackInfo.rendererCount || mappedTrackInfo.getRendererType(renderer) != C.TRACK_TYPE_VIDEO)
+                rendererFormatSupports[renderer]
+            else Array(rendererFormatSupports[renderer].size) { groupIndex ->
                 val group = mappedTrackInfo.getTrackGroups(renderer)[groupIndex]
                 IntArray(group.length) { track ->
-                    if (mappedTrackInfo.getRendererType(renderer) != C.TRACK_TYPE_VIDEO || allowed.any { it.group == group && it.index == track })
+                    if (allowed.any { it.group == group && it.index == track })
                         rendererFormatSupports[renderer][groupIndex][track]
                     else RendererCapabilities.create(C.FORMAT_UNSUPPORTED_SUBTYPE)
                 }
