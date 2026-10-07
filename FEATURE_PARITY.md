@@ -3,7 +3,7 @@
 Reviewed on **7 October 2026** against the local source checkouts:
 
 - Web: `../invidious` at `f260f8e5` plus native clip token scopes and channel Clips metadata. Includes this fork's custom features and native API extensions.
-- Android: `d8d0afa` plus native Clips implementation and focused playback fixes. Configured version: `0.6.0` (version code 12); release tag: `v0.6.0`.
+- Android: `32d5c14` plus the release version bump. Configured version: `0.7.0` (version code 13); release tag: `v0.7.0`.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 

@@ -2490,3 +2490,45 @@ update. Existing migration 19 already supplies storage; there is no new
 migration. Existing accounts must sign out and sign in again to obtain clip
 permissions. Production deployment, real upstream legacy-clip availability and
 moving live streams were not verified in this change.
+
+## Signed Mobivious 0.7.0 — 7 October 2026
+
+Prepared the new minor release from Android `32d5c14` with `versionName` 0.7.0
+and `versionCode` 13. It includes native Clips, subscription-directory sorting,
+the chat appearance/settings overhaul and the accompanying playback fixes since
+v0.6.0. The release uses the existing local signing material; no key was generated
+or rotated.
+
+| Check | Result |
+|---|---|
+| `scripts/build-release.sh` | Passed: signed release APK and checksum produced |
+| Android JVM unit/API tests | 284 passed, 0 failures/errors/skips |
+| Release lint | Passed: 0 errors, 38 warnings |
+| APK package/version | `net.wingress.mobivious`, 0.7.0, version code 13 |
+| Android compatibility | Minimum API 26, target/compile API 37; arm64-v8a, armeabi-v7a, x86, x86_64 |
+| `apksigner verify --print-certs` | Passed; certificate SHA-256 matches the published v0.6.0 APK |
+| APK SHA-256 | `a4ac572fe347c543be2b56da146fe7068ca6d7b29b0b9f32716e983a6e7ab9fd` |
+| APK bytes | 17,259,907 |
+| Signed release emulator smoke check | Installed and cold-launched successfully on emulator-5554 / Android 16; installed version/code confirmed and app process remained running |
+| Git whitespace checks | Passed |
+
+Signing certificate SHA-256:
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+The prior local 0.6.0 APK matches GitHub's published asset digest
+`7c3b92cae96ff1944a1f2f34942b694cc3b23d97e015c82c192cbd3218ec36e7`,
+so the continuity comparison uses the previously distributed binary.
+
+The release artifacts are `artifacts/Mobivious-0.7.0.apk` and
+`artifacts/Mobivious-0.7.0.apk.sha256`; release notes are in
+`artifacts/release-notes-0.7.0.md`. Local reports are preserved under
+`artifacts/release-0.7.0/`. Publication targets
+[GitHub Releases v0.7.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.7.0).
+
+The 40 focused emulator scenarios, additional docked-keyboard check, 13 server
+specs and disposable PostgreSQL clip harness above remain implementation
+evidence; those focused device tests used debug builds. This release adds the
+signed installation/launch smoke check, without claiming a complete release
+device suite or physical-device acceptance. No production server deployment,
+account writes or upstream clip acceptance was performed. Native clips require
+the matching server update and renewed sign-in; subscription ranking requires
+the enriched subscriptions API. Installing this APK does not deploy either.
