@@ -47,7 +47,7 @@ class MainActivity : ComponentActivity() {
         if (text != null) {
             val link = ContentLinks.parse(text, model.store.server)
             if (link != null) sharedVideo.value = model.openContent(link)
-            else model.message.value = "Share a YouTube or configured Invidious video, playlist, mix, channel, hashtag or post link."
+            else model.message.value = "Share a YouTube or configured Invidious video, clip, playlist, mix, channel, hashtag or post link."
         }
     }
     fun updatePip(watching: Boolean) {

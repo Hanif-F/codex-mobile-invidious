@@ -36,6 +36,7 @@ class PlaybackService : MediaSessionService() {
         const val SPONSOR_CONFIGURE = "mobivious.sponsorblock.configure"
         const val SPONSOR_SKIP = "mobivious.sponsorblock.skip"
         const val SPONSOR_DISMISS = "mobivious.sponsorblock.dismiss"
+        const val CLIP_FULL_VIDEO = "mobivious.clip.fullVideo"
         const val QUEUE_START = "mobivious.queue.start"
         const val QUEUE_INSERT = "mobivious.queue.insert"
         const val QUEUE_REMOVE = "mobivious.queue.remove"
@@ -47,7 +48,7 @@ class PlaybackService : MediaSessionService() {
         const val QUEUE_SETTINGS = "mobivious.queue.settings"
         const val VIDEO_AUTO = "mobivious.video.auto"
         const val VIDEO_SELECT = "mobivious.video.select"
-        val QUEUE_COMMANDS = listOf(QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT)
+        val QUEUE_COMMANDS = listOf(CLIP_FULL_VIDEO, QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT)
     }
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
@@ -100,15 +101,15 @@ class PlaybackService : MediaSessionService() {
                     if (customCommand.customAction == SET_HISTORY_SETTINGS) {
                         if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
-                        history = args.getBoolean("history") && owner != null
-                        savePosition = app.playbackQueue.value.current?.linkPlayback?.options?.savePosition ?: args.getBoolean("savePosition")
+                        history = args.getBoolean("history") && owner != null && player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true
+                        savePosition = player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true && (app.playbackQueue.value.current?.linkPlayback?.options?.savePosition ?: args.getBoolean("savePosition"))
                         app.watched.configure(ownerContext!!, savePosition)
                         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                     }
                     if (customCommand.customAction != SET_DISPLAY_TITLE) return Futures.immediateFuture(sponsorCommand(customCommand.customAction, args))
                     val item = player.currentMediaItem
                     val title = args.getString("title")
-                    if (item != null && item.mediaId == args.getString("mediaId") && !title.isNullOrBlank()) {
+                    if (item != null && item.mediaMetadata.extras?.getBoolean("clip") != true && item.mediaId == args.getString("mediaId") && !title.isNullOrBlank()) {
                         val extras = Bundle(item.mediaMetadata.extras ?: Bundle.EMPTY).apply { putBoolean("dearrowMetadataOnly", true) }
                         player.replaceMediaItem(player.currentMediaItemIndex, item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setTitle(title).setExtras(extras).build()).build())
                     }
@@ -156,17 +157,21 @@ class PlaybackService : MediaSessionService() {
     private fun queueCommand(action: String, args: Bundle): SessionResult {
         if (args.getString("server") != app.store.server || args.getString("account") != app.store.account.value?.username || args.getLong("generation") != app.store.contextGeneration)
             return SessionResult(SessionError.ERROR_INVALID_STATE)
-        if (action == QUEUE_STATE) return SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply { putString("state", app.playbackQueue.value.json().toString()) })
+        if (action == QUEUE_STATE) return SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply { putString("state", app.playbackQueue.value.json().toString()); putLong("positionMs", player.currentPosition); putLong("durationMs", player.duration); putBoolean("playing", player.playWhenReady) })
         if (action !in listOf(QUEUE_START, QUEUE_INSERT, QUEUE_SETTINGS) && args.getString("token") != app.playbackQueue.value.token)
             return SessionResult(SessionError.ERROR_INVALID_STATE)
         when (action) {
+            CLIP_FULL_VIDEO -> queue.fullVideo()
             QUEUE_START -> {
                 val id = args.getString("id").orEmpty(); val source = args.getString("source")
                 if ((id.isNotEmpty() && !SponsorBlockRules.validVideo(id)) || (source != null && !source.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) || id.isEmpty() && source == null)
                     return SessionResult(SessionError.ERROR_BAD_VALUE)
+                val clip = args.getString("clip")?.let { raw -> runCatching { Clip.parse(JSONObject(raw), "", app.api.context().server) }.getOrNull()
+                    ?: return SessionResult(SessionError.ERROR_BAD_VALUE) }
+                if (clip != null && (source != null || clip.video.id != id)) return SessionResult(SessionError.ERROR_BAD_VALUE)
                 queue.start(id, source, if (args.containsKey("index")) args.getInt("index") else null,
                     if (args.containsKey("seconds")) args.getLong("seconds") else null, args.getBoolean("audio"), sourceSeed = args.getString("seed"),
-                    linkPlayback = args.getString("linkPlayback")?.let { raw -> runCatching { LinkPlayback.parse(JSONObject(raw)) }.getOrNull() })
+                    linkPlayback = args.getString("linkPlayback")?.let { raw -> runCatching { LinkPlayback.parse(JSONObject(raw)) }.getOrNull() }, clip = clip)
             }
             QUEUE_INSERT -> {
                 val video = runCatching { ApiParser.video(JSONObject(args.getString("video") ?: "{}")) }.getOrNull()
@@ -210,7 +215,7 @@ class PlaybackService : MediaSessionService() {
         if (sponsorContext != app.api.context()) { resetSponsor(player.currentMediaItem, readSettings = false); return }
         val item = player.currentMediaItem ?: return
         sponsor.observePosition(player.currentPosition)
-        val usable = sponsor.settings.usable && item.mediaMetadata.extras?.getBoolean("liveNow") != true &&
+        val usable = item.mediaMetadata.extras?.getBoolean("clip") != true && sponsor.settings.usable && item.mediaMetadata.extras?.getBoolean("liveNow") != true &&
             !player.isCurrentMediaItemLive && player.isCurrentMediaItemSeekable && player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         if (usable && !segmentsRequested && SponsorBlockRules.validVideo(item.mediaId)) {
             segmentsRequested = true
@@ -267,6 +272,7 @@ class PlaybackService : MediaSessionService() {
     private fun recordHistory() {
         if (marked || !history || !sameOwner(owner) || ownerContext != app.api.context()) return
         val item = current ?: return
+        if (item.mediaMetadata.extras?.getBoolean("clip") == true) return
         val context = ownerContext ?: return
         val generation = playbackGeneration
         marked = true
@@ -277,7 +283,7 @@ class PlaybackService : MediaSessionService() {
         }
     }
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {
-        if (!started || !savePosition || item == null || ownerContext != app.api.context()) return
+        if (!started || !savePosition || item == null || item.mediaMetadata.extras?.getBoolean("clip") == true || ownerContext != app.api.context()) return
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: 0
         val value = PlaybackRules.save(position / 1000, duration, ended)
         val context = ownerContext ?: return
@@ -290,7 +296,7 @@ class PlaybackService : MediaSessionService() {
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession = session
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            "mobivious.toggle" -> if (player.playWhenReady) player.pause() else { val bound = app.playbackQueue.value.current?.linkPlayback; if (bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0); player.play() }
+            "mobivious.toggle" -> if (player.playWhenReady) player.pause() else { if (app.playbackQueue.value.current?.clip != null && player.playbackState == Player.STATE_ENDED) player.seekTo(0); val bound = app.playbackQueue.value.current?.linkPlayback; if (bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0); player.play() }
             "mobivious.rewind" -> player.seekTo(queue.clampSeek(player.currentPosition - 10_000))
             "mobivious.forward" -> player.seekTo(queue.clampSeek(player.currentPosition + 10_000))
             else -> return super.onStartCommand(intent, flags, startId)

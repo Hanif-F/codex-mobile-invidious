@@ -66,6 +66,7 @@ sealed interface ContentLink {
     data class Channel(val link: ChannelLink) : ContentLink
     data class Post(val link: PostLink) : ContentLink
     data class Hashtag(val tag: String) : ContentLink
+    data class Clip(val link: ClipLink) : ContentLink
     data class Seek(val milliseconds: Long) : ContentLink
     data class External(val url: String) : ContentLink
 }
@@ -97,6 +98,14 @@ object ContentLinks {
         return result
     }
     private fun native(url: HttpUrl, instance: String): ContentLink? {
+        val clipPath = url.pathSegments.dropLastWhile { it.isEmpty() }
+        if (clipPath.size == 2 && clipPath[0] == "clip" && ClipRules.validId(clipPath[1]) && url.username.isEmpty() && url.password.isEmpty()) {
+            val native = ClipRules.nativeId(clipPath[1])
+            if (accepted(url, instance) || native) {
+                val origin = if (native) url.newBuilder().encodedPath("/").query(null).fragment(null).build().toString().trimEnd('/') else instance
+                return ContentLink.Clip(ClipLink(clipPath[1], origin, url.toString()))
+            }
+        }
         if (!accepted(url, instance)) return null
         PostLinks.parse(url.toString(), instance)?.let { return ContentLink.Post(it) }
         VideoLinks.parseUrl(url, instance)?.let { return ContentLink.Video(it) }
@@ -115,7 +124,6 @@ object ContentLinks {
             it.isNotBlank() && it.length <= 128 && '/' !in it && '\\' !in it && it.none(Char::isISOControl)
         } ?: return null
         val suffix = path.getOrNull(if (handle) 1 else 2)
-        if (suffix == "clips") return null
         val tab = ChannelTab.entries.firstOrNull { it.path == when (suffix) { "community" -> "posts"; "live" -> "streams"; else -> suffix } }
         if (first == "channel") return name.takeIf(ContentVisibility::validChannel)?.let { ContentLink.Channel(ChannelLink(it, tab = tab)) }
         val canonical = "https://www.youtube.com".toHttpUrlOrNull()!!.newBuilder().apply {

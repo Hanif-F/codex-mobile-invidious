@@ -2400,3 +2400,93 @@ ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveChatSmokeTest,net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.WatchPlayerResizePresentationTest
 python3 scripts/check-chat-fixture.py
 ```
+
+
+## Native Clips — 7 October 2026
+
+Implemented against Android `d8d0afa` and sibling Invidious `f260f8e5`, with the
+working-tree Clips changes. Verification used the user's already running Pixel 8
+Pro emulator (`emulator-5554`, Android 16 / API 36), generated local video and
+localhost-only API fixtures. No production accounts or upstream clip writes were
+used, and no server deployment or signed release was performed.
+
+| Check | Result |
+|---|---|
+| Android JVM unit/API tests | 284 passed, 0 failures/errors; 10 dedicated clip scenarios |
+| Debug app and instrumentation APK builds | Passed |
+| Combined emulator suite | 40 passed, 0 failures/errors/skips: 12 Clips, 7 content links, 13 queue/Library, 4 player controls and 4 watch resizing |
+| Android debug lint | Passed: 0 errors, 38 warnings |
+| Crystal clip validation, native clip scopes, channel tab metadata and chat-scope regression specs | 13 passed, 0 failures/errors/pending |
+| Invidious normal/API-only source compilation (`--no-codegen`) | Passed with `-Dskip_videojs_download` |
+| Compiled disposable PostgreSQL clip integration harness | Passed: migration/fresh schema, native routes, token auth/scopes, ownership, Unicode/range validation, pagination, cache invalidation and deletion |
+| Isolated content-link, chapters and chat API fixture checks | Passed |
+| Emulator visual/accessibility checks | Light/dark list/details/editor; portrait/landscape, 1.6× text, wide dialog, keyboard editing, drag and accessible tenths trimming |
+| Additional docked-keyboard layout scenario after emulator restart | Passed: focused title, visible/enabled Publish, retained draft, larger text, rotation and wide dialog |
+| Git whitespace checks | Passed in both repositories |
+
+The real Media3 service decodes DASH, HLS and MP4 fixtures with source bounds
+12.345–42.789 seconds. Each exposes a relative duration of 30,444 milliseconds,
+clamps seeks to 0–30,444, loops from the clip start or stops at the end without
+advancing. Device checks cover notification rewind/forward, PiP entry/return,
+background playback, mini-player, fullscreen, buffer refresh, 1.5× speed,
+audio-only selection, recreation and incoming-link replay prevention. Watch full
+video resumes at source position 17,345 milliseconds from clip position 5,000,
+retaining pause and speed. Ordinary timestamp/playlist/queue/player regressions
+remain covered by the combined run.
+
+Clip playback with history/resume enabled produces no source history or position
+writes. Separate preview playback leaves the original paused service position
+and history unchanged. Closing creation restores the original playing intent
+only for the same occurrence/context; guest sign-in return and paused cancellation
+are checked. Source chapters/chat replay are unavailable during clips, and the
+service suppresses SponsorBlock skipping.
+
+API/unit and database checks cover native and legacy YouTube response shapes,
+missing/invalid/fractional ranges, Unicode code-point title limits, authenticated
+versus public reads, stale account responses, scope renewal messages and owner
+restrictions. Device scenarios exercise 30+1 pagination, scroll restoration,
+refreshing both previously loaded pages after deletion, storyboard/fallback
+trimming, failed create/delete retry, retained drafts, canonical copied links,
+publication/watch/deletion, foreign-instance notices, source-load retry and
+account-specific draft clearing. The fixture's HTTP responses explicitly close
+connections so non-retrying writes do not reuse its closed HTTP/1.0 sockets.
+
+Visual inspection caught an over-sized preview in landscape: the preview now
+uses explicit bounded dimensions and a texture-backed view that clips inside its
+scrolling card. Fullscreen callbacks now read current presentation state. Test
+setup waits for service/controller context and handles the mini-player through
+its visible Restore action. The final combined run above passed after those
+corrections. Physical TalkBack/OEM acceptance and real upstream YouTube clip
+resolution remain unexecuted.
+
+Reports and reviewed screenshots are saved in the ignored `artifacts/clips/`
+directory: `focused-device-40.xml`, `jvm/`, `lint-results-debug.xml`,
+`screenshots/`, and `verification.json`. Earlier failing runs were investigated
+and are not included as passing results. The guarded PostgreSQL container was
+removed after verification; emulator density, font and keyboard settings are
+restored after layout checks. The extra keyboard capture temporarily disabled
+stylus handwriting to exercise the full docked software keyboard, then restored
+that preference too. Its passing result is preserved in `keyboard-layout-device.xml`.
+
+Reproduction with an already running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
+  ANDROID_HOME="$HOME/Android/Sdk" scripts/test-android.sh \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.ClipsSmokeTest,net.wingress.mobivious.ContentLinksSmokeTest,net.wingress.mobivious.QueueLibrarySmokeTest,net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.WatchPlayerResizePresentationTest
+```
+
+Sibling server scope/channel checks:
+
+```sh
+CRYSTAL_CACHE_DIR=/tmp/mobivious-clips-crystal crystal spec \
+  spec/clips_spec.cr spec/native_clips_scopes_spec.cr \
+  spec/native_clips_channel_tabs_spec.cr spec/native_chat_scopes_spec.cr \
+  -Dskip_videojs_download
+```
+
+Native clips require the sibling Clips API, channel metadata and token-scope
+update. Existing migration 19 already supplies storage; there is no new
+migration. Existing accounts must sign out and sign in again to obtain clip
+permissions. Production deployment, real upstream legacy-clip availability and
+moving live streams were not verified in this change.

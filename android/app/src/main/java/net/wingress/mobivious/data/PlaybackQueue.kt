@@ -8,7 +8,7 @@ import net.wingress.mobivious.player.VideoSelection
 data class QueueSource(val id: String, val title: String = "", val count: Int = 0, val mix: Boolean = id.startsWith("RD"), val owned: Boolean = false, val seedVideoId: String? = null)
 data class QueuePage(val source: QueueSource, val videos: List<Video>, val playlist: Playlist? = null)
 data class QueueOccurrence(val key: String, val video: Video, val sourceIndex: Int? = null,
-    val removed: Boolean = false, val tail: Boolean = false, val linkPlayback: LinkPlayback? = null) {
+    val removed: Boolean = false, val tail: Boolean = false, val linkPlayback: LinkPlayback? = null, val clip: Clip? = null) {
     companion object {
         fun local(video: Video, tail: Boolean = false) = QueueOccurrence(UUID.randomUUID().toString(), video, tail = tail)
         fun source(id: String, video: Video, index: Int) = QueueOccurrence("$id:${video.indexId.ifBlank { "$index" }}", video, index)
@@ -32,7 +32,7 @@ data class PlaybackQueueSnapshot(val token: String = "", val context: ApiContext
         .put("source", source?.let { JSONObject().put("id", it.id).put("title", it.title).put("count", it.count).put("mix", it.mix).put("owned", it.owned).put("seedVideoId", it.seedVideoId) })
         .put("items", JSONArray(items.map { JSONObject().put("key", it.key).put("videoId", it.video.id).put("title", it.video.title)
             .put("author", it.video.author).put("authorId", it.video.channelId).put("index", it.sourceIndex).put("indexId", it.video.indexId)
-            .put("unavailable", it.video.unavailable).put("isMember", it.video.membersOnly).put("removed", it.removed).put("tail", it.tail).put("linkPlayback", it.linkPlayback?.json()) }))
+            .put("unavailable", it.video.unavailable).put("isMember", it.video.membersOnly).put("removed", it.removed).put("tail", it.tail).put("linkPlayback", it.linkPlayback?.json()).put("clip", it.clip?.json()) }))
 }
 
 object QueueRules {

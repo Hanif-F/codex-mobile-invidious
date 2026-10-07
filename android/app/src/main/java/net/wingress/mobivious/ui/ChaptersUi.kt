@@ -28,7 +28,7 @@ import net.wingress.mobivious.data.ChapterRules
 import net.wingress.mobivious.data.VideoChapter
 
 internal val PlaybackState.chapters: List<VideoChapter>
-    get() = details?.takeIf { it.video.id == mediaId }?.chapters?.let {
+    get() = details?.takeIf { clip == null && it.video.id == mediaId }?.chapters?.let {
         ChapterRules.available(it, duration, live)
     }.orEmpty()
 

@@ -142,12 +142,14 @@ sealed interface CommentLink {
     data class Video(val link: VideoLink) : CommentLink
     data class Channel(val id: String) : CommentLink
     data class ChannelAlias(val link: ChannelLink) : CommentLink
+    data class Clip(val link: ClipLink) : CommentLink
     data class Hashtag(val tag: String) : CommentLink
     data class Post(val link: PostLink) : CommentLink
     data class External(val url: String) : CommentLink
 }
 object CommentLinks {
     fun resolve(raw: String, instance: String, currentVideo: String): CommentLink? = when (val target = ContentLinks.resolve(raw, instance, currentVideo)) {
+        is ContentLink.Clip -> CommentLink.Clip(target.link)
         is ContentLink.Seek -> CommentLink.Seek(target.milliseconds / 1000)
         is ContentLink.Video -> CommentLink.Video(target.link)
         is ContentLink.Channel -> target.link.id?.let { CommentLink.Channel(it) } ?: CommentLink.ChannelAlias(target.link)

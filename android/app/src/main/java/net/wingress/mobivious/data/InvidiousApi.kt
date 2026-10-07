@@ -8,6 +8,7 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -65,6 +66,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                 if (auth && !chatSettings && response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired")) && target == this@InvidiousApi.context()) expired()
                 throw ApiException(response.code, when {
                     chatSettings && (response.code == 401 || response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired"))) -> "Sign out and sign in again to restore chat settings sync. Playback can continue."
+                    response.code in listOf(404, 405) && (path == "api/v1/auth/clips" || path.startsWith("api/v1/channels/") && path.endsWith("/clips")) -> "This server needs the native Clips API update."
+                    response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/clips") -> "Sign out and sign in again to enable Clips with an updated token."
                     response.code == 429 -> "Too many attempts. Try again after ${response.header("Retry-After") ?: "a few"} seconds."
                     response.code == 404 && path == "api/v1/mobile/login" -> "This server needs the Mobivious native sign-in update."
                     response.code in listOf(404, 405) && error != "Session no longer exists." && (path.startsWith("api/v1/mobile/registration") || path == "api/v1/mobile/register" || path.startsWith("api/v1/auth/account/")) -> "Update this server to enable native registration and account management."
@@ -150,6 +153,40 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     }
     suspend fun playlistAtom(id: String, context: ApiContext): String = request("api/v1/auth/playlists/$id/feed", auth = true,
         context = context, accept = "application/atom+xml").also { if (context != this.context()) throw CancellationException("Account or instance changed") }
+    suspend fun clip(id: String, context: ApiContext = context()): Clip {
+        require(ClipRules.validId(id)) { "Invalid clip ID." }
+        return Clip.parse(JSONObject(scopedRead("api/v1/clips/$id", mapOf("local" to "true"), false, context)), id, context.server)
+    }
+    suspend fun clips(channel: String? = null, page: Int = 1, context: ApiContext = context()): List<Clip> {
+        require(page >= 1)
+        require(channel == null || ContentVisibility.validChannel(channel))
+        val path = if (channel == null) "api/v1/auth/clips" else "api/v1/channels/$channel/clips"
+        return JSONArray(scopedRead(path, mapOf("page" to page.toString()), channel == null, context)).objects().map {
+            Clip.parse(it, it.text("clipId"), context.server)
+        }
+    }
+    suspend fun createClip(video: String, title: String, start: Long, end: Long, context: ApiContext): Clip {
+        require(video.matches(Regex("[A-Za-z0-9_-]{11}"))) { "Invalid source video." }
+        require(ClipRules.error(title, start, end, Long.MAX_VALUE) == null) { "Choose a title and a valid 5–120 second range." }
+        return Clip.parse(JSONObject(request("api/v1/auth/clips", "POST", JSONObject().put("videoId", video).put("title", title.trim())
+            .put("startTime", start / 1000.0).put("endTime", end / 1000.0), auth = true, context = context).also {
+                if (context != this.context()) throw CancellationException("Account or instance changed")
+            }), "", context.server)
+    }
+    suspend fun deleteClip(id: String, context: ApiContext) {
+        require(ClipRules.nativeId(id))
+        request("api/v1/auth/clips/$id", "DELETE", auth = true, context = context)
+        if (context != this.context()) throw CancellationException("Account or instance changed")
+    }
+    suspend fun storyboard(track: StoryboardTrack, context: ApiContext): List<StoryboardFrame> {
+        val target = context.server.toHttpUrlOrNull()?.resolve(track.url) ?: return emptyList()
+        require(target.host == context.server.toHttpUrlOrNull()?.host) { "Invalid storyboard address." }
+        val path = target.encodedPath.trimStart('/')
+        val body = request(path, query = target.queryParameterNames.associateWith { target.queryParameter(it).orEmpty() },
+            context = context, accept = "text/vtt")
+        if (context != this.context()) throw CancellationException("Account or instance changed")
+        return StoryboardVtt.parse(body, target.toString())
+    }
     suspend fun channelSearch(id: String, q: String, page: Int, context: ApiContext = context()) =
         SearchPage.parse(scopedRead("api/v1/channels/$id/search", mapOf("q" to q, "page" to "$page"), false, context))
     suspend fun subscriptionSearch(q: String, page: Int, context: ApiContext = context()) =

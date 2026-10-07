@@ -329,7 +329,7 @@ internal fun PlayerControlFooterWithChat(playback: PlaybackState, positionMs: Lo
                 if (chapters.isNotEmpty()) PlayerChapterTitle(chapters, positionMs, Modifier.weight(1f).padding(start = 8.dp), onChapters)
             }
         }
-        if (onChat != null && playback.details?.chatAvailable == true && !playback.live) IconButton(onClick = onChat,
+        if (onChat != null && playback.clip == null && playback.details?.chatAvailable == true && !playback.live) IconButton(onClick = onChat,
             modifier = Modifier.testTag("player-chat").semantics { selected = chatOpen }) { Icon(Icons.AutoMirrored.Filled.Chat, if (chatOpen) "Hide chat replay" else "Show chat replay", tint = Color.White) }
         IconButton(onClick = onSettings, enabled = settingsEnabled) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }
         IconButton(onClick = onFullscreen) { Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,

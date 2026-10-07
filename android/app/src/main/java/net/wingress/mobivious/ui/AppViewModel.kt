@@ -48,7 +48,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
     val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
-    val history: HistoryPage? = null, val lists: List<Playlist> = emptyList(),
+    val history: HistoryPage? = null, val clips: List<Clip> = emptyList(), val lists: List<Playlist> = emptyList(),
     val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
     val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false)
 data class PostDetailState(val link: PostLink? = null, val context: ApiContext? = null,
@@ -62,7 +62,7 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val speed: Float = 1f, val tracks: Tracks = Tracks.EMPTY, val selection: TrackSelectionParameters? = null,
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
     val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection(),
-    val geometry: VideoGeometry = VideoGeometry())
+    val geometry: VideoGeometry = VideoGeometry(), val clip: Clip? = null)
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
@@ -101,6 +101,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val channelPlaylistSort = MutableStateFlow("last")
     val channelVideoSort = MutableStateFlow(ChannelSort.NEWEST)
     val postDetail = MutableStateFlow(PostDetailState())
+    val clipResolution = MutableStateFlow(ClipResolutionState())
+    val clipEditor = MutableStateFlow(ClipEditorState())
+    val clipOpened = MutableStateFlow(0L)
+    val clipDelete = MutableStateFlow<Clip?>(null)
+    val clipDeleteBusy = MutableStateFlow(false)
+    val clipDeleteError = MutableStateFlow<String?>(null)
+    private var clipJob: Job? = null
+    private var clipEditorJob: Job? = null
+    private var clipDeleteJob: Job? = null
+    private var pendingClipEditor: Pair<String, String>? = null
     val postNavigation = MutableStateFlow(0L)
     private val postCommentController = CommentsController(viewModelScope, api::context, api::comments, ::friendly)
     val postComments = postCommentController.state
@@ -214,9 +224,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (account.value != null) refreshAccount()
             }
             previous = state
+            if (clipEditor.value.open && clipEditor.value.occurrence != state.currentKey) closeClipEditor()
             requestedVideo = state.current?.video?.id
             val old = playback.value.details?.video?.id
-            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection)
+            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection, clip = state.current?.clip)
             if (old != state.details?.video?.id) {
                 playback.value = playback.value.copy(geometry = VideoGeometry())
                 cancelAccumulatedSeek(false)
@@ -225,6 +236,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             syncComments(); syncChat(); state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
         } }
         viewModelScope.launch { account.collect {
+            clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipResolution.value = ClipResolutionState(); clipEditor.value = ClipEditorState()
+            clipDelete.value = null; clipDeleteBusy.value = false; clipDeleteError.value = null
+            if (pendingClipEditor?.first != api.context().server) pendingClipEditor = null
             chatController.bind("", "", false)
             commentController.bind(null, false)
             subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput()
@@ -312,6 +326,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             canRefresh = p.mediaItemCount > 0 && p.isCommandAvailable(Player.COMMAND_STOP) && p.isCommandAvailable(Player.COMMAND_PREPARE), geometry = geometry)
         syncChat()
         if (p.currentMediaItem?.mediaId == chatReplay.value.videoId) chatController.update(playback.value.position, playback.value.duration)
+        val state = queue.value
+        // Account changes replace the service occurrence before its controller timeline arrives.
+        // Wait for that occurrence so the editor captures its actual position and playing intent.
+        if (pendingClipEditor != null && account.value != null && state.context == api.context() &&
+            pendingClipEditor == (api.context().server to state.details?.video?.id) && !state.loading && state.current?.clip == null &&
+            p.playbackState == Player.STATE_READY && p.mediaMetadata.extras?.getString("occurrence") == state.currentKey) {
+            pendingClipEditor = null
+            openClipEditor()
+        }
     }
     fun refreshAccount() {
         refreshSharedSettings()
@@ -379,6 +402,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         lists.filter { it.channelId !in blocked.value.takeIf { state -> state.context == api.context() }?.ids.orEmpty() } else lists
     fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
     private fun syncDeArrowMetadata() {
+        if (queue.value.current?.clip != null) return
         val video = playback.value.details?.video ?: return
         val p = controller.value ?: return
         val title = displayTitle(video)
@@ -388,6 +412,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun navigate(tab: String, route: String = "", loadContent: Boolean = true, rememberOrigin: Boolean = false) {
         navigationRevision++
+        dismissClipResolution(); closeClipEditor()
         dismissLinkResolution()
         if (this.route != route && (rememberOrigin || (this.route.startsWith("channel:") || this.route.startsWith("post:") || this.route.startsWith("hashtag:")) &&
             (route.startsWith("channel:") || route.startsWith("post:") || route.startsWith("playlist:") || route.startsWith("hashtag:")))) browseReturns += captureBrowse()
@@ -416,7 +441,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browse.value = saved.browse.copy(loading = false)
         navigation.value = tab to route; restoredBrowse.value++
         if (route == "subscription-channels") refreshSubscriptions()
-        if (saved.browse.loading || afterSignIn && saved.tab in listOf("Library", "Subscriptions")) load(false, refreshChannel = false)
+        if (saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
+        else if (saved.browse.loading || afterSignIn && saved.tab in listOf("Library", "Subscriptions")) load(false, refreshChannel = false)
     }
     fun openGlobalSearch(text: String) {
         if (text.isBlank()) return
@@ -466,7 +492,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun openContent(target: ContentLink): Boolean {
         when (target) {
-            is ContentLink.Video -> { dismissLinkResolution(); return openLink(target.link) }
+            is ContentLink.Video -> { dismissClipResolution(); dismissLinkResolution(); return openLink(target.link) }
+            is ContentLink.Clip -> { openClipLink(target.link); return true }
             is ContentLink.Channel -> openChannelLink(target.link)
             is ContentLink.Post -> openPost(target.link)
             is ContentLink.Hashtag -> { postNavigation.value++; navigate(tab, "hashtag:${target.tag}", rememberOrigin = true) }
@@ -650,7 +677,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 var lists = emptyList<Playlist>()
                 var posts = emptyList<CommunityPost>()
                 var channels = emptyList<Channel>()
+                var clips = emptyList<Clip>()
                 val videos = when {
+                    selectedRoute == "clips" -> {
+                        if (context.account != null) clips = api.clips(page = page, context = context)
+                        hasMore = clips.size == 30; emptyList()
+                    }
                     selectedRoute.startsWith("hashtag:") -> {
                         val response = api.hashtag(selectedRoute.substringAfter(':'), page, context)
                         hasMore = response.size >= 60; response
@@ -667,7 +699,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         val id = selectedRoute.substringAfter(':')
                         val info = if (selectedChannel == null || !more && refreshChannel) api.channel(id, context) else selectedChannel
                         if (generation != browseGeneration || context != api.context()) throw CancellationException("Channel request superseded")
-                        val contentTab = info.preferredTab(selectedChannelTab)
+                        val contentTab = if (selectedChannelTab == ChannelTab.CLIPS) ChannelTab.CLIPS else info.preferredTab(selectedChannelTab)
                         channel.value = info; channelTab.value = contentTab
                         if (scopedQuery.isNotBlank()) {
                             val response = api.channelSearch(id, scopedQuery, page, context)
@@ -679,6 +711,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 contentTab.playlistTab -> {
                                     val response = api.channelPlaylistPage(id, contentTab, token, listSort, context)
                                     lists = response.items; continuation = response.continuation; emptyList()
+                                }
+                                contentTab == ChannelTab.CLIPS -> {
+                                    clips = api.clips(id, page, context); emptyList()
                                 }
                                 contentTab == ChannelTab.POSTS -> {
                                     val response = api.channelPosts(id, token, context)
@@ -694,7 +729,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 }
                             }
                             if (more && continuation == token) continuation = ""
-                            hasMore = continuation.isNotBlank()
+                            hasMore = if (contentTab == ChannelTab.CLIPS) clips.size == 30 else continuation.isNotBlank()
                             resultVideos
                         }
                     }
@@ -736,7 +771,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     else -> api.discovery(selectedDiscovery, selectedRegion)
                 }
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
-                    continuation = continuation, history = history, lists = (old.lists + lists).distinctBy { it.id },
+                    continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
                     posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id }, retryMore = false, end = if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                         selectedTab == "Home" && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
@@ -761,6 +796,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     fun play(id: String, explicit: Long? = null, source: String? = null, index: Int? = null, audio: Boolean = false, seed: String? = null) {
+        dismissClipResolution(); closeClipEditor()
         navigationRevision++
         cancelAccumulatedSeek(false)
         val linked = playlistLink?.takeIf { source != null && it.playlistId == source && route == "playlist:$source" }
@@ -774,6 +810,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun playVideo(video: Video, source: Playlist? = null, audio: Boolean = false) = play(video.id, source = source?.id, index = video.playlistIndex, audio = audio)
     fun openLink(link: VideoLink): Boolean {
+        dismissClipResolution(); closeClipEditor()
         if (link.id.isEmpty()) {
             openPlaylist(Playlist(link.playlistId!!, "Playlist", 0, seedVideoId = link.seedVideoId))
             playlistLink = link
@@ -787,6 +824,148 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             putString("linkPlayback", link.playback.copy(startMs = link.startMs).json().toString())
         }
         return true
+    }
+    fun dismissClipResolution() { clipJob?.cancel(); clipResolution.value = ClipResolutionState() }
+    fun openClipLink(link: ClipLink) {
+        dismissClipResolution()
+        if (ClipRules.nativeId(link.id) && link.server.trimEnd('/') != store.server.trimEnd('/')) {
+            clipResolution.value = ClipResolutionState(link, foreign = true); return
+        }
+        val context = api.context()
+        clipResolution.value = ClipResolutionState(link, loading = true)
+        clipJob = viewModelScope.launch {
+            try {
+                val clip = api.clip(link.id, context)
+                if (context == api.context() && clipResolution.value.link == link) {
+                    clipResolution.value = ClipResolutionState(); watchClip(clip)
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context() && clipResolution.value.link == link)
+                clipResolution.value = ClipResolutionState(link, error = friendly(e)) }
+        }
+    }
+    fun watchClip(clip: Clip) {
+        if (clip.server.trimEnd('/') != store.server.trimEnd('/')) return
+        navigationRevision++
+        closeClipEditor(); dismissClipResolution(); closeComments(); closeChat(); cancelAccumulatedSeek(false)
+        queueCommand(PlaybackService.QUEUE_START) { putString("id", clip.video.id); putString("clip", clip.json().toString()) }
+        clipOpened.value++
+    }
+    fun watchFullClip() { cancelAccumulatedSeek(false); queueCommand(PlaybackService.CLIP_FULL_VIDEO) }
+    fun requestClipSignIn() { playback.value.details?.video?.id?.let { pendingClipEditor = store.server to it } }
+    fun openClipEditor() {
+        val details = playback.value.details ?: return
+        if (account.value == null || queue.value.current?.clip != null || !ClipRules.eligible(details)) return
+        val context = api.context(); val occurrence = queue.value.currentKey.orEmpty()
+        val old = clipEditor.value
+        val range = ClipRules.defaultRange(controller.value?.currentPosition ?: playback.value.position, details.video.duration * 1000)
+        val wasPlaying = controller.value?.playWhenReady ?: playback.value.playWhenReady
+        controller.value?.pause(); cancelAccumulatedSeek(false); closeComments(); closeChat()
+        clipEditor.value = if (old.context == context && old.occurrence == occurrence && old.published == null)
+            old.copy(open = true, wasPlaying = wasPlaying, error = null)
+        else ClipEditorState(true, details, context, occurrence, wasPlaying, startMs = range.first, endMs = range.last,
+            startText = ClipRules.timestamp(range.first, range.last >= 3_600_000), endText = ClipRules.timestamp(range.last))
+        clipEditorJob?.cancel()
+        val track = details.storyboards.filter { it.width > 0 }.minByOrNull { kotlin.math.abs(it.width - 160) }
+        if (track != null && clipEditor.value.frames.isEmpty()) {
+            clipEditor.value = clipEditor.value.copy(loadingFrames = true)
+            clipEditorJob = viewModelScope.launch {
+                val frames = try { api.storyboard(track, context) } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyList() }
+                if (clipEditor.value.open && context == api.context() && clipEditor.value.occurrence == occurrence)
+                    clipEditor.value = clipEditor.value.copy(frames = frames, loadingFrames = false)
+            }
+        }
+    }
+    fun closeClipEditor() {
+        val state = clipEditor.value
+        if (!state.open) return
+        clipEditorJob?.cancel()
+        clipEditor.value = state.copy(open = false, busy = false, loadingFrames = false)
+        if (state.wasPlaying && state.context == api.context() && state.occurrence == queue.value.currentKey) controller.value?.play()
+    }
+    fun clipTitle(value: String) { if (!clipEditor.value.busy) clipEditor.value = clipEditor.value.copy(title = value, error = null) }
+    fun clipTimes(start: Long, end: Long) {
+        val state = clipEditor.value
+        if (state.busy) return
+        clipEditor.value = state.copy(startMs = start, endMs = end, startText = ClipRules.timestamp(start, end >= 3_600_000),
+            endText = ClipRules.timestamp(end), error = null)
+    }
+    fun clipTimeText(value: String, start: Boolean) {
+        val state = clipEditor.value
+        if (state.busy) return
+        val parsed = ClipRules.parseTimestamp(value)
+        clipEditor.value = if (start) state.copy(startText = value, startMs = parsed ?: state.startMs, error = null)
+            else state.copy(endText = value, endMs = parsed ?: state.endMs, error = null)
+    }
+    fun publishClip() {
+        val state = clipEditor.value; val context = state.context ?: return
+        val details = state.details ?: return
+        if (!state.open || state.busy || context != api.context()) return
+        state.validation?.let { clipEditor.value = state.copy(error = it); return }
+        clipEditor.value = state.copy(busy = true, error = null)
+        clipEditorJob?.cancel()
+        clipEditorJob = viewModelScope.launch {
+            try {
+                val clip = api.createClip(details.video.id, state.title, state.startMs, state.endMs, context)
+                if (context == api.context() && clipEditor.value.occurrence == state.occurrence) {
+                    clipEditor.value = clipEditor.value.copy(busy = false, published = clip)
+                    invalidateClipLists()
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context() && clipEditor.value.occurrence == state.occurrence)
+                clipEditor.value = clipEditor.value.copy(busy = false, error = friendly(e)) }
+        }
+    }
+    private fun invalidateClipLists(deleted: String? = null) {
+        for (index in browseReturns.indices) {
+            val saved = browseReturns[index]
+            if (saved.route == "clips" || saved.channelTab == ChannelTab.CLIPS)
+                browseReturns[index] = saved.copy(browse = saved.browse.copy(loading = true, clips = saved.browse.clips.filterNot { it.id == deleted }))
+        }
+        if (deleted != null) browse.value = browse.value.copy(clips = browse.value.clips.filterNot { it.id == deleted })
+        if (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS) reloadClipPages(browse.value.page)
+    }
+    private fun reloadClipPages(pages: Int) {
+        val selectedRoute = route
+        val channelId = selectedRoute.takeIf { it.startsWith("channel:") }?.substringAfter(':')
+        if (selectedRoute != "clips" && (channelId == null || channelTab.value != ChannelTab.CLIPS)) return
+        val context = api.context()
+        if (channelId == null && context.account == null) return
+        browseJob?.cancel(); val generation = ++browseGeneration
+        browse.value = browse.value.copy(loading = true, error = null)
+        browseJob = viewModelScope.launch {
+            try {
+                val clips = mutableListOf<Clip>(); var page = 1; var count = 0
+                for (number in 1..pages.coerceAtLeast(1)) {
+                    val response = api.clips(channelId, number, context)
+                    clips += response; page = number; count = response.size
+                    if (count < 30) break
+                }
+                if (generation == browseGeneration && context == api.context() && route == selectedRoute)
+                    browse.value = browse.value.copy(clips = clips.distinctBy { it.id }, page = page, end = count < 30, loading = false, error = null)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (generation == browseGeneration && context == api.context())
+                browse.value = browse.value.copy(loading = false, error = friendly(e), retryMore = false) }
+        }
+    }
+    fun confirmDeleteClip(clip: Clip) { if (clip.owned(api.context())) { clipDeleteError.value = null; clipDelete.value = clip } }
+    fun deleteClip() {
+        val clip = clipDelete.value ?: return
+        val context = api.context()
+        if (clipDeleteBusy.value || !clip.owned(context)) return
+        clipDeleteBusy.value = true
+        clipDeleteError.value = null
+        clipDeleteJob = viewModelScope.launch {
+            try {
+                api.deleteClip(clip.id, context)
+                if (context == api.context()) {
+                    if (queue.value.current?.clip?.id == clip.id) closePlayer()
+                    clipDelete.value = null; clipDeleteBusy.value = false
+                    invalidateClipLists(clip.id); message.value = "Clip deleted"
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context()) { clipDeleteBusy.value = false; clipDeleteError.value = friendly(e) } }
+        }
     }
     fun insertQueue(video: Video, next: Boolean) {
         queueCommand(PlaybackService.QUEUE_INSERT) {
@@ -950,6 +1129,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncComments() = commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
     fun openComments() { closeChat(); syncComments(); commentController.open() }
     private fun syncChat() {
+        if (queue.value.current?.clip != null) { chatController.bind("", "", false); return }
         if (chatAppearanceServer != store.server) { chatAppearanceServer = store.server; chatAppearance.value = store.chatAppearance() }
         val q = queue.value
         val details = q.details
@@ -1028,7 +1208,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         api.revokeSession(session.id, context); if (session.current) clearAccount(context)
     }
     fun logout() = action { accountOperation { val context = api.context(); try { api.logout() } finally { clearAccount(context) } } }
-    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++

@@ -34,6 +34,10 @@ if [[ ! -f "$media_dir/master.m3u8" ]]; then
   ffmpeg -y -hide_banner -loglevel error -i "$media_dir/fixture.mp4" -frames:v 1 "$media_dir/thumbnail.jpg"
   printf 'WEBVTT\n\n00:00.000 --> 00:30.000\nMobivious caption test\n' > "$media_dir/captions.vtt"
 fi
+if [[ ! -f "$media_dir/clip-storyboard.jpg" ]]; then
+  ffmpeg -y -hide_banner -loglevel error -i "$media_dir/fixture.mp4" \
+    -vf 'fps=1/20,scale=160:90,tile=6x1' -frames:v 1 "$media_dir/clip-storyboard.jpg"
+fi
 python3 scripts/generate-player-fixture.py "$media_dir"
 python3 scripts/fixture-server.py --media-dir "$media_dir" &
 fixture_pid=$!

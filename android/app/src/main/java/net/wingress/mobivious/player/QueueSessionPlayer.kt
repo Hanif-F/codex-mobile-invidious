@@ -26,7 +26,7 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
             // Keep the real active window, including live-edge timing and manifest state.
             val real = base.playlist.getOrNull(base.currentMediaItemIndex).takeIf { active }
             (real?.buildUpon()?.setUid(entry.key) ?: MediaItemData.Builder(entry.key)
-                .setIsSeekable(true).setDurationUs(queueDurationUs(entry.video.duration)))
+                .setIsSeekable(true).setDurationUs(entry.clip?.durationMs?.times(1000) ?: queueDurationUs(entry.video.duration)))
                 .setMediaItem(item).setMediaMetadata(item.mediaMetadata).build()
         }.toMutableList()
         val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0
@@ -59,6 +59,7 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
     }
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         val bound = snapshot().current?.linkPlayback
+        if (playWhenReady && snapshot().current?.clip != null && player.playbackState == Player.STATE_ENDED) player.seekTo(0)
         if (playWhenReady && bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0)
         return super.handleSetPlayWhenReady(playWhenReady)
     }

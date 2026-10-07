@@ -92,6 +92,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val chat by vm.chatReplay.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val linkResolution by vm.linkResolution.collectAsStateWithLifecycle()
+    val clipEditor by vm.clipEditor.collectAsStateWithLifecycle()
+    val clipOpened by vm.clipOpened.collectAsStateWithLifecycle()
     val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val discovery by vm.discovery.collectAsStateWithLifecycle()
@@ -128,14 +130,16 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     fun restorePlayer() { vm.cancelAccumulatedSeek(); presentation.present(PlayerPresentation.WATCH) }
     fun collapsePlayer() {
         vm.cancelAccumulatedSeek()
-        if (fullscreen) presentation.present(PlayerPresentation.WATCH)
+        if (presentation.fullscreen) presentation.present(PlayerPresentation.WATCH)
         else { vm.closeComments(); presentation.present(PlayerPresentation.MINI) }
     }
     fun closePlayer() { presentation.present(PlayerPresentation.CLOSED, animate = false); vm.closePlayer() }
     fun toggleFullscreen() {
         vm.cancelAccumulatedSeek()
-        presentation.present(if (fullscreen) PlayerPresentation.WATCH else PlayerPresentation.FULLSCREEN)
+        presentation.present(if (presentation.fullscreen) PlayerPresentation.WATCH else PlayerPresentation.FULLSCREEN)
     }
+    var handledClipOpened by rememberSaveable { mutableLongStateOf(0L) }
+    LaunchedEffect(clipOpened) { if (clipOpened > handledClipOpened) { handledClipOpened = clipOpened; restorePlayer() } }
     var previousQueueToken by remember { mutableStateOf(queue.token) }
     LaunchedEffect(queue.token, playback.details?.video?.id) {
         if (queue.token.isEmpty() && previousQueueToken.isNotEmpty()) presentation.present(PlayerPresentation.CLOSED, animate = false)
@@ -241,7 +245,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         if (result == SnackbarResult.ActionPerformed && undo != null) vm.undoBlock(undo)
         if (vm.message.value == it) vm.message.value = null
     } }
-    LaunchedEffect(watch, playback.playWhenReady, playback.error, playback.details, playback.geometry, prefs, vm.store.pip, settingsPage) { activity.updatePip(watch && settingsPage.isEmpty()) }
+    LaunchedEffect(watch, playback.playWhenReady, playback.error, playback.details, playback.geometry, prefs, vm.store.pip, settingsPage, clipEditor.open) { activity.updatePip(watch && settingsPage.isEmpty() && !clipEditor.open) }
     DisposableEffect(fullscreen, pip, playback.geometry.orientation) {
         activity.requestedOrientation = if (fullscreen && !pip) when (playback.geometry.orientation) {
             1 -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
@@ -262,8 +266,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     BackHandler(accountBusy) { }
     MaterialTheme(colorScheme = if (prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()) dark else light) {
         Surface(Modifier.fillMaxSize()) {
-          PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
-            fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null,
+          PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip || clipEditor.open,
+            fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) { openChatSettings ->
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
@@ -347,6 +351,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             { id -> navigate("Subscriptions", "channel:$id") },
                             { sort -> vm.sortSubscriptionChannels(sort); scope.launch { subscriptionList.scrollToItem(0) } })
                     }
+                    else if (route == "clips" && account == null) EmptyState("My Clips", "Sign in to create and find your clips.", "Sign in") { signIn() }
                     else if (route.isEmpty() && (tab == "Library" || tab == "Subscriptions") && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
                     else if (tab == "Library" && route.isEmpty()) LazyColumn(Modifier.fillMaxSize().testTag("library-playlist-list"), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item { Text("Your library", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
@@ -359,6 +364,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         }
                         items(playlists.filter { it.owned }, key = { "owned:${it.id}" }) { list -> PlaylistCard(vm, list, { browsePlayer(); vm.openPlaylist(list) }, { signIn() }) }
                         if (playlists.none { it.owned }) item { Text("Create a playlist to save your videos.") }
+                        item { Card(onClick = { vm.navigate("Library", "clips", rememberOrigin = true) }, modifier = Modifier.fillMaxWidth().testTag("library-clips")) {
+                            Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ContentCut, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(16.dp))
+                                Column(Modifier.weight(1f)) { Text("My Clips", style = MaterialTheme.typography.titleMedium); Text("Moments you’ve shared", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                Icon(Icons.Default.ChevronRight, null)
+                            }
+                        } }
                         item { Text("Subscribed playlists (${playlists.count { !it.owned && it.saved }})", style = MaterialTheme.typography.titleLarge) }
                         items(playlists.filter { !it.owned && it.saved }, key = { "subscribed:${it.id}" }) { list -> PlaylistCard(vm, list, { browsePlayer(); vm.openPlaylist(list) }, { signIn() }) }
                         if (playlists.none { !it.owned && it.saved }) item { Text("Subscribe to playlists or mixes from search, a channel, or a shared link.") }
@@ -366,6 +378,16 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh) }
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(bottom = 12.dp)) {
+                        if (route == "clips") item {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("My Clips", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                                Text("Most recent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (!state.loading && state.clips.isEmpty() && state.error == null) Text("Save a moment worth sharing. Open a video and choose Create clip.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        if (channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank() && !state.loading && state.clips.isEmpty() && state.error == null) item {
+                            Text("No clips yet. Clips made on videos from this channel will appear here.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
                         if (route.startsWith("hashtag:")) item { Text(state.title, Modifier.padding(16.dp), style = MaterialTheme.typography.headlineMedium) }
                         channel?.let { info -> item {
                             ChannelHeader(info, vm.store.server, prefs.thinMode, subscriptions.any { it.id == info.id }, actions = {
@@ -419,6 +441,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 channel = { id -> navigate(tab, "channel:$id") }, link = ::openRichLink, play = { play(it) },
                                 playlist = { list -> browsePlayer(); vm.openPlaylist(list) }, signIn = { signIn() })
                         }
+                        items(state.clips, key = { "clip:${it.id}" }) { clip ->
+                            ClipCard(vm, clip, { vm.watchClip(clip); restorePlayer() }, { id -> navigate(tab, "channel:$id") })
+                        }
                         items(state.channels, key = { "channel:${it.id}" }) { related ->
                             RelatedChannelCard(related, vm.store.server, prefs.thinMode) { navigate(tab, "channel:${related.id}") }
                         }
@@ -447,7 +472,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 OutlinedButton(onClick = { if (vm.contentSurface() == ContentSurface.SEARCH) dialog = if (tab == "Subscriptions") "visibilityFilters" else "filters" else settingsPage = "Browsing" }) { Text("Visibility controls") }
                             }
                         }
-                        if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty()) item { EmptyState(
+                        if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty() &&
+                            state.clips.isEmpty() && route != "clips" && !(channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank())) item { EmptyState(
                             if (scopedSearch.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
                             if (scopedSearch.submitted.isNotBlank()) "Try another title or channel, or clear the search." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search by title, channel, or paste a video link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
                         if (!state.end && !state.loading && state.error == null) item { OutlinedButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
@@ -487,6 +513,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; signIn() }, dismiss = { vm.sponsorSettingsChannel.value = null })
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
             if (saveSheet.video != null && tab != "Account" && !pip) SavePlaylistSheet(vm) { signIn() }
+            if (!pip) { ClipDialogs(vm); ClipEditor(vm) }
         }
     }
 }
@@ -608,7 +635,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         onClickLabel = "Open player", onClick = open).testTag("mini-player-preview"))
                 Column(Modifier.weight(1f).clickable(enabled = presentation.mode == PlayerPresentation.MINI && !presentation.active,
                     onClickLabel = "Open player", onClick = open).padding(horizontal = 8.dp)) {
-                    playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1) }
+                    if (playback.clip != null) Text(playback.clip.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    else playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1) }
                     Text(playback.details?.video?.author.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
                 }
                 val ended = playback.playerState == Player.STATE_ENDED
@@ -666,6 +694,9 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
             else if (chatDocked) ChatReplayPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), chatSettings)
             else if (commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
+            else if (playback.clip != null) LazyColumn(Modifier.weight(1f).testTag("clip-details-list"), state = detailsList) {
+                item { ClipDetails(vm, playback.clip, { presentation.present(PlayerPresentation.MINI) }, channel) }
+            }
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
                     item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -684,6 +715,9 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                                 runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url), "Share video")) }
                                     .onFailure { vm.message.value = "No app could share this link." }
                             } }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
+                            if (ClipRules.eligible(details)) AssistChip(onClick = {
+                                if (vm.account.value == null) { vm.requestClipSignIn(); signIn() } else vm.openClipEditor()
+                            }, label = { Text("Create clip") }, leadingIcon = { Icon(Icons.Default.ContentCut, null) }, modifier = Modifier.testTag("create-clip"))
                             AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
                         }
                         if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)

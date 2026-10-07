@@ -84,6 +84,16 @@ def reset_content_links():
                  hashtagRequests=[], videoDetailRequests=[])
 reset_content_links()
 
+def native_clip(index=0, creator='fixture-user'):
+    return dict(type='invidiousClip', clipId='IVCL' + f'{index:032d}', clipTitle=('A memorable moment' if index == 0 else f'Moment {index + 1}'),
+                startTime=12.345, endTime=42.789, creator=creator, createdAt=1791302400 - index * 86400,
+                video=dict(videoId=video['videoId'], title=video['title'], author=video['author'], authorId=video['authorId'],
+                           lengthSeconds=120, thumbnail='/media/thumbnail.jpg'))
+def reset_clips():
+    state.update(clipStoryboardFail=False, clipsEnabled=False, clips=[], clipRequests=[], storyboardRequests=[], clipFailNext=False, clipCreateFailNext=False,
+                 clipDeleteFailNext=False, clipScopeFail=False, clipDelayNext=0, clipLegacyInvalid=False, clipCounter=100)
+reset_clips()
+
 def reset_chapters():
     state.update(chapters=False, chapterAssetRequests=[],
                  chapterDescription='0:00 Introduction\n0:30 日本語 & details\n1:00 Final section')
@@ -194,6 +204,8 @@ class Handler(BaseHTTPRequestHandler):
     def respond(self, data=None, status=200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Connection', 'close')
         self.end_headers()
         if data is not None:
             self.wfile.write(json.dumps(data).encode())
@@ -201,6 +213,7 @@ class Handler(BaseHTTPRequestHandler):
     def xml(self, text, content_type='application/xml'):
         self.send_response(200)
         self.send_header('Content-Type', content_type)
+        self.send_header('Connection', 'close')
         self.send_header('Cache-Control', 'private, no-store')
         self.end_headers()
         self.wfile.write(text.encode())
@@ -276,9 +289,35 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
+        if p.startswith('/api/v1/storyboards/') and state['clipsEnabled']:
+            state['storyboardRequests'].append(dict(path=p, authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
+            if state.get('clipStoryboardFail', False): return self.respond(dict(error='No storyboard'), 404)
+            cues = ['WEBVTT', '']
+            for n in range(6):
+                def ts(seconds): return f'00:{seconds // 60:02d}:{seconds % 60:02d}.000'
+                cues.extend([f'{ts(n * 20)} --> {ts((n + 1) * 20)}', f'/media/clip-storyboard.jpg#xywh={n * 160},0,160,90', ''])
+            return self.xml('\n'.join(cues), content_type='text/vtt')
         if p.startswith(('/api/v1/storyboards/', '/sb/')):
             state['chapterAssetRequests'].append(p)
             return self.respond(dict(error='Storyboard requests are forbidden in the chapter fixture'), 404)
+        if p == '/api/v1/auth/clips' or p.startswith('/api/v1/clips/') or (p.startswith('/api/v1/channels/') and p.endswith('/clips')):
+            auth = p == '/api/v1/auth/clips'
+            state['clipRequests'].append(dict(method='GET', path=p, query=parse_qs(url.query), authorized=bool(self.headers.get('Authorization'))))
+            if auth and self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
+            if auth and state['clipScopeFail']: return self.respond(dict(error='Invalid scope'), 403)
+            delay = state['clipDelayNext']; state['clipDelayNext'] = 0
+            if delay: time.sleep(min(delay, 5000) / 1000)
+            if state['clipFailNext']:
+                state['clipFailNext'] = False; return self.respond(dict(error='Clip request failed'), 503)
+            if p.startswith('/api/v1/clips/'):
+                id = p.rsplit('/', 1)[-1]
+                if id == 'legacy-clip':
+                    return self.respond(dict(clipTitle='A YouTube moment', startTime=None if state['clipLegacyInvalid'] else 1.234, endTime=6.789, video=video))
+                clip = next((c for c in state['clips'] if c['clipId'] == id), None)
+                return self.respond(clip or dict(error='Clip not found.'), 200 if clip else 404)
+            page = max(1, int(parse_qs(url.query).get('page', ['1'])[0]))
+            items = [c for c in state['clips'] if not auth or c['creator'] == 'fixture-user']
+            return self.respond(items[(page - 1) * 30:page * 30])
         if p == '/api/v1/mobile/registration':
             return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=None))
         if p == '/api/v1/auth/account/sessions':
@@ -398,12 +437,15 @@ class Handler(BaseHTTPRequestHandler):
                             descriptionHtml='<b>Rich description</b><br><a href="/watch?v=' + selected['videoId'] + '&amp;t=30">0:30</a> <a href="/@fixture/shorts">Creator</a> <a href="/hashtag/music">#music</a>',
                             likeCount=42, authorVerified=True, subCountText='12.3K', isListed=False, genre='Music',
                             license='', isFamilyFriendly=True, allowedRegions=['ID', 'US'], musicTracks=[dict(song='Song', artist='Artist', album='Album', license='Music license')])
+            if state['clipsEnabled']:
+                info.update(storyboards=[dict(url='/api/v1/storyboards/' + selected['videoId'] + '?width=160&height=90', width=160, height=90)])
             if state['chapters']:
                 info.update(description=state['chapterDescription'], storyboards=[dict(url='/api/v1/storyboards/' + selected['videoId'],
                             templateUrl='/sb/fixture/M$M.jpg', width=160, height=90, count=12, interval=10000,
                             storyboardWidth=5, storyboardHeight=5, storyboardCount=1)])
             self.respond(dict(**selected, **info,
-                              dashUrl=dash, adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
+                              dashUrl='' if state['stream'] == 'mp4' else dash, formatStreams=[dict(url='/media/fixture.mp4', type='video/mp4', quality='medium')] if state['stream'] == 'mp4' else [],
+                              adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
                                                  if state['duplicateRecommendations'] else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
@@ -560,6 +602,13 @@ class Handler(BaseHTTPRequestHandler):
     def mutate(self):
         p = urlparse(self.path).path
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if p == '/test/clips':
+            state['clipsEnabled'] = True
+            state['channelTabs'] = ['videos', 'playlists', 'clips', 'posts', 'channels']
+            if 'count' in data: state['clips'] = [native_clip(n) for n in range(data['count'])]
+            for key in ('clipFailNext', 'clipCreateFailNext', 'clipDeleteFailNext', 'clipScopeFail', 'clipDelayNext', 'clipLegacyInvalid', 'clipStoryboardFail'):
+                if key in data: state[key] = data[key]
+            return self.respond({})
         if p == '/test/playlist-rss':
             state['playlistRss'] = True
             for key in ('sourceTitle', 'failSubscribe'):
@@ -591,6 +640,7 @@ class Handler(BaseHTTPRequestHandler):
             reset_chat()
             reset_content_links()
             reset_chapters()
+            reset_clips()
             reset_accounts()
             return self.respond({})
         if p == '/test/chat':
@@ -676,6 +726,26 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))
+        if p == '/api/v1/auth/clips' or p.startswith('/api/v1/auth/clips/'):
+            state['clipRequests'].append(dict(method=self.command, path=p, body=data, authorized=bool(self.headers.get('Authorization'))))
+            if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
+            if state['clipScopeFail']: return self.respond(dict(error='Invalid scope'), 403)
+            if self.command == 'POST' and p == '/api/v1/auth/clips':
+                if state['clipCreateFailNext']:
+                    state['clipCreateFailNext'] = False; return self.respond(dict(error='Publish failed. Try again.'), 503)
+                title = data.get('title', '').strip(); start = data.get('startTime', -1); end = data.get('endTime', -1)
+                if not 1 <= len(title) <= 140 or not 0 <= start < end <= 120 or not 5 <= end - start <= 120:
+                    return self.respond(dict(error='Invalid title or range.'), 400)
+                clip = native_clip(state['clipCounter']); state['clipCounter'] += 1
+                clip.update(clipTitle=title, startTime=start, endTime=end, createdAt=int(time.time()))
+                state['clips'].insert(0, clip)
+                return self.respond(clip, 201)
+            if self.command == 'DELETE':
+                if state['clipDeleteFailNext']:
+                    state['clipDeleteFailNext'] = False; return self.respond(dict(error='Deletion failed. Try again.'), 503)
+                clip = next((c for c in state['clips'] if c['clipId'] == p.rsplit('/', 1)[-1] and c['creator'] == 'fixture-user'), None)
+                if not clip: return self.respond(dict(error='Clip not found.'), 404)
+                state['clips'].remove(clip); return self.respond(None, 204)
         if p.startswith(('/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
         if p.startswith('/api/v1/auth/blocked_channels/'):

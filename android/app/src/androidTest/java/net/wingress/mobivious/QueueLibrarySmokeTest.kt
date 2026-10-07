@@ -35,7 +35,12 @@ class QueueLibrarySmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui { activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
-        waitFor { activity.model.browse.value.videos.isNotEmpty() }
+        waitFor {
+            var empty = false
+            ui { empty = activity.model.controller.value?.mediaItemCount == 0 }
+            empty && activity.model.account.value == null && !activity.model.preferences.value.watchHistory && activity.model.queue.value.token.isEmpty() && !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty()
+        }
+        compose.waitForIdle()
     }
     @After fun close() { if (::activity.isInitialized) ui { activity.model.closePlayer(); activity.finishAndRemoveTask() } }
     private fun playSource(id: String = "PLfixture", index: Int = 0) {
@@ -44,7 +49,8 @@ class QueueLibrarySmokeTest {
     }
     private fun finishCurrent() { ui { activity.model.seekTo(119_700) } }
     private fun showQueue() {
-        waitFor { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() }
+        waitFor { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+        if (compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
     }
     private fun recreateActivity() {
@@ -64,6 +70,8 @@ class QueueLibrarySmokeTest {
     @Test fun standaloneManualQueueCollapseAndNewSessionVisibility() {
         ui { activity.model.play("testvideo01"); activity.sharedVideo.value = true }
         waitFor { activity.model.playback.value.playing }
+        waitFor { compose.onAllNodesWithTag("watch-actions").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+        if (compose.onAllNodesWithTag("watch-actions").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
         compose.onNodeWithTag("playback-queue").assertDoesNotExist()
         compose.onNodeWithContentDescription("Playback queue").assertDoesNotExist()
         compose.onNodeWithTag("watch-actions").performScrollTo()
@@ -89,7 +97,7 @@ class QueueLibrarySmokeTest {
         compose.onNodeWithContentDescription("Full screen").performClick()
         compose.onNodeWithTag("playback-queue").assertDoesNotExist()
         compose.onNodeWithContentDescription("Playback queue").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Exit full screen").performClick()
+        compose.onNodeWithContentDescription("Exit full screen").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
         showQueue()
         assertFalse(activity.model.queueExpanded.value)
         recreateActivity()

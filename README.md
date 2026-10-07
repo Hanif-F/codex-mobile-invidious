@@ -40,10 +40,10 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 - Popular and trending feeds, filtered search, and channel browsing.
 - Available channel tabs for videos, Shorts, streams, podcasts, releases,
-  courses, playlists, community posts and related channels.
+  courses, playlists, clips, community posts and related channels.
 - Native community posts with images, galleries, attachments and read-only
   polls, quizzes and comments.
-- Open shared or pasted video, playlist, channel, post and hashtag links.
+- Open shared or pasted video, clip, playlist, channel, post and hashtag links.
 
 ### Watch and listen
 
@@ -63,6 +63,11 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Owned and subscribed playlists, searchable watch history, watched indicators
   and saved playback positions.
 - RSS links, subscription OPML exports and private playlist Atom exports.
+- **Clips:** create public 5–120 second moments with a title, precise timestamps,
+  draggable filmstrip and independent preview. Find My Clips beneath Playlists
+  in Library, or browse public clips on a channel's Clips tab. Watch with a
+  clip-relative timeline, loop, share or copy the permalink, continue the full
+  video at the same scene, and delete your own clips.
 
 ### Make it yours
 
@@ -82,6 +87,13 @@ other or older instances. Optional metadata is hidden when it is unavailable.
 If a feature reports a missing API or permission, the instance may need an update.
 After server updates that add token permissions, sign out and sign in again.
 Installing an APK does not update the server.
+
+Native clips require this fork's Clips API and existing migration 19. Deploy the
+matching native token-scope and channel-tab updates, then sign out and sign in
+again to renew existing tokens. Native clips stay on their originating instance;
+foreign-instance links offer a browser action. Existing YouTube clip links are
+resolved through the selected instance. Active livestream clipping and editing
+published clips are outside this feature.
 
 Channel sorting statistics require the matching server API update. Older servers
 keep the channel directory available in A–Z order. Relevance uses viewing habits

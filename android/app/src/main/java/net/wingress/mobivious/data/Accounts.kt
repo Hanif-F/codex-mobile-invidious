@@ -29,6 +29,8 @@ object AccountPermissions {
         "Manage subscriptions" to listOf("POST;DELETE:subscriptions/*"),
         "Read history and progress" to listOf("GET:history", "GET:playback", "GET:playback/*"),
         "Manage history and progress" to listOf("POST;DELETE:history/*", "DELETE:history", "PUT;DELETE:playback/*", "DELETE:playback"),
+        "Read clips" to listOf("GET:clips"),
+        "Create and delete clips" to listOf("POST:clips", "DELETE:clips/*"),
         "Read playlists" to listOf("GET:playlists", "GET:playlists/*"),
         "Manage playlists" to listOf("POST:playlists", "PATCH;DELETE:playlists/*", "POST:playlists/*", "PUT;DELETE:saved_playlists/*"),
         "Manage blocked channels" to listOf("GET:blocked_channels", "POST;DELETE:blocked_channels/*"),

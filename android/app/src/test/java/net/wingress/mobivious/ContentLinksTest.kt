@@ -45,7 +45,7 @@ class ContentLinksTest {
         assertTrue(ContentLinks.resolve("/post/Ugpost1", server) is ContentLink.Post)
         assertTrue(ContentLinks.resolve("/redirect?q=https%3A%2F%2Fexample.com%2Fsource", server) is ContentLink.External)
         assertNull(ContentLinks.resolve("https://user:secret@example.com/", server))
-        assertTrue(ContentLinks.resolve("/@creator/clips", server) is ContentLink.External)
+        assertEquals(ChannelTab.CLIPS, (ContentLinks.resolve("/@creator/clips", server) as ContentLink.Channel).link.tab)
     }
     @Test fun nullableOptionsKeepExplicitFalseAndNeverChangeSavedDefaults() {
         val link = VideoLinks.parse("$server/watch?v=$id&listen=0&autoplay=false&local=0&speed=1.25x&loop=1&quality_dash=720p&video_codec=h264&subtitles=&comments=reddit&region=id&save_player_pos=0&related_videos=false&extend_desc=1&continue=0&continue_autoplay=0", server)!!
