@@ -264,7 +264,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip,
             fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null,
-            queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) {
+            queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) { openChatSettings ->
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = when (settingsPage) { "Settings" -> ""; "Blocked channels" -> "Browsing"; else -> "Settings" } }, { signIn() }, { id -> settingsPage = ""; navigate("Home", "channel:$id") })
             else Scaffold(
                 modifier = Modifier.hiddenPlayerContent(pip || fullscreen && !presentation.active),
@@ -462,7 +462,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     WatchScreen(vm, playback, Modifier.padding(watchPadding).graphicsLayer { alpha = presentation.watchAlpha }
                         .hiddenPlayerContent(!watch || presentation.active),
                         presentation, watchList, watchResize, chapterPanel, ::openChapters, watchDescription, { watchDescription = it }, vm::openSave,
-                        { id -> navigate("Home", "channel:$id") }, { play(it) }, { signIn() })
+                        { id -> navigate("Home", "channel:$id") }, { play(it) }, { signIn() }, openChatSettings)
                 }
                 }
             }
@@ -625,7 +625,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     presentation: PlayerPresentationState, detailsList: androidx.compose.foundation.lazy.LazyListState,
     resize: WatchPlayerResizeState, chapterPanel: ChapterPanelState, openChapters: () -> Unit,
     description: Boolean, describe: (Boolean) -> Unit,
-    add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit) {
+    add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit, chatSettings: () -> Unit) {
     val chat by vm.chatReplay.collectAsStateWithLifecycle()
     val chatAppearance by vm.chatAppearance.collectAsStateWithLifecycle()
     val comments by vm.comments.collectAsStateWithLifecycle(); val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
@@ -664,7 +664,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             if (chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,
                 playback.seekable && !playback.loading && playback.error == null, chapterPanel::close, vm::seekTo,
                 Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
-            else if (chatDocked) WatchChatPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
+            else if (chatDocked) ChatReplayPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), chatSettings)
             else if (commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->

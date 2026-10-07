@@ -127,7 +127,7 @@ internal fun PlayerPresentationHost(
     pip: Boolean, hidden: Boolean, modal: Boolean, occurrence: String?,
     close: () -> Unit, collapse: () -> Unit, restore: () -> Unit, fullscreen: () -> Unit, settings: () -> Unit,
     chapters: () -> Unit, chat: () -> Unit,
-    content: @Composable () -> Unit,
+    content: @Composable (openChatSettings: () -> Unit) -> Unit,
 ) {
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
@@ -136,6 +136,10 @@ internal fun PlayerPresentationHost(
     val replay by vm.chatReplay.collectAsStateWithLifecycle()
     val appearance by vm.chatAppearance.collectAsStateWithLifecycle()
     var chatSettings by rememberSaveable(replay.context?.server, replay.occurrence) { mutableStateOf(false) }
+    val chatOverlayEditor = rememberSaveable(replay.context, replay.occurrence, saver = ChatOverlayEditor.StateSaver) { ChatOverlayEditor(appearance) }
+    LaunchedEffect(replay.open, appearance.overlay, state.watch, pip, hidden) {
+        if (!replay.open || !appearance.overlay || !state.watch || pip || hidden) chatOverlayEditor.editing.value = false
+    }
     val chatVisible = !hidden && !pip && state.watch && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)
     LaunchedEffect(chatVisible) { vm.presentChat(chatVisible) }
     LaunchedEffect(chatVisible, replay.open) { if (!chatVisible || !replay.open) chatSettings = false }
@@ -143,7 +147,7 @@ internal fun PlayerPresentationHost(
     LaunchedEffect(windowSize, playback.mediaId, occurrence, pip, hidden, modal, lifecycleState) { state.cancelMotion() }
     DisposableEffect(state) { onDispose { state.cancelMotion() } }
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        content()
+        content { chatSettings = true }
         val full = Rect(0f, 0f, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         fun bounds(mode: PlayerPresentation): Rect = when (mode) {
             PlayerPresentation.FULLSCREEN -> if (!docked) full else if (full.width > full.height)
@@ -169,7 +173,7 @@ internal fun PlayerPresentationHost(
                     .clip(RoundedCornerShape(if (pip || state.fullscreen) 0.dp else (8 + 8 * state.watchAlpha).dp)),
                 fullscreen = state.fullscreen, controls = !pip && state.watch, settingsOpen = modal,
                 presentation = state.mode, drag = drag,
-                gesturesEnabled = !pip && !modal && !chatSettings && (!state.active || state.dragging) && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
+                gesturesEnabled = !pip && !modal && !chatSettings && !chatOverlayEditor.editing.value && (!state.active || state.dragging) && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
                 chromeVisible = !state.active, gestureKey = windowSize to occurrence,
                 onCollapse = collapse, onRestore = restore, onDismiss = close,
                 onFullscreen = fullscreen, onSettings = settings, onChapters = chapters, onChat = chat,
@@ -182,7 +186,8 @@ internal fun PlayerPresentationHost(
                     val fittedHeight = minOf(rect.height, rect.width / ratio)
                     ChatOverlay(vm, Modifier.offset { IntOffset((rect.left + (rect.width - fittedWidth) / 2).roundToInt(),
                         (rect.top + (rect.height - fittedHeight) / 2).roundToInt()) }
-                        .size(with(density) { fittedWidth.toDp() }, with(density) { fittedHeight.toDp() }), { chatSettings = true })
+                        .size(with(density) { fittedWidth.toDp() }, with(density) { fittedHeight.toDp() }),
+                        settings = { chatSettings = true }, editor = chatOverlayEditor)
                 }
                 else if (state.fullscreen) {
                     val side = full.width > full.height
@@ -194,13 +199,6 @@ internal fun PlayerPresentationHost(
             if (chatSettings && chatVisible && replay.open) ChatSettings(vm) { chatSettings = false }
         }
     }
-}
-
-@Composable internal fun WatchChatPanel(vm: AppViewModel, modifier: Modifier) {
-    val state by vm.chatReplay.collectAsStateWithLifecycle()
-    var settings by rememberSaveable(state.context?.server, state.occurrence) { mutableStateOf(false) }
-    ChatReplayPanel(vm, modifier, { settings = true })
-    if (settings && state.open) ChatSettings(vm) { settings = false }
 }
 
 internal fun Modifier.playerAnchor(update: (Rect) -> Unit): Modifier = onGloballyPositioned {

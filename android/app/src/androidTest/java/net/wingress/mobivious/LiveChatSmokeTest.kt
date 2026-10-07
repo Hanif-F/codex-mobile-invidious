@@ -1,8 +1,11 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.media3.common.Player
 import androidx.lifecycle.Lifecycle
@@ -76,7 +79,16 @@ class LiveChatSmokeTest {
         until { activity.model.chatReplay.value.loaded && !activity.model.chatReplay.value.loading }
         compose.onNodeWithTag("chat-panel").assertIsDisplayed()
     }
-    private fun settings() { compose.onNodeWithTag("chat-settings").performClick(); compose.onNodeWithTag("chat-settings-sheet").assertExists() }
+    private fun settings() {
+        compose.onNodeWithTag("chat-menu").performClick()
+        compose.onNodeWithTag("chat-settings").performClick()
+        compose.onNodeWithTag("chat-settings-sheet").assertExists()
+    }
+    private fun adjustOverlay() {
+        compose.onNodeWithTag("chat-menu").performClick()
+        compose.onNodeWithTag("chat-overlay-edit").performClick()
+        compose.onNodeWithTag("chat-overlay-move").assertIsDisplayed()
+    }
     private fun restoreWatch() {
         compose.waitForIdle()
         if (compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
@@ -87,7 +99,6 @@ class LiveChatSmokeTest {
         compose.onNodeWithTag("chat-words").performTextReplacement(words)
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-timing"))
         compose.onNodeWithTag("chat-timing").performTextReplacement(timing)
-        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-settings-save"))
         compose.onNodeWithTag("chat-settings-save").performClick()
     }
     @Before fun launch() {
@@ -146,16 +157,125 @@ class LiveChatSmokeTest {
         ui { activity.onBackPressedDispatcher.onBackPressed() }
         reacquire(); until { compose.onAllNodesWithContentDescription("Full screen").fetchSemanticsNodes().isNotEmpty() }
     }
+    @Test fun settingsKeepDraftsAndFixedSaveWhileLayoutAndAppearanceSaveImmediately() {
+        incoming(); ready(); chat(); settings()
+        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        compose.onNodeWithTag("chat-side-width").performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(.1f)) }
+        assertEquals(.1f, activity.model.store.chatAppearance().besideFraction)
+        screenshot("settings-docked")
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
+        compose.onNodeWithTag("chat-words").performTextReplacement("draft-word")
+        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-layout-overlay"))
+        compose.onNodeWithTag("chat-layout-overlay").performClick()
+        compose.onNodeWithTag("chat-settings-sheet").assertExists()
+        compose.onNodeWithTag("chat-side-width").assertDoesNotExist()
+        compose.onNodeWithTag("chat-bottom-height").assertDoesNotExist()
+        compose.onNodeWithTag("chat-opacity").assertIsDisplayed()
+        assertTrue(activity.model.store.chatAppearance().overlay)
+        screenshot("settings-overlay")
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-channel-ids"))
+        compose.onNodeWithTag("chat-channel-ids").assertIsOff().performClick()
+        assertFalse(activity.model.store.chatAppearance().hideUserIds)
+        compose.onNodeWithTag("chat-timestamps").performClick()
+        assertTrue(activity.model.preferences.value.chat.timestamps)
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
+        compose.onNodeWithTag("chat-words").assertTextContains("draft-word")
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-timing"))
+        compose.onNodeWithTag("chat-timing").performClick()
+        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        screenshot("settings-keyboard")
+        compose.onNodeWithTag("chat-settings-save").performClick()
+        until { !activity.model.preferences.value.chat.timestamps && activity.model.preferences.value.chat.words == "draft-word" }
+        assertEquals(0, fixture().getJSONArray("chatPreferenceWrites").length())
+        compose.onNodeWithContentDescription("Close chat settings").performClick()
+        compose.onNodeWithTag("chat-overlay").assertExists()
+        assertTrue(activity.model.chatReplay.value.following)
+        compose.onNodeWithText("Move / resize chat").assertDoesNotExist()
+    }
+    @Test fun tenPercentDockWrapsLongUnicodeMessagesAndKeepsMenuActionsReachable() {
+        val author = "VeryLongAuthorName日本語😀".repeat(3)
+        val message = "A long chat message 日本語 😀 with more words to wrap. ".repeat(3)
+        command("chat", JSONObject().put("chatAuthor", author).put("chatText", message).toString())
+        incoming(); ready(); chat()
+        ui { activity.model.setChatAppearance(ChatAppearance(besideFraction = .1f)) }
+        compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()
+        until { activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
+        for (theme in listOf("light", "dark")) {
+            ui { activity.model.preferences.value = activity.model.preferences.value.copy(darkMode = theme) }
+            val panel = compose.onNodeWithTag("chat-panel").getUnclippedBoundsInRoot()
+            val video = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+            assertEquals(.1f, (panel.right - panel.left).value / (panel.right - video.left).value, .005f)
+            val menu = compose.onNodeWithTag("chat-menu").getUnclippedBoundsInRoot()
+            assertTrue(menu.left >= panel.left && menu.right <= panel.right)
+            assertTrue((menu.right - menu.left).value >= 47.5f)
+            compose.onNodeWithTag("chat-close").assertDoesNotExist()
+            assertEquals(message, activity.model.chatReplay.value.messages.last().text)
+            compose.onNodeWithTag("chat-list").performScrollToNode(hasTestTag("chat-message-chat-2"))
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNode(hasText(message, substring = true) and hasAnyAncestor(hasTestTag("chat-message-chat-2")))
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertTrue(layouts.single().lineCount > 1)
+            assertFalse(layouts.single().didOverflowWidth)
+            screenshot("ten-percent-$theme")
+            settings(); compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Close chat settings").performClick()
+        }
+        compose.onNodeWithTag("chat-menu").performClick()
+        compose.onNodeWithTag("chat-menu-close").performClick()
+        until { !activity.model.chatReplay.value.open }
+    }
+    @Test fun overlayDraftSurvivesRotationAndRecreationAndBackCancelsWithoutClosingChat() {
+        incoming(); ready(); chat(); ui { activity.model.setChatAppearance(ChatAppearance(overlay = true)) }
+        val before = activity.model.chatAppearance.value
+        val oldOrientation = activity.requestedOrientation
+        try {
+            adjustOverlay()
+            val move = compose.onNodeWithTag("chat-overlay-move").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            val resize = compose.onNodeWithTag("chat-overlay-resize").fetchSemanticsNode().config[SemanticsActions.CustomActions]
+            ui {
+                repeat(4) { assertTrue(move.first { it.label == "Move left" }.action()) }
+                repeat(3) { assertTrue(resize.first { it.label == "Wider" }.action()) }
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+            until { activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
+            until { runCatching { compose.onNodeWithTag("chat-overlay-save").assertIsDisplayed() }.isSuccess }
+            compose.onNodeWithTag("chat-overlay-move").assertIsDisplayed()
+            compose.onNodeWithTag("chat-list").assertIsDisplayed()
+            assertEquals(before, activity.model.store.chatAppearance())
+            screenshot("overlay-adjust-landscape")
+            ui { activity.recreate() }; reacquire()
+            until { runCatching { compose.onNodeWithTag("chat-overlay-save").assertIsDisplayed() }.isSuccess }
+            screenshot("overlay-adjust-recreated")
+            compose.onNodeWithTag("chat-overlay-save").assertIsDisplayed().performClick()
+            val saved = activity.model.chatAppearance.value
+            assertTrue(saved.x < before.x)
+            assertTrue(saved.width > before.width)
+            adjustOverlay()
+            compose.onNodeWithTag("chat-overlay-resize").performTouchInput { swipe(center, center + Offset(50f, 30f), 400) }
+            ui { activity.onBackPressedDispatcher.onBackPressed() }
+            compose.onNodeWithTag("chat-overlay-save").assertDoesNotExist()
+            assertTrue(activity.model.chatReplay.value.open)
+            assertEquals(saved, activity.model.store.chatAppearance())
+            assertEquals(10_000L, activity.model.playback.value.position)
+            assertFalse(activity.model.playback.value.playWhenReady)
+        } finally { ui { activity.requestedOrientation = oldOrientation } }
+    }
     @Test fun overlayDragAndResizeSaveCancelWithoutSeekingOrMinimizing() {
         incoming(); ready(); chat(); ui { activity.model.setChatAppearance(ChatAppearance(overlay = true)) }
         compose.onNodeWithTag("chat-overlay").assertExists()
         val before = activity.model.chatAppearance.value
-        compose.onNodeWithTag("chat-overlay-edit").performClick()
+        adjustOverlay()
+        compose.onNodeWithTag("player-surface").performTouchInput {
+            swipe(Offset(width * .1f, height * .4f), Offset(width * .3f, height * .6f), 400)
+        }
+        assertEquals(10_000L, activity.model.playback.value.position)
+        compose.onNodeWithTag("watch-content").assertExists()
         compose.onNodeWithTag("chat-overlay-move").performTouchInput { swipe(center, center - Offset(40f, 20f), 400) }
         compose.onNodeWithTag("chat-overlay-save").performClick()
         assertTrue(activity.model.chatAppearance.value.x < before.x)
         val saved = activity.model.chatAppearance.value
-        compose.onNodeWithTag("chat-overlay-edit").performClick()
+        adjustOverlay()
         compose.onNodeWithTag("chat-overlay-resize").performTouchInput { swipe(center, center - Offset(30f, 20f), 400) }
         compose.onNodeWithTag("chat-overlay-cancel").performClick()
         assertEquals(saved, activity.model.chatAppearance.value)
@@ -165,7 +285,7 @@ class LiveChatSmokeTest {
         val surface = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
         val overlay = compose.onNodeWithTag("chat-overlay").getUnclippedBoundsInRoot()
         assertTrue(overlay.left >= surface.left && overlay.right <= surface.right && overlay.top >= surface.top && overlay.bottom <= surface.bottom)
-        compose.onNodeWithTag("chat-overlay-edit").performClick()
+        adjustOverlay()
         val actions = compose.onNodeWithTag("chat-overlay-move").fetchSemanticsNode().config[SemanticsActions.CustomActions]
         ui { assertTrue(actions.first { it.label == "Move left" }.action()) }
         compose.onNodeWithTag("chat-overlay-save").performClick()
@@ -187,6 +307,10 @@ class LiveChatSmokeTest {
         account(); incoming(); ready(); chat(); settings()
         command("chat", """{"chatSaveFail":true}"""); saveFiltersAndTiming("spam", "-1.5")
         compose.onNodeWithText("Chat settings could not be saved").assertExists()
+        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        compose.onNodeWithTag("chat-timing").assertTextContains("-1.5")
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
+        compose.onNodeWithTag("chat-words").assertTextContains("spam")
         command("chat", """{"chatSaveFail":false}"""); compose.onNodeWithTag("chat-settings-save").performClick()
         until { activity.model.chatReplay.value.timingOffsetMs == -1500 && !activity.model.chatReplay.value.timingSaving }
         val saved = fixture(); assertEquals(-1500, saved.getJSONObject("chatTimings").getInt("testvideo01"))
@@ -197,7 +321,6 @@ class LiveChatSmokeTest {
     @Test fun invalidRegexIsRejectedAndOldScopesExplainHowToRestoreSync() {
         account(); command("chat", """{"chatScopeFail":true}""")
         incoming(); ready(); chat(); settings(); saveFiltersAndTiming("/(?=bad)/", "0")
-        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasText("Invalid or unsupported regex. Lookaround and backreferences are unsupported."))
         compose.onNodeWithText("Invalid or unsupported regex. Lookaround and backreferences are unsupported.").assertExists()
         assertTrue(activity.model.chatReplay.value.timingError!!.contains("Sign out and sign in")); assertNotNull(activity.model.account.value)
         assertEquals(0, fixture().getJSONArray("chatPreferenceWrites").length())
@@ -238,6 +361,10 @@ class LiveChatSmokeTest {
                 compose.onNodeWithTag("chat-follow").assertExists()
             }
             compose.onNodeWithTag("chat-follow").performClick(); until { activity.model.chatReplay.value.following }
+            ui { activity.model.setChatAppearance(ChatAppearance(overlay = true, fontScale = 300, width = .55f, height = 1f)) }
+            compose.onNodeWithTag("chat-menu").assertIsDisplayed()
+            assertTrue(activity.model.chatReplay.value.following)
+            screenshot("overlay-large-font-$theme")
         }
     }
     @Test fun miniplayerSuspendsReplayAndRestorationRetainsTheOpenedPanel() {

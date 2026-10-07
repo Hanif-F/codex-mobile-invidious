@@ -33,20 +33,21 @@ data class ChatPreferences(val timestamps: Boolean = true, val users: String = "
     companion object { fun parse(j: JSONObject) = ChatPreferences(j.optBoolean("chat_show_timestamps", true), j.text("chat_user_blacklist"), j.text("chat_word_blacklist")) }
 }
 
-data class ChatAppearance(val overlay: Boolean = false, val hideUserIds: Boolean = false, val fontScale: Int = 100,
+data class ChatAppearance(val overlay: Boolean = false, val hideUserIds: Boolean = true, val fontScale: Int = 100,
     val opacity: Int = 75, val belowFraction: Float = .60f, val besideFraction: Float = .35f,
     val x: Float = .56f, val y: Float = .05f, val width: Float = .40f, val height: Float = .75f) {
     fun bounded(): ChatAppearance {
         fun Float.safe(default: Float, min: Float, max: Float) = if (isFinite()) coerceIn(min, max) else default.coerceIn(min, max)
         val w = width.safe(.4f, .1f, 1f); val h = height.safe(.75f, .1f, 1f)
         return copy(fontScale = fontScale.coerceIn(25, 300), opacity = opacity.coerceIn(0, 100),
-            belowFraction = belowFraction.safe(.6f, .3f, .7f), besideFraction = besideFraction.safe(.35f, .3f, .7f),
+            belowFraction = belowFraction.safe(.6f, .3f, .7f), besideFraction = besideFraction.safe(.35f, BESIDE_FRACTION_RANGE.start, BESIDE_FRACTION_RANGE.endInclusive),
             width = w, height = h, x = x.safe(.56f, 0f, 1f - w), y = y.safe(.05f, 0f, 1f - h))
     }
     fun json() = JSONObject().put("overlay", overlay).put("hideUserIds", hideUserIds).put("fontScale", fontScale).put("opacity", opacity)
         .put("belowFraction", belowFraction).put("besideFraction", besideFraction).put("x", x).put("y", y).put("width", width).put("height", height)
     companion object {
-        fun parse(j: JSONObject) = ChatAppearance(j.optBoolean("overlay"), j.optBoolean("hideUserIds"), j.optInt("fontScale", 100),
+        val BESIDE_FRACTION_RANGE = .1f.. .7f
+        fun parse(j: JSONObject) = ChatAppearance(j.optBoolean("overlay"), j.optBoolean("hideUserIds", true), j.optInt("fontScale", 100),
             j.optInt("opacity", 75), j.optDouble("belowFraction", .6).toFloat(), j.optDouble("besideFraction", .35).toFloat(),
             j.optDouble("x", .56).toFloat(), j.optDouble("y", .05).toFloat(), j.optDouble("width", .4).toFloat(), j.optDouble("height", .75).toFloat()).bounded()
     }

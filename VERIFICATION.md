@@ -2342,3 +2342,61 @@ CRYSTAL_CACHE_DIR=/tmp/mobivious-subscription-crystal-cache \
   crystal build tests/database/accounts.cr -o /tmp/mobivious-subscription-accounts-tests
 # Follow tests/database/README.md to supply a disposable ACCOUNT_TEST_DATABASE_URL.
 ```
+
+## Chat appearance and settings overhaul — 7 October 2026
+
+Chat uses compact wrapping rows with muted timestamps, emphasized author names,
+and secondary paid-message/membership labels. New appearance settings hide channel
+IDs; explicitly saved visibility choices remain intact. The side panel supports
+10–70% width with the existing 35% default. Below 200dp, the header becomes a
+48dp menu button with settings and close actions.
+
+The single settings sheet shows Docked or Overlay controls as appropriate.
+Appearance saves immediately; its fixed Save footer applies timestamps, blocked
+users/words and per-video chat delay. Layout switching retains the sheet and
+unsaved filters. Validation and save errors remain visible beside Save, with
+drafts retained for retry. The existing account APIs, filter syntax and appearance
+storage fields are retained.
+
+Adjust overlay is inside the chat menu. Editing keeps messages visible beneath
+attached move, resize, Done and Cancel controls. Geometry stays within the fitted
+video picture. The player host owns the saveable adjustment draft, retaining it
+through rotation and Activity recreation; Cancel and Back discard it. Player
+gestures are disabled while adjusting. Layout changes and automatic positioning
+preserve follow-playback state instead of restoring a stale panel state.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | Passed: 274 tests, 0 failures/errors/skips |
+| Debug and instrumentation APK builds | Passed offline |
+| Debug lint | Passed: 0 errors, 27 existing warnings |
+| Chat device scenarios | Passed: all 18 scenarios on the already running emulator-5554, Android 16 |
+| Player control and watch-resize regressions | Passed: 8 scenarios; final combined run passed all 26 scenarios with 0 failures/skips |
+| Local chat fixture compatibility | Passed: replay chunks, sparse saves, authentication and timing isolation |
+| Native screenshots | Reviewed docked/overlay layouts, 10% width in both themes, 300% chat text, settings, text editing and adjustment controls |
+| Git whitespace checks | Passed |
+
+New unit coverage checks the 10% bound, nonfinite inputs, stored width round trips,
+new channel-ID defaults and explicit older choices. Device coverage checks menu
+access and touch targets, long Unicode author/message wrapping, immediate
+appearance persistence, staged timestamps/filters, fixed Save access during text
+editing, retry draft retention, overlay drag/resize and accessibility actions,
+Done/Cancel/Back, rotation/recreation, fitted-picture bounds, paused playback,
+and disabled player gestures while adjusting.
+
+Reports and screenshots are saved in the ignored `artifacts/chat-overhaul/`
+directory. `verification.json`, `focused-device-26.xml`, `jvm/`, and
+`lint-results-debug.xml` preserve the final combined results. The adjustment
+captures were retaken with window transitions temporarily disabled to avoid
+capturing Android's rotation animation; the emulator's original animation
+settings were restored.
+
+Reproduction on an already running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
+  ANDROID_HOME="$HOME/Android/Sdk" scripts/test-android.sh --offline \
+  --max-workers=2 \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveChatSmokeTest,net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.WatchPlayerResizePresentationTest
+python3 scripts/check-chat-fixture.py
+```

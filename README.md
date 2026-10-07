@@ -95,9 +95,12 @@ individual capabilities and their dependencies.
 
 Archived livestreams with `liveChatReplay` support offer on-demand chat replay
 through the player chat button or watch-page entry. Replay follows playback and
-seeks, with docked and movable/resizable overlay modes. Chat settings provide
-appearance controls, user/word/RE2 regex filters, and a per-video timing offset;
-positive timing delays chat. Signed-in timestamps, filters and offsets sync with
+seeks, with compact docked and movable/resizable overlay modes. The side panel
+can use 10–70% of the screen. Use the chat menu to open settings or choose
+**Adjust overlay**; attached handles move and resize the panel, with Done and
+Cancel controls. Appearance saves immediately; **Save** applies timestamps,
+user/word/RE2 regex filters, and a per-video chat delay. Positive delay values
+show messages later. Signed-in timestamps, filters and delays sync with
 Invidious, while appearance stays on the device. Guests save settings per instance.
 Deploy the sibling native token-scope update and renew sign-in for account chat
 sync. RE2 excludes lookaround/backreferences; unsupported imported patterns are

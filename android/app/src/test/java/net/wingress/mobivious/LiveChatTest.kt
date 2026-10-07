@@ -45,12 +45,36 @@ class LiveChatTest {
     @Test fun appearanceBoundsInvalidGeometryAndPreservesNativeDefaults() {
         val a = ChatAppearance.parse(JSONObject("""{"x":9,"y":-1,"width":2,"height":-1,"fontScale":999,"opacity":-9,"belowFraction":9,"besideFraction":0}"""))
         assertEquals(0f, a.x); assertEquals(0f, a.y); assertEquals(1f, a.width); assertEquals(.1f, a.height)
-        assertEquals(300, a.fontScale); assertEquals(0, a.opacity); assertEquals(.7f, a.belowFraction); assertEquals(.3f, a.besideFraction)
+        assertEquals(300, a.fontScale); assertEquals(0, a.opacity); assertEquals(.7f, a.belowFraction); assertEquals(.1f, a.besideFraction)
         assertEquals(ChatAppearance(), ChatAppearance.parse(JSONObject()))
         assertEquals(ChatAppearance(), ChatAppearance.parse(ChatAppearance().json()))
         assertTrue(ChatAppearance(x = Float.NaN).bounded().x.isFinite())
         val full = ChatAppearance(x = Float.NaN, y = Float.NaN, width = 1f, height = 1f).bounded()
         assertEquals(0f, full.x); assertEquals(0f, full.y)
+    }
+    @Test fun besideWidthAllowsTenPercentAndSurvivesStorageWithoutChangingOtherDefaults() {
+        for (width in listOf(.1f, .15f, .25f, .35f, .7f)) {
+            val value = ChatAppearance(besideFraction = width)
+            assertEquals(value, value.bounded())
+            assertEquals(value, ChatAppearance.parse(value.json()))
+        }
+        assertEquals(.1f, ChatAppearance(besideFraction = -.5f).bounded().besideFraction)
+        assertEquals(.7f, ChatAppearance(besideFraction = 2f).bounded().besideFraction)
+        for (width in listOf(Float.NaN, Float.POSITIVE_INFINITY, Float.NEGATIVE_INFINITY)) {
+            assertEquals(.35f, ChatAppearance(besideFraction = width).bounded().besideFraction)
+        }
+        assertEquals(.6f, ChatAppearance().belowFraction)
+        assertEquals(.3f, ChatAppearance(belowFraction = .1f).bounded().belowFraction)
+    }
+    @Test fun channelIdsAreHiddenForNewSettingsAndExplicitOlderChoicesArePreserved() {
+        assertTrue(ChatAppearance().hideUserIds)
+        assertTrue(ChatAppearance.parse(JSONObject()).hideUserIds)
+        assertTrue(ChatAppearance.parse(JSONObject("""{"fontScale":150}""")).hideUserIds)
+        for (hidden in listOf(false, true)) {
+            assertEquals(hidden, ChatAppearance.parse(JSONObject().put("hideUserIds", hidden)).hideUserIds)
+            val value = ChatAppearance(hideUserIds = hidden, besideFraction = .15f)
+            assertEquals(value, ChatAppearance.parse(value.json()))
+        }
     }
     @Test fun filtersMatchIdsHandlesWordsAndSafeRegexCaseInsensitively() {
         assertFalse(ChatFilters(ChatPreferences(users = "ucVIEWER")).accepts(message("a")))

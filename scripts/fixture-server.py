@@ -58,15 +58,16 @@ reset_comments()
 def reset_chat():
     state.update(chatReplay=False, chatRequests=[], chatTimingRequests=[], chatPreferenceWrites=[], chatTimings={},
                  chatFailNext=False, chatDelayNext=0, chatTimingDelayNext=0, chatSaveFail=False,
-                 chatUnavailable=False, chatRepeatCursor=False, chatSparse=False, chatScopeFail=False)
+                 chatUnavailable=False, chatRepeatCursor=False, chatSparse=False, chatScopeFail=False,
+                 chatAuthor='', chatText='')
 reset_chat()
 
 def chat_chunk(offset, token):
     start = int(token.split(':')[1]) if token else max(0, offset - 15000)
     stop = min(120000, start + 20000)
-    messages = [dict(id='chat-' + str(i), offsetMs=i * 5000, author='Viewer ' + str(i),
+    messages = [dict(id='chat-' + str(i), offsetMs=i * 5000, author=state['chatAuthor'] or 'Viewer ' + str(i),
                      authorChannelId='UC' + 'a' * 22, authorHandle='@viewer' + str(i),
-                     text=('Hidden word spam' if i == 2 else 'Replay message ' + str(i)),
+                     text=state['chatText'] or ('Hidden word spam' if i == 2 else 'Replay message ' + str(i)),
                      kind=('membership' if i == 1 else 'paid' if i == 3 else 'text'), amount='$5' if i == 3 else '')
                 for i in range(24) if start <= i * 5000 < stop]
     removed = []
@@ -594,7 +595,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/chat':
             state['chatReplay'] = data.get('chatReplay', True)
-            for key in ('chatFailNext', 'chatDelayNext', 'chatTimingDelayNext', 'chatSaveFail', 'chatUnavailable', 'chatRepeatCursor', 'chatSparse', 'chatScopeFail', 'chatTimings'):
+            for key in ('chatFailNext', 'chatDelayNext', 'chatTimingDelayNext', 'chatSaveFail', 'chatUnavailable', 'chatRepeatCursor', 'chatSparse', 'chatScopeFail', 'chatTimings', 'chatAuthor', 'chatText'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/chapters':
