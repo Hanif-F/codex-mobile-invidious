@@ -57,7 +57,9 @@ An `OK` result confirms the APK matches the supplied checksum.
 ### Accounts and library
 
 - Sign in, create an account, manage credentials, sessions and API tokens.
-- Channel subscriptions, a subscription feed and a searchable channel directory.
+- Channel subscriptions, a subscription feed and a searchable channel directory
+  sorted by Relevance, Latest upload, Most watched or A–Z, with upload and viewing
+  details. The choice is saved on this device for each instance.
 - Owned and subscribed playlists, searchable watch history, watched indicators
   and saved playback positions.
 - RSS links, subscription OPML exports and private playlist Atom exports.
@@ -80,6 +82,12 @@ other or older instances. Optional metadata is hidden when it is unavailable.
 If a feature reports a missing API or permission, the instance may need an update.
 After server updates that add token permissions, sign out and sign in again.
 Installing an APK does not update the server.
+
+Channel sorting statistics require the matching server API update. Older servers
+keep the channel directory available in A–Z order. Relevance uses viewing habits
+from the last 90 days, boosted by unwatched uploads from the last seven days;
+Most watched uses all-time distinct video counts. Existing native tokens already
+have the required subscriptions and history permissions.
 
 For instance owners, the [deployment guide](deploy/README.md) covers server setup,
 migrations and token renewal. The [feature checklist](FEATURE_PARITY.md) records

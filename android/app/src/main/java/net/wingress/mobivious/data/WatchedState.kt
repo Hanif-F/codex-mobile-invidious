@@ -26,7 +26,8 @@ data class PlaybackSnapshot(val watched: Set<String> = emptySet(), val positions
 }
 
 data class WatchedState(val context: ApiContext? = null, val watched: Set<String> = emptySet(),
-    val positions: Map<String, Long> = emptyMap(), val loading: Boolean = false, val error: String? = null)
+    val positions: Map<String, Long> = emptyMap(), val loading: Boolean = false, val error: String? = null,
+    val historyRevision: Long = 0)
 
 data class VideoIndicator(val watched: Boolean, val percent: Int?, val bar: Float?) {
     val description: String get() = listOfNotNull(if (watched) "In watch history" else null,
@@ -63,6 +64,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     val state = mutableState.asStateFlow()
     private var epoch = 0L
     private var revision = 0L
+    private var historyRevision = 0L
     private var clearGeneration = 0L
     private var positionGeneration = 0L
     private val historyGeneration = mutableMapOf<String, Long>()
@@ -82,6 +84,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         if (mutableState.value.context == context) return@synchronized
         epoch++; revision++; clearGeneration++; positionGeneration++
         historyGeneration.clear(); historyRevisions.clear(); positionRevisions.clear(); pendingPositions.clear()
+        historyRevision = 0
         refreshing = null; clearedAt = revision; positionsClearedAt = revision
         savePosition = false; positionsConfigured = false; snapshot = PlaybackSnapshot()
         mutableState.value = WatchedState(context)
@@ -103,7 +106,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     }
     private fun publish() {
         mutableState.value = mutableState.value.copy(watched = snapshot.watched,
-            positions = if (savePosition) snapshot.positions else emptyMap())
+            positions = if (savePosition) snapshot.positions else emptyMap(), historyRevision = historyRevision)
     }
     suspend fun refresh() {
         val request = synchronized(lock) {
@@ -178,6 +181,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         write(ticket, { ticket.history == (historyGeneration[id] ?: 0L) }, operation = { api.watched(id, context) }) {
             snapshot = snapshot.copy(watched = snapshot.watched + id)
             historyRevisions[id] = revision + 1
+            historyRevision++
         }
     }
     suspend fun savePosition(context: ApiContext, id: String, seconds: Long) {
@@ -199,6 +203,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
             historyGeneration[id] = (historyGeneration[id] ?: 0L) + 1
             snapshot = snapshot.copy(watched = snapshot.watched - id)
             historyRevisions[id] = revision + 1
+            historyRevision++
         }
     }
     suspend fun clearHistory(context: ApiContext) {
@@ -206,6 +211,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         write(ticket, operation = { api.clearHistory(context) }) {
             clearGeneration++; clearedAt = revision + 1; positionsClearedAt = clearedAt
             local.clearPositions(context); snapshot = PlaybackSnapshot()
+            historyRevision++
         }
     }
 }

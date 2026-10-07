@@ -2252,3 +2252,93 @@ JAVA_HOME=/opt/android-studio/jbr "$HOME/Android/Sdk/build-tools/36.0.0/apksigne
 cd artifacts
 sha256sum -c Mobivious-0.6.0.apk.sha256
 ```
+
+## Native subscription sorting — 7 October 2026
+
+The subscribed-channel directory now offers Relevance (default), Latest upload,
+Most watched and A–Z. One enriched request supplies the directory and statistics;
+sort changes and channel-name searches use that snapshot without requests.
+Selections are saved locally per instance. Rows show the last known upload and
+distinct watched-video counts: all time for Most watched, the last 90 days for
+the other choices. Relevance explains the shared 90-day viewing decay and
+seven-day unwatched-upload boost. The subscription video feed keeps its existing
+ordering.
+
+The sibling Invidious API preserves the ordinary array response and accepts
+`include_stats=true` to add `subscriptionStats`. It reuses the database statistics
+and relevance calculation from `e843ff9c853b824ab0959041ea075baa09b7c275`. Enriched
+access requires both existing subscriptions and history read permissions;
+responses remain private and uncached. It reads local caches without metadata
+requests, history backfills, new scopes or a schema migration. Missing statistics
+or a missing history permission produce an explained A–Z fallback without
+replacing the saved sort. Refresh errors retain rows, statistics, search and sort.
+
+| Check | Result |
+| --- | --- |
+| Android JVM unit/API tests | Passed: 272 tests, 0 failures/errors/skips |
+| Debug and instrumentation builds | Passed offline |
+| Debug lint | Passed: 0 errors, 27 warnings |
+| Focused sorting/directory device tests | Passed: 7 tests, including 4 new sorting scenarios |
+| Final subscription/search/avatar/RSS device regressions | Passed: 30 selected scenarios, 0 failures/skips |
+| Crystal shared ranking specs | Passed: 7 examples |
+| Guarded server database/API integration harness | Passed against disposable PostgreSQL 14 |
+| Normal and API-only server builds | Passed |
+| Native layout screenshots | Inspected 8 captures at 320dp/390dp in light/dark themes; dark captures use 1.4× text and thin mode |
+| Fixture syntax and Git whitespace checks | Passed in both repositories |
+
+Unit/API coverage includes all four orders, deterministic name/ID ties, unknown
+uploads, filtered ordering, invalid saved keys, legacy and malformed statistics,
+history-permission fallback, refresh failure retention and stale responses.
+Device checks cover default Relevance, immediate local switching/search, new
+activity persistence, channel navigation/restoration, unsubscribe, retry, empty
+states, repeated-history writes, member-visibility refresh and sign-out isolation.
+The existing history date-group device assertion now scrolls its lazy list to
+the first heading before asserting visibility; data grouping is unchanged.
+
+Server checks cover optional response compatibility, permission combinations,
+account isolation, private cache headers and equality with the shared ranking
+statistics. The shared tests exercise repeated watches, invalid/future dates,
+account timezone boundaries, exactly 90 days, exactly seven days, member uploads,
+future premieres and unknown uploads. The database harness confirms that reads
+do not write history backfills or alter the website's sort cookie.
+
+Two existing device scenarios still time out while opening playlists:
+`AvatarsSmokeTest.subscriptionsHistoryAndPlaylistCreatorsUseExistingPayloads`
+and `PlaylistRssSmokeTest.libraryGroupsAndReadOnlySubscriptionsFollowOwnerUpdates`.
+Both failures reproduced on the unchanged Android HEAD (`c0e50bf`) in an isolated
+checkout. They were excluded from the final 30-scenario run; the wider suite is
+not reported as passing.
+
+Local evidence is saved in ignored `.tools/subscription-sorting-*-device-results.xml`
+(focused, final and baseline comparison reports) and
+`.tools/subscription-sorting-screenshots/`. The screenshot montage is
+`.tools/subscription-sorting-screenshots/montage.png`. The debug APK is
+`android/app/build/outputs/apk/debug/app-debug.apk` and was installed on the
+user-started `emulator-5554` for continued use. Tests used the disposable localhost
+fixture; the runner cleaned up its fixture and ADB reverse mapping. The disposable
+server database/container was removed after verification.
+
+The live instance has not been updated. Deploying the sibling server changes is
+required to enable ranking statistics there; until then Android falls back to
+A–Z. Existing native tokens already grant the required permissions. Production
+accounts, production deployment, release signing and publication were not part
+of this implementation. The app version remains 0.6.0.
+
+Repeat the core device checks on an already-running emulator:
+
+```sh
+cd android
+JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:testDebugUnitTest \
+  :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug \
+  --offline --console=plain --max-workers=2
+cd ..
+ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
+  scripts/test-android.sh --offline --max-workers=2 \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.SubscriptionSortingSmokeTest,net.wingress.mobivious.SubscriptionsPresentationTest,net.wingress.mobivious.HomeSubscriptionsSmokeTest,net.wingress.mobivious.SearchHistorySmokeTest
+cd ../invidious
+CRYSTAL_CACHE_DIR=/tmp/mobivious-subscription-crystal-cache \
+  crystal spec spec/invidious/frontend/subscription_manager_spec.cr
+CRYSTAL_CACHE_DIR=/tmp/mobivious-subscription-crystal-cache \
+  crystal build tests/database/accounts.cr -o /tmp/mobivious-subscription-accounts-tests
+# Follow tests/database/README.md to supply a disposable ACCOUNT_TEST_DATABASE_URL.
+```

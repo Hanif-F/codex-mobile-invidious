@@ -38,6 +38,23 @@ class WatchedStateTest {
         .setBody(JSONObject().put("watched", org.json.JSONArray(watched)).put("positions", JSONObject(positions)).toString())
     private fun await(latch: CountDownLatch) { assertTrue("Fixture request did not arrive", latch.await(5, TimeUnit.SECONDS)) }
 
+    @Test fun historyRevisionAdvancesForRepeatWatchesButNotPlaybackPositions() = runBlocking {
+        Fixture().use { f ->
+            repeat(2) { index ->
+                f.server.enqueue(MockResponse().setResponseCode(204)); f.repo.recordWatched(f.context, first)
+                assertEquals(index + 1L, f.repo.state.value.historyRevision)
+            }
+            f.server.enqueue(MockResponse().setResponseCode(204)); f.repo.savePosition(f.context, first, 10)
+            assertEquals(2L, f.repo.state.value.historyRevision)
+            f.server.enqueue(MockResponse().setResponseCode(204)); f.repo.removeHistory(f.context, first)
+            assertEquals(3L, f.repo.state.value.historyRevision)
+            f.server.enqueue(MockResponse().setResponseCode(204)); f.repo.clearHistory(f.context)
+            assertEquals(4L, f.repo.state.value.historyRevision)
+            f.account = null; f.repo.reset()
+            assertEquals(0L, f.repo.state.value.historyRevision)
+        }
+    }
+
     @Test fun snapshotParsesIndependentStateAndRejectsMalformedEntries() {
         val parsed = PlaybackSnapshot.parse(JSONObject("""{"watched":["$first","$first",null,4,"bad"],"positions":{"$first":0,"$second":42,"ccccccccccc":-1,"ddddddddddd":1.5,"eeeeeeeeeee":"20","fffffffffff":2147483648,"bad":10}}"""))
         assertEquals(setOf(first), parsed.watched)

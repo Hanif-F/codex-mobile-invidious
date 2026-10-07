@@ -143,6 +143,8 @@ class SearchHistorySmokeTest {
     @Test fun historySearchCoversLaterPagesAndDateGroupsKeepUnknownEntries() {
         seedHistory(); openHistory()
         assertEquals(6, vm.browse.value.history!!.total)
+        // Lazy lists can retain the first video's key when date headings arrive; bring the heading into view.
+        compose.onNodeWithTag("browse-video-list").performScrollToIndex(0)
         compose.onNodeWithTag("history-group-TODAY").assertExists()
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Released: 2024-02-29"))
         compose.onNodeWithText("Released: 2024-02-29").assertExists()

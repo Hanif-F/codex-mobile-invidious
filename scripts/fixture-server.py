@@ -151,6 +151,7 @@ def community_posts():
 def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
                  subscriptionRequests=[], subscriptionDelayNext=0, failSubscriptionRead=False,
+                 subscriptionStatsMode='full', subscriptionStats={},
                  discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False)
 reset_home_subscriptions()
 
@@ -424,13 +425,21 @@ class Handler(BaseHTTPRequestHandler):
             finally:
                 event['completed'] = True
         elif p == '/api/v1/auth/subscriptions':
-            event = dict(completed=False, authorized=self.headers.get('Authorization') == 'Bearer fixture-token')
+            include_stats = parse_qs(url.query).get('include_stats') == ['true']
+            event = dict(completed=False, authorized=self.headers.get('Authorization') == 'Bearer fixture-token', includeStats=include_stats)
             state['subscriptionRequests'].append(event)
-            channels = list(state['subscriptionChannels'])
+            mode = state['subscriptionStatsMode']
+            channels = [dict(channel) for channel in state['subscriptionChannels']]
+            if include_stats and mode == 'full':
+                for channel in channels:
+                    channel['subscriptionStats'] = state['subscriptionStats'].get(channel['authorId'],
+                        dict(latestUpload=None, allTimeWatched=0, recentWatched=0, relevance=0))
             delay = state['subscriptionDelayNext']; state['subscriptionDelayNext'] = 0
             fail = state['failSubscriptionRead']
             if delay: time.sleep(min(5000, max(0, delay)) / 1000)
             event['completed'] = True
+            if include_stats and mode == 'permission':
+                return self.respond(dict(error='Channel sorting requires history read permission.'), 403)
             self.respond(dict(error='Fixture subscriptions temporarily unavailable') if fail else channels, 503 if fail else 200)
         elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
         elif p == '/api/v1/auth/feed/rss': self.respond(dict(feedPath='/feed/private?token=fixture-rss-secret'))
@@ -636,7 +645,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':
-            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'discoveryDelayNext', 'discoveryDistinct'):
+            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'discoveryDelayNext', 'discoveryDistinct'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/search-history':

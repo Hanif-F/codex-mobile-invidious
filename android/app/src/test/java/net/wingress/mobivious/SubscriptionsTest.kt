@@ -33,7 +33,7 @@ class SubscriptionsTest {
             val controller = SubscriptionsController(scope, { context }, {
                 calls++
                 if (failure) throw IllegalStateException("Temporarily unavailable")
-                listOf(Channel("a", "Studio"), Channel("a", "Duplicate response"))
+                SubscriptionDirectory(listOf(Channel("a", "Studio"), Channel("a", "Duplicate response")))
             }, { it.message.orEmpty() })
             controller.refresh(); controller.search("stud")
             assertEquals(1, controller.state.value.channels.size)
@@ -58,7 +58,7 @@ class SubscriptionsTest {
             val controller = SubscriptionsController(scope, { context }, {
                 val call = ++calls
                 if (call == 1) withContext(NonCancellable) { gate.await() }
-                listOf(Channel("$call", "Response $call"))
+                SubscriptionDirectory(listOf(Channel("$call", "Response $call")))
             }, { it.message.orEmpty() })
             controller.refresh(); assertTrue(controller.state.value.loading)
             controller.refresh(); gate.complete(Unit); yield()
@@ -76,7 +76,7 @@ class SubscriptionsTest {
                 var active = context; var delay = false
                 val controller = SubscriptionsController(scope, { active }, {
                     if (delay) { withContext(NonCancellable) { gate.await() }; throw IllegalStateException("Old account error") }
-                    listOf(Channel("a", "Alice's channel"))
+                    SubscriptionDirectory(listOf(Channel("a", "Alice's channel")))
                 }, { it.message.orEmpty() })
                 controller.refresh(); controller.search("Alice")
                 delay = true; controller.refresh()
@@ -96,6 +96,95 @@ class SubscriptionsTest {
             assertTrue(controller.state.value.loaded); assertFalse(controller.state.value.loading)
             assertTrue(controller.state.value.channels.isEmpty())
         } finally { scope.cancel() }
+    }
+
+    @Test fun allSortsUseTheirOwnMetricAndBreakTiesByNameAndId() {
+        val channels = listOf(Channel("b", "same"), Channel("a", "Same"), Channel("c", "Zulu"), Channel("d", "Dormant"))
+        val state = SubscriptionChannelsState(channels = channels, stats = mapOf(
+            "a" to SubscriptionStats(100, 8, 0, 0.0), "b" to SubscriptionStats(200, 1, 1, 1.5),
+            "c" to SubscriptionStats(null, 6, 6, 4.0), "d" to SubscriptionStats(null, 0, 0, 0.0)))
+        val expected = mapOf(SubscriptionSort.ALPHABETICAL to listOf("d", "a", "b", "c"),
+            SubscriptionSort.LATEST to listOf("b", "a", "d", "c"),
+            SubscriptionSort.MOST_WATCHED to listOf("a", "c", "b", "d"),
+            SubscriptionSort.RELEVANCE to listOf("c", "b", "d", "a"))
+        expected.forEach { (sort, order) -> assertEquals(order, state.copy(sort = sort).matches.map { it.id }) }
+        assertEquals(listOf("b", "a"), state.copy(sort = SubscriptionSort.LATEST, query = " SaMe ").matches.map { it.id })
+        assertEquals(listOf("a", "b"), state.copy(sort = SubscriptionSort.RELEVANCE,
+            channels = channels.take(2), stats = emptyMap()).matches.map { it.id })
+        assertEquals(SubscriptionSort.RELEVANCE, SubscriptionSort.saved(null))
+        assertEquals(SubscriptionSort.RELEVANCE, SubscriptionSort.saved("invalid"))
+    }
+
+    @Test fun sortChoicePersistsWithoutFetchAndSurvivesFailureAndLegacyFallback() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            var calls = 0; var failRead = false; var legacy = false
+            val saved = mutableMapOf<String, SubscriptionSort>()
+            var active = context
+            val controller = SubscriptionsController(scope, { active }, {
+                calls++; if (failRead) error("Offline")
+                SubscriptionDirectory(listOf(Channel("b", "Beta"), Channel("a", "Alpha")),
+                    mapOf("b" to SubscriptionStats(null, 3, 2, 2.0), "a" to SubscriptionStats(null, 1, 1, 1.0)),
+                    if (legacy) SubscriptionDirectory.LEGACY else null)
+            }, { it.message.orEmpty() }, { saved[it.server] ?: SubscriptionSort.RELEVANCE }, { ctx, sort -> saved[ctx.server] = sort })
+            controller.refresh(); controller.search("a"); controller.sort(SubscriptionSort.MOST_WATCHED)
+            assertEquals(1, calls); assertEquals(SubscriptionSort.MOST_WATCHED, saved[context.server])
+            failRead = true; controller.refresh()
+            assertEquals("Offline", controller.state.value.error); assertEquals("a", controller.state.value.query)
+            assertEquals(SubscriptionSort.MOST_WATCHED, controller.state.value.sort)
+            assertEquals(listOf("b", "a"), controller.state.value.matches.map { it.id })
+            failRead = false; legacy = true; controller.refresh()
+            assertEquals(SubscriptionSort.ALPHABETICAL, controller.state.value.effectiveSort)
+            assertEquals(SubscriptionSort.MOST_WATCHED, saved[context.server])
+            controller.sort(SubscriptionSort.LATEST)
+            assertEquals(SubscriptionSort.MOST_WATCHED, controller.state.value.sort)
+            legacy = false; controller.refresh()
+            assertEquals(SubscriptionSort.MOST_WATCHED, controller.state.value.effectiveSort)
+            active = active.copy(server = "https://second.test"); controller.reset()
+            assertEquals(SubscriptionSort.RELEVANCE, controller.state.value.sort)
+            assertTrue(controller.state.value.stats.isEmpty())
+            active = context.copy(generation = 1); controller.reset()
+            assertEquals(SubscriptionSort.MOST_WATCHED, controller.state.value.sort)
+        } finally { scope.cancel() }
+    }
+
+    @Test fun directoryParserAcceptsZeroAndUnknownButRejectsMalformedStats() {
+        val stats = """{"latestUpload":null,"allTimeWatched":0,"recentWatched":0,"relevance":0}"""
+        val body = """[{"authorId":"a","author":"Alpha","subscriptionStats":$stats}]"""
+        assertEquals(SubscriptionStats(null, 0, 0, 0.0), SubscriptionDirectory.parse(body).stats["a"])
+        assertNull(SubscriptionDirectory.parse("[]").unavailableReason)
+        assertEquals(SubscriptionDirectory.LEGACY, SubscriptionDirectory.parse("""[{"authorId":"a","author":"Alpha"}]""").unavailableReason)
+        for (malformed in listOf(stats.replace("\"relevance\":0", "\"relevance\":\"NaN\""),
+            stats.replace("\"recentWatched\":0", "\"recentWatched\":1"),
+            stats.replace("\"allTimeWatched\":0", "\"allTimeWatched\":-1"),
+            stats.replace("\"latestUpload\":null", "\"latestUpload\":1.5"),
+            stats.replace("\"allTimeWatched\":0", "\"allTimeWatched\":\"0\""), "null", "{}")) {
+            assertThrows(IllegalArgumentException::class.java) { SubscriptionDirectory.parse(body.replace(stats, malformed)) }
+        }
+    }
+
+    @Test fun directoryApiRequestsStatsAndOnlyFallsBackForMissingHistoryPermission() = runBlocking {
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val active = context.copy(server = address, account = context.account!!.copy(server = address))
+            val api = InvidiousApi({ address }, { active.account })
+            val body = """[{"authorId":"a","author":"Alpha","subscriptionStats":{"latestUpload":123,"allTimeWatched":4,"recentWatched":2,"relevance":1.5}}]"""
+            server.enqueue(MockResponse().setBody(body))
+            assertEquals(4, api.subscriptionDirectory(active).stats["a"]!!.allTimeWatched)
+            val enriched = server.takeRequest()
+            assertEquals("/api/v1/auth/subscriptions?include_stats=true", enriched.path)
+            assertEquals("Bearer fixture-token", enriched.getHeader("Authorization")); assertNull(enriched.getHeader("Cookie"))
+            server.enqueue(MockResponse().setResponseCode(403).setBody("""{"error":"Channel sorting requires history read permission."}"""))
+            server.enqueue(MockResponse().setBody("""[{"authorId":"a","author":"Alpha"}]"""))
+            assertEquals(SubscriptionDirectory.HISTORY_PERMISSION, api.subscriptionDirectory(active).unavailableReason)
+            assertEquals("/api/v1/auth/subscriptions?include_stats=true", server.takeRequest().path)
+            assertEquals("/api/v1/auth/subscriptions", server.takeRequest().path)
+            server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":"Unavailable"}"""))
+            assertTrue(runCatching { api.subscriptionDirectory(active) }.exceptionOrNull() is ApiException)
+            server.takeRequest(); assertEquals(4, server.requestCount)
+            server.enqueue(MockResponse().setBody("""[{"authorId":"a","author":"Alpha"}]"""))
+            assertEquals(SubscriptionDirectory.LEGACY, api.subscriptionDirectory(active).unavailableReason)
+        }
     }
 
     @Test fun subscriptionApiUsesCapturedBearerContextForReadsAndChanges() = runBlocking {
@@ -124,7 +213,7 @@ class SubscriptionsTest {
             val api = InvidiousApi({ address }, { active.account }, generation = { active.generation })
             val before = active
             server.enqueue(MockResponse().setBody("[]").setBodyDelay(200, TimeUnit.MILLISECONDS))
-            val result = async(Dispatchers.IO) { runCatching { api.subscriptions(before) } }
+            val result = async(Dispatchers.IO) { runCatching { api.subscriptionDirectory(before) } }
             assertNotNull(server.takeRequest(5, TimeUnit.SECONDS))
             active = active.copy(generation = 1)
             assertTrue(result.await().exceptionOrNull() is CancellationException)

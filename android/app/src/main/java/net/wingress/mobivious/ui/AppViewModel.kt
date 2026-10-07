@@ -29,6 +29,9 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.wingress.mobivious.MobiviousApplication
@@ -106,7 +109,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var playlistSeed: String? = null
     private var playlistLink: VideoLink? = null
     private var rssJob: Job? = null
-    private val subscriptionsController = SubscriptionsController(viewModelScope, api::context, api::subscriptions, ::friendly)
+    private val subscriptionsController = SubscriptionsController(viewModelScope, api::context, api::subscriptionDirectory, ::friendly,
+        store::subscriptionSort, store::subscriptionSort)
     val subscriptionChannels = subscriptionsController.state
     private var subscriptionChannelParent = false
     private var subscriptionFeedSearch = SearchInput()
@@ -259,6 +263,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             syncDeArrowMetadata()
         } }
         viewModelScope.launch { preferences.collect { syncComments(); syncChat(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
+        viewModelScope.launch { watched.map { it.context to it.historyRevision }.distinctUntilChanged().collect { (context, revision) ->
+            if (revision > 0 && context == api.context() && subscriptionChannels.value.loaded) refreshSubscriptions()
+        } }
+        viewModelScope.launch { preferences.map { it.showMemberVideos }.distinctUntilChanged().drop(1).collect {
+            if (preferencesContext == api.context() && api.context().account != null && subscriptionChannels.value.loaded) refreshSubscriptions()
+        } }
         refresh()
     }
     private fun receiveSponsorState(args: Bundle) {
@@ -314,6 +324,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun refreshSubscriptions() = subscriptionsController.refresh()
     fun searchSubscriptionChannels(query: String) = subscriptionsController.search(query)
+    fun sortSubscriptionChannels(sort: SubscriptionSort) = subscriptionsController.sort(sort)
     fun refreshSharedSettings() {
         val context = api.context()
         refreshBlockedChannels()
@@ -404,6 +415,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         scopedSearch.value = saved.scopedSearch; discovery.value = saved.discovery
         browse.value = saved.browse.copy(loading = false)
         navigation.value = tab to route; restoredBrowse.value++
+        if (route == "subscription-channels") refreshSubscriptions()
         if (saved.browse.loading || afterSignIn && saved.tab in listOf("Library", "Subscriptions")) load(false, refreshChannel = false)
     }
     fun openGlobalSearch(text: String) {
@@ -613,7 +625,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             browseJob?.cancel(); browseGeneration++
             browse.value = BrowseState(title = "Subscribed channels", end = true)
             val state = subscriptionChannels.value
-            if (!state.loaded && !state.loading && state.error == null) refreshSubscriptions()
+            if (!state.loading) refreshSubscriptions()
             return
         }
         if (more && (browse.value.loading || browse.value.end)) return

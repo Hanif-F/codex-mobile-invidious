@@ -238,6 +238,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         return if (notificationsOnly) notifications else notifications + ApiParser.videos(j.optJSONArray("videos") ?: JSONArray())
     }
     suspend fun subscriptions(context: ApiContext = context()) = JSONArray(scopedRead("api/v1/auth/subscriptions", emptyMap(), true, context)).objects().map(ApiParser::channel)
+    suspend fun subscriptionDirectory(context: ApiContext = context()): SubscriptionDirectory = try {
+        SubscriptionDirectory.parse(scopedRead("api/v1/auth/subscriptions", mapOf("include_stats" to "true"), true, context))
+    } catch (e: ApiException) {
+        if (e.status != 403 || e.message != "Channel sorting requires history read permission.") throw e
+        SubscriptionDirectory(subscriptions(context), unavailableReason = SubscriptionDirectory.HISTORY_PERMISSION)
+    }
     suspend fun blockedChannels(context: ApiContext) = BlockedChannel.parse(JSONArray(request("api/v1/auth/blocked_channels", auth = true, context = context)))
     suspend fun blockChannel(id: String, name: String, blocked: Boolean, context: ApiContext) {
         require(ContentVisibility.validChannel(id)) { "This video has no valid channel ID." }
