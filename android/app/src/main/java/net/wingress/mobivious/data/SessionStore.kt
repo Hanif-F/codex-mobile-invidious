@@ -80,6 +80,10 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
         get() = profiles.value(positionContext(), "pip") as? Boolean ?: true
         set(value) = pip(value, positionContext())
     @Synchronized fun pip(value: Boolean, context: ApiContext) { current(context); profiles.write(context, "pip", value) }
+    fun trendingCategory(context: ApiContext) = TrendingCategory.saved(profiles.value(context, "discovery.category") as? String)
+    @Synchronized fun trendingCategory(context: ApiContext, value: TrendingCategory) {
+        current(context); profiles.write(context, "discovery.category", value.apiValue)
+    }
     fun subscriptionSort(context: ApiContext) = SubscriptionSort.saved(profiles.value(context, "subscriptions.sort") as? String)
     @Synchronized fun subscriptionSort(context: ApiContext, value: SubscriptionSort) {
         current(context); profiles.write(context, "subscriptions.sort", value.key)

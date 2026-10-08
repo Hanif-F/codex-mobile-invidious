@@ -41,7 +41,9 @@ internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Bool
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ChannelAuthor(server, channel.image, channel.name, !thinMode, size = 48.dp, tag = "related-avatar-${channel.id}")
             if (channel.verified) Text("Verified channel", style = MaterialTheme.typography.labelSmall)
-            Text("${channel.subscribers} subscribers", style = MaterialTheme.typography.bodySmall)
+            if (channel.handle.isNotBlank()) Text(channel.handle, style = MaterialTheme.typography.bodySmall)
+            if (channel.subscribers.isNotBlank()) Text("${channel.subscribers} subscribers", style = MaterialTheme.typography.bodySmall)
+            channel.videoCount?.let { Text("$it videos", style = MaterialTheme.typography.bodySmall) }
             if (channel.description.isNotBlank()) Text(channel.description, maxLines = 3, style = MaterialTheme.typography.bodyMedium)
         }
     }

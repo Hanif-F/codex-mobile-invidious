@@ -66,6 +66,22 @@ class DeviceProfileStorageTest {
         stale { store.setPosition(old, "abcdefghijk", 40) }; stale { store.confirmProfile(old, "b".repeat(64)) }
         assertTrue(store.background); assertEquals(100, store.chatAppearance().fontScale)
     }
+    @Test fun trendingCategoryPersistsByAccountAndInstanceAndRejectsStaleWrites() {
+        val guest = store.positionContext()
+        store.trendingCategory(guest, TrendingCategory.GAMING)
+        store.save(account("Alice", 'a'))
+        assertEquals(TrendingCategory.LIVESTREAMS, store.trendingCategory(store.positionContext()))
+        stale { store.trendingCategory(guest, TrendingCategory.LIVESTREAMS) }
+        store.trendingCategory(store.positionContext(), TrendingCategory.GAMING)
+        store.save(account("Bob", 'b'))
+        assertEquals(TrendingCategory.LIVESTREAMS, store.trendingCategory(store.positionContext()))
+        store.save(null); store.server = "https://other.test"
+        assertEquals(TrendingCategory.LIVESTREAMS, store.trendingCategory(store.positionContext()))
+        store.server = address
+        assertEquals(TrendingCategory.GAMING, store.trendingCategory(store.positionContext()))
+        store.save(account("Alice", 'a', "renewed")); store = SessionStore(context)
+        assertEquals(TrendingCategory.GAMING, store.trendingCategory(store.positionContext()))
+    }
     @Test fun stableRenamesAndUsernameReuseRemainSeparate() {
         store.save(account("Alice", 'a')); store.pip = false; store.position("abcdefghijk", 50)
         store.replaceAccount(store.positionContext(), account("Renamed", 'a', "new"))

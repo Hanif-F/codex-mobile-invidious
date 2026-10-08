@@ -134,7 +134,16 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         return JSONObject(request("api/v1/auth/account/tokens", "POST", JSONObject().put("password", password)
             .put("scopes", JSONArray(scopes)).put("expiresAt", expiresAt ?: JSONObject.NULL), auth = true, context = context)).getString("accessToken")
     }
-    suspend fun discovery(kind: String, region: String = "US") = ApiParser.videos(JSONArray(request("api/v1/$kind", query = if (kind == "trending") mapOf("region" to region) else emptyMap())))
+    suspend fun discovery(kind: String, region: String = "US", category: TrendingCategory = TrendingCategory.LIVESTREAMS,
+        context: ApiContext = context()) = ApiParser.videos(JSONArray(scopedRead("api/v1/$kind",
+        if (kind == "trending") mapOf("region" to region, "type" to category.apiValue) else emptyMap(), false, context)))
+    suspend fun searchResults(q: String, page: Int, type: SearchType, sort: String, date: String, duration: String,
+        context: ApiContext = context()): GeneralSearchPage {
+        val order = if (type != SearchType.CHANNELS && sort in listOf("views", "view_count")) "views" else "relevance"
+        val query = mutableMapOf("q" to q, "page" to page.toString(), "sort" to order, "type" to type.apiValue)
+        if (type.videoFilters) { query["date"] = date; query["duration"] = duration }
+        return GeneralSearchPage.parse(JSONArray(scopedRead("api/v1/search", query, false, context)), type)
+    }
     suspend fun search(q: String, page: Int, sort: String, date: String, duration: String): List<Video> {
         val order = if (sort in listOf("views", "view_count")) "views" else "relevance"
         return ApiParser.videos(JSONArray(request("api/v1/search", query = mapOf("q" to q, "page" to page.toString(), "sort" to order, "date" to date, "duration" to duration, "type" to "video"))))

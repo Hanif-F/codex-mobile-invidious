@@ -2753,3 +2753,64 @@ ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
   -Dorg.gradle.jvmargs=-Xmx2g \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.NavigationHubSmokeTest,net.wingress.mobivious.HomeSubscriptionsSmokeTest,net.wingress.mobivious.AccountNavigationSmokeTest,net.wingress.mobivious.SettingsSmokeTest,net.wingress.mobivious.QueueLibrarySmokeTest,net.wingress.mobivious.ClipsSmokeTest,net.wingress.mobivious.AppSmokeTest,net.wingress.mobivious.SearchHistorySmokeTest,net.wingress.mobivious.PlaylistRssSmokeTest,net.wingress.mobivious.DeviceProfilesSmokeTest
 ```
+
+
+## Trending categories, country selection and mixed search — 8 October 2026
+
+Trending now offers Livestreams (default) and Gaming, with category persistence
+separated by device profile and instance. A shared searchable country picker
+uses the web fork's 107 supported regions and localized country names. Trending
+saves the region immediately; Settings keeps a draft until Save. Account saves
+retain the existing shared-preferences contract, and failed saves leave the
+previous selection/feed available. Popular remains instance-wide.
+
+General search defaults to All, with Videos, Channels and Playlists & mixes
+modes. Typed results preserve server order across pages, reuse native cards and
+navigation, and retain mix seeds. Optional channel metadata stays hidden when
+absent. Blocked-channel filtering applies to all three types; membership applies
+only to videos. Upload/duration choices survive switching to modes that omit
+them. Empty/repeated original-response pages stop pagination, while hidden or
+unsupported-only pages retain Load more. Retry keeps earlier results, and
+query/mode/filter/scroll state survives child navigation and Activity recreation.
+Captured request context and generation checks reject superseded responses.
+
+| Check | Result |
+|---|---|
+| Android JVM unit/API suite | 312 passed; 0 failures/errors/skips, including 10 new discovery/search scenarios |
+| Debug app and instrumentation APKs | Built successfully |
+| Debug lint | Passed; 0 errors, 21 existing warnings; no warnings in new files |
+| Android 16 / emulator-5554 focused run | 63 passed; 0 failures/errors/skips |
+| Discovery/search | 9 passed: categories, guest/account region saves and failures, Settings draft/Cancel, mixed order and cards, channel Back/scroll, recreation, modes/filters, hidden/unsupported pages, repeated pages, retries and delayed responses |
+| Device profile storage | 10 passed, including category isolation across accounts/instances, restart and stale writes |
+| Existing navigation/channel/playlist/search/history/visibility/settings checks | 44 passed |
+| Country compatibility | Android list exactly matches the sibling web fork's 107 CONTENT_REGIONS |
+| Compact layout reruns | Passed at 320 dp / 1.0× text and 358 dp / 1.6× text; screenshots inspected for Trending, country search, channel and playlist cards |
+
+An initial emulator run exposed a stale duplicate region field, which could
+send the previous country while the heading showed the saved one. Requests now
+read the saved preferences directly. Regression tests were updated to operate
+the country picker and to clean up fixture-only block snapshots; the final
+63-test run passed after these corrections.
+
+These checks used the user's already running emulator and disposable localhost
+accounts/media. No server changes, migrations, production writes or release
+publication were performed. The complete repository-wide instrumentation suite
+was not run. Parity row 02 is Implemented; row 04 remains Partial for Movie/Show,
+Medium duration and the remaining feature filters. Release version/code remain
+0.7.1/14.
+
+Reports and reviewed screenshots are retained under the ignored
+`.tools/discovery-search/` directory. The debug APK is
+`android/app/build/outputs/apk/debug/app-debug.apk` (Mobivious Preview).
+The fixture servers and owned port forwarding were cleaned up; density and
+text scale returned to their original 480 dpi and 1.0× values.
+The verified preview APK was installed after the test runner removed its test
+packages; cold launch passed and the normal public Popular feed was inspected.
+
+To reproduce the focused checks on an already running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline --max-workers=2 \
+  -Dorg.gradle.jvmargs=-Xmx2g \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DiscoverySearchSmokeTest,net.wingress.mobivious.DeviceProfileStorageTest,net.wingress.mobivious.SearchHistorySmokeTest,net.wingress.mobivious.PlaylistRssSmokeTest,net.wingress.mobivious.HomeSubscriptionsSmokeTest,net.wingress.mobivious.ChannelSmokeTest,net.wingress.mobivious.NavigationHubSmokeTest,net.wingress.mobivious.VisibilitySmokeTest,net.wingress.mobivious.SettingsSmokeTest
+```

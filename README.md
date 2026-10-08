@@ -38,7 +38,10 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 ### Browse and discover
 
-- Separate Popular and Trending tabs, filtered search, and channel browsing.
+- Separate Popular and Trending tabs; choose Livestreams or Gaming and search
+  for a Trending country by name or code.
+- Search videos, channels and playlists together, or choose a specific result
+  type; open channel results directly in the app.
 - Available channel tabs for videos, Shorts, streams, podcasts, releases,
   courses, playlists, clips, community posts and related channels.
 - Native community posts with images, galleries, attachments and read-only

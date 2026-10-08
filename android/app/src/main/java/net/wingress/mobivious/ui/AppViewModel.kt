@@ -50,7 +50,8 @@ data class BrowseState(val title: String = "For you", val videos: List<Video> = 
     val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
     val history: HistoryPage? = null, val clips: List<Clip> = emptyList(), val lists: List<Playlist> = emptyList(),
     val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
-    val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false)
+    val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false,
+    val searchResults: List<SearchResult> = emptyList(), val searchKeys: Set<String> = emptySet())
 data class PostDetailState(val link: PostLink? = null, val context: ApiContext? = null,
     val post: CommunityPost? = null, val loading: Boolean = false, val error: String? = null)
 data class LinkResolutionState(val link: ChannelLink? = null, val context: ApiContext? = null,
@@ -97,7 +98,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val playlistBusy = MutableStateFlow<Set<String>>(emptySet())
     val playlistErrors = MutableStateFlow<Map<String, String>>(emptyMap())
     val rss = MutableStateFlow(RssState())
-    val playlistSearch = MutableStateFlow(false)
+    val searchType = MutableStateFlow(SearchType.ALL)
+    val trendingCategory = MutableStateFlow(store.trendingCategory(api.context()))
+    val trendingRegionBusy = MutableStateFlow(false)
+    val trendingRegionError = MutableStateFlow<String?>(null)
+    private var trendingRegionJob: Job? = null
     val channelPlaylistSort = MutableStateFlow("last")
     val channelVideoSort = MutableStateFlow(ChannelSort.NEWEST)
     val postDetail = MutableStateFlow(PostDetailState())
@@ -154,7 +159,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         get() = searchInput.value.submitted
         set(value) { searchInput.value = SearchInput(value, value) }
     val discovery = MutableStateFlow(PreferenceRules.destination(preferences.value.defaultHome, account.value != null).second)
-    var region = preferences.value.region
     var sort = "relevance"
     var date = ""
     var durationFilter = ""
@@ -174,10 +178,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val playlistSort: String, val videoSort: ChannelSort, val postDetail: PostDetailState, val postComments: CommentsState,
         val scopedSearch: SearchInput, val discovery: String, val context: ApiContext,
         val channelSearchOrigin: BrowseReturn?, val subscriptionParent: Boolean, val playlistLink: VideoLink?,
-        val preferences: AccountPreferences)
+        val preferences: AccountPreferences, val category: TrendingCategory, val search: SearchInput,
+        val searchType: SearchType, val searchSort: String, val searchDate: String, val searchDuration: String)
     private fun captureBrowse() = BrowseReturn(tab, route, browse.value, channel.value, channelTab.value,
         playlist.value, playlistSeed, channelPlaylistSort.value, channelVideoSort.value, postDetail.value,
-        postComments.value, scopedSearch.value, discovery.value, api.context(), channelSearchOrigin, subscriptionChannelParent, playlistLink, preferences.value)
+        postComments.value, scopedSearch.value, discovery.value, api.context(), channelSearchOrigin, subscriptionChannelParent, playlistLink, preferences.value,
+        trendingCategory.value, searchInput.value, searchType.value, sort, date, durationFilter)
     private val browseReturns = mutableListOf<BrowseReturn>()
     private val tabBrowse = mutableMapOf<String, BrowseReturn>()
     private var channelSearchOrigin: BrowseReturn? = null
@@ -290,6 +296,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             app.blocked.reset(); searchVisibility.value = store.searchVisibility(api.context())
             searchInput.value = SearchInput(); scopedSearch.value = SearchInput()
+            searchType.value = SearchType.ALL; sort = "relevance"; date = ""; durationFilter = ""
+            trendingRegionJob?.cancel(); trendingRegionBusy.value = false; trendingRegionError.value = null
+            trendingCategory.value = store.trendingCategory(api.context())
             cancelAccumulatedSeek(false)
             sponsorSettingsChannel.value = null
             sponsorBlock.value = SponsorBlockPlayback()
@@ -298,7 +307,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             dearrowIdentity.value = null; dearrowIdentityError.value = null
             preferencesContext = if (it == null) api.context() else null
             preferences.value = store.initialPreferences()
-            region = preferences.value.region
             chatAppearanceContext = api.context(); chatAppearance.value = store.chatAppearance(chatAppearanceContext)
             if (it != null) refreshAccount() else playlists.value = emptyList()
             refresh()
@@ -394,7 +402,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
             val refreshCurrent = currentBrowseAffected(preferences.value, value)
             invalidateSavedTabs(preferences.value, value)
-            preferencesContext = context; preferences.value = value; region = value.region; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
+            preferencesContext = context; preferences.value = value; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
             val applyHome = homeAppliedContext != context && navigationRevision == navigationAtRequest && route != "sign-in" && signInReturn == null
             homeAppliedContext = context
             if (applyHome) openDefaultHome()
@@ -437,6 +445,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
     fun visiblePlaylists(lists: List<Playlist>): List<Playlist> = if (contentSurface() == ContentSurface.SEARCH && !searchVisibility.value.includeBlocked)
         lists.filter { it.channelId !in blocked.value.takeIf { state -> state.context == api.context() }?.ids.orEmpty() } else lists
+    fun visibleSearchResults(items: List<SearchResult>) = SearchResults.visible(items, preferences.value.showMemberVideos,
+        searchVisibility.value, blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
     fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
     private fun syncDeArrowMetadata() {
         if (queue.value.current?.clip != null) return
@@ -471,7 +481,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         navigationRevision++
         dismissLinkResolution()
         if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Popular"); return }
-        val refreshSaved = currentBrowseAffected(saved.preferences, preferences.value, saved.tab, saved.route)
+        val refreshSaved = currentBrowseAffected(saved.preferences, preferences.value, saved.tab, saved.route) ||
+            saved.tab == "Trending" && saved.route.isEmpty() && saved.category != trendingCategory.value
         browseJob?.cancel(); browseGeneration++
         tab = saved.tab; route = saved.route; channel.value = saved.channel; channelTab.value = saved.channelTab
         playlist.value = saved.playlist; playlistSeed = saved.seed; playlistLink = saved.playlistLink; channelPlaylistSort.value = saved.playlistSort
@@ -479,6 +490,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         postCommentController.restore(saved.postComments)
         channelSearchOrigin = saved.channelSearchOrigin; subscriptionChannelParent = saved.subscriptionParent
         scopedSearch.value = saved.scopedSearch; discovery.value = saved.discovery
+        if (saved.tab == "Search" && saved.route.isEmpty()) {
+            searchInput.value = saved.search; searchType.value = saved.searchType
+            sort = saved.searchSort; date = saved.searchDate; durationFilter = saved.searchDuration
+        }
         browse.value = saved.browse.copy(loading = false)
         navigation.value = tab to route; restoredBrowse.value++
         if (route == "subscription-channels") refreshSubscriptions()
@@ -603,7 +618,25 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             finally { if (context == api.context()) playlistBusy.value -= list.id }
         }
     }
-    fun setPlaylistSearch(value: Boolean) { if (playlistSearch.value != value) { playlistSearch.value = value; refresh() } }
+    fun setSearchType(value: SearchType) { if (searchType.value != value) { searchType.value = value; refresh() } }
+    fun selectTrendingCategory(value: TrendingCategory) {
+        if (trendingCategory.value == value) return
+        try { store.trendingCategory(api.context(), value) }
+        catch (e: Exception) { message.value = friendly(e); return }
+        trendingCategory.value = value; tabBrowse.remove("Trending")
+        if (tab == "Trending" && route.isEmpty()) refresh()
+    }
+    fun selectTrendingRegion(value: String) {
+        if (value !in ContentRegions.codes || value == preferences.value.region || trendingRegionBusy.value) return
+        val context = api.context(); val before = preferences.value
+        trendingRegionBusy.value = true; trendingRegionError.value = null
+        trendingRegionJob = viewModelScope.launch {
+            try { savePreferences(before.copy(region = value), before, context) }
+            catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context()) trendingRegionError.value = friendly(e) }
+            finally { if (context == api.context()) trendingRegionBusy.value = false }
+        }
+    }
     fun setChannelPlaylistSort(value: String) { if (value in listOf("last", "newest", "oldest")) { channelPlaylistSort.value = value; load(false, refreshChannel = false) } }
     fun openChannelRss(info: Channel) {
         rssJob?.cancel()
@@ -700,8 +733,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!more) browseReset.value++
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
-        val selectedDiscovery = discovery.value; val selectedRegion = region
-        val listSearch = playlistSearch.value; val listSort = channelPlaylistSort.value; val videoSort = channelVideoSort.value; val revision = playlistRevision
+        val selectedDiscovery = discovery.value; val selectedRegion = preferences.value.region; val selectedCategory = trendingCategory.value
+        val selectedSearchType = searchType.value; val selectedSort = sort; val selectedDate = date; val selectedDuration = durationFilter
+        val listSort = channelPlaylistSort.value; val videoSort = channelVideoSort.value; val revision = playlistRevision
         val scopedQuery = scopedSearch.value.submitted
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
@@ -716,6 +750,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 var posts = emptyList<CommunityPost>()
                 var channels = emptyList<Channel>()
                 var clips = emptyList<Clip>()
+                var searchResults = emptyList<SearchResult>()
+                var searchKeys = emptySet<String>()
                 val videos = when {
                     selectedRoute == "clips" -> {
                         if (context.account != null) clips = api.clips(page = page, context = context)
@@ -795,22 +831,28 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         history = response; hasMore = response.hasMore
                         response.entries
                     }
-                    selectedTab == "Search" -> if (selectedQuery.isBlank()) emptyList() else if (listSearch) {
-                        lists = api.searchPlaylists(selectedQuery, page, sort, context)
-                        hasMore = lists.isNotEmpty() && (!more || lists.any { incoming -> old.lists.none { it.id == incoming.id } })
-                        emptyList()
-                    } else api.search(selectedQuery, page, sort, date, durationFilter)
+                    selectedTab == "Search" && selectedRoute.isEmpty() -> {
+                        val response = if (selectedQuery.isBlank()) GeneralSearchPage(emptyList(), emptySet()) else
+                            api.searchResults(selectedQuery, page, selectedSearchType, selectedSort, selectedDate, selectedDuration, context)
+                        searchResults = response.items; searchKeys = response.sourceKeys
+                        hasMore = !response.exhausted(old.searchKeys)
+                        lists = searchResults.filterIsInstance<SearchResult.PlaylistItem>().map { it.playlist }
+                        channels = searchResults.filterIsInstance<SearchResult.ChannelItem>().map { it.channel }
+                        searchResults.filterIsInstance<SearchResult.VideoItem>().map { it.video }
+                    }
                     selectedTab == "Subscriptions" -> if (context.account == null) emptyList() else if (scopedQuery.isNotBlank()) {
                         val response = api.subscriptionSearch(scopedQuery, page, context)
                         hasMore = response.hasMore; response.items
                     } else api.feed(page, preferences.value.notificationsOnly)
                     selectedRoute == "sign-in" -> emptyList()
                     selectedTab == "You" -> { if (context.account != null) { val loaded = api.playlists(context); if (context == api.context() && revision == playlistRevision) playlists.value = loaded }; emptyList() }
-                    else -> api.discovery(selectedDiscovery, selectedRegion)
+                    else -> api.discovery(selectedDiscovery, selectedRegion, selectedCategory, context)
                 }
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
                     continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
-                    posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id }, retryMore = false, end = if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
+                    posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id },
+                    searchResults = SearchResults.merge(old.searchResults, searchResults), searchKeys = old.searchKeys + searchKeys,
+                    retryMore = false, end = if (selectedTab == "Search" && selectedRoute.isEmpty()) hasMore != true else if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                         PreferenceRules.isDiscovery(selectedTab) && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                         selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
@@ -1259,7 +1301,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         api.revokeSession(session.id, context); if (session.current) clearAccount(context)
     }
     fun logout() = action { accountOperation { val context = api.context(); try { api.logout() } finally { clearAccount(context) } } }
-    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
@@ -1275,7 +1317,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (api.context() == context) {
             val refreshCurrent = currentBrowseAffected(preferences.value, saved)
             invalidateSavedTabs(preferences.value, saved)
-            preferenceGeneration++; preferencesContext = context; preferences.value = saved; region = saved.region
+            preferenceGeneration++; preferencesContext = context; preferences.value = saved
             syncSponsorSettings(); syncHistorySettings(); if (!saved.savePosition) store.clearPositions()
             if (refreshCurrent) refresh()
             message.value = if (context.account == null) "Settings saved" else "Account settings saved"

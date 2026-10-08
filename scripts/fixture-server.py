@@ -163,11 +163,11 @@ def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
                  subscriptionRequests=[], subscriptionDelayNext=0, failSubscriptionRead=False,
                  subscriptionStatsMode='full', subscriptionStats={},
-                 discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False)
+                 discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False, discoveryCategories=False)
 reset_home_subscriptions()
 
 def reset_search_history():
-    state.update(searchTest=False, searchRequests=[], searchDelayNext=0, searchFailNext=False,
+    state.update(searchTest=False, searchMixed=False, searchRequests=[], searchDelayNext=0, searchFailNext=False,
                  historyRequests=[], historyEntries=[], historyToday='2026-10-04', historyLegacy=False)
 reset_search_history()
 
@@ -271,11 +271,27 @@ class Handler(BaseHTTPRequestHandler):
         params = parse_qs(query, keep_blank_values=True)
         q = params.get('q', [''])[0]
         page = int(params.get('page', ['1'])[0])
-        event = dict(scope=scope, q=q, page=page, authorized=bool(self.headers.get('Authorization')), completed=False)
+        kind = params.get('type', ['all'])[0]
+        event = dict(scope=scope, q=q, page=page, type=kind, sort=params.get('sort', ['relevance'])[0],
+                     date=params.get('date'), duration=params.get('duration'), authorized=bool(self.headers.get('Authorization')), completed=False)
         state['searchRequests'].append(event)
         delay = state['searchDelayNext']; state['searchDelayNext'] = 0
         items = []
-        if q.strip() and q != 'missing':
+        if scope == 'global' and state['searchMixed']:
+            channel = dict(type='channel', author='Search creator', authorId=video['authorId'], channelHandle='@searchcreator',
+                           subCount=42, videoCount=7, authorVerified=True, description='A channel found by search', authorThumbnails=video['authorThumbnails'])
+            related = dict(type='channel', author='Another search creator', authorId='UC' + 'c' * 22)
+            playlist = dict(source_playlist('PLlive'), type='playlist')
+            if q == 'hidden-mixed':
+                items = [dict(visibility_member, type='video'), channel, playlist] if page == 1 else [related] if page == 2 else []
+            elif q == 'unsupported':
+                items = [dict(type='hashtag', title='Unknown result')] if page == 1 else [channel] if page == 2 else []
+            elif q == 'repeat': items = [channel, dict(video, type='video')]
+            elif q != 'missing':
+                items = [dict(video, type='video'), channel, playlist] if page == 1 else [dict(video, type='video'), related,
+                         dict(recommended, type='video'), dict(source_playlist('RDopaque'), type='playlist')] if page == 2 else []
+            if kind != 'all': items = [item for item in items if item.get('type') == kind]
+        elif q.strip() and q != 'missing':
             if q == 'hidden':
                 items = [dict(visibility_member, videoId=f'member{i:05d}') for i in range(20)] if page == 1 else [video] if page == 2 else []
             elif q == 'many':
@@ -390,13 +406,17 @@ class Handler(BaseHTTPRequestHandler):
         elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'):
             if p in ('/api/v1/popular', '/api/v1/trending'):
                 kind = p.rsplit('/', 1)[-1]
-                event = dict(kind=kind, completed=False)
+                params = parse_qs(url.query)
+                event = dict(kind=kind, region=params.get('region', [None])[0], type=params.get('type', [None])[0], completed=False)
                 state['discoveryRequests'].append(event)
                 delay = state['discoveryDelayNext']; state['discoveryDelayNext'] = 0
                 distinct = state['discoveryDistinct']
                 if delay: time.sleep(min(5000, max(0, delay)) / 1000)
                 event['completed'] = True
+                if state['discoveryCategories']:
+                    return self.respond([dict(video, title=f'{kind} {event["type"] or "instance"} {event["region"] or "all"}')])
                 if distinct: return self.respond([dict(video, title=f'{kind} discovery fixture')])
+            if p == '/api/v1/search' and state['searchMixed']: return self.search('global', url.query)
             if p == '/api/v1/search' and parse_qs(url.query).get('type') == ['playlist']:
                 return self.respond([source_playlist('PLlive'), source_playlist('RDopaque'), source_playlist('IVother')] if parse_qs(url.query).get('page', ['1']) == ['1'] else [])
             if p == '/api/v1/search' and state['searchTest']: return self.search('global', url.query)
@@ -701,6 +721,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/home-subscriptions':
             for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'discoveryDelayNext', 'discoveryDistinct'):
+                if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/discovery-search':
+            for key in ('searchMixed', 'searchDelayNext', 'searchFailNext', 'discoveryCategories', 'discoveryDelayNext', 'failPreferences'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/search-history':

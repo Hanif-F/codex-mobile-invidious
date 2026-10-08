@@ -86,7 +86,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val channelTab by vm.channelTab.collectAsStateWithLifecycle()
     val playlist by vm.playlist.collectAsStateWithLifecycle()
     val playlists by vm.playlists.collectAsStateWithLifecycle()
-    val playlistSearch by vm.playlistSearch.collectAsStateWithLifecycle()
+    val searchType by vm.searchType.collectAsStateWithLifecycle()
     val channelPlaylistSort by vm.channelPlaylistSort.collectAsStateWithLifecycle()
     val channelVideoSort by vm.channelVideoSort.collectAsStateWithLifecycle()
     val postDetail by vm.postDetail.collectAsStateWithLifecycle()
@@ -343,10 +343,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             OutlinedButton(onClick = { settingsPage = "Blocked channels" }) { Text("Manage / retry blocked channels") }
                         }
                     }
-                    if (route.isEmpty() && tab == "Search") Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (route.isEmpty() && tab == "Search") Row(Modifier.padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         IconButton(onClick = { dialog = "filters" }) { Icon(Icons.Default.Tune, "Search filters") }
-                        FilterChip(selected = !playlistSearch, onClick = { vm.setPlaylistSearch(false) }, label = { Text("Videos") })
-                        FilterChip(selected = playlistSearch, onClick = { vm.setPlaylistSearch(true) }, label = { Text("Playlists & mixes") })
+                        SearchType.entries.forEach { type ->
+                            FilterChip(selected = searchType == type, onClick = { vm.setSearchType(type) }, label = { Text(type.label) },
+                                modifier = Modifier.testTag("search-type-${type.apiValue}"))
+                        }
                     }
                     if (route.isEmpty() && tab == "Subscriptions") Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Subscriptions", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
@@ -371,6 +373,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         }
                         IconButton(onClick = vm::refresh, modifier = Modifier.testTag("feed-refresh")) { Icon(Icons.Default.Refresh, "Refresh $tab") }
                     }
+                    if (route.isEmpty() && tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
                     if (route.startsWith("post:")) PostDetailScreen(vm, postDetail, browseList,
                         { id -> navigate(tab, "channel:$id") }, ::openRichLink, { play(it) },
                         { list -> browsePlayer(); vm.openPlaylist(list) }, { signIn() })
@@ -458,7 +461,20 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             PlaylistHeader(vm, list, { openPlayer(); vm.play("", source = list.id, seed = list.seedVideoId) },
                                 { dialog = "edit" }, { dialog = "deletePlaylist" }, { signIn() })
                         } }
-                        items(vm.visiblePlaylists(state.lists), key = { "result:${it.id}" }) { list ->
+                        val generalSearch = tab == "Search" && route.isEmpty()
+                        if (generalSearch) items(vm.visibleSearchResults(state.searchResults), key = { "search:${it.key}" }) { result ->
+                            when (result) {
+                                is SearchResult.VideoItem -> VideoCard(vm, result.video, vm.store.server, { play(result.video) },
+                                    { id -> navigate(tab, "channel:$id") }, { signIn() },
+                                    audioPlay = { openPlayer(); vm.playVideo(result.video, audio = true) })
+                                is SearchResult.ChannelItem -> RelatedChannelCard(result.channel, vm.store.server, prefs.thinMode) {
+                                    navigate(tab, "channel:${result.channel.id}")
+                                }
+                                is SearchResult.PlaylistItem -> PlaylistCard(vm, result.playlist,
+                                    { browsePlayer(); vm.openPlaylist(result.playlist) }, { signIn() })
+                            }
+                        }
+                        if (!generalSearch) items(vm.visiblePlaylists(state.lists), key = { "result:${it.id}" }) { list ->
                             PlaylistCard(vm, list, { browsePlayer(); vm.openPlaylist(list) }, { signIn() })
                         }
                         items(state.posts, key = { "post:${it.key}" }) { post ->
@@ -469,7 +485,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         items(state.clips, key = { "clip:${it.id}" }) { clip ->
                             ClipCard(vm, clip, { vm.watchClip(clip); openPlayer() })
                         }
-                        items(state.channels, key = { "channel:${it.id}" }) { related ->
+                        if (!generalSearch) items(state.channels, key = { "channel:${it.id}" }) { related ->
                             RelatedChannelCard(related, vm.store.server, prefs.thinMode) { navigate(tab, "channel:${related.id}") }
                         }
                         if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { "$it videos" } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge) } }
@@ -478,7 +494,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 items(subscriptions, key = { it.id }) { c -> SubscriptionChannelChip(c, vm.store.server, prefs.thinMode) { navigate("Subscriptions", "channel:${c.id}") } }
                             }
                         }
-                        val groups = if (route == "history" && state.history?.organized == true) visibleVideos.groupBy { History.group(it.history?.watched, state.history?.today) } else mapOf(null to visibleVideos)
+                        val groups = if (generalSearch) emptyMap() else if (route == "history" && state.history?.organized == true) visibleVideos.groupBy { History.group(it.history?.watched, state.history?.today) } else mapOf(null to visibleVideos)
                         groups.forEach { (group, videos) ->
                             if (group != null) item(key = "history-group-$group") { Text(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
                             items(videos, key = { it.id + it.indexId + (it.playlistIndex?.toString() ?: "") }) { video -> VideoCard(vm, video, vm.store.server, { play(video, playlist) }, { id -> navigate(tab, "channel:$id") }, { signIn() }, if (playlist?.let { list -> list.owned } == true || route == "history") ({
@@ -489,18 +505,18 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 avatarOwner = channel?.id.takeIf { route.startsWith("channel:") && channelTab?.videoTab == true }) }
                         }
                         if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                        if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty()) OutlinedButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
-                        if (!state.loading && visibleVideos.isEmpty() && state.videos.isNotEmpty()) item {
+                        if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty() && state.searchResults.isEmpty()) OutlinedButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
+                        if (!state.loading && (if (generalSearch) vm.visibleSearchResults(state.searchResults).isEmpty() && state.searchResults.isNotEmpty() else visibleVideos.isEmpty() && state.videos.isNotEmpty())) item {
                             Column(Modifier.padding(16.dp)) {
-                                Text("Videos hidden by your visibility settings")
+                                Text(if (generalSearch) "Results hidden by your visibility settings" else "Videos hidden by your visibility settings")
                                 Text("Change the filters or load another page to find visible videos.", style = MaterialTheme.typography.bodySmall)
                                 OutlinedButton(onClick = { if (vm.contentSurface() == ContentSurface.SEARCH) dialog = if (tab == "Subscriptions") "visibilityFilters" else "filters" else settingsPage = "Browsing" }) { Text("Visibility controls") }
                             }
                         }
                         if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty() &&
                             state.clips.isEmpty() && route != "clips" && !(channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank())) item { EmptyState(
-                            if (scopedSearch.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
-                            if (scopedSearch.submitted.isNotBlank()) "Try another title or channel, or clear the search." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search by title, channel, or paste a video link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
+                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
+                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
                         if (!state.end && !state.loading && state.error == null) item { OutlinedButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
                     }
                 }
@@ -772,7 +788,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
 
 @Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit, visibilityOnly: Boolean = false) {
     val context = remember { vm.api.context() }
-    val playlistSearch by vm.playlistSearch.collectAsStateWithLifecycle()
+    val searchType by vm.searchType.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     var sort by remember { mutableStateOf(vm.sort) }
     var date by remember { mutableStateOf(vm.date) }
@@ -781,9 +797,9 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     AlertDialog(onDismissRequest = dismiss, title = { Text("Search filters") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             if (!visibilityOnly) {
-                Choice("Sort", listOf("relevance", "views"), sort) { sort = it }
-                if (!playlistSearch) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }
-                if (!playlistSearch) Choice("Duration", listOf("", "short", "long"), duration) { duration = it }
+                if (searchType != SearchType.CHANNELS) Choice("Sort", listOf("relevance", "views"), sort) { sort = it }
+                if (searchType.videoFilters) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }
+                if (searchType.videoFilters) Choice("Duration", listOf("", "short", "long"), duration) { duration = it }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(visibility.showMembers ?: prefs.showMemberVideos, { visibility = visibility.copy(showMembers = it) }, modifier = Modifier.testTag("search-show-members"))

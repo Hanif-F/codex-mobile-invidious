@@ -233,7 +233,10 @@ class NavigationHubSmokeTest {
         assertTrue(position.index > 0)
         compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performScrollTo().performClick()
-        compose.onNodeWithText("Trending region (e.g. ID)").performScrollTo().performTextReplacement("ID")
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("settings-region"))
+        compose.onNodeWithTag("settings-region").performClick()
+        compose.onNodeWithTag("region-search").performTextReplacement("ID")
+        compose.onNodeWithTag("region-ID").performClick()
         compose.onNodeWithTag("settings-save").performClick()
         until { vm.preferences.value.region == "ID" }
         compose.onNodeWithTag("settings-root").assertExists()

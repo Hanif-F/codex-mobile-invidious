@@ -126,7 +126,7 @@ class PlaylistRssSmokeTest {
     }
 
     @Test fun typedDiscoveryAndChannelPaginationKeepMixSeeds() {
-        compose.runOnUiThread { vm.navigate("Search"); vm.setPlaylistSearch(true); vm.editSearch("music", false); vm.submitSearch(false) }
+        compose.runOnUiThread { vm.navigate("Search"); vm.setSearchType(SearchType.PLAYLISTS); vm.editSearch("music", false); vm.submitSearch(false) }
         until { !vm.browse.value.loading && vm.browse.value.lists.isNotEmpty() }
         assertTrue(vm.browse.value.videos.isEmpty())
         val mix = vm.browse.value.lists.single { it.mix }

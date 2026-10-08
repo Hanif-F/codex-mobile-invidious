@@ -148,7 +148,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
                         SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
                         Text("Choose where the app opens. Popular, Trending, Subscriptions and You stay in the bottom bar. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
-                        OutlinedTextField(value.region, { update(value.copy(region = it.uppercase().take(2))) }, label = { Text("Trending region (e.g. ID)") }, singleLine = true, enabled = !busy, isError = !Regex("[A-Z]{2}").matches(value.region), modifier = Modifier.fillMaxWidth())
+                        RegionChoice(value.region, !busy, "settings-region") { update(value.copy(region = it)) }
                     }
                     item {
                         SettingsHeading("Video pages")

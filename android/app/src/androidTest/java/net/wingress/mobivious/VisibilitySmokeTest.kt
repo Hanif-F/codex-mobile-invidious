@@ -95,7 +95,7 @@ class VisibilitySmokeTest {
         command("""{"hiddenFirstPage":true}""")
         navigate("Search")
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        compose.onNodeWithText("Videos hidden by your visibility settings").assertIsDisplayed()
+        compose.onNodeWithText("Results hidden by your visibility settings").assertIsDisplayed()
         compose.onNodeWithText("Load more").performClick()
         until { activity.model.browse.value.page == 2 && !activity.model.browse.value.loading }
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
