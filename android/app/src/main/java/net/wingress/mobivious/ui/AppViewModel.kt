@@ -63,7 +63,7 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val speed: Float = 1f, val tracks: Tracks = Tracks.EMPTY, val selection: TrackSelectionParameters? = null,
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
     val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection(),
-    val geometry: VideoGeometry = VideoGeometry(), val clip: Clip? = null)
+    val geometry: VideoGeometry = VideoGeometry(), val clip: Clip? = null, val downloadId: String? = null)
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
@@ -71,6 +71,55 @@ data class DeArrowContributionState(val open: Boolean = false, val videoId: Stri
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as MobiviousApplication
+    val downloads = app.downloads
+    val downloadDialog = MutableStateFlow(DownloadDialogState())
+    private var downloadJob: Job? = null
+    fun openDownload(video: Video) {
+        downloadJob?.cancel()
+        val context = api.context()
+        downloadDialog.value = DownloadDialogState(video, context, loading = true)
+        downloadJob = viewModelScope.launch {
+            try {
+                val catalog = api.downloads(video.id, context)
+                if (api.context() == context && downloadDialog.value.video?.id == video.id)
+                    downloadDialog.value = downloadDialog.value.copy(catalog = catalog, loading = false)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (api.context() == context) downloadDialog.value = downloadDialog.value.copy(loading = false, error = e.message ?: "Could not load downloadable tracks.") }
+        }
+    }
+    fun dismissDownload() { if (!downloadDialog.value.busy) { downloadJob?.cancel(); downloadDialog.value = DownloadDialogState() } }
+    fun selectDownload(selection: DownloadSelection) { if (!downloadDialog.value.busy) downloadDialog.value = downloadDialog.value.copy(selection = selection) }
+    fun confirmDownload() {
+        val state = downloadDialog.value
+        val catalog = state.catalog ?: return
+        if (state.busy || state.context != api.context() || !state.selection.hasMedia || !catalog.allowed) return
+        downloadDialog.value = state.copy(busy = true)
+        viewModelScope.launch {
+            try {
+                downloads.create(state.context.server, catalog, state.selection)
+                if (downloadDialog.value.context == state.context && downloadDialog.value.video?.id == state.video?.id && downloadDialog.value.busy) downloadDialog.value = DownloadDialogState()
+                message.value = "Download started. Find it in You → Downloaded."
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (downloadDialog.value.context == state.context && downloadDialog.value.video?.id == state.video?.id && downloadDialog.value.busy)
+                    downloadDialog.value = state.copy(error = e.message ?: "Could not save the download.")
+            }
+        }
+    }
+    fun playDownload(id: String) { queueCommand(PlaybackService.DOWNLOAD_START) { putString("downloadId", id) } }
+    fun cancelDownload(id: String) { viewModelScope.launch { runCatching { downloads.cancel(id) }.onFailure { message.value = it.message } } }
+    fun retryDownload(id: String) { viewModelScope.launch { runCatching { downloads.retry(id) }.onFailure { message.value = it.message } } }
+    fun deleteDownload(id: String) {
+        viewModelScope.launch {
+            try {
+                net.wingress.mobivious.downloads.DownloadExportService.cancelAndWait(getApplication(), id)
+                if (queue.value.current?.downloadId == id) {
+                    controller.value?.sendCustomCommand(SessionCommand(PlaybackService.QUEUE_CLOSE, Bundle.EMPTY), Bundle().apply { putString("token", queue.value.token); putString("server", store.server); putString("account", account.value?.username); putLong("generation", store.contextGeneration) })?.awaitSession()
+                }
+                downloads.delete(id)
+            } catch (e: Exception) { message.value = e.message ?: "Could not delete the download." }
+        }
+    }
     val store = app.store
     val api = app.api
     val account = store.account
@@ -262,13 +311,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (clipEditor.value.open && clipEditor.value.occurrence != state.currentKey) closeClipEditor()
             requestedVideo = state.current?.video?.id
             val old = playback.value.details?.video?.id
-            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection, clip = state.current?.clip)
+            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection, clip = state.current?.clip, downloadId = state.current?.downloadId)
             if (old != state.details?.video?.id) {
                 playback.value = playback.value.copy(geometry = VideoGeometry())
                 cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             }
-            syncComments(); syncChat(); state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
+            syncComments(); syncChat(); if (state.current?.downloadId == null) state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
         } }
         viewModelScope.launch { app.playbackContext.collect { changedContext ->
             val it = changedContext?.account
@@ -316,6 +365,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             else dearrowTitles.clear()
             syncDeArrowMetadata()
         } }
+        viewModelScope.launch { app.playbackContext.collect { context ->
+            if (downloadDialog.value.context != null && downloadDialog.value.context != context) { downloadJob?.cancel(); downloadDialog.value = DownloadDialogState() }
+        } }
         viewModelScope.launch { preferences.collect { syncComments(); syncChat(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
         viewModelScope.launch { watched.map { it.context to it.historyRevision }.distinctUntilChanged().collect { (context, revision) ->
             if (revision > 0 && context == api.context() && subscriptionChannels.value.loaded) refreshSubscriptions()
@@ -332,6 +384,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
     private fun syncSponsorSettings() {
+        if (queue.value.current?.downloadId != null) return
         val state = sponsorBlock.value
         if (preferencesContext != api.context()) return
         val video = playback.value.details?.video ?: return
@@ -414,7 +467,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             catch (e: Exception) { if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = null; dearrowIdentityError.value = friendly(e) } }
         }
     }
-    fun ensureDeArrow(id: String) { if (preferences.value.dearrowEnabled) dearrowTitles.ensure(id) }
+    fun ensureDeArrow(id: String) { if (queue.value.current?.downloadId == null && preferences.value.dearrowEnabled) dearrowTitles.ensure(id) }
     fun refreshBlockedChannels() { viewModelScope.launch { app.blocked.refresh() } }
     fun toggleBlocked(id: String, name: String, context: ApiContext = api.context()) {
         if (context != api.context()) return
@@ -449,7 +502,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         searchVisibility.value, blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
     fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
     private fun syncDeArrowMetadata() {
-        if (queue.value.current?.clip != null) return
+        if (queue.value.current?.clip != null || queue.value.current?.downloadId != null) return
         val video = playback.value.details?.video ?: return
         val p = controller.value ?: return
         val title = displayTitle(video)
@@ -719,6 +772,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         load(false, refreshChannel = false)
     }
     private fun load(more: Boolean, refreshChannel: Boolean = true) {
+        if (route == "downloads") { browseJob?.cancel(); browseGeneration++; browse.value = BrowseState(title = "Downloaded", end = true); downloads.refresh(); return }
+
         if (route == "subscription-channels") {
             browseJob?.cancel(); browseGeneration++
             browse.value = BrowseState(title = "Subscribed channels", end = true)
@@ -1155,19 +1210,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val p = controller.value ?: return
         if (!playback.value.canRefresh || playback.value.loading) return
         val position = p.currentPosition
-        val live = p.isCurrentMediaItemLive
         val playing = p.playWhenReady
         val speed = p.playbackParameters
-        val tracks = p.trackSelectionParameters
         playback.value = playback.value.copy(error = null)
-        // stop releases buffered media without replacing the item or its history owner.
-        p.stop()
-        if (live) p.seekToDefaultPosition() else p.seekTo(position)
-        p.trackSelectionParameters = tracks
-        p.playbackParameters = speed
-        p.prepare()
-        p.playWhenReady = playing
-        updatePlayback()
+        // Apply this snapshot atomically in the service. A pending controller seek
+        // must not be overwritten by an older position arriving between commands.
+        queueCommand(PlaybackService.QUEUE_REFRESH) {
+            putLong("positionMs", position); putBoolean("playing", playing)
+            putFloat("speed", speed.speed); putFloat("pitch", speed.pitch)
+        }
     }
     fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
     fun autoQuality() { queueCommand(PlaybackService.VIDEO_AUTO) { putString("occurrence", queue.value.currentKey) } }
@@ -1176,12 +1227,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         StreamCatalog.defaultVideo(StreamCatalog.choices(p.currentTracks, C.TRACK_TYPE_VIDEO), "${height}p",
             if (queue.value.videoSelection.dash) queue.value.videoSelection.codec else "auto")?.let { selectTrack(it.group, it.index) }
     } }
-    fun speed(value: Float) { if (!value.isFinite() || value !in .25f..2f) return; controller.value?.setPlaybackSpeed(value); updatePlayerDefault { it.copy(speed = value) } }
+    fun speed(value: Float) { if (!value.isFinite() || value !in .25f..2f) return; controller.value?.setPlaybackSpeed(value); if (queue.value.current?.downloadId == null) updatePlayerDefault { it.copy(speed = value) } }
     private fun updatePlayerDefault(change: (AccountPreferences) -> AccountPreferences) {
         val context = api.context()
         action { playerDefaultWrites.withLock { val before = preferences.value; savePreferences(change(before), before, context) } }
     }
     private fun syncHistorySettings() {
+        if (queue.value.current?.downloadId != null) return
         if (preferencesContext != api.context()) return
         val prefs = preferences.value
         app.watched.configure(api.context(), prefs.savePosition)
@@ -1206,10 +1258,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     } }
     fun autoAudio() { controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
         .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build() } }
-    private fun syncComments() = commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
+    private fun syncComments() = if (queue.value.current?.downloadId != null) commentController.bind(null, false) else commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
     fun openComments() { closeChat(); syncComments(); commentController.open() }
     private fun syncChat() {
-        if (queue.value.current?.clip != null) { chatController.bind("", "", false); return }
+        if (queue.value.current?.clip != null || queue.value.current?.downloadId != null) { chatController.bind("", "", false); return }
         if (chatAppearanceContext != api.context()) { chatAppearanceContext = api.context(); chatAppearance.value = store.chatAppearance(chatAppearanceContext) }
         val q = queue.value
         val details = q.details
@@ -1411,4 +1463,8 @@ private suspend fun ListenableFuture<MediaController>.awaitController(): MediaCo
         try { continuation.resume(get()) }
         catch (e: Exception) { continuation.resumeWithException(e) }
     }, com.google.common.util.concurrent.MoreExecutors.directExecutor())
+}
+
+private suspend fun ListenableFuture<SessionResult>.awaitSession(): SessionResult = suspendCancellableCoroutine { continuation ->
+    addListener({ try { continuation.resume(get()) } catch (e: Exception) { continuation.resumeWithException(e) } }, com.google.common.util.concurrent.MoreExecutors.directExecutor())
 }

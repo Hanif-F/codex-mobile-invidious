@@ -46,6 +46,7 @@ class StreamControlsSmokeTest {
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(40_000) }
+        until { !activity.model.playback.value.playWhenReady && activity.model.playback.value.position == 40_000L }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
@@ -102,9 +103,13 @@ class StreamControlsSmokeTest {
         val detailsBeforeRetry = state().getJSONArray("videoDetailRequests").length()
         compose.runOnUiThread { activity.model.retryPlayback() }
         until { state().getJSONArray("videoDetailRequests").length() > detailsBeforeRetry }
-        until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
-            selected(C.TRACK_TYPE_VIDEO)?.key == videoKey && selected(C.TRACK_TYPE_AUDIO)?.key == audioKey &&
-            activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
+        try {
+            until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
+                selected(C.TRACK_TYPE_VIDEO)?.key == videoKey && selected(C.TRACK_TYPE_AUDIO)?.key == audioKey &&
+                activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT) }
+        } catch (e: Throwable) {
+            throw AssertionError("Retry loading=${activity.model.playback.value.loading} state=${activity.model.playback.value.playerState} error=${activity.model.playback.value.error} video=${selected(C.TRACK_TYPE_VIDEO)?.key} audio=${selected(C.TRACK_TYPE_AUDIO)?.key} text=${activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_TEXT)} policy=${activity.model.playback.value.videoSelection}", e)
+        }
         assertEquals(audioKey, selected(C.TRACK_TYPE_AUDIO)?.key)
         assertEquals(.25f, activity.model.playback.value.speed)
         assertFalse(activity.model.playback.value.playWhenReady)
@@ -133,8 +138,12 @@ class StreamControlsSmokeTest {
             activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, videoCodec = codec, qualityDash = quality))
             activity.model.play("testvideo01", 0)
         }
-        until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
-            activity.model.playback.value.tracks.groups.isNotEmpty() && (quality == "auto" || selected(C.TRACK_TYPE_VIDEO) != null) }
+        try {
+            until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
+                activity.model.playback.value.tracks.groups.isNotEmpty() && (quality == "auto" || selected(C.TRACK_TYPE_VIDEO) != null) }
+        } catch (e: Throwable) {
+            throw AssertionError("$codec/$quality/$source loading=${activity.model.playback.value.loading} state=${activity.model.playback.value.playerState} error=${activity.model.playback.value.error} policy=${activity.model.playback.value.videoSelection} choices=${StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO)}", e)
+        }
     }
     private fun firstCodecVideo(): String {
         val pattern = Regex("/media/codec/chunk-stream([0-6])-")
@@ -150,8 +159,8 @@ class StreamControlsSmokeTest {
             val choices = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO)
             val expected = StreamCatalog.defaultVideo(choices, quality, codec)
             val initial = firstCodecVideo()
-            if (expected != null) assertEquals(expected.key.id, initial)
-            else assertTrue(StreamCatalog.automaticVideo(choices, codec).any { it.key.id == initial })
+            if (expected != null) assertEquals(expected.key.id?.substringAfterLast(':'), initial)
+            else assertTrue("$codec/$quality/$source first=$initial allowed=${StreamCatalog.automaticVideo(choices, codec).map { it.key }}", StreamCatalog.automaticVideo(choices, codec).any { it.key.id?.substringAfterLast(':') == initial })
             if (source == "codec-missing") assertEquals("0", initial)
             if (source == "codec-unsupported") assertTrue(choices.none { it.codec == "AV1" })
             assertNull(activity.model.playback.value.error)
@@ -182,12 +191,12 @@ class StreamControlsSmokeTest {
         until { activity.model.playback.value.playerState == Player.STATE_READY }
         val initial = firstCodecVideo()
         val supported = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO)
-        assertTrue(StreamCatalog.automaticVideo(supported, "av1").any { it.key.id == initial })
+        assertTrue("first=$initial allowed=${StreamCatalog.automaticVideo(supported, "av1").map { it.key }}", StreamCatalog.automaticVideo(supported, "av1").any { it.key.id?.substringAfterLast(':') == initial })
     }
     @Test fun nextQueueOccurrenceUsesSavedDefaultsAndMenusRetainAtMostFourPerGroup() {
         codecStart("h264")
         val choices = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO)
-        val manual = choices.firstOrNull { it.key.id == "5" } ?: choices.first { it.height == 720 }
+        val manual = choices.firstOrNull { it.key.id?.substringAfterLast(':') == "5" } ?: choices.first { it.height == 720 }
         compose.runOnUiThread { activity.model.selectTrack(manual.group, manual.index) }
         until { selected(C.TRACK_TYPE_VIDEO)?.key == manual.key }
         showControls(); compose.onNodeWithContentDescription("Player settings").performClick()
@@ -212,12 +221,13 @@ class StreamControlsSmokeTest {
         until { activity.model.queue.value.items.size == 2 }
         command("media-reset")
         compose.runOnUiThread { activity.model.controller.value!!.seekToNextMediaItem() }
-        until { activity.model.playback.value.mediaId == "testvideo02" && !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY }
+        until { activity.model.playback.value.mediaId == "testvideo02" && !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY && StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO).isNotEmpty() }
         assertEquals(VideoSelectionMode.AUTO, activity.model.playback.value.videoSelection.mode)
         assertNull(selected(C.TRACK_TYPE_VIDEO)); assertEquals("h264", activity.model.playback.value.videoSelection.codec)
         assertNull(activity.model.playback.value.videoSelection.manual)
         val nextChoices = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO)
-        assertTrue(StreamCatalog.automaticVideo(nextChoices, "h264").any { it.key.id == firstCodecVideo() })
+        val initial = firstCodecVideo()
+        assertTrue("first=$initial allowed=${StreamCatalog.automaticVideo(nextChoices, "h264").map { it.key }}", StreamCatalog.automaticVideo(nextChoices, "h264").any { it.key.id?.substringAfterLast(':') == initial })
     }
     @Test fun consecutiveSingleTapsAccumulateAndOppositeTapResets() {
         tap(true, true); tap(true); tap(true)
@@ -240,8 +250,8 @@ class StreamControlsSmokeTest {
         compose.runOnUiThread { assertNotNull(activity.model.pendingSeek.value); assertFalse(activity.model.playback.value.playWhenReady) }
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(40_000); activity.model.accumulateSeek(1); activity.model.refreshBuffer() }
-        until { activity.model.playback.value.playerState == Player.STATE_READY }
-        assertNull(activity.model.pendingSeek.value); assertEquals(40_000L, activity.model.playback.value.position)
+        until { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.position == 40_000L }
+        assertNull(activity.model.pendingSeek.value)
         compose.runOnUiThread { activity.model.accumulateSeek(1); activity.model.seekTo(15_000) }
         until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 15_000L }
         compose.runOnUiThread { activity.model.accumulateSeek(1); activity.model.controller.value!!.seekTo(25_000) }
@@ -255,12 +265,12 @@ class StreamControlsSmokeTest {
         until { activity.model.pendingSeek.value == null }
         assertEquals(35_000L, activity.model.playback.value.position)
     }
-    @Test fun fullscreenKeepsAccumulationAndPipEntryCancelsIt() {
+    @Test fun fullscreenAndPipEntryCancelAccumulation() {
         showControls()
         compose.runOnUiThread { activity.model.accumulateSeek(1) }
         compose.onNodeWithContentDescription("Full screen").performClick()
         until { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
-        until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 50_000L }
+        until { activity.model.pendingSeek.value == null && activity.model.playback.value.position == 40_000L }
         assertFalse(activity.model.playback.value.playWhenReady)
         showControls(); compose.onNodeWithContentDescription("Player settings").performClick()
         compose.onNodeWithText("Quality").performClick(); screenshot("quality-landscape")
@@ -269,7 +279,7 @@ class StreamControlsSmokeTest {
             compose.runOnUiThread { activity.model.accumulateSeek(1); activity.enterPip() }
             until { activity.isInPictureInPictureMode }
             assertNull(activity.model.pendingSeek.value)
-            assertEquals(50_000L, activity.model.playback.value.position)
+            assertEquals(40_000L, activity.model.playback.value.position)
         }
     }
 }

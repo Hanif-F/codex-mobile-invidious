@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 
 class MobiviousApplication : Application() {
+    lateinit var downloads: net.wingress.mobivious.data.DownloadRepository
     lateinit var store: SessionStore
     lateinit var api: InvidiousApi
     lateinit var cache: ResponseCache
@@ -31,6 +32,8 @@ class MobiviousApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         store = SessionStore(this)
+        downloads = net.wingress.mobivious.data.DownloadRepository(this)
+        net.wingress.mobivious.downloads.DownloadExportService.restore(this)
         cache = ResponseCache(File(cacheDir, "feeds"))
         api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration }, onProfile = store::confirmProfile)
         dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }

@@ -21,6 +21,7 @@ internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit
     val account by vm.account.collectAsStateWithLifecycle()
     OverflowMenu("Actions for ${video.title}", listOf(video, ApiContext(vm.store.server, account)), Modifier.testTag("video-actions-${video.id}")) { close ->
         DropdownMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
+        DropdownMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
         DropdownMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
         DropdownMenuItem(text = { Text("Play next") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
         DropdownMenuItem(text = { Text("Add to queue") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })

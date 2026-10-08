@@ -36,12 +36,13 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     fun update(value: PlaybackQueueSnapshot) { app.playbackQueue.value = value; changed() }
     fun settings(value: AccountPreferences) {
         prefs = value; prefsContext = app.api.context(); settingsVersion++
-        if (value.dearrowEnabled) state.current?.video?.id?.let { app.dearrowTitles.ensure(it) }
+        if (state.current?.downloadId == null && value.dearrowEnabled) state.current?.video?.id?.let { app.dearrowTitles.ensure(it) }
         syncDisplayTitle()
     }
     fun syncDisplayTitle() {
         val item = player.currentMediaItem ?: return
         val details = state.details ?: return
+        if (state.current?.downloadId != null) return
         if (state.context != app.api.context() || item.mediaMetadata.extras?.getString("occurrence") != state.currentKey) return
         val title = state.current?.clip?.title ?: if (prefs.dearrowEnabled) app.dearrowTitles.titles.value[item.mediaId] ?: details.video.title else details.video.title
         if (item.mediaMetadata.title?.toString() == title) return
@@ -65,6 +66,38 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                 else { player.pause(); update(state.copy(loading = false, sourceLoading = false, error = e.message ?: "Playback failed. Retry.")) }
             } }
         }
+    }
+    fun startDownload(id: String) {
+        val record = app.downloads.find(id) ?: return
+        beforeChange(); job?.cancel(); selection = null; decoderError = false
+        player.pause()
+        prefs = app.store.initialPreferences(); prefsContext = app.api.context()
+        baseRepeat = QueueRepeat.OFF; mixContinuations.clear()
+        val entry = QueueOccurrence.local(record.details.video).copy(downloadId = id)
+        val context = app.api.context()
+        update(PlaybackQueueSnapshot(token = UUID.randomUUID().toString(), context = context, items = listOf(entry), currentKey = entry.key, loading = true))
+        launch { token, owner -> load(entry, token, owner, playing = true, fresh = true) }
+    }
+    private suspend fun loadDownload(entry: QueueOccurrence, playing: Boolean, positionMs: Long?, fresh: Boolean) {
+        app.downloads.reconcile()
+        val record = app.downloads.find(entry.downloadId!!) ?: error("This download was deleted.")
+        val snapshot = if (fresh) null else capture()
+        beforeChange(); player.pause()
+        val details = app.downloads.localDetails(record)
+        update(state.copy(currentKey = entry.key, details = details, loading = true, error = null,
+            videoSelection = VideoSelection(occurrence = entry.key)))
+        trackSelector.configure(state.videoSelection)
+        player.trackSelectionParameters = (snapshot?.parameters ?: player.trackSelectionParameters).buildUpon()
+            .clearOverrides().setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
+            .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, record.assets.none { it.choice.kind == DownloadKind.VIDEO } || snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true)
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, record.assets.none { it.choice.kind == DownloadKind.AUDIO })
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) ?: (PreferenceRules.caption(prefs.captions, details.captions) == null))
+            .setPreferredTextLanguage(snapshot?.parameters?.preferredTextLanguages?.firstOrNull() ?: PreferenceRules.caption(prefs.captions, details.captions)?.language).build()
+        player.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
+        pendingSelection = snapshot; selectionPending = true
+        player.setMediaSource(DownloadPlayback.source(app, app.downloads, record, entry.key), positionMs ?: record.positionMs)
+        player.prepare(); player.playWhenReady = playing; requestedPlayWhenReady = playing
+        update(state.copy(details = details, loading = false, error = null))
     }
     fun start(id: String, source: String? = null, index: Int? = null, seconds: Long? = null,
         audio: Boolean = false, paused: Boolean = false, sourceSeed: String? = null, linkPlayback: LinkPlayback? = null, clip: Clip? = null) {
@@ -148,6 +181,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private suspend fun load(entry: QueueOccurrence, token: String, context: ApiContext, seconds: Long? = null,
         playing: Boolean = true, audio: Boolean = false, fresh: Boolean = false, positionMs: Long? = null) {
         check(token, context)
+        if (entry.downloadId != null) { loadDownload(entry, playing, positionMs, fresh); check(token, context); return }
         val sameOccurrence = !fresh && state.videoSelection.occurrence == entry.key
         if (!fresh && player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == state.currentKey) {
             val captured = capture()
@@ -211,6 +245,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         player.trackSelectionParameters = (snapshot?.parameters ?: player.trackSelectionParameters).buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).clearOverridesOfType(C.TRACK_TYPE_VIDEO)
             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, if (fresh) audio || prefs.listen else snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) ?: prefs.listen)
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
             .setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
             .setPreferredAudioLanguage(snapshot?.parameters?.preferredAudioLanguages?.firstOrNull())
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) ?: (caption == null))
@@ -229,7 +264,8 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     }
     fun applySelection() {
         applyVideoSelection()
-        if (!selectionPending || player.playbackState != Player.STATE_READY || player.currentTracks.groups.isEmpty()) return
+        if (!selectionPending || state.loading || player.playbackState != Player.STATE_READY || player.currentTracks.groups.isEmpty() ||
+            player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return
         selectionPending = false
         val snapshot = pendingSelection; pendingSelection = null
         val builder = player.trackSelectionParameters.buildUpon()

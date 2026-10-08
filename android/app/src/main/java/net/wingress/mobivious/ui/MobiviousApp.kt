@@ -77,6 +77,7 @@ private val light = lightColorScheme(primary = Teal, onPrimary = Color.White, se
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared: MutableState<Boolean>) {
+    val downloadDialog by vm.downloadDialog.collectAsStateWithLifecycle()
     val state by vm.browse.collectAsStateWithLifecycle()
     val playback by vm.playback.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
@@ -289,7 +290,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     MaterialTheme(colorScheme = if (darkTheme) dark else light) {
         Surface(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip || clipEditor.open,
-            fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
+            downloadDialog.video != null || fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) { openChatSettings ->
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = settingsParent(settingsPage) }, { signIn() }, { id -> settingsPage = ""; navigate("Popular", "channel:$id") })
             else Scaffold(
@@ -374,7 +375,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         IconButton(onClick = vm::refresh, modifier = Modifier.testTag("feed-refresh")) { Icon(Icons.Default.Refresh, "Refresh $tab") }
                     }
                     if (route.isEmpty() && tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
-                    if (route.startsWith("post:")) PostDetailScreen(vm, postDetail, browseList,
+                    if (route == "downloads") DownloadedScreen(vm, browseList) { id -> openPlayer(); vm.playDownload(id) }
+                    else if (route.startsWith("post:")) PostDetailScreen(vm, postDetail, browseList,
                         { id -> navigate(tab, "channel:$id") }, ::openRichLink, { play(it) },
                         { list -> browsePlayer(); vm.openPlaylist(list) }, { signIn() })
                     else if (route == "subscription-channels") {
@@ -385,11 +387,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             { sort -> vm.sortSubscriptionChannels(sort, deviceContext); scope.launch { subscriptionList.scrollToItem(0) } })
                     }
                     else if (route == "clips" && account == null) EmptyState("My Clips", "Sign in to create and find your clips.", "Sign in") { signIn() }
-                    else if (route.isEmpty() && tab == "You" && account == null) GuestYouScreen(vm.store.server, browseList) { signIn() }
+                    else if (route.isEmpty() && tab == "You" && account == null) GuestYouScreen(vm.store.server, browseList, { navigate("You", "downloads") }) { signIn() }
                     else if (route.isEmpty() && tab == "Subscriptions" && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
                     else if (tab == "You" && route.isEmpty()) LazyColumn(Modifier.fillMaxSize().testTag("you-library-list"), state = browseList, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item { Text("You", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
                         item { YouIdentity(account, vm.store.server) }
+                        item { DownloadShortcut { navigate("You", "downloads") } }
                         item { LibraryShortcuts({ navigate("You", "history") }, { vm.navigate("You", "clips", rememberOrigin = true) }) }
                         item {
                             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
@@ -553,6 +556,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             val dearrow by vm.dearrowContribution.collectAsStateWithLifecycle()
             if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; signIn() }, dismiss = { vm.sponsorSettingsChannel.value = null })
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
+            if (!pip) DownloadExportConsent()
+            if (downloadDialog.video != null && !pip) DownloadDialog(vm)
             if (saveSheet.video != null && route != "sign-in" && !pip) SavePlaylistSheet(vm) { signIn() }
             if (!pip) { ClipDialogs(vm); ClipEditor(vm) }
         }
@@ -742,15 +747,18 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 playback.details?.let { details ->
                     item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
-                        DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        if (playback.downloadId != null) Text(details.video.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        else DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         VideoNotices(details)
                         Text(listOf("${count(details.video.views)} views", details.likes?.let { "${count(it)} likes" }, details.video.published.takeIf(String::isNotBlank)).filterNotNull().joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        WatchChannelIdentity(details.video, vm.store.server, prefs.thinMode,
+                        if (playback.downloadId != null) DownloadChannelIdentity(details.video)
+                        else WatchChannelIdentity(details.video, vm.store.server, prefs.thinMode,
                             subscriptions.any { it.id == details.video.channelId }, subscribe = {
                                 if (vm.account.value == null) signIn()
                                 else vm.toggleSubscribe(details.video.channelId)
                             }, channel = channel, verified = details.authorVerified == true, subscribers = details.subscribers)
-                        FlowRow(Modifier.fillMaxWidth().testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (playback.downloadId == null) FlowRow(Modifier.fillMaxWidth().testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            AssistChip(onClick = { vm.openDownload(details.video) }, enabled = !details.video.live && details.upcoming != true, label = { Text("Download") }, leadingIcon = { Icon(Icons.Default.Download, null) }, modifier = Modifier.testTag("watch-download"))
                             AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
                             AssistChip(onClick = { VideoLinks.share(vm.store.server, vm.queue.value, vm.controller.value?.currentPosition ?: playback.position)?.let { url ->
                                 runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url), "Share video")) }
@@ -761,9 +769,9 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                             }, label = { Text("Create clip") }, leadingIcon = { Icon(Icons.Default.ContentCut, null) }, modifier = Modifier.testTag("create-clip"))
                             AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
                         }
-                        if (account == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
+                        if (account == null && playback.downloadId == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
                         blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                        if (prefs.showYoutubeComments) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
+                        if (prefs.showYoutubeComments && playback.downloadId == null) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
                         ChatReplayEntry(chat) { chapterPanel.close(); vm.openChat() }
                         ChaptersEntry(chapters, playback.position, openChapters)
                         ActionRow(if (description) "Hide description" else "Show description",

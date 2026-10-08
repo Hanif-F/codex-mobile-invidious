@@ -9,6 +9,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -37,18 +38,20 @@ class PlaybackService : MediaSessionService() {
         const val SPONSOR_SKIP = "mobivious.sponsorblock.skip"
         const val SPONSOR_DISMISS = "mobivious.sponsorblock.dismiss"
         const val CLIP_FULL_VIDEO = "mobivious.clip.fullVideo"
+        const val DOWNLOAD_START = "mobivious.download.start"
         const val QUEUE_START = "mobivious.queue.start"
         const val QUEUE_INSERT = "mobivious.queue.insert"
         const val QUEUE_REMOVE = "mobivious.queue.remove"
         const val QUEUE_DELETE_SOURCE = "mobivious.queue.delete_source"
         const val QUEUE_RETRY = "mobivious.queue.retry"
+        const val QUEUE_REFRESH = "mobivious.queue.refresh"
         const val QUEUE_MORE = "mobivious.queue.more"
         const val QUEUE_CLOSE = "mobivious.queue.close"
         const val QUEUE_STATE = "mobivious.queue.state"
         const val QUEUE_SETTINGS = "mobivious.queue.settings"
         const val VIDEO_AUTO = "mobivious.video.auto"
         const val VIDEO_SELECT = "mobivious.video.select"
-        val QUEUE_COMMANDS = listOf(CLIP_FULL_VIDEO, QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT)
+        val QUEUE_COMMANDS = listOf(DOWNLOAD_START, CLIP_FULL_VIDEO, QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_REFRESH, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT)
     }
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
@@ -78,7 +81,7 @@ class PlaybackService : MediaSessionService() {
         // This data source has no Authorization headers or account cookies.
         val mediaHttp = DefaultHttpDataSource.Factory().setUserAgent("Mobivious/0.1").setAllowCrossProtocolRedirects(false)
         val trackSelector = CodecAwareTrackSelector(this)
-        player = ExoPlayer.Builder(this).setTrackSelector(trackSelector).setMediaSourceFactory(DefaultMediaSourceFactory(mediaHttp)).build().apply {
+        player = ExoPlayer.Builder(this).setTrackSelector(trackSelector).setMediaSourceFactory(DefaultMediaSourceFactory(androidx.media3.datasource.DefaultDataSource.Factory(this, mediaHttp))).build().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
             setHandleAudioBecomingNoisy(true)
             setWakeMode(PowerManager.PARTIAL_WAKE_LOCK)
@@ -101,6 +104,7 @@ class PlaybackService : MediaSessionService() {
                     if (customCommand.customAction == SET_HISTORY_SETTINGS) {
                         if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
+                        if (player.currentMediaItem?.mediaMetadata?.extras?.getString("downloadId") != null) return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                         history = args.getBoolean("history") && owner != null && player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true
                         savePosition = player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true && (app.playbackQueue.value.current?.linkPlayback?.options?.savePosition ?: args.getBoolean("savePosition"))
                         app.watched.configure(ownerContext!!, savePosition)
@@ -130,7 +134,7 @@ class PlaybackService : MediaSessionService() {
                 started = false
                 marked = false
                 playbackGeneration++
-                if (mediaItem != null) app.watched.configure(ownerContext!!, savePosition)
+                if (mediaItem != null && mediaItem.mediaMetadata.extras?.getString("downloadId") == null) app.watched.configure(ownerContext!!, savePosition)
                 resetSponsor(mediaItem)
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -140,7 +144,7 @@ class PlaybackService : MediaSessionService() {
                 } else persist()
             }
             override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { if (queue.enforceEnd()) persist() else { persist(ended = true); queue.advance(automatic = true) } } }
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) { queue.playerError("Playback failed. Retry to refresh the stream.") }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) { queue.playerError(if (app.playbackQueue.value.current?.downloadId != null) "Offline playback failed. Check the downloaded files or retry the download." else "Playback failed. Retry to refresh the stream.") }
             override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) { if (error == null) queue.playerError(null) }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
                 if (reason == Player.DISCONTINUITY_REASON_REMOVE) persist(item = oldPosition.mediaItem, position = oldPosition.positionMs)
@@ -158,9 +162,10 @@ class PlaybackService : MediaSessionService() {
         if (args.getString("server") != app.store.server || args.getString("account") != app.store.account.value?.username || args.getLong("generation") != app.store.contextGeneration)
             return SessionResult(SessionError.ERROR_INVALID_STATE)
         if (action == QUEUE_STATE) return SessionResult(SessionResult.RESULT_SUCCESS, Bundle().apply { putString("state", app.playbackQueue.value.json().toString()); putLong("positionMs", player.currentPosition); putLong("durationMs", player.duration); putBoolean("playing", player.playWhenReady) })
-        if (action !in listOf(QUEUE_START, QUEUE_INSERT, QUEUE_SETTINGS) && args.getString("token") != app.playbackQueue.value.token)
+        if (action !in listOf(DOWNLOAD_START, QUEUE_START, QUEUE_INSERT, QUEUE_SETTINGS) && args.getString("token") != app.playbackQueue.value.token)
             return SessionResult(SessionError.ERROR_INVALID_STATE)
         when (action) {
+            DOWNLOAD_START -> queue.startDownload(args.getString("downloadId").orEmpty())
             CLIP_FULL_VIDEO -> queue.fullVideo()
             QUEUE_START -> {
                 val id = args.getString("id").orEmpty(); val source = args.getString("source")
@@ -182,6 +187,21 @@ class PlaybackService : MediaSessionService() {
             QUEUE_REMOVE -> queue.remove(args.getString("key").orEmpty())
             QUEUE_DELETE_SOURCE -> queue.removeFromPlaylist(args.getString("key").orEmpty())
             QUEUE_RETRY -> queue.retry()
+            QUEUE_REFRESH -> {
+                val position = PlaybackRules.seek(args.getLong("positionMs"), player.duration)
+                val live = player.isCurrentMediaItemLive
+                // MediaSession rewrites TrackGroup IDs for each controller.
+                // Keep the service's own groups rather than decoding a controller
+                // bundle outside MediaSession's normal ID translation.
+                val tracks = player.trackSelectionParameters
+                val speed = args.getFloat("speed", 1f); val pitch = args.getFloat("pitch", 1f)
+                if (!speed.isFinite() || speed !in .25f..2f || !pitch.isFinite() || pitch <= 0) return SessionResult(SessionError.ERROR_BAD_VALUE)
+                player.stop()
+                if (live) player.seekToDefaultPosition() else player.seekTo(position)
+                player.trackSelectionParameters = tracks
+                player.playbackParameters = PlaybackParameters(speed, pitch)
+                player.prepare(); player.playWhenReady = args.getBoolean("playing")
+            }
             QUEUE_MORE -> queue.more()
             QUEUE_CLOSE -> queue.close()
             QUEUE_SETTINGS -> queue.settings(AccountPreferences.parse(JSONObject(args.getString("settings") ?: "{}")))
@@ -215,7 +235,7 @@ class PlaybackService : MediaSessionService() {
         if (sponsorContext != app.api.context()) { resetSponsor(player.currentMediaItem, readSettings = false); return }
         val item = player.currentMediaItem ?: return
         sponsor.observePosition(player.currentPosition)
-        val usable = item.mediaMetadata.extras?.getBoolean("clip") != true && sponsor.settings.usable && item.mediaMetadata.extras?.getBoolean("liveNow") != true &&
+        val usable = item.mediaMetadata.extras?.getString("downloadId") == null && item.mediaMetadata.extras?.getBoolean("clip") != true && sponsor.settings.usable && item.mediaMetadata.extras?.getBoolean("liveNow") != true &&
             !player.isCurrentMediaItemLive && player.isCurrentMediaItemSeekable && player.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         if (usable && !segmentsRequested && SponsorBlockRules.validVideo(item.mediaId)) {
             segmentsRequested = true
@@ -283,6 +303,10 @@ class PlaybackService : MediaSessionService() {
         }
     }
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {
+        item?.mediaMetadata?.extras?.getString("downloadId")?.let { id ->
+            if (started) scope.launch { app.downloads.position(id, if (ended || player.duration > 0 && position >= player.duration - 2000) 0 else position) }
+            return
+        }
         if (!started || !savePosition || item == null || item.mediaMetadata.extras?.getBoolean("clip") == true || ownerContext != app.api.context()) return
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: 0
         val value = PlaybackRules.save(position / 1000, duration, ended)

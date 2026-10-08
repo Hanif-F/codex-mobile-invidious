@@ -72,6 +72,18 @@ An `OK` result confirms the APK matches the supplied checksum.
   public clips on a channel's Clips tab. Watch with a
   clip-relative timeline, loop, share or copy the permalink, continue the full
   video at the same scene, and delete your own clips.
+- **Downloads:** choose a separate video track, audio track, or both, with optional
+  captions. Each saved copy appears in **You → Downloaded**, available to guests
+  and signed-in users. Repeated downloads create separate entries; Retry repairs
+  the existing entry. Saved artwork and media play offline through the usual
+  player. Downloads may use mobile data and remain available after sign-out or
+  changing instances. Delete removes one entry and its app-specific files;
+  uninstalling or clearing app storage removes the library.
+- **Save to files:** choose a destination with Android's file picker. Single tracks
+  and VTT captions copy unchanged. A paired download exports one MP4, first trying
+  to merge without conversion. If necessary, confirm **Convert and export** to
+  convert affected tracks to H.264/AAC; quality may change and processing takes
+  longer. Unsupported resolution/frame-rate capabilities produce an error.
 
 ### Make it yours
 
@@ -93,6 +105,12 @@ other or older instances. Optional metadata is hidden when it is unavailable.
 If a feature reports a missing API or permission, the instance may need an update.
 After server updates that add token permissions, sign out and sign in again.
 Installing an APK does not update the server.
+
+Native downloads require this fork's public `/api/v1/videos/:id/downloads` and
+`/api/v1/videos/:id/download?key=…` endpoints. Deploy the matching sibling server
+update; no new database migration or sign-in renewal is needed. Instance download
+restrictions apply. Active livestreams and upcoming videos cannot be downloaded.
+Previously saved media remains local and usable when the instance changes.
 
 Native clips require this fork's Clips API and existing migration 19. Deploy the
 matching native token-scope and channel-tab updates, then sign out and sign in
@@ -127,7 +145,7 @@ without chat. Chat is read-only.
 
 ### Current limitations
 
-Clips, downloads, casting, upload notifications and timeline
+Casting, upload notifications and timeline
 thumbnail previews are not implemented. Comments, polls and quizzes are read-only;
 RSS support provides links and exports rather than an in-app feed reader.
 

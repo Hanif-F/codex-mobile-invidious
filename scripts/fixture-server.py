@@ -190,6 +190,21 @@ def submissions():
                              locked=state['originalMode'] == 'locked', UUID='original'))
     return titles
 
+def download_choices():
+    choices = []
+    for key, filename, kind, height, language in [('v360', 'video360.mp4', 'video', 360, ''), ('v144', 'video144.mp4', 'video', 144, ''),
+            ('vp8', 'video-vp8.webm', 'video', 144, ''), ('aen', 'audioen.m4a', 'audio', 0, 'en'), ('aes', 'audioes.m4a', 'audio', 0, 'es')]:
+        item = dict(key=key, kind=kind, url='/api/v1/videos/testvideo01/download?key=' + key, itag='140' if kind == 'audio' else key,
+                    type='audio/mp4; codecs="mp4a.40.2"' if kind == 'audio' else 'video/webm; codecs="vp8"' if key == 'vp8' else 'video/mp4; codecs="avc1.42E01E"',
+                    bitrate='96000' if kind == 'audio' else '500000', clen=str((args.media_dir / 'downloads' / filename).stat().st_size), filename=filename)
+        if height: item.update(size=f'{height * 16 // 9}x{height}', fps=24)
+        else: item.update(audioTrack=dict(id=language + '.1', displayName='English' if language == 'en' else 'Spanish', audioIsDefault=language == 'en'), isDrc=False)
+        choices.append(item)
+    choices.append(dict(key='cen', kind='caption', label='English', language_code='en', url='/api/v1/videos/testvideo01/download?key=cen'))
+    return choices
+
+state.update(downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='', downloadEndpointsMissing=False, allRequests=[])
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
@@ -307,6 +322,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
+        if not p.startswith('/test/'):
+            state['allRequests'].append(dict(method='GET', path=self.path))
         if p.startswith('/api/v1/storyboards/') and state['clipsEnabled']:
             state['storyboardRequests'].append(dict(path=p, authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
             if state.get('clipStoryboardFail', False): return self.respond(dict(error='No storyboard'), 404)
@@ -358,6 +375,22 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             try: self.wfile.write(data)
             except (BrokenPipeError, ConnectionResetError): pass
+        elif p.endswith('/downloads') and p.startswith('/api/v1/videos/'):
+            if state.get('downloadEndpointsMissing'): return self.respond(dict(error='Not found'), 404)
+            metadata = dict(video, description='Downloaded fixture description', lengthSeconds=12)
+            state['downloadRequests'].append(dict(kind='catalog', path=p))
+            disabled = state.get('downloadDisabled', False)
+            return self.respond(dict(video=metadata, allowed=not disabled, reason='Downloads are disabled by this instance.' if disabled else '', choices=[] if disabled else download_choices()))
+        elif p.endswith('/download') and p.startswith('/api/v1/videos/'):
+            key = parse_qs(url.query).get('key', [''])[0]
+            state['downloadRequests'].append(dict(kind='file', key=key))
+            if state.get('downloadDisabled'): return self.respond(dict(error='Downloads disabled'), 403)
+            if key == state.get('downloadFailKey'): return self.respond(dict(error='Fixture download failure'), 403)
+            choice = next((item for item in download_choices() if item['key'] == key), None)
+            if choice is None: return self.respond(dict(error='Selected track unavailable'), 404)
+            self.send_response(302)
+            self.send_header('Location', '/media/' + ('captions.vtt' if key == 'cen' else 'downloads/' + choice['filename']) + ('?slow=1' if state.get('downloadSlow') else ''))
+            self.end_headers()
         elif p.startswith('/media/'):
             state['mediaRequests'] += 1
             state['mediaPaths'].append(p)
@@ -366,12 +399,24 @@ class Handler(BaseHTTPRequestHandler):
             if not file.is_relative_to(root) or not file.is_file():
                 return self.respond({}, 404)
             data = file.read_bytes()
-            self.send_response(200)
-            self.send_header('Content-Length', str(len(data)))
-            self.send_header('Content-Type', {'.mp4':'video/mp4', '.mpd':'application/dash+xml', '.m3u8':'application/vnd.apple.mpegurl', '.vtt':'text/vtt', '.jpg':'image/jpeg'}.get(file.suffix, 'application/octet-stream'))
+            start, end = 0, len(data) - 1
+            ranged = self.headers.get('Range', '')
+            if ranged.startswith('bytes='):
+                first, last = ranged[6:].split('-', 1)
+                start = int(first or 0); end = min(end, int(last) if last else end)
+                if start > end:
+                    self.send_response(416); self.end_headers(); return
+            self.send_response(206 if ranged else 200)
+            self.send_header('Accept-Ranges', 'bytes')
+            if ranged: self.send_header('Content-Range', f'bytes {start}-{end}/{len(data)}')
+            self.send_header('Content-Length', str(end - start + 1))
+            self.send_header('Content-Type', {'.mp4':'video/mp4', '.m4a':'audio/mp4', '.webm':'video/webm', '.mpd':'application/dash+xml', '.m3u8':'application/vnd.apple.mpegurl', '.vtt':'text/vtt', '.jpg':'image/jpeg'}.get(file.suffix, 'application/octet-stream'))
             self.end_headers()
             try:
-                self.wfile.write(data)
+                if parse_qs(url.query).get('slow') == ['1']:
+                    for offset in range(start, end + 1, 8192):
+                        self.wfile.write(data[offset:min(offset + 8192, end + 1)]); self.wfile.flush(); time.sleep(.1)
+                else: self.wfile.write(data[start:end + 1])
             except (BrokenPipeError, ConnectionResetError):
                 pass
         elif p.startswith('/api/v1/live_chat/'):
@@ -624,6 +669,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def mutate(self):
         p = urlparse(self.path).path
+        if not p.startswith('/test/'):
+            state['allRequests'].append(dict(method=self.command, path=self.path))
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if p == '/test/clips':
             state['clipsEnabled'] = True
@@ -631,6 +678,11 @@ class Handler(BaseHTTPRequestHandler):
             if 'count' in data: state['clips'] = [native_clip(n) for n in range(data['count'])]
             for key in ('clipFailNext', 'clipCreateFailNext', 'clipDeleteFailNext', 'clipScopeFail', 'clipDelayNext', 'clipLegacyInvalid', 'clipStoryboardFail'):
                 if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/downloads':
+            for key in ('downloadDisabled', 'downloadSlow', 'downloadFailKey', 'downloadEndpointsMissing'):
+                if key in data: state[key] = data[key]
+            if data.get('resetRequests'): state['downloadRequests'] = []
             return self.respond({})
         if p == '/test/playlist-rss':
             state['playlistRss'] = True

@@ -215,6 +215,10 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         }
     suspend fun video(id: String, local: Boolean = true, region: String? = null, context: ApiContext = context()) =
         ApiParser.details(JSONObject(scopedRead("api/v1/videos/$id", buildMap { put("local", local.toString()); region?.let { put("region", it) } }, false, context)))
+    suspend fun downloads(id: String, context: ApiContext = context()): DownloadCatalog {
+        try { return DownloadCatalog.parse(JSONObject(scopedRead("api/v1/videos/$id/downloads", emptyMap(), false, context))) }
+        catch (e: ApiException) { if (e.status in listOf(404, 405)) throw ApiException(e.status, "Update this server to enable native downloads."); throw e }
+    }
     suspend fun resolveChannel(link: ChannelLink, context: ApiContext = context()): String {
         link.id?.takeIf(ContentVisibility::validChannel)?.let { return it }
         require(ContentLinks.parse(link.resolveUrl, context.server) is ContentLink.Channel) { "Invalid channel link." }

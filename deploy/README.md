@@ -5,6 +5,18 @@ Postgres 14, and `postgresdata` / `companioncache` volumes. Both hostnames serve
 the same backend and database. It builds the sibling fork in `../invidious` by
 default; Android never connects directly to Postgres or Companion.
 
+The native download addition requires the sibling server routes
+`GET /api/v1/videos/:id/downloads` and `GET /api/v1/videos/:id/download?key=…`.
+Deploy both before distributing the new APK. They use the existing media/Companion
+proxy and enforce disabled downloads, restricted videos and finite-track
+availability. Exact keys distinguish audio languages and stable-volume variants
+sharing an itag; unavailable selections fail without substitution. This addition
+requires no database migration, token scope, sign-in renewal or new keys.
+Android stores downloads locally and exports paired files using Media3 Transformer
+1.9.3 with explicit conversion consent. Older instances show an update-required
+message. See the sibling `docs/mobile-api.md` for the contract and verify both
+allowed and disabled-download responses after deployment.
+
 Keep the two Git projects side by side on both this device and the Ubuntu server:
 
 ```text

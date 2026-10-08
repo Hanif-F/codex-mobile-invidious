@@ -67,10 +67,11 @@ private fun LibraryShortcut(title: String, detail: String, icon: ImageVector, mo
 }
 
 @Composable
-internal fun GuestYouScreen(server: String, state: LazyListState, signIn: () -> Unit) {
+internal fun GuestYouScreen(server: String, state: LazyListState, downloaded: () -> Unit, signIn: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize().testTag("you-guest"), state = state, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { Text("You", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
         item { YouIdentity(null, server) }
+        item { DownloadShortcut(downloaded) }
         item {
             Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Your videos, together", style = MaterialTheme.typography.headlineSmall)
@@ -83,3 +84,6 @@ internal fun GuestYouScreen(server: String, state: LazyListState, signIn: () -> 
         }
     }
 }
+
+@Composable
+internal fun DownloadShortcut(action: () -> Unit) = LibraryShortcut("Downloaded", "Watch and listen offline", Icons.Default.DownloadDone, Modifier.fillMaxWidth().testTag("you-downloads"), action)

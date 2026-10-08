@@ -2814,3 +2814,90 @@ ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline --max-workers=2 \
   -Dorg.gradle.jvmargs=-Xmx2g \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DiscoverySearchSmokeTest,net.wingress.mobivious.DeviceProfileStorageTest,net.wingress.mobivious.SearchHistorySmokeTest,net.wingress.mobivious.PlaylistRssSmokeTest,net.wingress.mobivious.HomeSubscriptionsSmokeTest,net.wingress.mobivious.ChannelSmokeTest,net.wingress.mobivious.NavigationHubSmokeTest,net.wingress.mobivious.VisibilitySmokeTest,net.wingress.mobivious.SettingsSmokeTest
 ```
+
+## Downloads, offline playback and combined exports — 8 October 2026
+
+Implemented against Android `da6993b` and sibling Invidious `a54910fb`, preserving
+the existing checkouts. Feature parity row 46 is Implemented. Version/code remain
+0.7.1/14; no production deployment, release publication, migration or token-scope
+change was performed.
+
+| Check | Result |
+| --- | --- |
+| Android JVM unit/API suite | 317 passed; 0 failures/errors, including five download selection/persistence/progress/consent tests |
+| Final combined Android 16 / emulator-5554 run | 38 discovered: 37 passed, 0 failures/errors, 1 explicitly skipped |
+| Download device scenarios | Eight passed: selection/recreation/duplicates, all offline media modes/captions/artwork, player surfaces/background/PiP, failures/selective retry/missing files/deletion, restrictions/stale contexts/missing endpoints, file-picker copies, unchanged paired MP4 export/declining conversion, slow-transfer cancellation/context changes |
+| Existing player regressions | Eight passed, including exact tracks, codec policies, refresh/retry/reconnection, queue transitions and accumulated seeking |
+| Existing navigation/queue/library regressions | 21 passed |
+| Real app process restart | Both phases passed again using the final APK; different process IDs, unchanged DownloadManager IDs, durable SQLite entries, independent resume/deletion and local playback with no fixture requests |
+| Debug app and instrumentation APKs | Built successfully |
+| Release variant APK and vital lint | Built successfully |
+| Debug lint | Passed: 0 errors, 30 warnings |
+| Sibling server contract/audio specs | Eight passed: five native-download examples and three audio-metadata examples |
+| Sibling server source checks | Normal and `-Dapi_only` builds passed with `--no-codegen`; new Crystal files formatted |
+
+The generated finite fixtures contain separate 360p/144p H.264 video, English and
+Spanish AAC tracks sharing an itag, VP8 video, VTT captions and saved artwork.
+The server fixture supports Range requests, slow transfers, restrictions, missing
+endpoints and failures. Strict fixture request counters stay unchanged during
+local playback, seeking, recreation, player retry and post-restart playback.
+Successful media stays usable when captions fail; retries keep successful media
+transfer IDs and replace only missing/failed/cancelled assets. Repeated downloads
+use different UUIDs, and deleting one playing entry closes that player while
+retaining the other copies.
+
+Single video/audio/VTT exports were compared byte-for-byte after interception of
+the system file-picker intent. This verifies the picker/result contract and file
+copy, rather than full DocumentsUI interaction. The unchanged paired export was
+inspected with MediaExtractor: video plus audio, starting timestamps within
+100 ms and durations within one second of the 12-second source. Declining the
+conversion warning starts no conversion and removes the unused destination.
+The restart scenario simulates an interrupted export journal and verifies
+Interrupted state plus temporary/partial-output cleanup; it does not kill a
+running hardware conversion. Download transfers run through the real Android
+DownloadManager, not an app coroutine substitute.
+
+The explicitly skipped test is
+`DownloadsSmokeTest.acceptedVideoConversionPreservesResolutionFrameRateAndBothTracks`.
+It accepts VP8-to-H.264 conversion with AAC audio and checks the exported media's
+tracks, 256×144 resolution and frame rate. This work was originally part of
+`combinedExportHasBothTracksAndConversionRequiresConsent`, which repeatedly
+terminated the emulator. The safe remux and decline-consent checks are now separate.
+The host coredump for QEMU PID 262388 records SIGSEGV at 18:19:06 WIB in
+`libgfxstream_backend.so`, with `TextureResize`, `ColorBufferGl` and `RenderThread`
+on the crashing stack. Accepted video conversion must be tested on a physical
+device or an emulator where this graphics crash is fixed. No emulator reboot was
+attempted during the final safe runs. Device-reboot/network-outage recovery and
+upstream/production downloads were not exercised; DownloadManager supplies the
+underlying persistent transfer recovery.
+
+Testing also fixed buffer refresh losing audio overrides: MediaSession rewrites
+TrackGroup IDs for controllers, so the service now retains its native selection
+parameters while applying the refresh atomically. Pending restoration waits for
+the loaded queue occurrence. Cached codec fixture namespaces and asynchronous
+mini-player assertions were corrected; the final combined run is green with the
+one requested skip.
+
+Reports, process-restart output and the host crash stack are retained under
+`.tools/download-verification/`; the inspected library screenshot is
+`.tools/downloads-page.png`. APKs are under
+`android/app/build/outputs/apk/debug/app-debug.apk` and
+`android/app/build/outputs/apk/release/app-release.apk`. Deploy both sibling public
+download endpoints before using native downloads against that instance. Existing
+local downloads remain usable after account or instance changes.
+
+Fixture processes and owned ADB forwarding were cleaned up. The preview APK was
+left installed, its fixture instance was restored to the normal public instance,
+and a cold launch to Downloaded passed. The user's release app was not replaced.
+
+Reproduce on an already running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DownloadsSmokeTest,net.wingress.mobivious.StreamControlsSmokeTest,net.wingress.mobivious.NavigationHubSmokeTest,net.wingress.mobivious.QueueLibrarySmokeTest
+ANDROID_SERIAL=emulator-5554 scripts/test-download-restart.sh
+cd ../invidious
+crystal spec spec/native_downloads_spec.cr spec/audio_metadata_spec.cr
+crystal build src/invidious.cr --no-codegen
+crystal build src/invidious.cr -Dapi_only --no-codegen
+```

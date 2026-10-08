@@ -2,8 +2,8 @@
 
 Reviewed on **8 October 2026** against the local source checkouts:
 
-- Web: `../invidious` at `f260f8e5` plus native clip token scopes, channel Clips metadata and additive account-profile metadata. Includes this fork's custom features and native API extensions.
-- Android: `0097918` plus the discovery/search changes. Configured version: `0.7.1` (version code 14); latest release tag: `v0.7.1`.
+- Web: `../invidious` at `a54910fb` plus the public native download endpoints. Includes this fork's custom features and native API extensions.
+- Android: `da6993b` plus the downloads/offline/export changes. Configured version: `0.7.1` (version code 14); latest release tag: `v0.7.1`.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 
@@ -17,7 +17,7 @@ Account-separated device saves add stable ownership, repeatable local migration,
 guest channel SponsorBlock overrides and guest channel blocking. Their Android,
 emulator and server evidence is recorded in the 8 October entry in [VERIFICATION.md](VERIFICATION.md).
 
-**Summary: 48 broad feature areas — 32 implemented, 9 partial, 7 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
+**Summary: 48 broad feature areas — 33 implemented, 9 partial, 6 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
 
 ## Discovery and channels
 
@@ -98,11 +98,11 @@ These web capabilities were missing from the original 45-area checklist. They ha
 
 | ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
 | --- | --- | --- | --- | --- |
-| 46 | Download video, audio and caption files | Not implemented | — | The web Download selector exports available combined, video-only, audio-only and VTT caption formats, subject to instance restrictions; Companion handles downloads when configured. Android has no media/caption file download flow. Cached JSON, streaming buffers and RSS/OPML exports do not implement this capability. |
+| 46 | Download video, audio and caption files | Implemented | Watch/card Download dialog with independent None/video/audio selectors and optional captions; separate finite tracks only, exact audio identities and instance restrictions. Device-wide SQLite library under You → Downloaded, unique entries for every confirmation, durable files/artwork, DownloadManager transfers, progress, cancellation, selective retry and independent deletion. Local playback merges paired tracks and reuses the player with per-download resume and no online playback requests. Save to files copies single tracks/VTT or merges a pair into MP4; conversion needs explicit consent and runs in a cancellable foreground service. | Requires deployment of the sibling public download endpoints; no migration or token renewal. Accepted video conversion remains unverified on a physical device because the emulator graphics backend crashes during that test; remuxing and declining conversion passed. |
 | 47 | Player keyboard shortcuts and fine seeking | Partial | Focusable native controls; Enter/Space restores the mini-player; Enter activates an available SponsorBlock skip; MediaSession transport controls, timeline and ±10-second seeking. | The web's player shortcut map for play/pause, seek, mute/volume, speed, captions and fullscreen; numeric percentage jumps and paused frame stepping. Android system volume/media controls do not reproduce the full web map. |
 | 48 | Caption appearance controls | Not implemented | Captions render through the Media3 PlayerView (row 13). | In-app caption size and text/window opacity controls with remembered styling, as exposed by the web player. Android has no corresponding caption appearance editor. |
 
-Evidence: [web download widget][w-download], [web download routing][w-watch-route], [web shortcuts/caption styling][w-player-js]; [native player controls][a-player], [native video/caption surface][a-surface], [playback service][a-service], [Android API][a-api].
+Evidence: [web download widget][w-download], [web download routing][w-watch-route], [web shortcuts/caption styling][w-player-js]; [native downloads][a-downloads], [download library/dialog][a-downloads-ui], [offline media sources][a-download-playback], [export service][a-download-export], [native public endpoints][w-native-downloads], [native player controls][a-player], [native video/caption surface][a-surface], [playback service][a-service], [Android API][a-api].
 
 ## Integration details affecting the checklist
 
@@ -118,7 +118,7 @@ Evidence: [web download widget][w-download], [web download routing][w-watch-rout
 
 The web checkout also supplies embeddable players, developer JSON APIs, browser OpenSearch integration, server-side HTML with many no-JavaScript fallbacks, and self-hosting/administration controls. These are web/server capabilities rather than native screen parity items. Android consumes the APIs and inherits server extraction/proxy behavior; it does not need to duplicate the server.
 
-Android adds a live-video mini-player with swipe minimize/restore/dismiss, scroll-driven watch-player resizing, animated description/queue disclosures, screen-awake handling, MediaSession/system controls, playback notification, picture-in-picture with seek/play actions, background service playback, encrypted session storage and short-lived cached discovery/search/subscription results. The response cache is not video downloading or offline media playback. Web media/caption downloads are a parity gap (row 46); a managed offline-media library and casting were not found as implemented web features in this checkout and are not counted.
+Android adds a live-video mini-player with swipe minimize/restore/dismiss, scroll-driven watch-player resizing, animated description/queue disclosures, screen-awake handling, MediaSession/system controls, playback notification, picture-in-picture with seek/play actions, background service playback, encrypted session storage and short-lived cached discovery/search/subscription results. Row 46 now includes durable media/caption downloads and a managed offline library, separate from streaming/response caches. A managed offline-media library and casting were not found as implemented web features in this checkout and are not counted as web parity gaps.
 
 The original checklist was a documentation-only source audit. The subsequent Android player overhaul consolidates playback settings under one in-player gear, removes the persistent fullscreen/back overlays, and adds touch seeking and Refresh buffer. Row 11 also corrects an audit omission: the old Media3 gear already exposed 0.25× speed; the new unified sheet retains it. Rows 09, 11, 13 and 20 reflect the overhaul; their broad statuses and summary counts are unchanged. Detailed statistics remain missing. Runtime validation for this revision is recorded separately in [VERIFICATION.md](VERIFICATION.md).
 
@@ -153,6 +153,11 @@ Links are repository-relative so this checklist works with the documented siblin
 [a-service]: android/app/src/main/java/net/wingress/mobivious/player/PlaybackService.kt
 [a-activity]: android/app/src/main/java/net/wingress/mobivious/MainActivity.kt
 [a-manifest]: android/app/src/main/AndroidManifest.xml
+[a-downloads]: android/app/src/main/java/net/wingress/mobivious/data/DownloadRepository.kt
+[a-downloads-ui]: android/app/src/main/java/net/wingress/mobivious/ui/DownloadsUi.kt
+[a-download-playback]: android/app/src/main/java/net/wingress/mobivious/player/DownloadPlayback.kt
+[a-download-export]: android/app/src/main/java/net/wingress/mobivious/downloads/DownloadExportService.kt
+[w-native-downloads]: ../invidious/src/invidious/routes/api/v1/downloads.cr
 [w-routing]: ../invidious/src/invidious/routing.cr
 [w-search]: ../invidious/src/invidious/search/filters.cr
 [w-search-ui]: ../invidious/src/invidious/frontend/search_filters.cr
@@ -642,3 +647,24 @@ Stored `feed_menu` values remain compatible with the website. Row 03 remains
 Partial because configurable native tab visibility and ordering are outside the
 chosen fixed-tab design. Fixture-based emulator and visual evidence is recorded
 in the matching [VERIFICATION.md](VERIFICATION.md) entry.
+
+### Downloads, offline playback and file exports — 8 October 2026
+
+Row 46 is Implemented. Guests and signed-in users can choose separate video/audio
+tracks and optional captions, then manage unique saved copies under You →
+Downloaded. The device-wide library, media/artwork files and per-copy resume
+positions survive sign-out, instance changes and app process restarts. Media3
+merges paired local files for playback; Android DownloadManager owns persistent
+transfers and retries preserve already successful files.
+
+Save to files copies individual media/caption files or exports a pair as one MP4.
+Conversion requires explicit acceptance; cancellation and interruption clean up
+incomplete output. The public sibling endpoints enforce instance restrictions
+and exact audio/DRC identities without a migration or token renewal.
+
+The final checks passed 317 JVM tests, 37 emulator scenarios plus two real process
+restart phases, eight server specs, normal/API-only server source checks, APK
+builds and lint. One accepted video-conversion test remains explicitly skipped
+at the user's request because it crashes the emulator host's gfxstream code.
+Unchanged paired export and declining conversion passed; physical-device
+conversion acceptance remains pending. Details are in [VERIFICATION.md](VERIFICATION.md).

@@ -111,6 +111,26 @@ On a busy host, add `--max-workers=1 -Dorg.gradle.jvmargs=-Xmx768m` to limit bui
 resource use. Distinguish compiled checks from runtime acceptance when recording
 results; the complete device suite is not yet green.
 
+The focused download checks use separate video/audio files, captions, Range
+responses, slow transfers and controllable failures:
+
+```sh
+scripts/test-android.sh \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DownloadsSmokeTest
+scripts/test-download-restart.sh
+```
+
+The restart runner installs the existing debug/test APKs, seeds background
+transfers, force-stops only the test app and checks recovery in a new process. It
+does not reboot or restart the emulator. Build the APKs first; retain the generated
+fixture media. Its evidence is under `.tools/download-verification/`.
+
+`acceptedVideoConversionPreservesResolutionFrameRateAndBothTracks` is explicitly
+ignored because Emulator 37.2.12 crashes in the host gfxstream `TextureResize`
+code during this conversion. The other download tests include unchanged paired
+MP4 export and rejecting conversion. Remove that test's `@Ignore` only when
+testing on a physical device or an emulator with this graphics crash resolved.
+
 ## Signed releases
 
 Releases are built and published manually. Set `JAVA_HOME` and `ANDROID_HOME`

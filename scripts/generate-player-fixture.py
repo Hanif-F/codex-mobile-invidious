@@ -42,6 +42,12 @@ def generate_rich():
 def generate_codecs():
     directory = args.media_dir / 'codec'
     if (directory / '.complete-v2').exists():
+        # Normalize cached variants too: Android's DASH parser expects MPD as
+        # the element name rather than an ElementTree-generated ns0: prefix.
+        ET.register_namespace('', 'urn:mpeg:dash:schema:mpd:2011')
+        for name in ('unsupported.mpd', 'missing.mpd'):
+            target = directory / name
+            ET.parse(target).write(target, encoding='utf-8', xml_declaration=True)
         return
     directory.mkdir(parents=True, exist_ok=True)
     manifest = directory / 'dash.mpd'
@@ -102,3 +108,23 @@ def generate_shapes():
                         '-movflags', '+faststart', str(target)], check=True)
 
 generate_shapes()
+
+
+def generate_downloads():
+    directory = args.media_dir / 'downloads'
+    directory.mkdir(parents=True, exist_ok=True)
+    for name, height in [('video360', 360), ('video144', 144)]:
+        target = directory / (name + '.mp4')
+        if not target.exists():
+            subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', str(args.media_dir / 'fixture.mp4'),
+                            '-t', '12', '-an', '-vf', f'scale={height * 16 // 9}:{height}', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-movflags', '+faststart', str(target)], check=True)
+    for name, frequency in [('audioen', 440), ('audioes', 880)]:
+        target = directory / (name + '.m4a')
+        if not target.exists():
+            subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', f'sine=frequency={frequency}:sample_rate=48000',
+                            '-t', '12', '-c:a', 'aac', '-b:a', '96k', str(target)], check=True)
+    target = directory / 'video-vp8.webm'
+    if not target.exists():
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', str(directory / 'video144.mp4'), '-an', '-c:v', 'libvpx', '-deadline', 'realtime', '-cpu-used', '8', '-threads', '2', str(target)], check=True)
+
+generate_downloads()
