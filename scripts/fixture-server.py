@@ -172,7 +172,7 @@ def reset_search_history():
 reset_search_history()
 
 def reset_accounts():
-    state.update(accountUsername='Fixture', registrationEnabled=True, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[],
+    state.update(accountUsername='Fixture', accountProfileId=None, registrationEnabled=True, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[],
                  accountSessions=[dict(id='current', type='api', issuedAt=1700000000, expiresAt=9999999999, current=True),
                                   dict(id='browser', type='browser', issuedAt=1700000001, expiresAt=9999999999, current=False)])
 reset_accounts()
@@ -201,11 +201,13 @@ class Handler(BaseHTTPRequestHandler):
             # Canceled app requests close their sockets while delayed fixtures respond.
             pass
 
-    def respond(self, data=None, status=200):
+    def respond(self, data=None, status=200, headers=None):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Cache-Control', 'no-store')
         self.send_header('Connection', 'close')
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         if data is not None:
             self.wfile.write(json.dumps(data).encode())
@@ -462,9 +464,10 @@ class Handler(BaseHTTPRequestHandler):
             event = dict(completed=False)
             state['preferencesRequests'].append(event)
             delay = state['preferencesDelayNext']; state['preferencesDelayNext'] = 0
+            profile_id = state['accountProfileId']
             try:
                 if delay: time.sleep(min(5000, max(0, delay)) / 1000)
-                self.respond(prefs)
+                self.respond(prefs, headers={'X-Invidious-Account-Profile': profile_id} if profile_id else None)
             finally:
                 event['completed'] = True
         elif p == '/api/v1/auth/subscriptions':
@@ -661,6 +664,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/accounts':
+            if 'accountProfileId' in data: state['accountProfileId'] = data['accountProfileId']
             if 'registrationEnabled' in data: state['registrationEnabled'] = bool(data['registrationEnabled'])
             return self.respond({})
         if p == '/test/comments':
@@ -780,7 +784,7 @@ class Handler(BaseHTTPRequestHandler):
             if p.endswith('/register') and data.get('password') != data.get('passwordConfirmation'):
                 return self.respond(dict(error='New passwords must match'), 400)
             state['accountUsername'] = data.get('username', 'Viewer'); state['accountRevoked'] = False
-            return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999))
+            return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999, profileId=state['accountProfileId']))
         elif p.startswith('/api/v1/auth/account/'):
             if state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token':
                 return self.respond(dict(error='Request must be authenticated'), 403)
@@ -800,7 +804,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(dict(accessToken='new-external-fixture-token'))
             if p.endswith('/username'): state['accountUsername'] = data['username']
             state['accountSessions'] = [entry for entry in state['accountSessions'] if entry['current']]
-            return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999))
+            return self.respond(dict(accessToken='fixture-token', username=state['accountUsername'], expiresAt=9999999999, profileId=state['accountProfileId']))
         elif p == '/api/v1/auth/chat_preferences' or p.startswith('/api/v1/auth/chat_timing/'):
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 401)
             if state['chatScopeFail']: return self.respond(dict(error='Invalid scope'), 403)

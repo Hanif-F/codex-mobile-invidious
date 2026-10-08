@@ -127,13 +127,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val commentController = CommentsController(viewModelScope, api::context,
         { video, sort, continuation, context -> api.comments(video, sort, continuation, context) }, ::friendly)
     val comments = commentController.state
-    val preferences = MutableStateFlow(store.guestDeArrow())
+    val preferences = MutableStateFlow(store.initialPreferences())
     val chatAppearance = MutableStateFlow(store.chatAppearance())
     private val chatController = ChatReplayController(viewModelScope, api::context, api::chatReplay,
         { id, ctx -> if (ctx.account == null) store.chatTiming(id, ctx) else api.chatTiming(id, ctx) },
         { id, offset, ctx -> if (ctx.account == null) store.chatTiming(id, offset, ctx) else api.chatTiming(id, offset, ctx) }, ::friendly)
     val chatReplay = chatController.state
-    private var chatAppearanceServer = store.server
+    private var chatAppearanceContext = api.context()
     val sponsorBlock = MutableStateFlow(SponsorBlockPlayback())
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
     fun openSponsorBlock(channelId: String = "") { sponsorSettingsChannel.value = channelId; refreshSharedSettings() }
@@ -141,7 +141,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val dearrowIdentity = MutableStateFlow<DeArrowIdentity?>(null)
     val dearrowIdentityError = MutableStateFlow<String?>(null)
     val dearrowContribution = MutableStateFlow(DeArrowContributionState())
-    val message = MutableStateFlow<String?>(null)
+    val message = MutableStateFlow<String?>(store.storageError.value)
     val blockUndo = MutableStateFlow<BlockUndo?>(null)
     val saveSheet = MutableStateFlow(PlaylistSaveState())
     val queue = app.playbackQueue
@@ -192,6 +192,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         }).buildAsync()
     init {
+        viewModelScope.launch { store.storageError.collect { it?.let { error -> message.value = error } } }
         future.addListener({
             runCatching {
                 controller.value = future.get().apply {
@@ -208,7 +209,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             if (error == null) playback.value = playback.value.copy(error = null)
                         }
                     })
-                    if (currentMediaItem == null) setPlaybackSpeed(store.defaultSpeed)
+                    if (currentMediaItem == null) setPlaybackSpeed(preferences.value.speed)
                     val stateContext = api.context()
                     val state = sendCustomCommand(SessionCommand(PlaybackService.SPONSOR_STATE, Bundle.EMPTY), Bundle.EMPTY)
                     state.addListener({ if (api.context() == stateContext && sponsorBlock.value.token.isEmpty()) runCatching { receiveSponsorState(state.get().extras) } }, ContextCompat.getMainExecutor(application))
@@ -235,7 +236,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             syncComments(); syncChat(); state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
         } }
-        viewModelScope.launch { account.collect {
+        viewModelScope.launch { app.playbackContext.collect { changedContext ->
+            val it = changedContext?.account
             clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipResolution.value = ClipResolutionState(); clipEditor.value = ClipEditorState()
             clipDelete.value = null; clipDeleteBusy.value = false; clipDeleteError.value = null
             if (pendingClipEditor?.first != api.context().server) pendingClipEditor = null
@@ -267,7 +269,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             dearrowTitles.clear(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             dearrowIdentity.value = null; dearrowIdentityError.value = null
             preferencesContext = if (it == null) api.context() else null
-            preferences.value = if (it == null) store.guestDeArrow() else AccountPreferences()
+            preferences.value = store.initialPreferences()
+            region = preferences.value.region
+            chatAppearanceContext = api.context(); chatAppearance.value = store.chatAppearance(chatAppearanceContext)
             if (it != null) refreshAccount() else playlists.value = emptyList()
             refresh()
         } }
@@ -296,7 +300,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (preferencesContext != api.context()) return
         val video = playback.value.details?.video ?: return
         if (state.mediaId != video.id || state.token.isEmpty()) return
-        val settings = preferences.value.sponsorBlock.effective(video.channelId, account.value != null)
+        val settings = preferences.value.sponsorBlock.effective(video.channelId)
         if (state.settings != settings) sponsorCommand(PlaybackService.SPONSOR_CONFIGURE, settings = settings)
     }
     fun sponsorCommand(action: String, segment: String? = null, settings: SponsorBlockSettings? = null) {
@@ -347,7 +351,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun refreshSubscriptions() = subscriptionsController.refresh()
     fun searchSubscriptionChannels(query: String) = subscriptionsController.search(query)
-    fun sortSubscriptionChannels(sort: SubscriptionSort) = subscriptionsController.sort(sort)
+    fun sortSubscriptionChannels(sort: SubscriptionSort, context: ApiContext = api.context()) {
+        if (context != api.context()) return
+        try { subscriptionsController.sort(sort) } catch (_: CancellationException) { } catch (e: Exception) { message.value = friendly(e) }
+    }
     fun refreshSharedSettings() {
         val context = api.context()
         refreshBlockedChannels()
@@ -372,8 +379,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun ensureDeArrow(id: String) { if (preferences.value.dearrowEnabled) dearrowTitles.ensure(id) }
     fun refreshBlockedChannels() { viewModelScope.launch { app.blocked.refresh() } }
-    fun toggleBlocked(id: String, name: String) {
-        val context = api.context()
+    fun toggleBlocked(id: String, name: String, context: ApiContext = api.context()) {
+        if (context != api.context()) return
         val block = id !in blocked.value.ids
         action {
             app.blocked.setBlocked(context, id, name, block)
@@ -382,8 +389,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 refreshBlockedChannels() }
         }
     }
-    fun saveSearchVisibility(value: SearchVisibility) {
-        store.saveSearchVisibility(api.context(), value); searchVisibility.value = value
+    fun saveSearchVisibility(value: SearchVisibility, context: ApiContext = api.context()): Boolean {
+        return try { store.saveSearchVisibility(context, value); searchVisibility.value = value; true }
+        catch (_: CancellationException) { false } catch (e: Exception) { message.value = friendly(e); false }
     }
     fun contentSurface(): ContentSurface = when {
         route == "subscription-channels" -> ContentSurface.SUBSCRIPTIONS
@@ -1096,7 +1104,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         StreamCatalog.defaultVideo(StreamCatalog.choices(p.currentTracks, C.TRACK_TYPE_VIDEO), "${height}p",
             if (queue.value.videoSelection.dash) queue.value.videoSelection.codec else "auto")?.let { selectTrack(it.group, it.index) }
     } }
-    fun speed(value: Float) { store.defaultSpeed = value; controller.value?.setPlaybackSpeed(value); updatePlayerDefault { it.copy(speed = value) } }
+    fun speed(value: Float) { if (!value.isFinite() || value !in .25f..2f) return; controller.value?.setPlaybackSpeed(value); updatePlayerDefault { it.copy(speed = value) } }
     private fun updatePlayerDefault(change: (AccountPreferences) -> AccountPreferences) {
         val context = api.context()
         action { playerDefaultWrites.withLock { val before = preferences.value; savePreferences(change(before), before, context) } }
@@ -1130,7 +1138,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun openComments() { closeChat(); syncComments(); commentController.open() }
     private fun syncChat() {
         if (queue.value.current?.clip != null) { chatController.bind("", "", false); return }
-        if (chatAppearanceServer != store.server) { chatAppearanceServer = store.server; chatAppearance.value = store.chatAppearance() }
+        if (chatAppearanceContext != api.context()) { chatAppearanceContext = api.context(); chatAppearance.value = store.chatAppearance(chatAppearanceContext) }
         val q = queue.value
         val details = q.details
         if (details != null) chatController.bind(details.video.id, q.currentKey.orEmpty(), details.chatAvailable && !playback.value.live)
@@ -1148,7 +1156,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun chatTiming(value: Int) = chatController.timing(value)
     fun retryChatTiming() = chatController.retryTiming()
-    fun setChatAppearance(value: ChatAppearance) { chatAppearance.value = value.bounded(); store.chatAppearance(chatAppearance.value) }
+    fun setChatAppearance(value: ChatAppearance, context: ApiContext = api.context()): Boolean {
+        return try { store.chatAppearance(value.bounded(), context); chatAppearance.value = value.bounded(); true }
+        catch (e: CancellationException) { false }
+        catch (e: Exception) { message.value = friendly(e); false }
+    }
+    fun setBackground(value: Boolean, context: ApiContext): Boolean = try { store.background(value, context); true }
+        catch (_: CancellationException) { false } catch (e: Exception) { message.value = friendly(e); false }
+    fun setPip(value: Boolean, context: ApiContext): Boolean = try { store.pip(value, context); true }
+        catch (_: CancellationException) { false } catch (e: Exception) { message.value = friendly(e); false }
     suspend fun saveChatPreferences(value: ChatPreferences, before: ChatPreferences, context: ApiContext) = preferenceWrites.withLock {
         ChatFilters.validateChanges(value, before)
         if (api.context() != context) throw CancellationException("Account or instance changed")
@@ -1156,7 +1172,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         changed.keys().forEach { if (old.get(it) != changed.get(it)) patch.put(it, changed.get(it)) }
         if (patch.length() == 0) return@withLock
         preferenceGeneration++
-        val saved = if (context.account == null) preferences.value.merge(patch).also { store.guestDeArrow(it) }
+        val saved = if (context.account == null) LocalPreferences.normalize(preferences.value.merge(patch)).also { store.guestDeArrow(it, context) }
             else api.chatPreferences(patch, context)
         if (api.context() == context) { preferenceGeneration++; preferencesContext = context; preferences.value = saved }
     }
@@ -1167,15 +1183,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun loadComments(more: Boolean = false, threadKey: String? = null) = commentController.load(more, threadKey)
     fun commentPosition(threadKey: String?, position: CommentPosition) = commentController.position(threadKey, position)
     fun action(block: suspend () -> Unit) { viewModelScope.launch { try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { message.value = friendly(e) } } }
-    private fun acceptAuthentication(value: Account, context: ApiContext, resumeIntent: Boolean = true) {
+    private fun acceptAuthentication(value: Account, context: ApiContext, resumeIntent: Boolean = true, replaceCurrent: Boolean = false) {
         if (context != api.context()) throw CancellationException("Account or instance changed")
         homeAppliedContext = null
-        store.save(value)
+        if (replaceCurrent) store.replaceAccount(context, value) else store.save(value)
+        val accepted = store.account.value
         homeAppliedContext = api.context()
         val origin = signInReturn; signInReturn = null
         // Run after the account collector resets account-scoped state.
         viewModelScope.launch { yield()
-            if (account.value != value) return@launch
+            if (account.value != accepted) return@launch
             if (resumeIntent && origin != null) restoreBrowse(origin, afterSignIn = true)
             else navigate("Account")
             authenticationFinished.value++
@@ -1192,7 +1209,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context(); acceptAuthentication(api.register(username, password, confirmation, answer, token, context), context)
     }
     suspend fun changeCredentials(kind: String, fields: JSONObject, context: ApiContext) = accountOperation {
-        acceptAuthentication(api.changeCredentials(kind, fields, context), context, resumeIntent = false)
+        acceptAuthentication(api.changeCredentials(kind, fields, context), context, resumeIntent = false, replaceCurrent = true)
     }
     suspend fun createAccountToken(password: String, scopes: List<String>, expires: Long?, context: ApiContext) = accountOperation {
         api.createToken(password, scopes, expires, context)
@@ -1200,21 +1217,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun clearAccount(context: ApiContext) {
         if (context != api.context()) return
         signInReturn = null; searchReturn = null
-        closePlayer(); store.clearPositions(context); store.clearVisibilitySnapshot(context); store.save(null)
+        closePlayer(); store.save(null)
         app.cache.clear(); navigate("Account")
     }
-    suspend fun deleteAccount(password: String, context: ApiContext) = accountOperation { api.deleteAccount(password, context); clearAccount(context) }
+    suspend fun deleteAccount(password: String, context: ApiContext) = accountOperation {
+        api.deleteAccount(password, context)
+        try { store.deleteProfile(context) } finally { clearAccount(context) }
+    }
     suspend fun revokeSession(session: AccountSession, context: ApiContext) = accountOperation {
         api.revokeSession(session.id, context); if (session.current) clearAccount(context)
     }
     fun logout() = action { accountOperation { val context = api.context(); try { api.logout() } finally { clearAccount(context) } } }
-    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); store.clearPositions(); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.DEBUG); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); region = preferences.value.region; homeAppliedContext = null; openDefaultHome() }
     suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
-        val changes = value.changesFrom(before)
+        val changes = value.changesFrom(before, includeChannelNames = context.account == null)
         val saved = if (context.account == null) {
-            preferences.value.merge(changes).let { it.copy(watchHistory = false, sponsorBlock = it.sponsorBlock.copy(channels = emptyMap())) }.also { store.guestDeArrow(it) }
+            LocalPreferences.normalize(preferences.value.merge(changes)).also { store.guestDeArrow(it, context) }
         } else if (changes.length() > 0) try { api.preferences(changes, context) }
             catch (e: ApiException) {
                 if (e.status in listOf(404, 405) || e.status == 400 && (e.message?.contains("preference", true) == true || e.message?.contains("Only boolean") == true))

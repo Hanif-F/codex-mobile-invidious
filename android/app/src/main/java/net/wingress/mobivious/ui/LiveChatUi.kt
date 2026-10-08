@@ -168,6 +168,7 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
     vm: AppViewModel, modifier: Modifier, settings: () -> Unit, editor: ChatOverlayEditor,
 ) {
     val appearance by vm.chatAppearance.collectAsStateWithLifecycle()
+    val editorContext = remember(editor) { vm.api.context() }
     var editing by editor.editing
     var draft by editor.draft
     val currentDraft by rememberUpdatedState(draft)
@@ -218,7 +219,7 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                         IconButton(onClick = { editing = false }, modifier = Modifier.size(48.dp).testTag("chat-overlay-cancel")) {
                             Icon(Icons.Default.Close, "Cancel overlay adjustment")
                         }
-                        IconButton(onClick = { vm.setChatAppearance(clamp(draft)); editing = false },
+                        IconButton(onClick = { if (vm.setChatAppearance(clamp(draft), editorContext)) editing = false },
                             modifier = Modifier.size(48.dp).testTag("chat-overlay-save")) { Icon(Icons.Default.Check, "Done adjusting overlay") }
                     }
                     if (narrow) Column {
@@ -294,7 +295,7 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                     Text("Chat layout", style = MaterialTheme.typography.labelLarge)
                     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                         listOf("Docked", "Overlay").forEachIndexed { index, label ->
-                            SegmentedButton(selected = appearance.overlay == (index == 1), onClick = { vm.setChatAppearance(appearance.copy(overlay = index == 1)) },
+                            SegmentedButton(selected = appearance.overlay == (index == 1), onClick = { vm.setChatAppearance(appearance.copy(overlay = index == 1), ctx) },
                                 shape = SegmentedButtonDefaults.itemShape(index, 2), modifier = Modifier.heightIn(min = 48.dp).testTag("chat-layout-${label.lowercase()}")) { Text(label) }
                         }
                     }
@@ -302,17 +303,17 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                 }
                 if (appearance.overlay) {
                     item { ChatSlider("Background opacity", "chat-opacity", appearance.opacity.toFloat(), 0f..100f, "${appearance.opacity}%") {
-                        vm.setChatAppearance(appearance.copy(opacity = it.roundToInt())) } }
+                        vm.setChatAppearance(appearance.copy(opacity = it.roundToInt()), ctx) } }
                 } else {
                     item { ChatSlider("Side panel width", "chat-side-width", appearance.besideFraction, ChatAppearance.BESIDE_FRACTION_RANGE) {
-                        vm.setChatAppearance(appearance.copy(besideFraction = it)) } }
+                        vm.setChatAppearance(appearance.copy(besideFraction = it), ctx) } }
                     item { ChatSlider("Bottom panel height", "chat-bottom-height", appearance.belowFraction, .3f.. .7f) {
-                        vm.setChatAppearance(appearance.copy(belowFraction = it)) } }
+                        vm.setChatAppearance(appearance.copy(belowFraction = it), ctx) } }
                 }
                 item { ChatSlider("Text size", "chat-text-size", appearance.fontScale.toFloat(), 25f..300f, "${appearance.fontScale}%") {
-                    vm.setChatAppearance(appearance.copy(fontScale = it.roundToInt())) } }
+                    vm.setChatAppearance(appearance.copy(fontScale = it.roundToInt()), ctx) } }
                 item { ChatSwitch("Show channel IDs", "chat-channel-ids", !appearance.hideUserIds) {
-                    vm.setChatAppearance(appearance.copy(hideUserIds = !it)) } }
+                    vm.setChatAppearance(appearance.copy(hideUserIds = !it), ctx) } }
                 item { ChatSwitch("Show timestamps", "chat-timestamps", timestamps, enabled = !busy) { timestamps = it; error = null } }
                 item { OutlinedTextField(users, { users = it; error = null }, label = { Text("Blocked users") },
                     supportingText = { Text("Channel IDs or @handles, separated by spaces.") }, enabled = !busy,

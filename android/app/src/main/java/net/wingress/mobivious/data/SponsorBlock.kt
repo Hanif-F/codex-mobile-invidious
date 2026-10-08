@@ -31,8 +31,8 @@ data class SponsorBlockSettings(val enabled: Boolean = false,
     val modes: Map<SponsorBlockCategory, SponsorBlockMode> = SponsorBlockCategory.entries.associateWith { SponsorBlockMode.MANUAL },
     val colors: Map<SponsorBlockCategory, String> = SponsorBlockCategory.entries.associateWith { it.color },
     val channels: Map<String, SponsorBlockChannel> = emptyMap()) {
-    fun effective(channelId: String, signedIn: Boolean): SponsorBlockSettings {
-        val channel = if (signedIn) channels[channelId] else null
+    fun effective(channelId: String): SponsorBlockSettings {
+        val channel = channels[channelId]
         return copy(enabled = channel?.enabled ?: enabled, modes = modes + channel?.modes.orEmpty(), channels = emptyMap())
     }
     val usable: Boolean get() = enabled && modes.values.any { it != SponsorBlockMode.DISABLED }
@@ -42,7 +42,7 @@ data class SponsorBlockSettings(val enabled: Boolean = false,
         put("sponsorblock_colors", JSONObject().apply { colors.forEach { (k, v) -> put(k.wire, v) } })
         put("sponsorblock_channel_overrides", JSONObject().apply { channels.forEach { (k, v) -> put(k, v.json()) } })
     }
-    fun patch(before: SponsorBlockSettings, output: JSONObject) {
+    fun patch(before: SponsorBlockSettings, output: JSONObject, includeChannelNames: Boolean = false) {
         if (enabled != before.enabled) output.put("sponsorblock_enabled", enabled)
         val modesPatch = JSONObject(); val colorsPatch = JSONObject(); val channelsPatch = JSONObject()
         SponsorBlockCategory.entries.forEach { category ->
@@ -50,7 +50,7 @@ data class SponsorBlockSettings(val enabled: Boolean = false,
             if (colors[category] != before.colors[category]) colorsPatch.put(category.wire, colors[category] ?: category.color)
         }
         (channels.keys + before.channels.keys).forEach { id ->
-            if (channels[id] != before.channels[id]) channelsPatch.put(id, channels[id]?.json(false) ?: JSONObject.NULL)
+            if (channels[id] != before.channels[id]) channelsPatch.put(id, channels[id]?.json(includeChannelNames) ?: JSONObject.NULL)
         }
         if (modesPatch.length() > 0) output.put("sponsorblock_modes", modesPatch)
         if (colorsPatch.length() > 0) output.put("sponsorblock_colors", colorsPatch)

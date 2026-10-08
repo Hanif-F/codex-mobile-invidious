@@ -1,6 +1,8 @@
 package net.wingress.mobivious
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import net.wingress.mobivious.data.InvidiousApi
 import net.wingress.mobivious.data.SessionStore
 import net.wingress.mobivious.data.ResponseCache
@@ -30,11 +32,18 @@ class MobiviousApplication : Application() {
         super.onCreate()
         store = SessionStore(this)
         cache = ResponseCache(File(cacheDir, "feeds"))
-        api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration })
+        api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration }, onProfile = store::confirmProfile)
         dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }
         watched = WatchedRepository(api, store)
         blocked = BlockedRepository(api, store)
-        store.onContextChanged = { watched.reset(it); blocked.reset(it); dearrowTitles.clear(); offline.value = false; playbackContext.value = it }
+        val main = Handler(Looper.getMainLooper())
+        fun changed(context: ApiContext) {
+            if (context != api.context()) return
+            watched.reset(context); blocked.reset(context); dearrowTitles.clear(); offline.value = false; playbackContext.value = context
+        }
+        store.onContextChanged = { context ->
+            if (Looper.myLooper() == Looper.getMainLooper()) changed(context) else main.post { changed(context) }
+        }
         playbackContext.value = api.context()
         blocked.reset()
         watched.reset()

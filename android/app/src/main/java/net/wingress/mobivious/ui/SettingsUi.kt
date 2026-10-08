@@ -87,7 +87,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     val scope = rememberCoroutineScope()
     val value = AccountPreferences.parse(JSONObject(draft))
     val edited = draft != baseline
-    LaunchedEffect(prefs) { if (!edited && !busy) { baseline = prefs.json().toString(); draft = baseline } }
+    LaunchedEffect(prefs) { if (draft == baseline && !busy) { baseline = prefs.json().toString(); draft = baseline } }
     fun update(next: AccountPreferences) { draft = next.json().toString(); error = null }
     val accountOnly = page == "Subscriptions"
     val valid = (!accountOnly || account != null) && (page != "Browsing" || Regex("[A-Z]{2}").matches(value.region)) && (page != "Subscriptions" || value.maxResults in 1..1500)
@@ -111,9 +111,9 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     }
                     item {
                         SettingsHeading("On this device")
-                        SettingsToggle("Background playback", "Keep playing when the app is in the background", background, !busy) { background = it; vm.store.background = it }
-                        SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip, !busy) { pip = it; vm.store.pip = it }
-                        Text("These two options save immediately on this device.", style = MaterialTheme.typography.bodySmall)
+                        SettingsToggle("Background playback", "Keep playing when the app is in the background", background, !busy) { if (vm.setBackground(it, context)) background = it }
+                        SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip, !busy) { if (vm.setPip(it, context)) pip = it }
+                        Text("These two options save immediately for this account or guest on this device.", style = MaterialTheme.typography.bodySmall)
                     }
                     item {
                         SettingsHeading("Caption language priority")
@@ -188,8 +188,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     item { CommunityDataLinks() }
                 }
             }
-            error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("settings-save-error")) } }
         }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("settings-save-error")) }
         HorizontalDivider()
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
             TextButton(onClick = back, enabled = !busy) { Text("Cancel") }

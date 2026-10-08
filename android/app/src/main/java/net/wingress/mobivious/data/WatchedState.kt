@@ -93,14 +93,20 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         if (context != api.context()) return@synchronized
         reset(context)
         if (!rememberPosition && (!positionsConfigured || savePosition)) {
+            try { local.clearPositions(context) }
+            catch (_: CancellationException) { return@synchronized }
+            catch (e: Exception) {
+                mutableState.value = mutableState.value.copy(error = e.message ?: "Could not clear playback positions on this device.")
+                return@synchronized
+            }
             revision++
             positionsClearedAt = revision
             positionGeneration++
-            local.clearPositions(context)
             snapshot = snapshot.copy(positions = emptyMap())
         }
         savePosition = rememberPosition
         positionsConfigured = true
+        mutableState.value = mutableState.value.copy(error = null)
         if (context.account == null) snapshot = PlaybackSnapshot(positions = if (savePosition) local.positions(context) else emptyMap())
         publish()
     }

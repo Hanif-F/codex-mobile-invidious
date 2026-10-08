@@ -105,11 +105,11 @@ class WatchedIndicatorsSmokeTest {
             activity.model.store.position(first, 35); activity.model.refreshSharedSettings()
             val guest = activity.model.api.context()
             val signed = guest.copy(account = net.wingress.mobivious.data.Account("fixture-token", "OtherViewer", Long.MAX_VALUE, guest.server))
-            activity.model.store.setPosition(signed, first, 90)
+            try { activity.model.store.setPosition(signed, first, 90); fail("Inactive account accepted a device save") }
+            catch (_: kotlinx.coroutines.CancellationException) { }
             assertEquals(35L, activity.model.store.position(first, guest))
-            assertEquals(90L, activity.model.store.position(first, signed))
+            assertEquals(0L, activity.model.store.position(first, signed))
             assertEquals(0L, activity.model.store.position(first, guest.copy(server = "https://other.test")))
-            activity.model.store.clearPositions(signed)
         }
         until { activity.model.watched.value.positions[first] == 35L }
         progress(first).assertExists(); watched(first).assertDoesNotExist()
@@ -158,7 +158,8 @@ class WatchedIndicatorsSmokeTest {
         until { (activity.model.watched.value.positions[first] ?: 0) >= 55 }
         android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
             "am start -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")).use { it.readBytes() }
-        until { activity.model.playback.value.playing }
+        compose.runOnUiThread { activity.startActivity(Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
+        until { activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) && activity.window.decorView.hasWindowFocus() && activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.seekTo(119_000) }
         until { first !in activity.model.watched.value.positions }
         compose.onNodeWithContentDescription("Back").performClick()

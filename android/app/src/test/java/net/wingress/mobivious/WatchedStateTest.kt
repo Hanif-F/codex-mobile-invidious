@@ -16,13 +16,17 @@ class WatchedStateTest {
     private val first = "abcdefghijk"
     private val second = "bbbbbbbbbbb"
     private class MemoryPositions : LocalPlaybackPositions {
+        var failClear = false
         private val values = mutableMapOf<Pair<String, String?>, Map<String, Long>>()
         private fun key(context: ApiContext) = context.server to context.account?.username
         override fun positions(context: ApiContext) = values[key(context)].orEmpty()
         override fun setPosition(context: ApiContext, id: String, seconds: Long) {
             values[key(context)] = if (seconds == 0L) positions(context) - id else positions(context) + (id to seconds)
         }
-        override fun clearPositions(context: ApiContext) { values.remove(key(context)) }
+        override fun clearPositions(context: ApiContext) {
+            if (failClear) throw java.io.IOException("Device save failed")
+            values.remove(key(context))
+        }
     }
     private class Fixture(guest: Boolean = false) : AutoCloseable {
         val server = MockWebServer().apply { start() }
@@ -303,6 +307,18 @@ class WatchedStateTest {
             f.server.enqueue(MockResponse().setResponseCode(503))
             try { f.repo.savePosition(f.context, first, 55); fail("Failure swallowed") } catch (_: ApiException) { }
             assertEquals(55L, f.local.positions(f.context)[first]); assertEquals(55L, f.repo.state.value.positions[first])
+        }
+    }
+    @Test fun failedDeviceClearPreservesProgressAndCanRetryWithoutStoppingObservers() {
+        Fixture(guest = true).use { f ->
+            f.local.setPosition(f.context, first, 30); f.repo.configure(f.context, true)
+            f.local.failClear = true
+            f.repo.configure(f.context, false)
+            assertEquals("Device save failed", f.repo.state.value.error)
+            assertEquals(30L, f.repo.state.value.positions[first]); assertEquals(30L, f.local.positions(f.context)[first])
+            f.local.failClear = false; f.repo.configure(f.context, false)
+            assertNull(f.repo.state.value.error); assertTrue(f.repo.state.value.positions.isEmpty()); assertTrue(f.local.positions(f.context).isEmpty())
+            assertEquals(0, f.server.requestCount)
         }
     }
 }

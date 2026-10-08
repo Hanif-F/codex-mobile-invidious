@@ -95,6 +95,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val clipEditor by vm.clipEditor.collectAsStateWithLifecycle()
     val clipOpened by vm.clipOpened.collectAsStateWithLifecycle()
     val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
+    val deviceContext = vm.api.context()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val discovery by vm.discovery.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
@@ -349,7 +350,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         else SubscriptionChannelsScreen(subscriptionChannels.takeIf { it.context == vm.api.context() } ?: SubscriptionChannelsState(), vm.store.server, prefs.thinMode,
                             subscriptionList, { query -> vm.searchSubscriptionChannels(query); scope.launch { subscriptionList.scrollToItem(0) } }, vm::refreshSubscriptions,
                             { id -> navigate("Subscriptions", "channel:$id") },
-                            { sort -> vm.sortSubscriptionChannels(sort); scope.launch { subscriptionList.scrollToItem(0) } })
+                            { sort -> vm.sortSubscriptionChannels(sort, deviceContext); scope.launch { subscriptionList.scrollToItem(0) } })
                     }
                     else if (route == "clips" && account == null) EmptyState("My Clips", "Sign in to create and find your clips.", "Sign in") { signIn() }
                     else if (route.isEmpty() && (tab == "Library" || tab == "Subscriptions") && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
@@ -746,13 +747,13 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
 }
 
 @Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit, visibilityOnly: Boolean = false) {
+    val context = remember { vm.api.context() }
     val playlistSearch by vm.playlistSearch.collectAsStateWithLifecycle()
-    val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     var sort by remember { mutableStateOf(vm.sort) }
     var date by remember { mutableStateOf(vm.date) }
     var duration by remember { mutableStateOf(vm.durationFilter) }
-    var visibility by remember(vm.api.context()) { mutableStateOf(vm.searchVisibility.value) }
+    var visibility by remember { mutableStateOf(vm.searchVisibility.value) }
     AlertDialog(onDismissRequest = dismiss, title = { Text("Search filters") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             if (!visibilityOnly) {
@@ -766,13 +767,15 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             }
             Text(if (visibility.showMembers == null) "Using browsing default" else "Search override saved on this device", style = MaterialTheme.typography.bodySmall)
             OutlinedButton(onClick = { visibility = visibility.copy(showMembers = null) }, modifier = Modifier.testTag("search-members-reset")) { Text("Use browsing default") }
-            if (account != null) Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(visibility.includeBlocked, { visibility = visibility.copy(includeBlocked = it) }, modifier = Modifier.testTag("search-include-blocked"))
                 Text("Include blocked channels", Modifier.weight(1f))
             }
         }
     }, confirmButton = { TextButton(onClick = {
-        vm.sort = sort; vm.date = date; vm.durationFilter = duration; vm.saveSearchVisibility(visibility); vm.refresh(); dismiss()
+        if (vm.saveSearchVisibility(visibility, context)) {
+            vm.sort = sort; vm.date = date; vm.durationFilter = duration; vm.refresh(); dismiss()
+        }
     }) { Text("Apply") } }, dismissButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
 }
 @Composable private fun Choice(label: String, values: List<String>, selected: String, update: (String) -> Unit) {

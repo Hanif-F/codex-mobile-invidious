@@ -53,7 +53,7 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
         if (!edited) { before = prefs; global = prefs.sponsorBlock; channel = prefs.sponsorBlock.channels[channelId] ?: SponsorBlockChannel(channelId) }
     }
     LaunchedEffect(channelId, page, account) {
-        if (page == "Channel SponsorBlock settings" && channelId.isNotBlank() && account != null && channelId !in prefs.sponsorBlock.channels) {
+        if (page == "Channel SponsorBlock settings" && channelId.isNotBlank() && channelId !in prefs.sponsorBlock.channels) {
             loading = true; error = null
             try { val found = vm.api.channel(channelId); if (vm.api.context() == context) channel = channel.copy(name = found.name.ifBlank { channelId }) }
             catch (e: CancellationException) { throw e }
@@ -123,20 +123,18 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                         }
                     }
                     "Configured channels" -> {
-                        if (account == null) item { Text("Sign in to save channel-specific SponsorBlock settings."); Button(onClick = signIn) { Text("Sign in") } }
-                        else {
+                        run {
                             item {
                                 Text("Channel settings override global settings. Use global follows future global changes. Colors remain global.")
                                 OutlinedTextField(input, { input = it }, label = { Text("Channel ID or /channel/UC… URL") }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
                                 Button(enabled = !busy, onClick = { val id = SponsorBlockRules.channelId(input); if (id == null) error = "Enter a valid channel ID or /channel/UC… URL." else navigate("Channel SponsorBlock settings", id) }) { Text("Edit channel settings") }
                                 if (prefs.sponsorBlock.channels.isEmpty()) Text("No channel overrides yet.")
                             }
-                            items(prefs.sponsorBlock.channels.toList().sortedBy { it.second.name.lowercase() }, key = { it.first }) { (id, saved) -> ActionRow(saved.name, detail = "Channel SponsorBlock settings", enabled = !busy) { navigate("Channel SponsorBlock settings", id) } }
+                            items(prefs.sponsorBlock.channels.toList().sortedBy { it.second.name.lowercase() }, key = { it.first }) { (id, saved) -> ActionRow(saved.name, modifier = Modifier.testTag("sponsor-configured-channel-$id"), detail = "Channel SponsorBlock settings", enabled = !busy) { navigate("Channel SponsorBlock settings", id) } }
                         }
                     }
                     "Channel SponsorBlock settings" -> {
-                        if (account == null) item { Text("Sign in to save channel-specific SponsorBlock settings."); Button(onClick = signIn) { Text("Sign in") } }
-                        else {
+                        run {
                             item {
                                 Text(channel.name, style = MaterialTheme.typography.titleMedium)
                                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
@@ -154,9 +152,9 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                         }
                     }
                 }
-                error?.let { item { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("sponsorblock-save-error")) } }
             }
-            if (page != "Configured channels" && (page == "Global SponsorBlock settings" || account != null)) {
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("sponsorblock-save-error")) }
+            if (page != "Configured channels") {
                 HorizontalDivider()
                 FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (page == "Channel SponsorBlock settings") OutlinedButton(onClick = { save(true) }, enabled = !busy && !loading) { Text("Reset to global") }

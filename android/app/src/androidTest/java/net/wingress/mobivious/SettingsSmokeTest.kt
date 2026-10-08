@@ -73,10 +73,11 @@ class SettingsSmokeTest {
     @Test fun failedSharedSaveKeepsDraftAndRetryPreservesOtherPreferences() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "Account" && !activity.model.accountBusy.value }
-        open("Browsing"); toggle("Show related videos")
+        open("Browsing"); toggle("Show related videos"); compose.onNodeWithText("Show related videos").assertIsOff()
         command("sponsorblock", """{"failPreferences":true}""")
-        compose.onNodeWithTag("settings-save").performClick()
-        until { compose.onAllNodesWithTag("settings-save-error").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("settings-save").assertIsEnabled().performClick()
+        until { compose.onAllNodesWithTag("settings-save-error").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
+        assertTrue("Missing save error: account=" + activity.model.account.value?.username + ", related=" + activity.model.preferences.value.relatedVideos + ", fixture=" + state().getJSONObject("preferences") + ", events=" + state().getJSONArray("events"), compose.onAllNodesWithTag("settings-save-error").fetchSemanticsNodes().isNotEmpty())
         compose.onNodeWithContentDescription("Back from Browsing").assertExists()
         command("sponsorblock", """{"failPreferences":false}""")
         save("Browsing")

@@ -52,7 +52,7 @@ data class Playlist(val id: String, val title: String, val count: Int, val priva
     val sourceLabel get() = if (owned) "My playlist" else if (mix) "Mix" else if (id.startsWith("IV")) "Invidious playlist" else "YouTube playlist"
 }
 data class Page<T>(val items: List<T>, val continuation: String = "")
-data class Account(val token: String, val username: String, val expiresAt: Long, val server: String)
+data class Account(val token: String, val username: String, val expiresAt: Long, val server: String, val profileId: String? = null)
 data class ApiContext(val server: String, val account: Account?, val generation: Long = 0)
 data class DeArrowIdentity(val ready: Boolean, val configured: Boolean)
 data class DeArrowSubmission(val title: String, val original: Boolean, val votes: Int, val locked: Boolean, val uuid: String)

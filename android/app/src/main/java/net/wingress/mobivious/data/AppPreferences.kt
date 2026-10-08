@@ -33,19 +33,19 @@ data class AccountPreferences(
         put("default_playlist", defaultPlaylist.ifBlank { null } ?: JSONObject.NULL)
         put("show_member_videos", showMemberVideos)
     }
-    fun changesFrom(before: AccountPreferences) = JSONObject().apply {
+    fun changesFrom(before: AccountPreferences, includeChannelNames: Boolean = false) = JSONObject().apply {
         val old = before.json(); val current = json()
         current.keys().forEach { key ->
             if (!key.startsWith("sponsorblock_") && !key.startsWith("chat_") && current.get(key).toString() != old.get(key).toString()) put(key, current.get(key))
         }
-        sponsorBlock.patch(before.sponsorBlock, this)
+        sponsorBlock.patch(before.sponsorBlock, this, includeChannelNames)
     }
     fun merge(changes: JSONObject): AccountPreferences {
         val current = json()
         changes.keys().forEach { key ->
-            if (key in listOf("sponsorblock_modes", "sponsorblock_colors")) {
+            if (key in listOf("sponsorblock_modes", "sponsorblock_colors", "sponsorblock_channel_overrides")) {
                 val map = current.getJSONObject(key); val delta = changes.getJSONObject(key)
-                delta.keys().forEach { map.put(it, delta.get(it)) }
+                delta.keys().forEach { if (delta.isNull(it)) map.remove(it) else map.put(it, delta.get(it)) }
             } else current.put(key, changes.get(key))
         }
         return parse(current)

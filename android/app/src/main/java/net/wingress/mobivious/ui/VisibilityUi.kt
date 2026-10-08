@@ -21,10 +21,10 @@ internal fun MembersBadge(id: String) {
 internal fun BlockChannelMenuItem(vm: AppViewModel, id: String, name: String, signIn: () -> Unit,
     modifier: Modifier = Modifier, close: () -> Unit) {
     val state by vm.blocked.collectAsStateWithLifecycle()
-    val account by vm.account.collectAsStateWithLifecycle()
+    val context = state.context ?: vm.api.context()
     if (!ContentVisibility.validChannel(id)) return
     DropdownMenuItem(text = { Text(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel") },
-        onClick = { close(); if (account == null) signIn() else vm.toggleBlocked(id, name) }, enabled = id !in state.busy,
+        onClick = { close(); vm.toggleBlocked(id, name, context) }, enabled = id !in state.busy,
         modifier = modifier)
 }
 
@@ -39,11 +39,12 @@ internal fun ChannelBlockingError(vm: AppViewModel, id: String) {
 internal fun BlockedChannelsScreen(vm: AppViewModel, modifier: Modifier, signIn: () -> Unit, openChannel: (String) -> Unit) {
     val state by vm.blocked.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
+    val context = state.context ?: vm.api.context()
     LaunchedEffect(vm.api.context()) { vm.refreshBlockedChannels() }
     LazyColumn(modifier.fillMaxSize().testTag("blocked-channel-manager"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Blocked channels are hidden from discovery, search and recommendations. Subscriptions, history, playlists and direct links remain accessible.") }
-        if (account == null) item { Text("Sign in to share blocked channels with the website."); Button(onClick = signIn) { Text("Sign in") } }
-        else {
+        if (account == null) item { Text("Blocked channels are saved for guests on this device and instance.") }
+        run {
             item { OutlinedButton(onClick = vm::refreshBlockedChannels, enabled = !state.loading) { Text("Refresh blocked channels") } }
             if (state.loading) item { CircularProgressIndicator() }
             state.error?.let { error -> item {
@@ -56,7 +57,7 @@ internal fun BlockedChannelsScreen(vm: AppViewModel, modifier: Modifier, signIn:
                 Column(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { openChannel(channel.id) }) { Text(channel.name) }
-                        OutlinedButton(onClick = { vm.toggleBlocked(channel.id, channel.name) }, enabled = channel.id !in state.busy,
+                        OutlinedButton(onClick = { vm.toggleBlocked(channel.id, channel.name, context) }, enabled = channel.id !in state.busy,
                             modifier = Modifier.testTag("unblock-${channel.id}")) { Text(if (channel.id in state.busy) "Saving…" else "Unblock") }
                     }
                     state.actionErrors[channel.id]?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("blocked-action-error-${channel.id}")) }

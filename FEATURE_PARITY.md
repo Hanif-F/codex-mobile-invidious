@@ -2,7 +2,7 @@
 
 Reviewed on **7 October 2026** against the local source checkouts:
 
-- Web: `../invidious` at `f260f8e5` plus native clip token scopes and channel Clips metadata. Includes this fork's custom features and native API extensions.
+- Web: `../invidious` at `f260f8e5` plus native clip token scopes, channel Clips metadata and additive account-profile metadata. Includes this fork's custom features and native API extensions.
 - Android: `32d5c14` plus the release version bump. Configured version: `0.7.0` (version code 13); release tag: `v0.7.0`.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
@@ -12,6 +12,10 @@ Reviewed on **7 October 2026** against the local source checkouts:
 - **Not implemented:** no corresponding Android flow was found in the reviewed source.
 
 The status combines source/build checks with the focused native checks recorded in [VERIFICATION.md](VERIFICATION.md). Clips passed 284 Android unit/API tests, debug app/test APK builds, focused Android 16 emulator checks and server authorization/database checks. Older dated entries retain their individual runtime limitations. Native clip creation, ownership and channel lists require the sibling API/token-scope update and renewed sign-in; migration 19 already supplies storage. This audit does not verify a production rollout or upstream YouTube clip availability.
+
+Account-separated device saves add stable ownership, repeatable local migration,
+guest channel SponsorBlock overrides and guest channel blocking. Their Android,
+emulator and server evidence is recorded in the 8 October entry in [VERIFICATION.md](VERIFICATION.md).
 
 **Summary: 48 broad feature areas — 31 implemented, 10 partial, 7 not implemented.** These counts describe the in-scope grouping below, not a weighted completion percentage. Excluded capabilities at the bottom are not counted as missing work. IDs 01–45 are retained; newly listed player tools use IDs 46–48.
 
@@ -76,10 +80,10 @@ Evidence: [web account][w-account], [web authenticated APIs][w-auth], [web feed 
 
 | ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
 | --- | --- | --- | --- | --- |
-| 37 | SponsorBlock | Implemented | Instance-proxied segments; all eight web categories and four modes; colored timeline ranges and scrub labels; manual Skip/Dismiss with remaining time; service-owned auto skipping in background/audio/PiP; overlapping-range merging and manual replay after an auto skip; custom colors; shared account settings and inherited per-channel overrides with a native manager. Guests save global settings per instance. | — for the web capability; shared settings require the SponsorBlock preference API update. Native runtime/layout acceptance is unverified because the emulator crashes before boot; see VERIFICATION.md. |
+| 37 | SponsorBlock | Implemented | Instance-proxied segments; all eight web categories and four modes; colored timeline ranges and scrub labels; manual Skip/Dismiss with remaining time; service-owned auto skipping in background/audio/PiP; overlapping-range merging and manual replay after an auto skip; custom colors; shared account settings and inherited per-channel overrides with a native manager. Guests save global settings and per-channel overrides per instance. | — for the web capability; shared settings require the SponsorBlock preference API update. Native runtime/layout acceptance is unverified because the emulator crashes before boot; see VERIFICATION.md. |
 | 38 | DeArrow titles and contributions | Implemented | Optional replacement titles throughout video lists, watch/mini-player and system playback metadata; accessible original-title toggle; native suggestion/voting sheet with all four guideline acknowledgements, locked/original vote restrictions, refresh and preserved failed drafts; shared account settings and encrypted contribution identity, including private-ID import. Guests keep per-instance local title settings. | — for the web capability; requires the native DeArrow API server update and an updated sign-in token. This fork does not implement thumbnail replacement. |
 | 39 | Clips | Implemented | Native/YouTube clip resolution with validated millisecond bounds; My Clips in Library and public channel Clips pages with pagination, retained scroll and owner deletion. Public 5–120-second creation with Unicode titles, tenths trimming, storyboard filmstrip/fallback, separate preview and retained drafts. Clip-relative service/system timelines, loop/end stopping, share/copy, origin notice and same-scene full-video transition; source history/progress writes, chapters, chat replay and SponsorBlock skipping suppressed in clip mode. | Production deployment and upstream YouTube availability are unverified. Native sign-in tokens need renewed clip scopes. Active-live clipping, published editing, remix, embeds, federation and import/export are outside scope. |
-| 40 | Channel blocking | Implemented | Shared account block list; card and channel Block/Unblock actions; Browsing settings manager with channel navigation, errors and retry; immediate discovery/search/recommendation filtering and saved search inclusion override. Confirmed snapshots support offline filtering and isolate accounts/instances. Subscriptions, history, playlists and direct access remain available. The watch action row omits the blocking overflow menu. | — for the web capability; requires the sibling blocking API deployment and renewed sign-in tokens. Native runtime/layout acceptance remains unverified. |
+| 40 | Channel blocking | Implemented | Shared account block list or independent device-local guest blocks; card and channel Block/Unblock actions; Browsing settings manager with channel navigation, errors and retry; immediate discovery/search/recommendation filtering and saved search inclusion override. Confirmed snapshots support offline filtering and isolate accounts/instances. Subscriptions, history, playlists and direct access remain available. The watch action row omits the blocking overflow menu. | — for the web capability; requires the sibling blocking API deployment and renewed sign-in tokens. Native runtime/layout acceptance remains unverified. |
 | 41 | Members-only content visibility controls | Implemented | Shared show-members preference, per-instance guest preference, device-local search override/reset, explicit member metadata and Members only labels. Filters discovery, search, channels, subscriptions, playlists and recommendations; preserves history and direct access. Original pages and continuation state keep hidden pages navigable. | — for visibility controls; requires additive member metadata and preference PATCH support on the server. Missing metadata remains visible. This does not grant membership access. Native runtime/layout acceptance remains unverified. |
 | 42 | Native appearance and layout preferences | Implemented | Shared light/dark/system color mode, compact video-list density and thumbnail-free thin mode; dedicated Appearance settings screen. | —; multiple web themes, random theme selection and alternative player skins are listed under [Intentionally excluded parity](#intentionally-excluded-parity). |
 | 43 | Interface localization | Not implemented | — | Translated app interface and language selector. Android's user-facing strings are hardcoded in English; caption/audio language selection is a separate capability. |
@@ -105,7 +109,7 @@ Evidence: [web download widget][w-download], [web download routing][w-watch-rout
 1. **Search sorting now uses the fork’s contract:** [Android API][a-api] sends `sort=relevance` or `sort=views`, matching [the search parser][w-search]. The native menu exposes these supported choices; the former `view_count` value maps to `views`, while unsupported legacy values fall back to relevance. Date and duration retain their correctly named parameters. Wire behavior is covered by API tests; live result-order testing is not claimed.
 2. **External playlists and mixes have native flows:** [Android API][a-api] calls public playlist endpoints and `/api/v1/mixes/:id` directly, retaining mix seeds/continuations without following redirects. Typed search, channel playlists and shared/pasted links reach these sources. The native bookmark API supports subscribe/unsubscribe, and ownership metadata gates editing/deletion and save/default destinations. Migration 20 and renewed native sign-in are required for account bookmarks/RSS; public playlist/mix playback works for guests. See rows 17, 24, 31 and 45.
 3. **Feed settings now have native controls:** [shared server feed rules][w-users] are applied by the authenticated feed endpoint. Android no longer overrides account page size with 30. Pending-notifications-only filters the returned notifications even when the web endpoint falls back to ordinary feed videos; latest-only and notifications-only lists do not expose redundant pagination. Other feeds still merge notifications and ordinary items.
-4. **Shared settings require the expanded PATCH API:** [the mobile PATCH endpoint][w-mobile] now validates supported native booleans, playback defaults, captions, appearance, browsing and feed values in addition to SponsorBlock. It merges changed fields under the account lock and preserves unknown preferences. The existing preference token scopes suffice; no migration or token renewal is added. Guests save native preferences per instance. Background playback and PiP remain device settings. Unsupported web capabilities have no native switches.
+4. **Shared settings require the expanded PATCH API:** [the mobile PATCH endpoint][w-mobile] now validates supported native booleans, playback defaults, captions, appearance, browsing and feed values in addition to SponsorBlock. It merges changed fields under the account lock and preserves unknown preferences. The existing preference token scopes suffice; no migration or token renewal is added. Guests save native preferences per instance. Background playback and PiP remain device settings, isolated by account or guest and instance. Unsupported web capabilities have no native switches.
 5. **Channel first pages omit empty continuation values:** [Android API][a-api] omits the parameter for empty/blank tokens and preserves opaque follow-up tokens for Videos, Streams and Playlists. Earlier recorded public-instance checks found a YouTube 400 error with `continuation=`; this audit does not rerun them. [Channel metadata][a-models] selects supported tabs in Videos/Streams/Playlists order, preserves the selection on Refresh/Retry when available, and falls back to Videos if no supported tab is advertised. A channel advertising Streams, Podcasts and Posts selects Streams. These public browsing endpoints require no native account extension.
 6. **The current trending baseline has two categories:** [web trending extraction][w-trending] supports Gaming and Livestreams, with Livestreams as the default. Android sends a region but no category parameter. Music/Movies should not be listed as current web parity gaps.
 7. **History timezone consumption is separate from editing:** [Android history parsing][a-history] uses server-provided calendar dates/timezone for grouping. [Web preferences][w-prefs] expose timezone selection and detection; [native settings][a-settings] do not. This gap is included in row 36 rather than claiming that history groups use the device timezone.
@@ -208,7 +212,7 @@ All 78 Android unit/API tests, debug/instrumentation APK builds, lint and dispos
 
 ### Members-only visibility and channel blocking — 4 October 2026
 
-Rows 40–41 now implement the web visibility capabilities. Blocking requires an account and shares the existing website block table. Android keeps public responses unpersonalized and filters the original loaded lists locally, retaining pagination and playlist occurrence indexes. Block changes and preference changes update lists/recommendations without stopping playback. Search visibility overrides are device-local and isolated by instance/account or guest; they do not overwrite global preferences. History and directly opened videos remain accessible.
+Rows 40–41 now implement the web visibility capabilities. Signed-in blocking shares the existing website block table; guest blocking is saved locally for that instance. Android keeps public responses unpersonalized and filters the original loaded lists locally, retaining pagination and playlist occurrence indexes. Block changes and preference changes update lists/recommendations without stopping playback. Search visibility overrides are device-local and isolated by instance/account or guest; they do not overwrite global preferences. History and directly opened videos remain accessible.
 
 The server adds boolean `isMember` to search/channel/feed/video/recommendation metadata, permits `show_member_videos` sparse preference patches, and exposes scoped block-list read/block/unblock endpoints. No new migration is introduced. Blocking needs the updated server and renewed native tokens; membership preferences need no new scope. Old-server/token errors explain the required update.
 
@@ -597,3 +601,27 @@ and clip import/export remain outside scope.
 
 [a-clips]: android/app/src/main/java/net/wingress/mobivious/data/Clips.kt
 [a-clips-ui]: android/app/src/main/java/net/wingress/mobivious/ui/ClipsUi.kt
+
+### Account-separated device saves — 8 October 2026
+
+All personal device saves use a normalized instance plus an opaque account profile
+or a separate guest profile. Background playback, picture in picture, chat layout,
+subscription-directory sorting, search visibility, blocked-channel snapshots, chat
+timing and resume positions remain separate across accounts and sign-out/restart.
+First-time accounts use native device defaults and load their existing website
+preferences normally; local speed is no longer written into a shared device scalar.
+
+Guests can manage channel SponsorBlock overrides and blocked channels locally,
+including inheritance/reset and unblock/undo, without authenticated requests.
+Existing local playback, appearance, browsing, captions, DeArrow, chat filters and
+resume settings remain supported. History, subscriptions, playlists, contribution
+identity and account notification state still require accounts.
+
+A checked versioned migration assigns unowned legacy saves to guests and retains
+previously separated records under their owners. Sign-out, expiry and instance
+changes preserve profiles; successful account deletion removes only that profile.
+The additive server `profileId` and preference response header let existing sessions
+resolve stable ownership without token renewal or a database migration. Older
+servers use username-based profiles; external renames and reused usernames cannot
+be distinguished reliably there. Deploy the server addition before the app for
+full identity guarantees. Validation is recorded in `VERIFICATION.md`.

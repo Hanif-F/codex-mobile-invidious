@@ -1,5 +1,7 @@
 package net.wingress.mobivious
 
+import net.wingress.mobivious.data.AccountPreferences
+
 import android.content.Intent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
@@ -30,7 +32,7 @@ class AppSmokeTest {
             activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences())
             activity.model.refreshSharedSettings(); activity.model.navigate("Home")
-            activity.model.store.defaultSpeed = 1f; activity.model.store.maxHeight = Int.MAX_VALUE; activity.model.store.pip = true
+            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.store.pip = true
         }
     }
     @After fun closeActivity() {

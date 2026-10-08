@@ -37,8 +37,8 @@ data class BlockedChannel(val id: String, val name: String) {
     fun json() = JSONObject().put("authorId", id).put("author", name)
     companion object {
         fun parse(array: JSONArray) = array.objects().mapNotNull {
-            val id = it.text("authorId")
-            if (ContentVisibility.validChannel(id)) BlockedChannel(id, it.text("author").ifBlank { id }) else null
+            val id = it.opt("authorId") as? String ?: return@mapNotNull null
+            if (ContentVisibility.validChannel(id)) BlockedChannel(id, (it.opt("author") as? String).orEmpty().take(200).ifBlank { id }) else null
         }.distinctBy { it.id }.sortedWith(compareBy({ it.name }, { it.id }))
     }
 }
@@ -71,7 +71,7 @@ class BlockedRepository(private val api: InvidiousApi, private val local: Visibi
     fun reset(context: ApiContext = api.context()) = synchronized(lock) {
         if (mutableState.value.context == context) return@synchronized
         epoch++; revision = 0; changes.clear(); refreshing = null
-        val cached = if (context.account != null) local.blockedSnapshot(context) else null
+        val cached = local.blockedSnapshot(context)
         mutableState.value = BlockedState(context, cached.orEmpty(), loaded = context.account == null || cached != null)
     }
 
@@ -103,8 +103,8 @@ class BlockedRepository(private val api: InvidiousApi, private val local: Visibi
     private fun valid(context: ApiContext, version: Long) = context == api.context() && version == epoch
     private fun publish(values: List<BlockedChannel>, loaded: Boolean = mutableState.value.loaded) {
         val sorted = values.sortedWith(compareBy({ it.name }, { it.id }))
-        mutableState.value = mutableState.value.copy(channels = sorted, loaded = loaded)
         if (loaded) local.saveBlockedSnapshot(mutableState.value.context!!, sorted)
+        mutableState.value = mutableState.value.copy(channels = sorted, loaded = loaded)
     }
 
     suspend fun setBlocked(context: ApiContext, id: String, name: String, blocked: Boolean) {
@@ -121,7 +121,7 @@ class BlockedRepository(private val api: InvidiousApi, private val local: Visibi
                     actionErrors = mutableState.value.actionErrors - id)
             }
             try {
-                api.blockChannel(id, name, blocked, context)
+                if (context.account != null) api.blockChannel(id, name, blocked, context)
                 synchronized(lock) {
                     if (!valid(context, version)) throw CancellationException("Account or instance changed")
                     val values = mutableState.value.channels.filter { it.id != id }

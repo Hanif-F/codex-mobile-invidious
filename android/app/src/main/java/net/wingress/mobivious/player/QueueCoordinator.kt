@@ -18,7 +18,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private val trackSelector: CodecAwareTrackSelector, private val scope: CoroutineScope, private val beforeChange: () -> Unit) {
     private val state get() = app.playbackQueue.value
     private var job: Job? = null
-    private var prefs = app.store.guestDeArrow()
+    private var prefs = app.store.initialPreferences()
     private var prefsContext: ApiContext? = null
     private var settingsVersion = 0L
     private var selection: Selection? = null
@@ -71,7 +71,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         beforeChange(); job?.cancel(); selection = null; decoderError = false; mixContinuations.clear()
         player.pause()
         val context = app.api.context()
-        if (prefsContext != context) { prefs = app.store.guestDeArrow(); prefsContext = context }
+        if (prefsContext != context) { prefs = app.store.initialPreferences(); prefsContext = context }
         requestedPlayWhenReady = !paused && (clip != null || (linkPlayback?.options?.autoplay ?: prefs.autoplay))
         val token = UUID.randomUUID().toString()
         val seed = id.takeIf { it.isNotEmpty() }?.let { QueueOccurrence.local(clip?.video ?: Video(it, it)).copy(sourceIndex = index, linkPlayback = linkPlayback, clip = clip) }
@@ -79,7 +79,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             sourceComplete = source == null, explicitQueue = source != null, carriedOptions = (linkPlayback?.options?.carried() ?: PlaybackLinkOptions()).let { if (audio) it.copy(listen = true) else it }))
         launch { _, _ ->
             val version = settingsVersion
-            val fetched = if (context.account == null) app.store.guestDeArrow() else try { app.api.preferences(context) }
+            val fetched = if (context.account == null) app.store.initialPreferences() else try { app.api.preferences(context) }
                 catch (e: CancellationException) { throw e } catch (_: Exception) { prefs }
             check(token, context)
             if (version == settingsVersion) prefs = fetched
@@ -162,7 +162,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         update(state.copy(currentKey = entry.key, details = null, loading = true, error = null))
         if (!fresh && !sameOccurrence) {
             val version = settingsVersion
-            val fetched = if (context.account == null) app.store.guestDeArrow() else try { app.api.preferences(context) }
+            val fetched = if (context.account == null) app.store.initialPreferences() else try { app.api.preferences(context) }
                 catch (e: CancellationException) { throw e } catch (_: Exception) { prefs }
             check(token, context)
             if (version == settingsVersion) prefs = fetched
@@ -193,7 +193,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             .setArtworkUri(Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
                 putString("occurrence", entry.key); putBoolean("clip", entry.clip != null); putBoolean("history", entry.clip == null && context.account != null && prefs.watchHistory); putBoolean("savePosition", entry.clip == null && prefs.savePosition)
                 putString("channelId", details.video.channelId); putBoolean("liveNow", details.video.live)
-                putString("sponsorblock", prefs.sponsorBlock.effective(details.video.channelId, context.account != null).json().toString())
+                putString("sponsorblock", prefs.sponsorBlock.effective(details.video.channelId).json().toString())
             }).build()
         val caption = PreferenceRules.caption(prefs.captions, details.captions)
         val item = MediaItem.Builder().setMediaId(entry.video.id).setUri(uri).setMediaMetadata(metadata)

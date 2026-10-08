@@ -59,17 +59,19 @@ class PlaybackVisibilitySmokeTest {
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui {
+            activity.model.closePlayer()
+            activity.model.store.save(null)
+            activity.model.switchServer("http://127.0.0.1:18080")
             originalBackground = activity.model.store.background; originalPip = activity.model.store.pip
             activity.model.store.background = true; activity.model.store.pip = true
-            activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.save(null)
             activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
         }
-        until { activity.model.browse.value.videos.isNotEmpty() }
+        until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() && activity.model.queue.value.token.isEmpty() }
     }
 
     @After fun close() {
         if (::activity.isInitialized) ui {
-            activity.model.closePlayer(); activity.model.store.background = originalBackground; activity.model.store.pip = originalPip
+            activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.background = originalBackground; activity.model.store.pip = originalPip
             activity.finishAndRemoveTask()
         }
     }
@@ -169,6 +171,7 @@ class PlaybackVisibilitySmokeTest {
         lateinit var view: PlayerView
         ui { view = playerViews().single(); controller.pause(); activity.model.seekTo(4_000); activity.model.speed(1.5f) }
         until { activity.model.playback.value.position == 4_000L && activity.model.playback.value.playerState == Player.STATE_READY }
+        if (compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
         val token = activity.model.queue.value.token
         val selection = activity.model.playback.value.selection!!
         val content = compose.onNodeWithTag("watch-content").getUnclippedBoundsInRoot()
@@ -320,7 +323,9 @@ class PlaybackVisibilitySmokeTest {
     }
 
     private fun foreground() {
+        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(500, 5_000)
         shell("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")
+        ui { activity.startActivity(Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
         until { !activity.isInPictureInPictureMode && activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) }
     }
 
@@ -413,9 +418,11 @@ class PlaybackVisibilitySmokeTest {
         ui { activity.model.insertQueue(Video("testvideo02", "Next video"), true) }
         until { activity.model.queue.value.items.size == 2 }
         compose.onNodeWithContentDescription("Back").performClick()
+        until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("mini-player").assertIsDisplayed()
         ui { activity.model.seekTo(119_700) }
         until { activity.model.playback.value.mediaId == "testvideo02" && activity.model.playback.value.playing }
-        compose.onNodeWithTag("mini-player").assertExists(); awake(true)
+        compose.onNodeWithTag("mini-player").assertIsDisplayed(); awake(true)
         ui { activity.model.seekTo(119_700) }
         until { activity.model.playback.value.playerState == Player.STATE_ENDED }
         awake(false)
@@ -473,6 +480,9 @@ class PlaybackVisibilitySmokeTest {
                     command("preferences", """{"dark_mode":"$mode"}""")
                     ui { activity.model.refreshSharedSettings() }
                     until { activity.model.preferences.value.darkMode == mode }
+                    compose.waitForIdle()
+                    if (compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
+                    until { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() }
                     ui {
                         val state = activity.model.playback.value
                         val details = requireNotNull(state.details)
@@ -503,7 +513,7 @@ class PlaybackVisibilitySmokeTest {
             shell(if (originalDensity != null) "wm density $originalDensity" else "wm density reset")
             shell(if (originalFont.toFloatOrNull() != null) "settings put system font_scale $originalFont" else "settings delete system font_scale")
             resumed()
-            ui { activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
+            ui { activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
         }
     }
 }

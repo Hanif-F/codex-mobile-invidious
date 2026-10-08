@@ -2532,3 +2532,80 @@ device suite or physical-device acceptance. No production server deployment,
 account writes or upstream clip acceptance was performed. Native clips require
 the matching server update and renewed sign-in; subscription ranking requires
 the enriched subscriptions API. Installing this APK does not deploy either.
+
+## Account-separated device saves — 8 October 2026
+
+Device saves now belong to a normalized instance and stable opaque account ID,
+with independent guests and an older-server username fallback. Device defaults
+are fresh for first-time accounts; website preferences load normally. Ordinary
+sign-out, expiry, revocation and server changes retain saves. Account deletion
+purges only that account's profile. Guest overrides and blocks use local storage;
+they do not issue authenticated preference, blocking or history requests.
+
+Migration version 2 preserves existing destinations, moves unowned settings to
+the previously selected instance's guest, and retains already separated owners.
+An authenticated saved session can transfer its username profile to a stable ID.
+Expired encrypted sessions still establish ownership of old progress. If a saved
+session cannot be decrypted, unscoped legacy progress stays untouched and private
+instead of becoming guest data. Migration and transfers check persistence before
+removing sources. Failed saves keep editable drafts and show an error; failed
+automatic progress clears retain their source and can retry.
+
+| Check | Result |
+|---|---|
+| Android JVM unit/API tests | 297 passed, 0 failures/errors/skips |
+| Android debug app and test APKs | Built successfully |
+| Android debug lint | Passed: 0 errors, 21 warnings |
+| Android 16 / emulator-5554 | 76 unique scenarios passed across the combined run and focused follow-ups |
+| New device-profile checks | 9 storage scenarios and 4 UI/playback scenarios |
+| Server account and browser-profile database/route harness | Passed against disposable PostgreSQL 14 |
+| Focused server search/subscription specs | 14 passed |
+| Normal server and account harness builds | Passed |
+| Whitespace checks in both repositories | Passed |
+
+Coverage includes guest → account A → guest → account B → account A, encrypted
+session/store restart, instance changes, token replacement, stable and fallback
+renames, reused usernames, account deletion, expiry, delayed identity responses
+and rejected stale local writes. Guest checks cover SponsorBlock merging,
+inheritance/reset, persistence and application during Media3 playback, plus
+blocking, filtering, unblock and Undo without authenticated requests. Related
+settings, chat, search visibility, subscription sorting, account navigation,
+resume/history indicators and playback/PiP checks were also exercised.
+
+The broad run and subsequent targeted reruns exposed stale test fixtures that
+still removed legacy global keys, wrote under inactive contexts or relied on
+sign-out deleting saves. Those fixtures now reset their actual owner explicitly.
+Playback checks wait for foreground/window and miniplayer transitions before
+measuring shapes or advancing the queue. The final broad run passed 74 of 75;
+the miniplayer transition assertion then passed its corrected focused rerun.
+Thirteen profile scenarios, including the added corrupted-session guard, passed
+their focused rerun. Failed diagnostic attempts are retained separately and are
+not counted as passing evidence. All 76 unique scenarios have passing results.
+
+Local evidence is in `.tools/device-profiles-final-broad-device-results.xml`,
+`.tools/device-profiles-final-focused-device-results.xml`,
+`.tools/device-profiles-final-miniplayer-device-results.xml`, the Android build's
+unit XML reports and `android/app/build/reports/lint-results-debug.html`.
+The combined per-scenario result index is
+`.tools/device-profiles-final-passing-results.json`.
+The debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`. The runner
+uses the already running emulator and a disposable localhost fixture; it cleans
+up its server and port forwarding. The temporary PostgreSQL container was removed.
+
+To reproduce the combined device checks with the running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
+  ANDROID_HOME="$HOME/Android/Sdk" scripts/test-android.sh --offline --max-workers=2 \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DeviceProfileStorageTest,net.wingress.mobivious.DeviceProfilesSmokeTest,net.wingress.mobivious.SettingsSmokeTest,net.wingress.mobivious.VisibilitySmokeTest,net.wingress.mobivious.SponsorBlockSmokeTest,net.wingress.mobivious.LiveChatSmokeTest,net.wingress.mobivious.AccountNavigationSmokeTest,net.wingress.mobivious.SubscriptionSortingSmokeTest,net.wingress.mobivious.WatchedIndicatorsSmokeTest,net.wingress.mobivious.PlaybackVisibilitySmokeTest
+```
+
+The sibling server adds `profileId` to login, registration and credential-change
+responses and `X-Invidious-Account-Profile` to authenticated preference reads.
+Its account harness verifies metadata discovery with current permissions,
+unchanged browser identity/cookies, credential stability and separation after
+username reuse. This requires no database migration or new token scopes. Deploy
+that additive change before the app release for full identity guarantees.
+Older servers retain username compatibility, with external rename and reused-name
+limitations. Stability also assumes the instance retains its signing key.
+Production deployment, publication and physical-device acceptance were not performed.

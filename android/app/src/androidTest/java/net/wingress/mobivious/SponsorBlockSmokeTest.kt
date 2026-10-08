@@ -37,7 +37,7 @@ class SponsorBlockSmokeTest {
         compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Home")
-            activity.model.store.defaultSpeed = 1f; activity.model.store.background = true
+            activity.model.store.background = true
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -66,13 +66,14 @@ class SponsorBlockSmokeTest {
         command("sponsorblock", """{"sponsorSegments":[{"id":"a","category":"sponsor","start":10,"end":20}]}""")
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
         compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText("SponsorBlock").performClick()
-        compose.onNodeWithText("Enable SponsorBlock").onParent().onChildAt(1).performClick()
+        compose.onNode(isToggleable() and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
         val color = compose.onNode(hasSetTextAction() and hasText("Sponsor color (#RRGGBB)"))
         color.performScrollTo().performTextReplacement("bad")
         compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).assertIsNotEnabled()
         color.performTextReplacement("#123456")
         screenshot("guest-colors")
         saveSheet()
+        assertTrue(activity.model.store.guestDeArrow().sponsorBlock.enabled)
         // Fullscreen SponsorBlock returns to the Settings screen.
         compose.onNodeWithContentDescription("Back from Settings").performClick()
         compose.onNodeWithTag("navigation-Home").performClick()
@@ -123,7 +124,7 @@ class SponsorBlockSmokeTest {
         compose.onNodeWithTag("navigation-Home").performClick()
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
         compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
-        compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("watch-details-list"))).performScrollTo().performClick()
+        compose.onAllNodes(hasText("Mobivious Studio") and hasClickAction() and hasAnyAncestor(hasTestTag("watch-details-list"))).onFirst().performScrollTo().performClick()
         until { activity.model.channel.value?.id == id }
         compose.onNodeWithTag("channel-actions-$id").performScrollTo().performClick()
         compose.onNodeWithText("Channel SponsorBlock settings").performClick()
@@ -156,13 +157,17 @@ class SponsorBlockSmokeTest {
             activity.model.store.pip = false; activity.moveTaskToBack(true)
         }
         until { activity.model.playback.value.position >= 20_000 }
+        until { !activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) }
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        automation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top").let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { stream -> stream.readBytes() } }
+        automation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task").let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { stream -> stream.readBytes() } }
+        compose.runOnUiThread { activity.startActivity(Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
         until { activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(11_000); activity.model.store.pip = true; activity.enterPip() }
         until { activity.isInPictureInPictureMode }
         compose.runOnUiThread { assertNotNull(activity.model.sponsorBlock.value.active) }
-        automation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top").let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { stream -> stream.readBytes() } }
+        automation.waitForIdle(500, 5_000)
+        automation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task").let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { stream -> stream.readBytes() } }
+        compose.runOnUiThread { activity.startActivity(Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
         until { !activity.isInPictureInPictureMode }
         compose.runOnUiThread { activity.model.closePlayer(); activity.model.play("testvideo01", 0) }
         until(40_000) { activity.model.sponsorBlock.value.token.isNotEmpty() && activity.model.sponsorBlock.value.token != old.token }

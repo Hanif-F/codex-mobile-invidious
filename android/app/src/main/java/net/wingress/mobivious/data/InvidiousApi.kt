@@ -21,7 +21,8 @@ class ApiException(val status: Int, message: String, val retryAfter: String? = n
 class InvidiousApi(private val server: () -> String, private val account: () -> Account?,
     private val expired: () -> Unit = {}, private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build(),
-    private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}, private val generation: () -> Long = { 0 }) {
+    private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}, private val generation: () -> Long = { 0 },
+    private val onProfile: (ApiContext, String) -> Unit = { _, _ -> }) {
     private val contributionClient = client.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
     fun context() = ApiContext(server(), account(), generation())
     companion object {
@@ -87,6 +88,10 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     else -> "Request failed (${response.code})."
                 }, response.header("Retry-After"))
             }
+            if (auth && path == "api/v1/auth/preferences" && method == "GET") {
+                DeviceProfile.validId(response.header("X-Invidious-Account-Profile"))?.let { onProfile(target, it) }
+                if (target != this@InvidiousApi.context()) throw CancellationException("Account profile resolved")
+            }
             if (cacheKey != null) {
                 val valid = runCatching { if (path == "api/v1/auth/feed") JSONObject(body) else JSONArray(body) }.isSuccess
                 if (!valid) throw ApiException(502, "The instance returned an invalid feed. Try again.")
@@ -105,7 +110,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     private fun accountResponse(body: String, context: ApiContext): Account {
         if (context != this.context()) throw CancellationException("Account or instance changed")
         val json = JSONObject(body)
-        return Account(json.getString("accessToken"), json.getString("username"), json.getLong("expiresAt"), context.server)
+        return Account(json.getString("accessToken"), json.getString("username"), json.getLong("expiresAt"), context.server, DeviceProfile.validId(json.opt("profileId") as? String))
     }
     suspend fun login(username: String, password: String, context: ApiContext = context()): Account = accountResponse(
         request("api/v1/mobile/login", "POST", JSONObject().put("username", username).put("password", password), context = context), context)

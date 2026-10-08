@@ -194,10 +194,12 @@ class VisibilitySmokeTest {
     @Test fun savedSearchOverridesAndSnapshotsAreOwnedByEachAccountAndInstance() {
         val store = activity.model.store
         val guest = activity.model.api.context()
-        val alice = guest.copy(account = Account("fixture-token", "Alice", Long.MAX_VALUE, guest.server))
+        store.saveSearchVisibility(guest, SearchVisibility(false))
+        compose.runOnUiThread { store.save(Account("fixture-token", "Alice", Long.MAX_VALUE, guest.server)) }
+        until { activity.model.blocked.value.loaded && !activity.model.blocked.value.loading }
+        val alice = activity.model.api.context()
         val bob = alice.copy(account = alice.account!!.copy(username = "Bob"))
         val another = alice.copy(server = "https://another.instance")
-        store.saveSearchVisibility(guest, SearchVisibility(false))
         store.saveSearchVisibility(alice, SearchVisibility(true, true))
         store.saveBlockedSnapshot(alice, listOf(BlockedChannel(first, "Mobivious Studio")))
         assertEquals(SearchVisibility(false), store.searchVisibility(guest))

@@ -46,8 +46,6 @@ class SubscriptionSortingSmokeTest {
     }
     @Before fun launch() {
         command(path = "reset")
-        val ctx = InstrumentationRegistry.getInstrumentation().targetContext
-        ctx.getSharedPreferences("mobivious", 0).edit().remove("subscriptions.sort.$address").apply()
         command(JSONObject().put("subscriptionChannels", JSONArray(listOf(
             JSONObject().put("authorId", alpha).put("author", "Alpha Studio"),
             JSONObject().put("authorId", beta).put("author", "Beta Studio"),
@@ -61,14 +59,13 @@ class SubscriptionSortingSmokeTest {
             activity.model.action { activity.model.login("SortingViewer", "fixture-password") }
         }
         until { activity.model.account.value != null && activity.model.subscriptionChannels.value.loaded && activity.model.dearrowIdentity.value != null }
+        compose.runOnUiThread { activity.model.sortSubscriptionChannels(SubscriptionSort.RELEVANCE) }
         directory()
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null); activity.finishAndRemoveTask()
         }
-        InstrumentationRegistry.getInstrumentation().targetContext.getSharedPreferences("mobivious", 0)
-            .edit().remove("subscriptions.sort.$address").apply()
     }
     private fun directory() {
         compose.runOnUiThread { activity.model.navigate("Subscriptions", "subscription-channels") }

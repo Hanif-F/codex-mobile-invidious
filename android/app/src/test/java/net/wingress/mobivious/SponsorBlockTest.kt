@@ -47,11 +47,11 @@ class SponsorBlockTest {
     }
     @Test fun inheritancePreservesFalseAndGlobalColors() {
         val global = SponsorBlockSettings(enabled = true, channels = mapOf(channelId to SponsorBlockChannel("Channel", false, mapOf(intro to SponsorBlockMode.AUTO))))
-        val effective = global.effective(channelId, true)
+        val effective = global.effective(channelId)
         assertFalse(effective.enabled); assertEquals(SponsorBlockMode.AUTO, effective.modes[intro]); assertEquals(SponsorBlockMode.MANUAL, effective.modes[sponsor])
-        assertEquals(global.colors, effective.colors); assertTrue(global.effective(channelId, false).enabled)
+        assertEquals(global.colors, effective.colors); assertFalse(global.effective(channelId).enabled)
         val inherited = global.copy(channels = mapOf(channelId to SponsorBlockChannel("Channel", null, mapOf(intro to SponsorBlockMode.MARKER))))
-        assertTrue(inherited.effective(channelId, true).enabled)
+        assertTrue(inherited.effective(channelId).enabled)
         assertEquals(global, SponsorBlockSettings.parse(global.json()))
     }
     @Test fun sparseCategoryAndChannelPatch() {

@@ -40,12 +40,17 @@ class AccountNavigationSmokeTest {
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
-            vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
+            vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
             vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Home")
         }
-        until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+        until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() && vm.queue.value.token.isEmpty() && activity.window.decorView.hasWindowFocus() }
     }
     @After fun close() { if (::activity.isInitialized) compose.runOnUiThread { vm.closePlayer(); vm.store.save(null); activity.finishAndRemoveTask() } }
+    private fun restoreWatch() {
+        compose.waitForIdle()
+        if (compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
+        until { compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isNotEmpty() }
+    }
 
     private fun signInWithDelayedPreferences() {
         command("preferences", """{"default_home":"Subscriptions","delayNextMillis":1200}""")
@@ -156,6 +161,7 @@ class AccountNavigationSmokeTest {
         for ((id, expected) in listOf("portrait001" to 9f / 16f, "square00001" to 1f, "landscape01" to 16f / 9f, "ultrawide01" to 8f / 3f)) {
             compose.runOnUiThread { vm.openLink(VideoLink(id)); activity.sharedVideo.value = true }
             until { vm.playback.value.mediaId == id && vm.playback.value.geometry.ratio != null && vm.playback.value.playing }
+            restoreWatch()
             assertEquals(expected, vm.playback.value.geometry.ratio!!, .01f)
             val player = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
             val content = compose.onNodeWithTag("watch-content").getUnclippedBoundsInRoot()
@@ -179,13 +185,20 @@ class AccountNavigationSmokeTest {
             compose.runOnUiThread { activity.updatePip(true) }
             if (activity.supportsPip()) {
                 compose.runOnUiThread { activity.enterPip() }
-                until { activity.isInPictureInPictureMode && activity.window.decorView.width > 0 && activity.window.decorView.height > 0 }
+                until {
+                    val surface = activity.window.decorView
+                    activity.isInPictureInPictureMode && surface.height > 0 &&
+                        kotlin.math.abs(surface.width.toFloat() / surface.height - expected.coerceIn(1f / 2.39f, 2.39f)) < .15f
+                }
                 compose.runOnUiThread {
                     val surface = activity.window.decorView
                     assertEquals(expected.coerceIn(1f / 2.39f, 2.39f), surface.width.toFloat() / surface.height, .15f)
                 }
-                val descriptor = InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")
+                val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+                automation.waitForIdle(500, 5_000)
+                val descriptor = automation.executeShellCommand("am start --windowingMode 1 -n ${activity.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")
                 FileInputStream(descriptor.fileDescriptor).use { it.readBytes() }; descriptor.close()
+                compose.runOnUiThread { activity.startActivity(Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
                 until { !activity.isInPictureInPictureMode }
             }
         }
