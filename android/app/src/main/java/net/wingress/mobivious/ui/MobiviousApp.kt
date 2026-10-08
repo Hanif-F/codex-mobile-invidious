@@ -443,7 +443,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 playlist = { list -> browsePlayer(); vm.openPlaylist(list) }, signIn = { signIn() })
                         }
                         items(state.clips, key = { "clip:${it.id}" }) { clip ->
-                            ClipCard(vm, clip, { vm.watchClip(clip); restorePlayer() }, { id -> navigate(tab, "channel:$id") })
+                            ClipCard(vm, clip, { vm.watchClip(clip); restorePlayer() })
                         }
                         items(state.channels, key = { "channel:${it.id}" }) { related ->
                             RelatedChannelCard(related, vm.store.server, prefs.thinMode) { navigate(tab, "channel:${related.id}") }
@@ -488,7 +488,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         bottom = (padding.calculateBottomPadding() - miniPadding).coerceAtLeast(0.dp))
                     WatchScreen(vm, playback, Modifier.padding(watchPadding).graphicsLayer { alpha = presentation.watchAlpha }
                         .hiddenPlayerContent(!watch || presentation.active),
-                        presentation, watchList, watchResize, chapterPanel, ::openChapters, watchDescription, { watchDescription = it }, vm::openSave,
+                        presentation, watchList, watchResize, chapterPanel, ::openChapters, watchDescription, { watchDescription = it }, ::closePlayer, vm::openSave,
                         { id -> navigate("Home", "channel:$id") }, { play(it) }, { signIn() }, openChatSettings)
                 }
                 }
@@ -506,7 +506,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             when(dialog) {
                 "filters" -> FiltersDialog(vm, { dialog = "" })
                 "visibilityFilters" -> FiltersDialog(vm, { dialog = "" }, visibilityOnly = true)
-                "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip(), { dialog = ""; vm.openSponsorBlock() })
+                "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip())
                 "create", "edit" -> PlaylistDialog(if(dialog == "edit") playlist else null, { dialog = "" }) { title, privacy, description -> val editing = if (dialog == "edit") playlist else null; vm.action { if (editing != null) vm.api.editPlaylist(editing.id, title, privacy, description) else vm.api.createPlaylist(title, privacy); vm.refreshAccount(); vm.refresh() }; dialog = "" }
                 "deletePlaylist", "clearHistory" -> AlertDialog(onDismissRequest = { dialog = "" }, title = { Text(if (dialog == "clearHistory") "Clear watch history?" else "Delete playlist?") }, text = { Text("This also changes your account on the website.") }, confirmButton = { TextButton(onClick = { val clear = dialog == "clearHistory"; val id = playlist?.id; if (clear) vm.clearHistory() else vm.action { if (id != null) vm.api.deletePlaylist(id); vm.refreshAccount(); navigate("Library") }; dialog = "" }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Cancel") } })
             }
@@ -653,7 +653,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, modifier: Modifier,
     presentation: PlayerPresentationState, detailsList: androidx.compose.foundation.lazy.LazyListState,
     resize: WatchPlayerResizeState, chapterPanel: ChapterPanelState, openChapters: () -> Unit,
-    description: Boolean, describe: (Boolean) -> Unit,
+    description: Boolean, describe: (Boolean) -> Unit, closePlayer: () -> Unit,
     add: (Video) -> Unit, channel: (String) -> Unit, play: (Video) -> Unit, signIn: () -> Unit, chatSettings: () -> Unit) {
     val chat by vm.chatReplay.collectAsStateWithLifecycle()
     val chatAppearance by vm.chatAppearance.collectAsStateWithLifecycle()
@@ -696,7 +696,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             else if (chatDocked) ChatReplayPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), chatSettings)
             else if (commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
             else if (playback.clip != null) LazyColumn(Modifier.weight(1f).testTag("clip-details-list"), state = detailsList) {
-                item { ClipDetails(vm, playback.clip, { presentation.present(PlayerPresentation.MINI) }, channel) }
+                item { ClipDetails(vm, playback.clip, closePlayer, channel) }
             }
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->

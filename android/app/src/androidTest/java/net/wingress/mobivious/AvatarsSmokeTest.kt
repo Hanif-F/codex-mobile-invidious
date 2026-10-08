@@ -127,7 +127,8 @@ class AvatarsSmokeTest {
         compose.onNodeWithTag("library-playlist-list").performScrollToNode(hasTestTag("playlist-card-PLlive"))
         compose.onNodeWithTag("playlist-avatar-PLlive", true).assertExists()
         screenshot("playlist-card")
-        compose.onNodeWithTag("playlist-card-PLlive").performClick()
+        // Invoke the card action directly; its center can fall on the nested channel link.
+        compose.onNodeWithTag("playlist-card-PLlive").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
         until { !activity.model.browse.value.loading && activity.model.playlist.value?.author == "Source owner" }
         compose.onNodeWithTag("playlist-avatar-PLlive", true).assertExists()
         compose.onNodeWithText("Source owner").assertHasClickAction()

@@ -29,6 +29,9 @@ internal fun rememberPlayerTouchExploration(): Boolean {
 
 /** Distances and velocity are expressed in dp and dp/second, independently of display density. */
 internal object PlayerGestureRules {
+    fun acceptsStart(mode: PlayerPresentation, y: Float, fullscreenTopEdge: Float): Boolean =
+        mode != PlayerPresentation.FULLSCREEN || y >= fullscreenTopEdge
+
     fun axis(mode: PlayerPresentation, displacement: Offset): PlayerDragAxis? = when {
         abs(displacement.y) >= abs(displacement.x) -> when {
             mode == PlayerPresentation.MINI && displacement.y < 0 -> PlayerDragAxis.VERTICAL
@@ -46,6 +49,7 @@ internal object PlayerGestureRules {
     }
 
     fun completes(mode: PlayerPresentation, axis: PlayerDragAxis, distance: Float, velocity: Float, width: Float): Boolean {
+        if (mode == PlayerPresentation.FULLSCREEN) return axis == PlayerDragAxis.VERTICAL && distance >= 120f
         val direction = if (axis == PlayerDragAxis.HORIZONTAL) if (distance < 0) -1 else 1
             else if (mode == PlayerPresentation.MINI) -1 else 1
         val directedDistance = distance * direction
@@ -67,9 +71,12 @@ internal suspend fun AwaitPointerEventScope.playerGesture(
     mode: PlayerPresentation,
     drag: PlayerDragHandler?,
     position: (Offset) -> Offset = { it },
+    fullscreenTopEdge: Float = 0f,
     claim: () -> Unit = {},
 ): PointerInputChange? {
     val start = position(down.position)
+    // Leave the entire top-edge gesture unconsumed so Android can reveal its bars.
+    if (!PlayerGestureRules.acceptsStart(mode, start.y, fullscreenTopEdge)) return null
     val velocity = VelocityTracker().apply { addPosition(down.uptimeMillis, start) }
     var axis: PlayerDragAxis? = null
     var finished = false

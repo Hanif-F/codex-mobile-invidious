@@ -35,6 +35,14 @@ class ClipsTest {
             try { Clip.parse(j, id, server); fail("Invalid clip accepted") } catch (_: IllegalArgumentException) { }
         }
     }
+    @Test fun sourceAvatarSurvivesClipPlaybackHandoffAndRestoration() {
+        val metadata = metadata().apply { getJSONObject("video").put("authorThumbnails",
+            JSONArray().put(JSONObject().put("url", "/ggpht/channel=s88"))) }
+        val clip = Clip.parse(metadata, id, server)
+        assertEquals("/ggpht/channel=s88", clip.video.authorAvatar)
+        assertEquals(clip, Clip.parse(clip.json(), id, server))
+        assertEquals("/ggpht/channel=s88", clip.json().getJSONObject("video").getString("authorThumbnail"))
+    }
     @Test fun unicodeTitlesAndLimitsMatchTheServer() {
         assertEquals(140, ClipRules.titleCount("😀".repeat(140)))
         assertNull(ClipRules.error("😀".repeat(140), 0, 5000, 5000))

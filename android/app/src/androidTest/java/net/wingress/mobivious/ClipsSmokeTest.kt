@@ -7,6 +7,7 @@ import androidx.media3.session.SessionResult
 import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.TimeUnit
 import androidx.compose.ui.test.*
+import androidx.compose.ui.geometry.Offset
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -15,6 +16,8 @@ import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackService
 import net.wingress.mobivious.ui.chapters
+import net.wingress.mobivious.ui.AvatarImageLoader
+import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -83,6 +86,109 @@ class ClipsSmokeTest {
     @After fun close() {
         if (::activity.isInitialized) ui { vm.closeClipEditor(); vm.closePlayer(); vm.store.save(null); activity.finishAndRemoveTask() }
     }
+    @Test fun everyClipRowTapOpensTheClipWhileOverflowKeepsItsActions() {
+        ui { vm.navigate("Library", "clips") }; until { !vm.browse.value.loading && vm.browse.value.clips.isNotEmpty() }
+        val clip = vm.browse.value.clips.first()
+        compose.onNodeWithTag("clip-actions-${clip.id}").performClick()
+        compose.onNodeWithText("Share clip").assertExists(); compose.onNodeWithText("Delete clip").assertExists()
+        compose.onNodeWithText("Copy link").performClick()
+        assertTrue(vm.queue.value.token.isEmpty())
+        for (target in listOf("channel", "title", "metadata", "thumbnail", "padding")) {
+            val card = hasTestTag("clip-card-${clip.id}")
+            when (target) {
+                "channel" -> compose.onNode(hasText("from ${clip.video.author}") and hasAnyAncestor(card), true).performTouchInput { click() }
+                "title" -> compose.onNode(hasText(clip.title) and hasAnyAncestor(card), true).performTouchInput { click() }
+                "metadata" -> compose.onNode(hasText(clip.creator, substring = true) and hasAnyAncestor(card), true).performTouchInput { click() }
+                "thumbnail" -> compose.onNode(card).performTouchInput { click(Offset(70f * activity.resources.displayMetrics.density, height * .5f)) }
+                else -> compose.onNode(card).performTouchInput { click(Offset(2f, height * .5f)) }
+            }
+            ready(clip.id)
+            assertEquals("clips", vm.route)
+            compose.onNodeWithContentDescription("Close clip").performClick()
+            until { vm.queue.value.token.isEmpty() && vm.playback.value.details == null }
+            compose.onNodeWithTag("mini-player").assertDoesNotExist()
+        }
+    }
+
+    @Test fun clipCloseStopsPlaybackWhileBackAndSwipeOnlyMinimize() {
+        incoming("/clip/$id"); ready(id)
+        ui { vm.controller.value!!.pause(); vm.seekTo(5000); vm.speed(1.5f) }
+        until { vm.playback.value.position in 4998L..5002L }
+        val token = vm.queue.value.token
+        val key = vm.queue.value.currentKey
+        compose.onNodeWithContentDescription("Back").performClick()
+        until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("mini-player-preview").performClick()
+        val density = activity.resources.displayMetrics.density
+        compose.onNodeWithTag("player-gestures").performTouchInput {
+            val start = Offset(width * .5f, height * .2f)
+            swipe(start, start + Offset(0f, 96f * density), durationMillis = 600)
+        }
+        until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+        ui {
+            assertEquals(token, vm.queue.value.token); assertEquals(key, vm.queue.value.currentKey)
+            assertEquals(id, vm.queue.value.current!!.clip!!.id)
+            assertEquals(30444L, vm.controller.value!!.duration); assertEquals(1.5f, vm.controller.value!!.playbackParameters.speed)
+            assertTrue(vm.controller.value!!.currentPosition in 4998L..5002L); assertFalse(vm.controller.value!!.playWhenReady)
+        }
+        compose.onNodeWithTag("mini-player-preview").performClick()
+        compose.onNodeWithContentDescription("Close clip").performClick()
+        until { vm.queue.value.token.isEmpty() && vm.playback.value.details == null && !vm.playback.value.playing }
+        compose.onNodeWithTag("mini-player").assertDoesNotExist(); compose.onNodeWithTag("player-surface").assertDoesNotExist()
+    }
+
+    @Test fun playerSettingsEndWithRefreshAndKeepClipPlaybackChoices() {
+        incoming("/clip/$id"); ready(id)
+        ui { vm.controller.value!!.pause(); vm.seekTo(5000); vm.speed(1.5f) }
+        until { vm.playback.value.position in 4998L..5002L }
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("SponsorBlock").assertDoesNotExist()
+        val labels = listOf("Quality", "Audio", "Captions", "Playback speed", "Audio only", "Picture in picture", "Refresh buffer")
+        val positions = labels.map { label -> compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("player-settings-list"))).fetchSemanticsNode().boundsInRoot.top }
+        assertTrue("Player settings should follow the agreed order", positions.zipWithNext().all { (first, second) -> first < second })
+        screenshot("player-settings-ordered")
+        compose.onNodeWithText("Refresh buffer").performClick(); ready(id)
+        ui {
+            assertEquals(30444L, vm.controller.value!!.duration); assertEquals(1.5f, vm.controller.value!!.playbackParameters.speed)
+            assertTrue(vm.controller.value!!.currentPosition in 4998L..5002L); assertFalse(vm.controller.value!!.playWhenReady)
+        }
+    }
+
+    @OptIn(coil.annotation.ExperimentalCoilApi::class)
+    @Test fun clipChannelUsesDiskCachedAvatarAndKeepsThinModeAndFailureFallback() {
+        ui { vm.preferences.value = vm.preferences.value.copy(thinMode = true) }; compose.waitForIdle()
+        val loader = AvatarImageLoader.get(activity)
+        loader.memoryCache?.clear(); loader.diskCache?.clear()
+        val avatar = "$base/ggpht/studio=s176"
+        runBlocking { assertTrue(loader.execute(coil.request.ImageRequest.Builder(activity).data(avatar).size(176).build()) is coil.request.SuccessResult) }
+        loader.memoryCache?.clear()
+        command("avatars", """{"fail":true}""")
+        runBlocking {
+            val result = loader.execute(coil.request.ImageRequest.Builder(activity).data(avatar).size(96).build())
+            assertTrue(result is coil.request.SuccessResult)
+            assertEquals(coil.decode.DataSource.DISK, (result as coil.request.SuccessResult).dataSource)
+        }
+        loader.memoryCache?.clear()
+        val metadataReads = fixture().getJSONArray("channelRequests").length()
+        incoming("/clip/$id"); ready(id)
+        ui { vm.preferences.value = vm.preferences.value.copy(thinMode = false) }
+        compose.onNodeWithTag("clip-channel").performScrollTo()
+        compose.onNodeWithTag("clip-channel-avatar", true).assertExists()
+        screenshot("channel-cached-avatar")
+        assertEquals(0, fixture().getJSONArray("avatarRequests").length())
+        assertEquals(metadataReads, fixture().getJSONArray("channelRequests").length())
+        ui { vm.preferences.value = vm.preferences.value.copy(thinMode = true) }; compose.waitForIdle()
+        compose.onNodeWithTag("clip-channel-avatar", true).assertDoesNotExist()
+        loader.memoryCache?.clear(); loader.diskCache?.clear()
+        ui { vm.preferences.value = vm.preferences.value.copy(thinMode = false) }
+        until { fixture().getJSONArray("avatarRequests").length() > 0 }
+        compose.onNodeWithTag("clip-channel-avatar", true).assertExists()
+        compose.onNodeWithTag("clip-channel").assert(hasText("Mobivious Studio"))
+        screenshot("channel-failed-avatar")
+        compose.onNodeWithTag("clip-channel").performClick()
+        until { vm.channel.value?.id == owner && !vm.browse.value.loading }
+    }
+
     @Test fun libraryAndChannelListsPaginateRestoreAndShowBothThemes() {
         ui { vm.navigate("Library") }; until { !vm.browse.value.loading }
         compose.onNodeWithTag("library-clips").performScrollTo().performClick()

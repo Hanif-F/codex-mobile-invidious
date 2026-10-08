@@ -68,7 +68,7 @@ internal fun playerTime(ms: Long): String {
 internal fun speedLabel(speed: Float) = "${speed.toString().removeSuffix(".0")}×"
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun VideoPlayer(
     vm: AppViewModel, playback: PlaybackState, controller: MediaController?, modifier: Modifier,
@@ -94,6 +94,9 @@ internal fun VideoPlayer(
     var feedbackGeneration by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
     var inputOrigin by remember { mutableStateOf(Offset.Zero) }
+    val density = LocalDensity.current
+    val fullscreenTopEdge by rememberUpdatedState(maxOf(with(density) { 32.dp.toPx() },
+        WindowInsets.statusBarsIgnoringVisibility.getTop(density).toFloat(), WindowInsets.displayCutout.getTop(density).toFloat()))
     val exploring = rememberPlayerTouchExploration()
     fun interact() { interaction++; visible = true }
     fun toggleControls() { vm.cancelAccumulatedSeek(); visible = !visible; interaction++ }
@@ -144,7 +147,7 @@ internal fun VideoPlayer(
                 awaitEachGesture {
                     val down = awaitFirstDown()
                     val up = playerGesture(down, presentation, if (exploring) null else currentDrag,
-                        position = { it + inputOrigin }) {
+                        position = { it + inputOrigin }, fullscreenTopEdge = fullscreenTopEdge) {
                         single?.cancel(); firstTime = Long.MIN_VALUE; vm.cancelAccumulatedSeek()
                     } ?: return@awaitEachGesture
                     if (presentation == PlayerPresentation.MINI) { onRestore?.invoke(); return@awaitEachGesture }
@@ -358,7 +361,7 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean, sponsorBlock: () -> Unit) {
+internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
     val formats = playback.details?.formats.orEmpty()
     val video = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_VIDEO, formats)
@@ -386,8 +389,6 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
             HorizontalDivider()
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).testTag("player-settings-list"), contentPadding = PaddingValues(bottom = 16.dp)) {
                 if (page == "Player settings") {
-                    item { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
-                    item { SettingRow("SponsorBlock") { sponsorBlock() } }
                     item { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
                     item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
                     item { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
@@ -399,6 +400,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                         }
                     }
                     item { SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device", supportsPip && playback.details != null && playback.error == null && !playback.loading) { dismiss(); pip() } }
+                    item { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
                 } else when (page) {
                     "Quality" -> {
                         item { SettingChoice("Auto", qualityAuto, available && !audioOnly) { vm.autoQuality(); page = "Player settings" } }

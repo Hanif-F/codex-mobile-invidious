@@ -82,21 +82,35 @@ internal class PlayerPresentationState(initial: PlayerPresentation, private val 
             this@PlayerPresentationState.axis = axis
             travel = (if (axis == PlayerDragAxis.VERTICAL) verticalTravel else rowWidth).coerceAtLeast(1f)
             width = rowWidth / density
-            target = PlayerGestureRules.target(mode, axis)
+            // Fullscreen stays fixed until a completed swipe is released.
+            target = if (fullscreen) null else PlayerGestureRules.target(mode, axis)
             dragFraction = 0f; dragging = true
         }
         override fun move(displacement: Offset) {
+            if (!dragging) return
             distance = if (axis == PlayerDragAxis.VERTICAL) displacement.y / density else displacement.x / density
+            if (fullscreen) return
             dismissDirection = if (distance < 0) -1f else 1f
             val directed = if (axis == PlayerDragAxis.HORIZONTAL) abs(distance) else distance * if (mode == PlayerPresentation.MINI) -1 else 1
             dragFraction = (directed * density / travel).coerceIn(0f, 1f)
         }
         override fun end(velocity: Offset) {
+            if (!dragging) return
             val speed = (if (axis == PlayerDragAxis.VERTICAL) velocity.y else velocity.x) / density
+            val complete = PlayerGestureRules.completes(mode, axis, distance, speed, width)
             dragging = false
-            settle(PlayerGestureRules.completes(mode, axis, distance, speed, width), closed)
+            if (fullscreen) {
+                if (!complete) { cancelMotion(); return }
+                target = PlayerPresentation.WATCH
+            }
+            settle(complete, closed)
         }
-        override fun cancel() { if (dragging) { dragging = false; settle(false, closed) } }
+        override fun cancel() {
+            if (dragging) {
+                if (fullscreen) cancelMotion()
+                else { dragging = false; settle(false, closed) }
+            }
+        }
     }
 
     private fun settle(complete: Boolean, closed: () -> Unit) {

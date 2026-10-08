@@ -2609,3 +2609,41 @@ that additive change before the app release for full identity guarantees.
 Older servers retain username compatibility, with external rename and reused-name
 limitations. Stability also assumes the instance retains its signing key.
 Production deployment, publication and physical-device acceptance were not performed.
+
+## Fullscreen gestures, player settings and clip interactions — 8 October 2026
+
+Fullscreen downward swipes now require 120 dp of net movement on release, without
+a short-fling shortcut. The player stays fixed during the gesture and animates
+to watch only after completion. The top 32 dp, expanded for status-bar/cutout
+insets, leaves touches to Android. Watch and mini-player drags retain their
+existing behavior. Interrupted gestures cannot complete after cancellation.
+
+Player settings now end with Refresh buffer and omit the SponsorBlock shortcut.
+Clip rows use one open-clip action across their content and padding, with separate
+overflow actions. The clip X closes the player and queue; Back and swipe-down
+still minimize. Clip channel identity uses the shared 32 dp avatar and existing
+image cache, with source metadata taking precedence and initials on failure.
+Optional avatar metadata survives clip serialization. No server changes are needed.
+
+| Check | Result |
+|---|---|
+| Android JVM unit/API tests | 301 passed, 0 failures/errors/skips |
+| Debug app and instrumentation APKs | Built successfully |
+| Debug lint | Passed: 0 errors, 21 existing warnings |
+| Android 16 / user's running emulator-5554 | 30 unique focused scenarios passed |
+| Clip acceptance | 16 passed, including row tap targets, close/minimize, settings order/refresh and disk-cached avatars |
+| Related regressions | 5 player gestures, 5 SponsorBlock and 4 avatar scenarios passed |
+| Visual review | Settings order, cached avatar, initials fallback and native top-edge swipes in portrait/landscape inspected |
+| Whitespace check | Passed |
+
+The initial device run passed 29 of 30. Its existing saved-playlist avatar test
+tapped a card center overlapping the separate channel link; the test now invokes
+the card's semantics action explicitly. That test and the settings screenshot
+follow-up both passed, completing all 30 unique scenarios. The moving-frame test
+helper also supports the player's current TextureView as well as SurfaceView.
+
+Local logs, both device-result XML files and reviewed screenshots are retained
+under the ignored `artifacts/player-clip-improvements/` directory. The initial
+and follow-up runner logs are also in `.tools/player-clip-improvements-device.log`
+and `.tools/player-clip-improvements-followup.log`. Tests used generated local
+media and fixture accounts. These changes have not been published as a release.

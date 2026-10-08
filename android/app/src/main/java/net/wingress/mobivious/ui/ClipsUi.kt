@@ -85,14 +85,15 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
     "Clipped " + DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault()))
 }.orEmpty()
 
-@Composable internal fun ClipCard(vm: AppViewModel, clip: Clip, play: () -> Unit, channel: (String) -> Unit) {
+@Composable internal fun ClipCard(vm: AppViewModel, clip: Clip, play: () -> Unit) {
     val context = LocalContext.current
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
-    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp).testTag("clip-card-${clip.id}"),
+    Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
+        .padding(horizontal = 16.dp, vertical = 9.dp).testTag("clip-card-${clip.id}"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!prefs.thinMode) Box(Modifier.width(140.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
+            .background(MaterialTheme.colorScheme.surfaceContainer)) {
             AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(Modifier.align(Alignment.BottomEnd).padding(5.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .82f))
                 .padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -100,9 +101,9 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
                 Text(playerTime(clip.durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
             }
         }
-        Column(Modifier.weight(1f).clickable(onClick = play), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(clip.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            Text("from ${clip.video.author.ifBlank { "Source video" }}", Modifier.clickable { channel(clip.video.channelId) },
+            Text("from ${clip.video.author.ifBlank { "Source video" }}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOf(clip.creator.takeIf(String::isNotBlank), clippedDate(clip).takeIf(String::isNotBlank),
                 playerTime(clip.durationMs).takeIf { prefs.thinMode }).filterNotNull().joinToString(" · "),
@@ -119,7 +120,10 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
 @Composable internal fun ClipDetails(vm: AppViewModel, clip: Clip, close: () -> Unit, channel: (String) -> Unit) {
     val context = LocalContext.current
     val queue by vm.queue.collectAsStateWithLifecycle()
-    val details = queue.details
+    val savedPrefs by vm.preferences.collectAsStateWithLifecycle()
+    val prefs = queue.effective(savedPrefs)
+    val details = queue.details?.takeIf { it.video.id == clip.video.id }
+    val source = details?.video ?: clip.video
     Column(Modifier.fillMaxWidth().padding(16.dp).testTag("clip-details"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape) {
@@ -127,7 +131,7 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
             }
             Text("Clip", Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
             if (clip.owned(vm.api.context())) IconButton(onClick = { vm.confirmDeleteClip(clip) }, Modifier.testTag("clip-delete")) { Icon(Icons.Default.DeleteOutline, "Delete clip") }
-            IconButton(onClick = close) { Icon(Icons.Default.Close, "Minimize clip") }
+            IconButton(onClick = close) { Icon(Icons.Default.Close, "Close clip") }
         }
         if (clip.creator.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(36.dp)) {
@@ -156,18 +160,21 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
-                    AsyncImage(resolved(clip.server, (details?.video ?: clip.video).thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    Text(time((details?.video ?: clip.video).duration), Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = .8f)).padding(3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    AsyncImage(resolved(clip.server, source.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    Text(time(source.duration), Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = .8f)).padding(3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(details?.video?.title ?: clip.video.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
-                    Text(clip.video.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(source.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                    Text(source.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Continue from this moment", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }
         }
-        if (clip.video.channelId.isNotBlank()) TextButton(onClick = { channel(clip.video.channelId) }) {
-            Icon(Icons.Default.AccountCircle, null); Spacer(Modifier.width(8.dp)); Text(clip.video.author.ifBlank { "View channel" })
+        if (ContentVisibility.validChannel(source.channelId)) CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.primary) {
+            ChannelAuthor(clip.server, source.authorAvatar.ifBlank { clip.video.authorAvatar.takeIf { source.channelId == clip.video.channelId }.orEmpty() },
+                source.author.ifBlank { "View channel" }, Avatars.show(prefs.thinMode, source.channelId), size = 32.dp,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 12.dp).testTag("clip-channel"),
+                tag = "clip-channel-avatar", onClick = { channel(source.channelId) })
         }
     }
 }

@@ -9,6 +9,7 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.view.PixelCopy
 import android.view.SurfaceView
+import android.view.TextureView
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.ui.test.*
@@ -100,12 +101,17 @@ class PlaybackVisibilitySmokeTest {
     }
 
     private fun frame(): Bitmap {
-        lateinit var surface: SurfaceView
-        ui { surface = playerViews().single { it.player != null }.videoSurfaceView as SurfaceView }
+        lateinit var surface: View
+        var textureFrame: Bitmap? = null
+        ui {
+            surface = playerViews().single { it.player != null }.videoSurfaceView!!
+            if (surface is TextureView) textureFrame = (surface as TextureView).bitmap
+        }
+        if (surface is TextureView) return requireNotNull(textureFrame) { "Video must render into the active texture" }
         val bitmap = Bitmap.createBitmap(surface.width, surface.height, Bitmap.Config.ARGB_8888)
         val done = CountDownLatch(1)
         var result = -1
-        PixelCopy.request(surface, bitmap, { result = it; done.countDown() }, Handler(Looper.getMainLooper()))
+        PixelCopy.request(surface as SurfaceView, bitmap, { result = it; done.countDown() }, Handler(Looper.getMainLooper()))
         assertTrue("Video frame copy timed out", done.await(5, TimeUnit.SECONDS))
         assertEquals("Video must render into the active surface", PixelCopy.SUCCESS, result)
         return bitmap
@@ -258,7 +264,22 @@ class PlaybackVisibilitySmokeTest {
         val token = activity.model.queue.value.token
         compose.onNodeWithContentDescription("Full screen").performClick()
         until { compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isNotEmpty() }
+        until { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
         playerDrag(dy = 96f)
+        compose.onNodeWithContentDescription("Exit full screen").assertExists()
+        playerDrag(dy = 24f, duration = 30)
+        compose.onNodeWithContentDescription("Exit full screen").assertExists()
+        val fullBounds = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+        val density = activity.resources.displayMetrics.density
+        compose.onNodeWithTag("player-gestures").performTouchInput {
+            down(Offset(width * .5f, height * .2f)); moveBy(Offset(0f, 144f * density), delayMillis = 600)
+        }
+        compose.waitForIdle()
+        assertEquals("Fullscreen should remain fixed while the finger is down", fullBounds,
+            compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot())
+        compose.onNodeWithTag("player-gestures").performTouchInput { cancel() }
+        compose.onNodeWithContentDescription("Exit full screen").assertExists()
+        playerDrag(dy = 150f)
         compose.onNodeWithTag("watch-details-list").assertIsDisplayed()
         compose.onNodeWithContentDescription("Exit full screen").assertDoesNotExist()
         showControls(); compose.onNodeWithContentDescription("Minimize player").performClick()
@@ -274,6 +295,33 @@ class PlaybackVisibilitySmokeTest {
             .single { it.label == "Dismiss player" }
         ui { assertTrue(dismiss.action()) }; until { activity.model.playback.value.details == null }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
+    }
+
+    @Test fun fullscreenTopEdgeSwipesLeavePlaybackFullscreenInBothOrientations() {
+        for (video in listOf("testvideo01", "portrait001")) {
+            ui { activity.model.openLink(VideoLink(video)); activity.sharedVideo.value = true }
+            until { activity.model.playback.value.mediaId == video && activity.model.playback.value.geometry.ratio != null && activity.model.playback.value.playing }
+            showControls(); compose.onNodeWithContentDescription("Full screen").performClick()
+            val orientation = if (video == "portrait001") android.content.res.Configuration.ORIENTATION_PORTRAIT else android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            until { activity.resources.configuration.orientation == orientation }
+            val density = activity.resources.displayMetrics.density
+            compose.onNodeWithTag("player-gestures").performTouchInput {
+                swipe(Offset(width * .5f, 1f), Offset(width * .5f, 160f * density), durationMillis = 600)
+            }
+            compose.onNodeWithContentDescription("Exit full screen").assertExists()
+            val token = activity.model.queue.value.token
+            var x = 0
+            ui { x = activity.window.decorView.width / 2 }
+            // Native input exercises Android's transient system bars, outside Compose's touch dispatcher.
+            shell("input touchscreen swipe $x 1 $x ${(160 * density).toInt()} 500")
+            compose.waitForIdle()
+            assertEquals(token, activity.model.queue.value.token)
+            showControls(); compose.onNodeWithContentDescription("Exit full screen").assertExists()
+            shell("mkdir -p /data/local/tmp/mobivious-gesture-screenshots")
+            shell("screencap -p /data/local/tmp/mobivious-gesture-screenshots/top-edge-$video.png")
+            compose.onNodeWithContentDescription("Exit full screen").performSemanticsAction(SemanticsActions.OnClick) { it() }
+            until { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() }
+        }
     }
 
     @Test fun timelineCommentsQueueAndMiniButtonsKeepPriorityOverPresentationGestures() {

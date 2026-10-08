@@ -16,7 +16,8 @@ data class Clip(val id: String, val title: String, val startMs: Long, val endMs:
         .put("endTime", endMs / 1000.0).put("type", if (native) "invidiousClip" else "youtubeClip")
         .put("creator", creator).put("createdAt", createdAt).put("server", server)
         .put("video", JSONObject().put("videoId", video.id).put("title", video.title).put("author", video.author)
-            .put("authorId", video.channelId).put("lengthSeconds", video.duration).put("thumbnail", video.thumbnail))
+            .put("authorId", video.channelId).put("lengthSeconds", video.duration).put("thumbnail", video.thumbnail)
+            .apply { if (video.authorAvatar.isNotBlank()) put("authorThumbnail", video.authorAvatar) })
     companion object {
         fun parse(j: JSONObject, id: String, server: String): Clip {
             val native = j.text("type") == "invidiousClip"
