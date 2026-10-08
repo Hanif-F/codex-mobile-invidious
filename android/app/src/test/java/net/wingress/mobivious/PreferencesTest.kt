@@ -61,12 +61,23 @@ class PreferencesTest {
         assertNull(PreferenceRules.caption(listOf("", "German"), available))
     }
     @Test fun homeAndNavigationKeepSupportedDestinationsReachable() {
-        assertEquals("Home" to "trending", PreferenceRules.destination("Trending", false))
+        assertEquals("Trending" to "trending", PreferenceRules.destination("Trending", false))
         assertEquals("Search" to "popular", PreferenceRules.destination("", false))
-        assertEquals("Library" to "popular", PreferenceRules.destination("Playlists", true))
-        assertEquals("Home" to "popular", PreferenceRules.destination("Subscriptions", false))
-        assertEquals(listOf("Home", "Subscriptions", "Library", "Account"), PreferenceRules.navigation(listOf("Playlists", "Subscriptions", "Trending", "Popular")))
-        assertEquals(4, PreferenceRules.navigation(emptyList()).size)
+        assertEquals("You" to "popular", PreferenceRules.destination("Playlists", true))
+        assertEquals("Popular" to "popular", PreferenceRules.destination("Subscriptions", false))
+        assertEquals(listOf("Popular", "Trending", "Subscriptions", "You"), PreferenceRules.navigation())
+        assertEquals("You (library)", PreferenceRules.homeLabel("Playlists"))
+        assertEquals("Search", PreferenceRules.homeLabel(""))
+        assertEquals("Popular" to "popular", PreferenceRules.destination("Playlists", false))
+        assertEquals("Popular" to "popular", PreferenceRules.destination("unsupported", true))
+    }
+    @Test fun nativeHomepageChangesPreserveTheWebsiteFeedMenu() {
+        val before = AccountPreferences(feedMenu = listOf("Trending", "", "Playlists", "Subscriptions"))
+        val changed = before.copy(defaultHome = "Playlists")
+        val patch = changed.changesFrom(before)
+        assertEquals(setOf("default_home"), patch.keys().asSequence().toSet())
+        assertEquals(before.feedMenu, AccountPreferences.parse(changed.json()).feedMenu)
+        assertEquals(before.feedMenu, before.merge(patch).feedMenu)
     }
     @Test fun malformedPreferencesHaveUsableDefaults() {
         val p = ApiParser.preferences(JSONObject("""{"speed":999,"dark_mode":"other","max_results":99999,"ui_density":"other","default_playlist":null}"""))

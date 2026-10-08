@@ -36,7 +36,7 @@ class SponsorBlockSmokeTest {
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
             activity.model.store.background = true
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
@@ -65,7 +65,7 @@ class SponsorBlockSmokeTest {
     @Test fun guestSheetColorValidationPersistenceAndMarkers() {
         command("sponsorblock", """{"sponsorSegments":[{"id":"a","category":"sponsor","start":10,"end":20}]}""")
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText("SponsorBlock").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick(); compose.onNodeWithText("SponsorBlock").performClick()
         compose.onNode(isToggleable() and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
         val color = compose.onNode(hasSetTextAction() and hasText("Sponsor color (#RRGGBB)"))
         color.performScrollTo().performTextReplacement("bad")
@@ -76,7 +76,7 @@ class SponsorBlockSmokeTest {
         assertTrue(activity.model.store.guestDeArrow().sponsorBlock.enabled)
         // Fullscreen SponsorBlock returns to the Settings screen.
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.onNodeWithTag("navigation-Home").performClick()
+        compose.onNodeWithTag("navigation-Popular").performClick()
         compose.onNodeWithTag("mini-player-preview").performClick()
         until { activity.model.sponsorBlock.value.segments.size == 1 }
         assertFalse(fixture().getBoolean("sponsorAuthorized"))
@@ -120,8 +120,8 @@ class SponsorBlockSmokeTest {
     @Test fun sharedChannelOverridesFailedDraftAndReset() {
         command("sponsorblock", """{"sponsorblock_enabled":true,"sponsorblock_channel_overrides":{"$id":{"name":"Mobivious Studio","enabled":false,"modes":{}}},"sponsorSegments":[{"id":"a","category":"sponsor","start":10,"end":20}]}""")
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.preferences.value.sponsorBlock.channels.containsKey(id) && activity.model.tab == "Account" }
-        compose.onNodeWithTag("navigation-Home").performClick()
+        until { activity.model.preferences.value.sponsorBlock.channels.containsKey(id) && activity.model.tab == "You" }
+        compose.onNodeWithTag("navigation-Popular").performClick()
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
         compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
         compose.onAllNodes(hasText("Mobivious Studio") and hasClickAction() and hasAnyAncestor(hasTestTag("watch-details-list"))).onFirst().performScrollTo().performClick()

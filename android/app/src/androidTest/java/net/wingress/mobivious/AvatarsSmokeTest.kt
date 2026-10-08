@@ -37,7 +37,7 @@ class AvatarsSmokeTest {
         compose.runOnUiThread {
             activity.model.store.save(null); activity.model.switchServer(server)
             activity.model.store.guestDeArrow(AccountPreferences(autoplay = false))
-            activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -115,16 +115,16 @@ class AvatarsSmokeTest {
         compose.onNodeWithTag("subscription-avatar-UC${"a".repeat(22)}", true).assertExists()
         screenshot("subscriptions")
         command("watched", """{"watched":["testvideo01"]}""")
-        compose.runOnUiThread { activity.model.navigate("Library", "history") }
+        compose.runOnUiThread { activity.model.navigate("You", "history") }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
         compose.onNodeWithTag("video-avatar-testvideo01", true).assertExists()
         screenshot("history")
         command("playlist-rss")
         compose.runOnUiThread { activity.model.subscribePlaylist(Playlist("PLlive", "Fixture playlist", 2), true) }
         until { activity.model.playlists.value.any { it.id == "PLlive" && it.saved } }
-        compose.runOnUiThread { activity.model.navigate("Library") }
+        compose.runOnUiThread { activity.model.navigate("You") }
         until { !activity.model.browse.value.loading }
-        compose.onNodeWithTag("library-playlist-list").performScrollToNode(hasTestTag("playlist-card-PLlive"))
+        compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("playlist-card-PLlive"))
         compose.onNodeWithTag("playlist-avatar-PLlive", true).assertExists()
         screenshot("playlist-card")
         // Invoke the card action directly; its center can fall on the nested channel link.

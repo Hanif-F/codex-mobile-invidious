@@ -147,7 +147,7 @@ class PlaybackVisibilitySmokeTest {
         playerDrag(dy = 96f)
         compose.onNodeWithTag("mini-player").assertIsDisplayed()
         compose.onNodeWithTag("watch-details-list").assertDoesNotExist()
-        assertEquals("Home", activity.model.tab)
+        assertEquals("Popular", activity.model.tab)
         ui { assertSame(view, playerViews().single()); assertSame(controller, activity.model.controller.value) }
         awake(false)
         playerDrag(dy = -96f)
@@ -453,7 +453,7 @@ class PlaybackVisibilitySmokeTest {
         awake(false)
         ui { assertTrue(activity.model.controller.value!!.playWhenReady) }
         foreground(); awake(true)
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
         awake(false)
         ui { assertTrue(playerViews().isEmpty()) }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
@@ -497,8 +497,8 @@ class PlaybackVisibilitySmokeTest {
 
     @Test fun narrowLayoutsKeepActionsAndMiniPlayerAccessibleWithLargeTitles() {
         ui { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.account.value != null && activity.model.tab == "Account" && !activity.model.accountBusy.value }
-        compose.onNodeWithTag("navigation-Home").performClick()
+        until { activity.model.account.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
+        compose.onNodeWithTag("navigation-Popular").performClick()
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
         openVideo()
         ui { activity.model.controller.value!!.pause() }

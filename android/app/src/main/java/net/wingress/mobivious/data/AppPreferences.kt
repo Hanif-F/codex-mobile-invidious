@@ -84,12 +84,15 @@ object PreferenceRules {
     val feedSorts = listOf("published", "published - reverse", "alphabetically", "alphabetically - reverse", "channel name", "channel name - reverse")
     fun destination(home: String, signedIn: Boolean): Pair<String, String> = when (home) {
         "" -> "Search" to "popular"
-        "Trending" -> "Home" to "trending"
-        "Subscriptions" -> (if (signedIn) "Subscriptions" else "Home") to "popular"
-        "Playlists" -> (if (signedIn) "Library" else "Home") to "popular"
-        else -> "Home" to "popular"
+        "Trending" -> "Trending" to "trending"
+        "Subscriptions" -> (if (signedIn) "Subscriptions" else "Popular") to "popular"
+        "Playlists" -> (if (signedIn) "You" else "Popular") to "popular"
+        else -> "Popular" to "popular"
     }
-    fun navigation(@Suppress("UNUSED_PARAMETER") menu: List<String>): List<String> = listOf("Home", "Subscriptions", "Library", "Account")
+    val tabs = listOf("Popular", "Trending", "Subscriptions", "You")
+    fun navigation(): List<String> = tabs
+    fun isDiscovery(tab: String) = tab == "Popular" || tab == "Trending"
+    fun homeLabel(home: String) = when (home) { "" -> "Search"; "Playlists" -> "You (library)"; else -> home }
     // The web stores English language names; also accept tags from older/native preferences.
     fun caption(preferred: List<String>, available: List<Caption>): Caption? = preferred.asSequence().filter { it.isNotBlank() }.mapNotNull { choice ->
         available.firstOrNull { c -> c.language.equals(choice, true) || c.label.equals(choice, true) ||

@@ -40,7 +40,7 @@ class DeviceProfilesSmokeTest {
             vm.store.save(null)
             vm.store.clearVisibilitySnapshot(vm.api.context()); vm.saveSearchVisibility(SearchVisibility())
             vm.store.guestDeArrow(AccountPreferences()); vm.store.background = true; vm.store.pip = true
-            vm.store.chatAppearance(ChatAppearance()); vm.refreshSharedSettings(); vm.navigate("Home")
+            vm.store.chatAppearance(ChatAppearance()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { activity.model.browse.value.videos.isNotEmpty() && !activity.model.browse.value.loading }
         command("reset")
@@ -56,7 +56,7 @@ class DeviceProfilesSmokeTest {
     private fun login(name: String, id: Char) {
         command("accounts", JSONObject().put("accountProfileId", id.toString().repeat(64)).toString())
         compose.runOnUiThread { activity.model.action { activity.model.login(name, "fixture-password") } }
-        until { activity.model.account.value?.profileId == id.toString().repeat(64) && !activity.model.accountBusy.value && activity.model.tab == "Account" }
+        until { activity.model.account.value?.profileId == id.toString().repeat(64) && !activity.model.accountBusy.value && activity.model.tab == "You" }
     }
     private fun logout() {
         compose.runOnUiThread { activity.model.logout() }
@@ -114,7 +114,7 @@ class DeviceProfilesSmokeTest {
         compose.onNodeWithTag("video-actions-testvideo01").performClick()
         compose.onNodeWithText("Block channel", substring = false).performClick()
         until { channel in activity.model.blocked.value.ids && activity.model.blocked.value.busy.isEmpty() }
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithText("Browsing").performClick(); compose.onNodeWithText("Blocked channels").performClick()
         compose.onNodeWithTag("unblock-$channel").performClick()
         until { channel !in activity.model.blocked.value.ids }
@@ -124,7 +124,7 @@ class DeviceProfilesSmokeTest {
     }
     @Test fun guestCanCreateAndResetChannelSponsorBlockOverrides() {
         command("sponsorblock", """{"sponsorSegments":[{"id":"guest-segment","category":"sponsor","start":10,"end":20}]}""")
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithText("SponsorBlock").performScrollTo().performClick()
         compose.onNodeWithText("Channel SponsorBlock settings").performClick()
         compose.onNodeWithText("Channel ID or /channel/UC… URL").performTextInput(channel)

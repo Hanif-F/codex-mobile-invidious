@@ -32,24 +32,31 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val context = vm.api.context()
+    val accountBusy by vm.accountBusy.collectAsStateWithLifecycle()
+    var previousContext by remember { mutableStateOf(context) }
+    LaunchedEffect(context) {
+        if (previousContext != context && page in accountSettingsPages && page != "Account") navigate("Account")
+        previousContext = context
+    }
     var saving by remember(page, context) { mutableStateOf(false) }
     if (page == "SponsorBlock") {
         key(context) { SponsorBlockSheet(vm, "", signIn, back, fullScreen = true) }
         return
     }
-    BackHandler { if (!saving) back() }
+    BackHandler { if (!saving && !accountBusy) back() }
     Scaffold(topBar = {
         TopAppBar(title = { Text(page) }, navigationIcon = {
-            IconButton(onClick = back, enabled = !saving) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back from $page") }
+            IconButton(onClick = back, enabled = !saving && !accountBusy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back from $page") }
         })
     }) { padding ->
         key(page, context) {
             when (page) {
                 "Settings" -> LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings-root"), contentPadding = PaddingValues(vertical = 12.dp)) {
                     item { Text(account?.let { "Signed in as ${it.username}" } ?: "Preferences for this device and instance", Modifier.padding(horizontal = 20.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    item { SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate) }
                     item { SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate) }
                     item { SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate) }
-                    item { SettingsLink("Browsing", "Homepage, navigation and video pages", Icons.Default.Explore, navigate) }
+                    item { SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate) }
                     item { SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate) }
                     item { SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate) }
                     item { HorizontalDivider(Modifier.padding(vertical = 12.dp)) }
@@ -62,6 +69,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                 "Server" -> ServerSettingsScreen(vm, Modifier.padding(padding), back)
                 "About" -> AboutSettingsScreen(Modifier.padding(padding))
                 "Blocked channels" -> BlockedChannelsScreen(vm, Modifier.padding(padding), signIn, openChannel)
+                in accountSettingsPages -> AccountSettingsContent(vm, page, Modifier.padding(padding), navigate, signIn)
                 else -> PreferenceSettingsScreen(vm, page, prefs, Modifier.padding(padding), back, signIn, navigate) { saving = it }
             }
         }
@@ -138,15 +146,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     }
                     item {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
-                        SettingsChoice("Default homepage", homes.map { it to it.ifBlank { "Search" } }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
-                        Text("The homepage opens on launch or sign-in. Search is available from the top-right button; Library remains a tab.", style = MaterialTheme.typography.bodySmall)
-                        SettingsHeading("Home discovery order")
-                        repeat(if (account == null) 2 else 4) { index ->
-                            SettingsChoice("Feed priority ${index + 1}", homes.map { it to it.ifBlank { "Search" } }, value.feedMenu.getOrElse(index) { "" }, !busy) { home ->
-                                val menu = value.feedMenu.toMutableList(); while (menu.size <= index) menu.add(""); menu[index] = home
-                                update(value.copy(feedMenu = menu))
-                            }
-                        }
+                        SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
+                        Text("Choose where the app opens. Popular, Trending, Subscriptions and You stay in the bottom bar. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
                         OutlinedTextField(value.region, { update(value.copy(region = it.uppercase().take(2))) }, label = { Text("Trending region (e.g. ID)") }, singleLine = true, enabled = !busy, isError = !Regex("[A-Z]{2}").matches(value.region), modifier = Modifier.fillMaxWidth())
                     }
                     item {

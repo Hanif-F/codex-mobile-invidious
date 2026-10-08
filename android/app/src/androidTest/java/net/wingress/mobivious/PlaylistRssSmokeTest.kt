@@ -31,7 +31,7 @@ class PlaylistRssSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        compose.runOnUiThread { vm.store.save(null); vm.switchServer("http://127.0.0.1:18080"); vm.store.guestDeArrow(AccountPreferences()); vm.navigate("Home") }
+        compose.runOnUiThread { vm.store.save(null); vm.switchServer("http://127.0.0.1:18080"); vm.store.guestDeArrow(AccountPreferences()); vm.navigate("Popular") }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
     }
     @After fun close() { if (::activity.isInitialized) compose.runOnUiThread { vm.closePlayer(); activity.finishAndRemoveTask() } }
@@ -42,7 +42,7 @@ class PlaylistRssSmokeTest {
         signIn()
         until { source.id !in vm.playlistBusy.value && vm.playlists.value.any { it.owned } &&
             vm.playlists.value.any { it.id == source.id && it.saved } }
-        compose.runOnUiThread { vm.navigate("Library") }
+        compose.runOnUiThread { vm.navigate("You") }
         until { !vm.browse.value.loading }
         compose.onNodeWithText("My playlists (1)").assertExists()
         compose.onNodeWithText("Subscribed playlists (1)").assertExists()
@@ -53,11 +53,12 @@ class PlaylistRssSmokeTest {
         val source = Playlist("IVother", "Live owner playlist", 2)
         compose.runOnUiThread { vm.subscribePlaylist(source, true) }
         until { vm.playlists.value.any { it.id == source.id && it.saved } }
-        compose.runOnUiThread { vm.navigate("Library") }
+        compose.runOnUiThread { vm.navigate("You") }
         until { !vm.browse.value.loading }
         compose.onNodeWithText("My playlists (1)").assertExists()
         compose.onNodeWithText("Subscribed playlists (1)").assertExists()
-        compose.onNodeWithTag("playlist-card-IVother").performClick()
+        compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("playlist-card-IVother"))
+        compose.onNodeWithTag("playlist-card-IVother").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
         until { vm.playlist.value?.id == source.id && !vm.browse.value.loading }
         compose.onNodeWithTag("playlist-actions-IVother").performScrollTo().performClick()
         compose.onNodeWithTag("playlist-edit").assertDoesNotExist()
@@ -83,13 +84,13 @@ class PlaylistRssSmokeTest {
         val source = Playlist("IVother", "Live owner playlist", 2)
         compose.runOnUiThread { vm.subscribePlaylist(source, true) }
         until { vm.playlists.value.any { it.id == source.id && it.saved } }
-        compose.runOnUiThread { vm.navigate("Library") }
+        compose.runOnUiThread { vm.navigate("You") }
         until { !vm.browse.value.loading }
-        compose.onNodeWithTag("library-playlist-list").performScrollToNode(hasTestTag("playlist-subscribe-IVother"))
+        compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("playlist-subscribe-IVother"))
         compose.onNodeWithTag("playlist-subscribe-IVother").performClick()
         until { vm.playlists.value.none { it.id == source.id } }
         assertNull(vm.playlist.value)
-        assertEquals("Library", vm.tab)
+        assertEquals("You", vm.tab)
         assertEquals("", vm.route)
     }
 
@@ -107,7 +108,7 @@ class PlaylistRssSmokeTest {
         compose.onNodeWithTag("playlist-delete").performClick()
         compose.onNodeWithText("Delete", useUnmergedTree = true).performClick()
         until { vm.playlists.value.none { it.id == list.id } && vm.route.isEmpty() }
-        assertEquals("Library", vm.tab)
+        assertEquals("You", vm.tab)
     }
 
     @Test fun signInRetainsSubscriptionIntentAndFailureCanRetry() {

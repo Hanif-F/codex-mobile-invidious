@@ -35,7 +35,7 @@ class VisibilitySmokeTest {
             activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(AccountPreferences())
             activity.model.saveSearchVisibility(SearchVisibility())
-            activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.size == 3 }
     }
@@ -48,15 +48,15 @@ class VisibilitySmokeTest {
     }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("VisibilityViewer", "fixture-password") } }
-        until { activity.model.account.value != null && activity.model.blocked.value.loaded && !activity.model.blocked.value.loading && activity.model.tab == "Account" }
-        navigate("Home")
+        until { activity.model.account.value != null && activity.model.blocked.value.loaded && !activity.model.blocked.value.loading && activity.model.tab == "You" }
+        navigate("Popular")
     }
     private fun navigate(tab: String, route: String = "") {
         compose.runOnUiThread { activity.model.query = "fixture"; activity.model.navigate(tab, route) }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun manager() {
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Blocked channels", substring = false).performClick()
         compose.onNodeWithTag("blocked-channel-manager").assertIsDisplayed()
@@ -76,13 +76,13 @@ class VisibilitySmokeTest {
 
     @Test fun guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts() {
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Show members-only videos", substring = false).performClick()
         compose.onNodeWithTag("settings-save").performClick()
         until { activity.model.preferences.value.showMemberVideos }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.onNodeWithTag("navigation-Home").performClick()
+        compose.onNodeWithTag("navigation-Popular").performClick()
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-membervid01"))
         compose.onNodeWithTag("video-members-membervid01", useUnmergedTree = true).assertIsDisplayed()
         save(activity.model.preferences.value.copy(thinMode = true, uiDensity = "compact", darkMode = "dark"))
@@ -128,10 +128,10 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
         navigate("Subscriptions")
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
-        navigate("Library", "playlist:IVfixture")
+        navigate("You", "playlist:IVfixture")
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        navigate("Home", "channel:$first")
+        navigate("Popular", "channel:$first")
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
         compose.onNodeWithTag("channel-actions-$first").performScrollTo().performClick()
         compose.onNodeWithTag("channel-block-$first").performClick()

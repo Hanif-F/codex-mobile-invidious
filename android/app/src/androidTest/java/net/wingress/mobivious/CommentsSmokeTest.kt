@@ -38,7 +38,7 @@ class CommentsSmokeTest {
             activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = "light"))
-            activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()

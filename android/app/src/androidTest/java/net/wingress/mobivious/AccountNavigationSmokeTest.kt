@@ -41,7 +41,7 @@ class AccountNavigationSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Home")
+            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() && vm.queue.value.token.isEmpty() && activity.window.decorView.hasWindowFocus() }
     }
@@ -63,10 +63,10 @@ class AccountNavigationSmokeTest {
 
     @Test fun delayedAccountPreferencesKeepThePageOpenedWhileTheyLoad() {
         signInWithDelayedPreferences()
-        compose.runOnUiThread { vm.navigate("Library", "history") }
+        compose.runOnUiThread { vm.navigate("You", "history") }
         until { !vm.browse.value.loading && vm.browse.value.history != null }
         until { vm.preferences.value.defaultHome == "Subscriptions" }
-        assertEquals("Library" to "history", vm.navigation.value)
+        assertEquals("You" to "history", vm.navigation.value)
         compose.onNodeWithTag("history-search").assertExists()
     }
 
@@ -77,21 +77,30 @@ class AccountNavigationSmokeTest {
     }
 
     @Test fun delayedAccountPreferencesKeepExplicitDiscoveryAndPlayback() {
-        signInWithDelayedPreferences()
-        compose.runOnUiThread { vm.selectDiscovery("trending"); vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
-        until { vm.preferences.value.defaultHome == "Subscriptions" && vm.playback.value.playing }
-        assertEquals("Home" to "", vm.navigation.value)
-        assertEquals("trending", vm.discovery.value)
-        compose.onNodeWithTag("watch-details-list").assertExists()
+        repeat(5) { attempt ->
+            if (attempt > 0) {
+                compose.runOnUiThread { vm.closePlayer(); vm.store.save(null); vm.navigate("Popular") }
+                until { vm.queue.value.token.isEmpty() && !vm.browse.value.loading }
+            }
+            signInWithDelayedPreferences()
+            compose.runOnUiThread { vm.selectDiscovery("trending"); vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+            until { vm.preferences.value.defaultHome == "Subscriptions" && vm.playback.value.playing }
+            assertEquals("Trending" to "", vm.navigation.value)
+            assertEquals("trending", vm.discovery.value)
+            // Service playback can become ready before Compose collects its state.
+            // Await the watch UI itself; never expand the mini-player to make this pass.
+            until { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("watch-details-list").assertIsDisplayed()
+        }
     }
 
     @Test fun fourTabsGuestSettingsAndSearchCancellationAndReturn() {
-        listOf("Home", "Subscriptions", "Library", "Account").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
+        listOf("Popular", "Trending", "Subscriptions", "You").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
         compose.onNodeWithTag("main-search").assertDoesNotExist()
         val original = vm.browse.value
         compose.onNodeWithTag("global-search").performClick()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
-        assertEquals("Home", vm.tab); assertEquals(original.videos, vm.browse.value.videos)
+        assertEquals("Popular", vm.tab); assertEquals(original.videos, vm.browse.value.videos)
         back(); compose.onNodeWithTag("main-search").assertDoesNotExist()
         compose.onNodeWithTag("global-search").performClick()
         compose.onNodeWithTag("main-search").performTextReplacement("fixture")
@@ -102,23 +111,24 @@ class AccountNavigationSmokeTest {
         compose.onNodeWithTag("global-search").performClick()
         compose.onNodeWithTag("main-search").assertTextContains("fixture")
         back(); assertEquals("Search", vm.tab)
-        back(); until { vm.tab == "Home" }; assertEquals(original.videos, vm.browse.value.videos)
-        compose.onNodeWithTag("navigation-Account").performClick()
-        compose.onNodeWithTag("account-settings").performClick()
+        back(); until { vm.tab == "Popular" }; assertEquals(original.videos, vm.browse.value.videos)
+        compose.onNodeWithTag("navigation-You").performClick()
+        compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithTag("settings-root").assertExists()
-        back(); compose.onNodeWithTag("account-screen").assertExists()
+        back(); compose.onNodeWithTag("you-guest").assertExists()
     }
 
     @Test fun contextualSignupReturnsToLibraryAndCredentialChangesRetainSignIn() {
-        compose.onNodeWithTag("navigation-Library").performClick()
+        compose.onNodeWithTag("navigation-You").performClick()
         compose.onNodeWithText("Sign in").performClick()
         compose.onNodeWithText("Create account").performClick()
         compose.onNodeWithTag("account-username").performTextInput("NewViewer")
         compose.onNodeWithTag("account-password").performTextInput("an uncommon signup password")
         compose.onNodeWithTag("account-confirm-password").performTextInput("an uncommon signup password")
         compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
-        until { vm.account.value != null && vm.tab == "Library" }
-        compose.onNodeWithTag("navigation-Account").performClick()
+        until { vm.account.value != null && vm.tab == "You" }
+        compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithText("Account", substring = false).performClick()
         compose.onNodeWithText("Change username").performClick()
         compose.onNodeWithTag("account-current-password").performTextInput("wrong")
         compose.onNodeWithTag("account-new-username").performTextReplacement("RenamedViewer")
@@ -132,7 +142,9 @@ class AccountNavigationSmokeTest {
     }
 
     @Test fun sessionsTokenCreationAndDeletionConfirmation() {
-        compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)); vm.navigate("Account") }
+        compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)); vm.navigate("You") }
+        compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithText("Account", substring = false).performClick()
         compose.onNodeWithText("Sessions & API tokens").performClick()
         until { compose.onAllNodesWithText("This session").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("Browser session").assertExists()
@@ -140,8 +152,8 @@ class AccountNavigationSmokeTest {
         compose.onAllNodesWithText("Revoke", substring = false).onLast().performClick()
         until { compose.onAllNodesWithText("Browser session").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText("Create API token").performClick()
-        compose.onNodeWithTag("global-search").performClick()
-        back(); compose.onNodeWithTag("account-create-token").assertExists()
+        compose.onNodeWithContentDescription("Back from Create API token").assertExists()
+        compose.onNodeWithTag("account-create-token").assertExists()
         compose.onNodeWithTag("account-token-permission-Read preferences").performClick()
         compose.onNodeWithTag("account-token-password").performScrollTo().performTextInput("an uncommon signup password")
         compose.onNodeWithTag("account-create-token").performScrollTo().performClick()

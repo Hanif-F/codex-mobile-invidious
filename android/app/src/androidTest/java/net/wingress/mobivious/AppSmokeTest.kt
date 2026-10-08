@@ -31,7 +31,7 @@ class AppSmokeTest {
             activity.model.closePlayer(); activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences())
-            activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
             activity.model.store.guestDeArrow(AccountPreferences()); activity.model.store.pip = true
         }
     }
@@ -106,9 +106,11 @@ class AppSmokeTest {
         waitFor(40_000) { activity.model.playback.value.playing }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-up-next"))
         compose.onAllNodesWithTag("video-card-testvideo02").assertCountEquals(1)
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-card-testvideo03"))
         compose.onNodeWithTag("video-card-testvideo03").assertExists()
         assertEquals(listOf("testvideo02", "testvideo03"), activity.model.playback.value.details!!.recommendations.map { it.id })
         assertTrue(activity.model.playback.value.playing)
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("video-card-testvideo02"))
         compose.onNode(hasText("Another original title") and hasAnyAncestor(hasTestTag("video-card-testvideo02")))
             .performScrollTo().performClick()
         waitFor(40_000) { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
@@ -276,12 +278,13 @@ class AppSmokeTest {
         command("reset")
         compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080") }
         waitFor { activity.model.browse.value.videos.isNotEmpty() }
-        compose.onNodeWithTag("navigation-Account").performClick()
+        compose.onNodeWithTag("navigation-You").performClick()
+        compose.onNodeWithTag("you-sign-in").performClick()
         compose.onNodeWithText("Username").performTextInput("EmulatorViewer")
         compose.onNodeWithText("Password").performTextInput("fixture-password")
         compose.onNodeWithTag("account-auth-submit").performClick()
         waitFor { activity.model.account.value != null }
-        compose.onNodeWithTag("navigation-Home").performClick()
+        compose.onNodeWithTag("navigation-Popular").performClick()
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
         assertNull(activity.model.playback.value.error)
@@ -296,7 +299,7 @@ class AppSmokeTest {
         compose.runOnUiThread { assertEquals(1.5f, activity.model.controller.value!!.playbackParameters.speed) }
         compose.onNodeWithContentDescription("Back").performClick()
         compose.onNodeWithContentDescription("Pause").assertExists()
-        compose.onNodeWithTag("navigation-Library").performClick()
+        compose.onNodeWithTag("navigation-You").performClick()
         compose.onNodeWithText("New playlist").performClick()
         compose.onNodeWithText("Title").performTextInput("Emulator playlist")
         compose.onNodeWithText("Save", useUnmergedTree = true).performClick()

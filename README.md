@@ -16,7 +16,7 @@ architectures, so there is no separate device-specific download.
 
 1. Download and install the APK. Allow your browser or file manager to install
    apps when Android prompts you.
-2. Open **Account → Settings → Server** to choose an HTTPS Invidious instance.
+2. Open the **Settings gear → Server** to choose an HTTPS Invidious instance.
    The default is [invidious.wingress.net](https://invidious.wingress.net).
 3. Start browsing, or sign in to your Invidious account on the selected instance
    for account features. Registration is available when the instance allows it.
@@ -38,7 +38,7 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 ### Browse and discover
 
-- Popular and trending feeds, filtered search, and channel browsing.
+- Separate Popular and Trending tabs, filtered search, and channel browsing.
 - Available channel tabs for videos, Shorts, streams, podcasts, releases,
   courses, playlists, clips, community posts and related channels.
 - Native community posts with images, galleries, attachments and read-only
@@ -60,18 +60,21 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Channel subscriptions, a subscription feed and a searchable channel directory
   sorted by Relevance, Latest upload, Most watched or A–Z, with upload and viewing
   details. The choice is saved on this device for each instance.
-- Owned and subscribed playlists, searchable watch history, watched indicators
-  and saved playback positions.
+- A **You** hub for your identity, owned/subscribed playlists, clips, and searchable
+  watch history, with account management in **Settings → Account**.
+- Watched indicators and saved playback positions.
 - RSS links, subscription OPML exports and private playlist Atom exports.
 - **Clips:** create public 5–120 second moments with a title, precise timestamps,
-  draggable filmstrip and independent preview. Find My Clips beneath Playlists
-  in Library, or browse public clips on a channel's Clips tab. Watch with a
+  draggable filmstrip and independent preview. Find My Clips in **You**, or browse
+  public clips on a channel's Clips tab. Watch with a
   clip-relative timeline, loop, share or copy the permalink, continue the full
   video at the same scene, and delete your own clips.
 
 ### Make it yours
 
 - Light, dark or system appearance; compact lists and optional hidden thumbnails.
+- Choose your launch homepage; retain your place across the fixed Popular, Trending,
+  Subscriptions, and You tabs.
 - Playback defaults, browsing and feed preferences, and channel blocking.
 - **SponsorBlock:** optional segment skipping, category controls and channel overrides.
 - **DeArrow:** optional community titles, an original-title toggle and title contributions.
@@ -133,6 +136,9 @@ acceptance and reproduction instructions.
 
 Built with Kotlin, Jetpack Compose and Media3. Start with the developer guide
 whether you are contributing directly or working with an AI coding agent.
+
+Debug builds appear as **Mobivious Preview** and install separately from the
+release app for local review.
 
 - [Developer guide](docs/DEVELOPMENT.md) — repository orientation, prerequisites,
   builds, tests, signing, releases and upstream maintenance.

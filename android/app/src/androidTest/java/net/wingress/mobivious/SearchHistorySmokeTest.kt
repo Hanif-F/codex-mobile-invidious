@@ -35,7 +35,7 @@ class SearchHistorySmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Home")
+            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
         command(body = """{"searchTest":true}""")
@@ -48,7 +48,7 @@ class SearchHistorySmokeTest {
         until { vm.subscriptionChannels.value.channels.isNotEmpty() }
     }
     private fun openHistory() {
-        signIn(); compose.runOnUiThread { vm.navigate("Library", "history") }
+        signIn(); compose.runOnUiThread { vm.navigate("You", "history") }
         until { !vm.browse.value.loading && vm.browse.value.history != null }
     }
     private fun submit(tag: String, text: String) {
@@ -105,7 +105,7 @@ class SearchHistorySmokeTest {
     }
 
     @Test fun channelSearchPaginationAndClearRestoreSelectedStreams() {
-        compose.runOnUiThread { vm.navigate("Home", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
+        compose.runOnUiThread { vm.navigate("Popular", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
         until { !vm.browse.value.loading && vm.channel.value != null }
         choose(ChannelTab.STREAMS)
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("channel-search"))
@@ -193,7 +193,7 @@ class SearchHistorySmokeTest {
     }
 
     @Test fun delayedSearchCannotReplaceNewChannelTabOrAccount() {
-        compose.runOnUiThread { vm.navigate("Home", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
+        compose.runOnUiThread { vm.navigate("Popular", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
         until { !vm.browse.value.loading && vm.channel.value != null }
         command(body = """{"searchDelayNext":1200}""")
         compose.runOnUiThread { vm.editSearch("second", true); vm.submitSearch(true) }

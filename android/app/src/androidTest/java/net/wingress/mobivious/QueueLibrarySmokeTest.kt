@@ -187,7 +187,7 @@ class QueueLibrarySmokeTest {
         compose.onNodeWithTag("account-username").performTextInput("Alice")
         compose.onNodeWithTag("account-password").performTextInput("an uncommon fixture password")
         compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
-        waitFor { activity.model.tab != "Account" && !activity.model.saveSheet.value.loading }
+        waitFor { activity.model.route != "sign-in" && !activity.model.saveSheet.value.loading }
         compose.onNodeWithTag("save-playlist-title").performTextInput("Create and save fixture")
         compose.onNodeWithTag("create-and-save").performClick()
         waitFor { activity.model.saveSheet.value.created != null && activity.model.saveSheet.value.error != null }

@@ -87,7 +87,7 @@ class ClipsSmokeTest {
         if (::activity.isInitialized) ui { vm.closeClipEditor(); vm.closePlayer(); vm.store.save(null); activity.finishAndRemoveTask() }
     }
     @Test fun everyClipRowTapOpensTheClipWhileOverflowKeepsItsActions() {
-        ui { vm.navigate("Library", "clips") }; until { !vm.browse.value.loading && vm.browse.value.clips.isNotEmpty() }
+        ui { vm.navigate("You", "clips") }; until { !vm.browse.value.loading && vm.browse.value.clips.isNotEmpty() }
         val clip = vm.browse.value.clips.first()
         compose.onNodeWithTag("clip-actions-${clip.id}").performClick()
         compose.onNodeWithText("Share clip").assertExists(); compose.onNodeWithText("Delete clip").assertExists()
@@ -190,8 +190,8 @@ class ClipsSmokeTest {
     }
 
     @Test fun libraryAndChannelListsPaginateRestoreAndShowBothThemes() {
-        ui { vm.navigate("Library") }; until { !vm.browse.value.loading }
-        compose.onNodeWithTag("library-clips").performScrollTo().performClick()
+        ui { vm.navigate("You") }; until { !vm.browse.value.loading }
+        compose.onNodeWithTag("you-clips").performScrollTo().performClick()
         until { vm.browse.value.clips.size == 30 && !vm.browse.value.loading }
         assertFalse(vm.browse.value.end)
         screenshot("library-light")
@@ -351,7 +351,7 @@ class ClipsSmokeTest {
     }
     @Test fun missingScopesAndUnavailableStoryboardsRemainActionable() {
         command("clips", """{"clipScopeFail":true,"clipStoryboardFail":true}""")
-        ui { vm.navigate("Library", "clips") }
+        ui { vm.navigate("You", "clips") }
         until { !vm.browse.value.loading && vm.browse.value.error != null }
         assertTrue(vm.browse.value.error!!.contains("sign in again"))
         incoming("/watch?v=testvideo01&autoplay=0"); ready()
@@ -369,7 +369,7 @@ class ClipsSmokeTest {
         if (compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
         until { compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("create-clip").performScrollTo().performClick()
-        until { vm.tab == "Account" }
+        until { vm.route == "sign-in" }
         compose.onNodeWithTag("account-username").performScrollTo().performTextInput("fixture-user")
         compose.onNodeWithTag("account-password").performScrollTo().performTextInput("fixture-password")
         compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
@@ -386,7 +386,7 @@ class ClipsSmokeTest {
         command("clips", """{"clipDelayNext":500}""")
         incoming("/clip/$id")
         until { vm.clipResolution.value.loading }
-        ui { vm.navigate("Library") }
+        ui { vm.navigate("You") }
         until { fixture().getJSONArray("clipRequests").length() > 0 }
         Thread.sleep(600)
         assertNull(vm.queue.value.current?.clip)

@@ -2682,3 +2682,74 @@ from the debug build; release acceptance adds signed update and cold-launch chec
 The player/clip fixes need no server changes. Stable identity across account
 renames uses the accompanying server profile metadata, with username fallback
 on older servers. Publishing this APK does not deploy the server.
+
+## Popular, Trending and You navigation — 8 October 2026
+
+The bottom bar now has fixed Popular, Trending, Subscriptions and You tabs.
+Discovery feeds have separate headings and refresh actions; Trending identifies
+the selected region. Each tab retains its content and scroll position. Search,
+Settings, contextual authentication and child-screen Back restore their origin.
+Saved browsing state is cleared on account/instance changes; changes to browsing
+preferences invalidate affected feeds without resetting an unrelated library.
+
+You combines a compact identity card, Watch history/My Clips shortcuts and owned
+and subscribed playlists. New playlist stays beside its section heading and wraps
+on narrow screens. Guests get an introduction and the existing sign-in/signup
+flow. The app-bar Settings gear is available throughout browsing. Settings →
+Account reuses credential, session/token, sign-out and deletion behavior, with
+consistent headers and token creation returning to Sessions & API tokens.
+
+Homepage labels include You (library), retaining `Playlists` on the wire. Search
+and guest Popular fallback remain supported. Obsolete feed-priority controls are
+removed; stored `feed_menu` values survive preference changes and round trips.
+No server API changes are required. Parity row 03 remains Partial because native
+tab visibility and ordering are intentionally fixed.
+
+The account/discovery regression repeats its delayed-preferences plus incoming-video
+sequence five times and waits for the visible watch screen. It exposed an expansion
+animation being canceled when the new media occurrence arrived. New video/clip
+actions now enter watch directly; expanding existing mini-player playback retains
+its animation. The debug launcher label is Mobivious Preview so manual review can
+distinguish it from the existing release app.
+
+| Check | Result |
+|---|---|
+| Android JVM unit/API tests | 302 passed; 0 failures/errors/skips |
+| Debug app and instrumentation APKs | Built successfully |
+| Debug lint | Passed; 0 errors, 21 existing warnings |
+| Final Android 16 / emulator-5554 run | 80 passed; 0 failures/errors/skips |
+| Navigation / discovery / Account / Settings | 25 passed, including eight new hub scenarios and five repetitions of incoming-video playback during delayed preference loading |
+| Library / clips / search/history / playlists/RSS / app / device profiles | 55 passed |
+| Visual inspection | Light/dark portrait, 320 dp width, 358 dp width with 1.6× text, landscape with enlarged text, guest You, Settings and Account inspected |
+| Whitespace check | Passed |
+
+The final run covers separate discovery feeds, retained tab/child/search state,
+region changes while a return snapshot is saved, contextual authentication,
+library actions, sessions/token creation and confirmation behavior, identity
+isolation and active service playback. It includes all 16 clip scenarios. The
+complete repository-wide instrumentation suite was not run.
+
+Initial runs exposed directory Back handling, scroll clamping when switching
+between differently sized lists, the playback expansion race described above,
+and card tests tapping an offscreen or separate nested action. These were fixed
+before the final passing run. An earlier run was interrupted when the emulator
+disconnected; the user restarted it. The runner used the user's existing emulator
+and disposable localhost media/accounts. Its fixture server and port forwarding
+were cleaned up. Density and text size returned to 480 dpi and 1.0× respectively.
+
+The verified debug APK was installed separately as Mobivious Preview for manual
+review. Cold launch and manual Popular → You navigation passed; all four tab
+labels were confirmed in the native UI. Release version/code remain 0.7.1/14;
+no release was published. Reviewed
+screenshots and final device/unit/lint results are retained in the ignored
+`artifacts/navigation-hub/` directory. The app APK is
+`android/app/build/outputs/apk/debug/app-debug.apk`.
+
+To reproduce the final fixture-based checks with an already running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 JAVA_HOME=/opt/android-studio/jbr \
+  ANDROID_HOME="$HOME/Android/Sdk" scripts/test-android.sh --offline --max-workers=2 \
+  -Dorg.gradle.jvmargs=-Xmx2g \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.NavigationHubSmokeTest,net.wingress.mobivious.HomeSubscriptionsSmokeTest,net.wingress.mobivious.AccountNavigationSmokeTest,net.wingress.mobivious.SettingsSmokeTest,net.wingress.mobivious.QueueLibrarySmokeTest,net.wingress.mobivious.ClipsSmokeTest,net.wingress.mobivious.AppSmokeTest,net.wingress.mobivious.SearchHistorySmokeTest,net.wingress.mobivious.PlaylistRssSmokeTest,net.wingress.mobivious.DeviceProfilesSmokeTest
+```

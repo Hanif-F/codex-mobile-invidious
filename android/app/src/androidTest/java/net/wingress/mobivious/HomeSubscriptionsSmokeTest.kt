@@ -1,6 +1,5 @@
 package net.wingress.mobivious
 
-import android.accessibilityservice.AccessibilityService
 import android.content.Intent
 import androidx.compose.ui.test.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -37,7 +36,7 @@ class HomeSubscriptionsSmokeTest {
         compose.runOnUiThread {
             val vm = activity.model
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Home")
+            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -60,7 +59,8 @@ class HomeSubscriptionsSmokeTest {
         until { activity.model.route == "subscription-channels" && !activity.model.subscriptionChannels.value.loading }
     }
     private fun back() {
-        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.waitForIdle()
+        compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
     }
     private fun recreate() {
@@ -81,28 +81,29 @@ class HomeSubscriptionsSmokeTest {
     @Test fun homeHighlightChangesDuringRequestsAndSurvivesNavigationAndRecreation() {
         command("""{"discoveryDistinct":true}""")
         compose.runOnUiThread {
+            activity.model.navigate("Popular")
             activity.model.store.guestDeArrow(AccountPreferences(defaultHome = "Trending"))
             activity.model.refreshSharedSettings(); activity.model.openDefaultHome()
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.firstOrNull()?.title == "trending discovery fixture" }
-        compose.onNodeWithTag("discovery-trending").assertIsSelected()
+        compose.onNodeWithTag("navigation-Trending").assertIsSelected()
         command("""{"discoveryDelayNext":1800}""")
-        compose.onNodeWithTag("discovery-popular").performClick()
-        compose.onNodeWithTag("discovery-popular").assertIsSelected()
-        compose.onNodeWithTag("discovery-trending").assertIsNotSelected()
+        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        compose.onNodeWithTag("navigation-Trending").assertIsNotSelected()
         until { fixture().getJSONArray("discoveryRequests").let { array -> (0 until array.length()).any { !array.getJSONObject(it).getBoolean("completed") } } }
         assertTrue(activity.model.browse.value.loading)
-        compose.onNodeWithTag("discovery-trending").performClick()
+        compose.onNodeWithTag("navigation-Trending").performClick()
         until { !activity.model.browse.value.loading }
-        compose.onNodeWithTag("discovery-trending").assertIsSelected()
+        compose.onNodeWithTag("navigation-Trending").assertIsSelected()
         until { fixture().getJSONArray("discoveryRequests").let { array -> (0 until array.length()).all { array.getJSONObject(it).getBoolean("completed") } } }
         assertEquals("trending discovery fixture", activity.model.browse.value.videos.single().title)
-        compose.onNodeWithTag("discovery-popular").performClick()
+        compose.onNodeWithTag("navigation-Popular").performClick()
         until { !activity.model.browse.value.loading }
         compose.onNodeWithContentDescription("Search").performClick()
-        compose.onNodeWithTag("navigation-Home").performClick()
-        compose.onNodeWithTag("discovery-popular").assertIsSelected()
-        recreate(); compose.onNodeWithTag("discovery-popular").assertIsSelected()
+        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        recreate(); compose.onNodeWithTag("navigation-Popular").assertIsSelected()
         screenshot("home-selection")
     }
 

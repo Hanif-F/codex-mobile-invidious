@@ -29,13 +29,13 @@ class SettingsSmokeTest {
         command("reset")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Home") }
+        compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular") }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
-    private fun open(page: String) { compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText(page).performScrollTo().performClick() }
+    private fun open(page: String) { compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick(); compose.onNodeWithText(page).performScrollTo().performClick() }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
     private fun save(page: String) { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
 
@@ -48,19 +48,19 @@ class SettingsSmokeTest {
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
         save("Browsing")
         assertFalse(activity.model.store.guestDeArrow().relatedVideos)
-        compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithText("Playback").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Back from Playback").performClick()
         compose.onNodeWithTag("settings-root").assertExists()
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.onNodeWithTag("account-screen").assertExists()
+        compose.onNodeWithTag("you-guest").assertExists()
     }
 
     @Test fun guestPlaybackDefaultsAndLocalResumeReachPlayer() {
         open("Playback"); toggle("Autoplay opened videos"); toggle("Audio only by default"); save("Playback")
         open("History & library"); toggle("Remember playback position"); save("History & library")
         compose.runOnUiThread { activity.model.store.position("testvideo01", 35) }
-        compose.onNodeWithTag("navigation-Home").performClick()
+        compose.onNodeWithTag("navigation-Popular").performClick()
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null && activity.model.playback.value.duration > 0 }
         assertFalse(activity.model.playback.value.playWhenReady)
@@ -72,7 +72,7 @@ class SettingsSmokeTest {
 
     @Test fun failedSharedSaveKeepsDraftAndRetryPreservesOtherPreferences() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "Account" && !activity.model.accountBusy.value }
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
         open("Browsing"); toggle("Show related videos"); compose.onNodeWithText("Show related videos").assertIsOff()
         command("sponsorblock", """{"failPreferences":true}""")
         compose.onNodeWithTag("settings-save").assertIsEnabled().performClick()
@@ -90,7 +90,7 @@ class SettingsSmokeTest {
     @Test fun codecSettingPrecedesQualityAndSyncsInBothDirections() {
         fun option(label: String) = compose.onNode(hasText(label) and hasAnyAncestor(isPopup()))
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "Account" && !activity.model.accountBusy.value }
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
         open("Playback")
         compose.onNodeWithText("Preferred video codec").performScrollTo()
         assertTrue(compose.onNodeWithText("Preferred video codec").fetchSemanticsNode().boundsInRoot.top <

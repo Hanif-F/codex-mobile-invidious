@@ -43,7 +43,7 @@ class CommunitySmokeTest {
         ui {
             activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(AccountPreferences(autoplay = false)); activity.model.refreshSharedSettings()
-            activity.model.navigate("Home", "channel:$owner")
+            activity.model.navigate("Popular", "channel:$owner")
         }
         until { !activity.model.browse.value.loading && activity.model.channel.value != null }
     }
@@ -235,7 +235,7 @@ class CommunitySmokeTest {
         ui { activity.model.clearScopedSearch() }
         until { activity.model.scopedSearch.value.submitted.isBlank() }
         feedComments("Ugpost1")
-        ui { activity.model.navigate("Home", "channel:UC${"b".repeat(22)}") }
+        ui { activity.model.navigate("Popular", "channel:UC${"b".repeat(22)}") }
         assertNull(activity.model.postComments.value.target)
         ui { activity.model.openPostComments(first) }
         assertFalse(activity.model.postComments.value.open)
@@ -310,7 +310,7 @@ class CommunitySmokeTest {
         assertFalse(activity.model.postComments.value.open)
         // Account preferences intentionally return to the configured home; re-enter Posts for the instance check.
         until { activity.model.route.isEmpty() && !activity.model.browse.value.loading }
-        ui { activity.model.navigate("Home", "channel:$owner") }
+        ui { activity.model.navigate("Popular", "channel:$owner") }
         until { activity.model.channel.value?.id == owner && !activity.model.browse.value.loading }
         choose(ChannelTab.POSTS)
         feedComments("Ugpost1")
@@ -376,7 +376,7 @@ class CommunitySmokeTest {
             action = Intent.ACTION_VIEW; data = android.net.Uri.parse("https://youtube.com/post/Ugpost1")
         }) }
         until { activity.model.postDetail.value.post?.id == "Ugpost1" }
-        ui { activity.model.clearNavigationReturns(); activity.model.navigate("Home") }
+        ui { activity.model.clearNavigationReturns(); activity.model.navigate("Popular") }
         until { activity.model.route.isEmpty() && !activity.model.browse.value.loading }
         val reads = events("postRequests").size
         val model = activity.model

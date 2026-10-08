@@ -35,7 +35,7 @@ class DeArrowSmokeTest {
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             activity.model.store.save(null); activity.model.closePlayer(); activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -43,13 +43,13 @@ class DeArrowSmokeTest {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
-    private fun settings() { compose.onNodeWithTag("navigation-Account").performClick(); compose.onNodeWithTag("account-settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
+    private fun settings() { compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
     private fun save() {
         compose.onNodeWithTag("settings-save").performClick()
         until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.onNodeWithTag("navigation-Home").performClick()
+        compose.onNodeWithTag("navigation-Popular").performClick()
         if (activity.model.playback.value.details != null)
             compose.onNodeWithTag("mini-player-preview").performClick()
     }
@@ -60,8 +60,8 @@ class DeArrowSmokeTest {
     }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "Account" }
-        compose.onNodeWithTag("navigation-Home").performClick()
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" }
+        compose.onNodeWithTag("navigation-Popular").performClick()
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun openVideo(title: String) { compose.onNodeWithText(title).performClick(); until(40_000) { activity.model.playback.value.playing } }
@@ -105,7 +105,7 @@ class DeArrowSmokeTest {
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("video-card-testvideo01"))).performClick()
         until { activity.model.channel.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
-        compose.onNodeWithText("Library").performClick()
+        compose.onNodeWithText("You").performClick()
         until { compose.onAllNodesWithText("DeArrow fixture playlist").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("DeArrow fixture playlist").performClick()
         until { activity.model.playlist.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
@@ -126,7 +126,7 @@ class DeArrowSmokeTest {
         compose.onNodeWithText("Another calm scene").assertExists()
         compose.onNodeWithContentDescription("Back").performClick()
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 } // playlist card and mini-player
-        compose.onNodeWithText("Library").performClick(); compose.onNodeWithText("Watch history").performClick()
+        compose.onNodeWithText("You").performClick(); compose.onNodeWithText("Watch history").performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 }
         val watchedAfter = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }

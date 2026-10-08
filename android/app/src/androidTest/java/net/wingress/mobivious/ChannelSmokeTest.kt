@@ -38,7 +38,7 @@ class ChannelSmokeTest {
             activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
-            activity.model.navigate("Home")
+            activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -93,7 +93,7 @@ class ChannelSmokeTest {
         compose.onNodeWithContentDescription("Close channel description").performClick()
         assertEquals(reads, requests().size)
         compose.onNodeWithTag("channel-description-open").performClick()
-        compose.runOnUiThread { activity.model.navigate("Home") }
+        compose.runOnUiThread { activity.model.navigate("Popular") }
         until { activity.model.channel.value == null && !activity.model.browse.value.loading }
         compose.onNodeWithTag("channel-description-sheet").assertDoesNotExist()
     }

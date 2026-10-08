@@ -37,7 +37,7 @@ class WatchedIndicatorsSmokeTest {
             activity.model.closePlayer(); activity.model.store.clearPositions(); activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
             activity.model.store.clearPositions(); activity.model.store.guestDeArrow(AccountPreferences())
-            activity.model.refreshSharedSettings(); activity.model.navigate("Home")
+            activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
@@ -50,8 +50,8 @@ class WatchedIndicatorsSmokeTest {
     }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("IndicatorViewer", "fixture-password") } }
-        until { activity.model.account.value != null && activity.model.preferences.value.savePosition && !activity.model.watched.value.loading && activity.model.tab == "Account" }
-        navigate("Home")
+        until { activity.model.account.value != null && activity.model.preferences.value.savePosition && !activity.model.watched.value.loading && activity.model.tab == "You" }
+        navigate("Popular")
     }
     private fun navigate(tab: String, route: String = "") {
         compose.runOnUiThread { activity.model.query = "fixture"; activity.model.navigate(tab, route) }
@@ -75,14 +75,14 @@ class WatchedIndicatorsSmokeTest {
     @Test fun sharedCardsCoverListsAndCompactThumbnailFreeLayouts() {
         command("watched", """{"indicatorVideos":true,"seedPlaylist":true,"watched":["$first","$second"],"positions":{"$first":40}}""")
         login(); until { first in activity.model.watched.value.watched }
-        listOf("Home" to "", "Search" to "", "Subscriptions" to "", "Home" to "channel:${"UC" + "a".repeat(22)}",
-            "Library" to "playlist:IVfixture", "Library" to "history").forEach { (tab, route) ->
+        listOf("Popular" to "", "Search" to "", "Subscriptions" to "", "Popular" to "channel:${"UC" + "a".repeat(22)}",
+            "You" to "playlist:IVfixture", "You" to "history").forEach { (tab, route) ->
             navigate(tab, route); card(first); watched(first).assertExists(); progress(first).assertExists()
             assertEquals(1f / 3, progress(first).fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current, .01f)
             compose.onNodeWithTag("video-card-$first").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription,
                 "In watch history. Playback progress 33 percent"))
         }
-        navigate("Home")
+        navigate("Popular")
         listOf("light", "dark").forEach { mode ->
             compose.runOnUiThread { activity.model.preferences.value = activity.model.preferences.value.copy(darkMode = mode, uiDensity = "compact", thinMode = false) }
             card(first); watched(first).assertExists(); progress(first).assertExists(); screenshot("compact")
@@ -125,7 +125,7 @@ class WatchedIndicatorsSmokeTest {
     @Test fun unknownDurationAndLiveCardsKeepBadgesWithoutPartialBars() {
         command("watched", """{"indicatorVideos":true,"watched":["$first","$second","unknownvid1","streamvid01"],"positions":{"$first":40,"unknownvid1":10,"streamvid01":30}}""")
         login(); until { activity.model.watched.value.watched.size == 4 }
-        navigate("Home")
+        navigate("Popular")
         card(second); watched(second).assertExists()
         assertEquals(ProgressBarRangeInfo(1f, 0f..1f), progress(second).fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo])
         listOf("unknownvid1", "streamvid01").forEach { id -> card(id); watched(id).assertExists(); progress(id).assertDoesNotExist() }
@@ -134,17 +134,17 @@ class WatchedIndicatorsSmokeTest {
     @Test fun historyRemovalPreservesProgressAndClearRemovesBoth() {
         command("watched", """{"watched":["$first","$second"],"positions":{"$first":40}}""")
         login(); until { first in activity.model.watched.value.watched }
-        navigate("Library", "history"); card(first)
+        navigate("You", "history"); card(first)
         compose.onNodeWithContentDescription("Remove A quiet moment · playback fixture").performClick()
         until { first !in activity.model.watched.value.watched && !activity.model.browse.value.loading }
         assertEquals(40L, activity.model.watched.value.positions[first])
-        navigate("Home"); watched(first).assertDoesNotExist(); progress(first).assertExists()
-        navigate("Library", "history")
+        navigate("Popular"); watched(first).assertDoesNotExist(); progress(first).assertExists()
+        navigate("You", "history")
         compose.onNodeWithTag("history-actions").performClick()
         compose.onNodeWithText("Clear watch history").performClick(); compose.onNodeWithText("Delete", useUnmergedTree = true).performClick()
         until { activity.model.watched.value.watched.isEmpty() && activity.model.watched.value.positions.isEmpty() }
         assertTrue(fixture().getJSONObject("positions").length() == 0)
-        navigate("Home"); watched(first).assertDoesNotExist(); progress(first).assertDoesNotExist()
+        navigate("Popular"); watched(first).assertDoesNotExist(); progress(first).assertDoesNotExist()
     }
 
     @Test fun playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge() {

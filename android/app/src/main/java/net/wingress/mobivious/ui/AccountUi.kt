@@ -6,7 +6,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.os.PersistableBundle
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,38 +33,52 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
+internal val accountSettingsPages = setOf("Account", "Change username", "Change password", "Sessions & API tokens", "Create API token", "Delete account")
+
+internal fun settingsParent(page: String): String = when (page) {
+    "Settings" -> ""
+    "Blocked channels" -> "Browsing"
+    "Create API token" -> "Sessions & API tokens"
+    "Change username", "Change password", "Sessions & API tokens", "Delete account" -> "Account"
+    else -> "Settings"
+}
+
 @Composable
-internal fun AccountScreen(vm: AppViewModel, modifier: Modifier = Modifier, page: String, changePage: (String) -> Unit, backEnabled: Boolean, settings: () -> Unit) {
+internal fun SignInScreen(vm: AppViewModel, modifier: Modifier = Modifier) {
+    key(vm.api.context()) {
+        Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).imePadding()
+            .testTag("sign-in-screen"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Welcome to your library", style = MaterialTheme.typography.headlineSmall)
+            Text("Sign in to your Invidious account on ${vm.store.server}.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            AuthenticationForm(vm, vm.api.context())
+        }
+    }
+}
+
+@Composable
+internal fun AccountSettingsContent(vm: AppViewModel, page: String, modifier: Modifier, navigate: (String) -> Unit, signIn: () -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
-    val accountBusy by vm.accountBusy.collectAsStateWithLifecycle()
+    val busy by vm.accountBusy.collectAsStateWithLifecycle()
     val context = vm.api.context()
-    BackHandler(page.isNotEmpty() && backEnabled) { if (!accountBusy) changePage("") }
-    key(context) {
-        Column(modifier.fillMaxSize().testTag("account-screen")) {
-            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(if (page.isEmpty()) "Account" else page, style = MaterialTheme.typography.headlineSmall)
-                if (page.isNotEmpty()) TextButton(enabled = !accountBusy, onClick = { changePage("") }) { Text("Back") }
-            }
-            when {
-                page == "Sessions & API tokens" -> AccountSessionsScreen(vm, context, Modifier.weight(1f)) { changePage("Create API token") }
-                page == "Create API token" -> TokenForm(vm, context, Modifier.weight(1f)) { changePage("Sessions & API tokens") }
-                page.isNotEmpty() && account != null -> CredentialForm(vm, context, page, Modifier.weight(1f)) { changePage("") }
-                else -> Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).imePadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(vm.store.server, style = MaterialTheme.typography.bodyMedium)
-                    FilledTonalButton(onClick = settings, enabled = !accountBusy, modifier = Modifier.testTag("account-settings")) {
-                        Icon(Icons.Default.Settings, "App settings"); Spacer(Modifier.width(8.dp)); Text("Settings")
-                    }
-                    if (account == null) AuthenticationForm(vm, context)
-                    else {
-                        Text("Signed in as ${account!!.username}", style = MaterialTheme.typography.titleLarge)
-                        ActionRow("Change username", enabled = !accountBusy, icon = Icons.Default.Person) { changePage("Change username") }
-                        ActionRow("Change password", enabled = !accountBusy, icon = Icons.Default.Lock) { changePage("Change password") }
-                        ActionRow("Sessions & API tokens", enabled = !accountBusy, icon = Icons.Default.Devices) { changePage("Sessions & API tokens") }
-                        OutlinedButton(onClick = vm::logout, enabled = !accountBusy, modifier = Modifier.testTag("account-sign-out")) { Text("Sign out") }
-                        TextButton(enabled = !accountBusy, onClick = { changePage("Delete account") }) { Text("Delete account", color = MaterialTheme.colorScheme.error) }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                }
+    when {
+        account == null -> Column(modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Sign in to manage your account", style = MaterialTheme.typography.titleLarge)
+            Text(vm.store.server, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = signIn, enabled = !busy) { Text("Sign in") }
+        }
+        page == "Sessions & API tokens" -> AccountSessionsScreen(vm, context, modifier) { navigate("Create API token") }
+        page == "Create API token" -> TokenForm(vm, context, modifier) { navigate("Sessions & API tokens") }
+        page != "Account" -> CredentialForm(vm, context, page, modifier) { navigate("Account") }
+        else -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp).testTag("account-settings-screen")) {
+            Text("Signed in as ${account!!.username}", Modifier.padding(horizontal = 20.dp, vertical = 12.dp), style = MaterialTheme.typography.titleLarge)
+            Text(vm.store.server, Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            ActionRow("Change username", enabled = !busy, icon = Icons.Default.Person) { navigate("Change username") }
+            ActionRow("Change password", enabled = !busy, icon = Icons.Default.Lock) { navigate("Change password") }
+            ActionRow("Sessions & API tokens", enabled = !busy, icon = Icons.Default.Devices) { navigate("Sessions & API tokens") }
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            OutlinedButton(onClick = vm::logout, enabled = !busy, modifier = Modifier.padding(horizontal = 20.dp).testTag("account-sign-out")) { Text("Sign out") }
+            TextButton(onClick = { navigate("Delete account") }, enabled = !busy, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+                Text("Delete account", color = MaterialTheme.colorScheme.error)
             }
         }
     }
