@@ -2647,3 +2647,38 @@ under the ignored `artifacts/player-clip-improvements/` directory. The initial
 and follow-up runner logs are also in `.tools/player-clip-improvements-device.log`
 and `.tools/player-clip-improvements-followup.log`. Tests used generated local
 media and fixture accounts. These changes have not been published as a release.
+
+## Signed Mobivious 0.7.1 — 8 October 2026
+
+Prepared patch version 0.7.1, version code 14, from the committed account-separated
+device saves and player/clip fixes through `e87ebb3`. The release includes all
+Android changes since v0.7.0 and uses the existing signing key.
+
+| Check | Result |
+|---|---|
+| `scripts/build-release.sh` | Passed; signed APK and checksum produced |
+| Android JVM unit/API tests | 301 passed, 0 failures/errors/skips |
+| Release lint | Passed: 0 errors, 21 warnings |
+| APK package/version | `net.wingress.mobivious`, 0.7.1, version code 14 |
+| Android compatibility | Minimum API 26; target/compile API 37 |
+| Signing continuity | Verified; same certificate as the published v0.7.0 APK |
+| APK SHA-256 | `166ac51e7b59a5e4b70a70fa66b01e80df084204d0dfa3f2248ae41eaba015d5` |
+| APK bytes | 17,276,291 |
+| Signed emulator update | Installed v0.7.0 then updated to v0.7.1 on emulator-5554 / Android 16 |
+| Cold launch | Passed; installed version/code confirmed, process remained running without a fatal crash |
+
+The previous local v0.7.0 APK matches GitHub's published asset digest
+`a4ac572fe347c543be2b56da146fe7068ca6d7b29b0b9f32716e983a6e7ab9fd`.
+Both APKs have signing certificate SHA-256
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+
+Release artifacts are `artifacts/Mobivious-0.7.1.apk` and its `.apk.sha256` file;
+notes are in `artifacts/release-notes-0.7.1.md`. Build, lint, certificate, metadata
+and signed launch evidence is in the ignored `artifacts/release-0.7.1/` directory.
+Publication targets [GitHub Releases v0.7.1](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.7.1).
+
+The 30 focused player/clip emulator scenarios above remain behavior evidence
+from the debug build; release acceptance adds signed update and cold-launch checks.
+The player/clip fixes need no server changes. Stable identity across account
+renames uses the accompanying server profile metadata, with username fallback
+on older servers. Publishing this APK does not deploy the server.
