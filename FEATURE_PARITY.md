@@ -2,8 +2,8 @@
 
 Reviewed on **8 October 2026** against the local source checkouts:
 
-- Web: `../invidious` at `a54910fb` plus the public native download endpoints. Includes this fork's custom features and native API extensions.
-- Android: `da6993b` plus the downloads/offline/export changes. Configured version: `0.7.1` (version code 14); latest release tag: `v0.7.1`.
+- Web: `../invidious` at `2e297338`, including the public native download endpoints. Includes this fork's custom features and native API extensions.
+- Android: `d105662` plus the minor-release version update. Configured version: `0.8.0` (version code 15); release tag: `v0.8.0`.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 

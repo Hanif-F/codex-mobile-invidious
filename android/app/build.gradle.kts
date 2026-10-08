@@ -14,8 +14,8 @@ android {
         applicationId = "net.wingress.mobivious"
         minSdk = 26
         targetSdk = 37
-        versionCode = 14
-        versionName = "0.7.1"
+        versionCode = 15
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }

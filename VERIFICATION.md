@@ -2901,3 +2901,46 @@ crystal spec spec/native_downloads_spec.cr spec/audio_metadata_spec.cr
 crystal build src/invidious.cr --no-codegen
 crystal build src/invidious.cr -Dapi_only --no-codegen
 ```
+
+## Signed Mobivious 0.8.0 minor release — 8 October 2026
+
+Prepared version 0.8.0, version code 15, from the committed downloads/offline/export
+implementation at `d105662` and the Popular/Trending/You and discovery/search
+updates since v0.7.1. Release preparation changes the version metadata and dated
+documentation; the verified application implementation is unchanged.
+
+| Check | Result |
+| --- | --- |
+| `scripts/build-release.sh` | Passed; signed APK and checksum produced |
+| Android JVM unit/API tests | 317 passed; 0 failures/errors/skips |
+| Release lint | Passed: 0 errors, 30 warnings |
+| APK package/version | `net.wingress.mobivious`, 0.8.0, version code 15 |
+| Android compatibility | Minimum API 26; target/compile API 37 |
+| Signing continuity | Verified against the published v0.7.1 APK; same existing certificate |
+| APK SHA-256 | `17c451a0f893e025006bad5bb51bad6ae5352ae333560dfd37db653697259e62` |
+| APK bytes | 18,617,562 |
+| Signed emulator update | v0.7.1/14 to v0.8.0/15 using `adb install -r`, preserving app data |
+| Signed cold launch | Downloaded page visible and app process running on emulator-5554 |
+
+The previous local v0.7.1 APK matches GitHub's published digest
+`166ac51e7b59a5e4b70a70fa66b01e80df084204d0dfa3f2248ae41eaba015d5`.
+Both APKs have signing certificate SHA-256
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+
+The preceding implementation entries supply the focused debug behavior evidence,
+including 37 passing download/player/navigation emulator scenarios, two real
+process-restart phases, and eight sibling download/audio specs. Release acceptance
+adds the signed build, version/checksum/certificate checks and signed update/cold
+launch. The accepted video-conversion test remains explicitly ignored for the
+documented gfxstream host crash; this release does not claim physical-device
+conversion acceptance. The developer guide and release notes retain that flag.
+
+Native downloads need deployment of the sibling server update `2e297338` with
+both public download endpoints; no migration or token renewal is added. Publishing
+the APK does not deploy the server. This work performed no production server
+changes.
+
+Artifacts are `artifacts/Mobivious-0.8.0.apk` and its `.apk.sha256` file; notes are
+`artifacts/release-notes-0.8.0.md`. Build/lint, signing, metadata and signed launch
+evidence is retained in the ignored `artifacts/release-0.8.0/` directory.
+Publication targets [GitHub Releases v0.8.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.8.0).
