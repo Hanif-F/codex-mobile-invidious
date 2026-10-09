@@ -32,9 +32,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import net.wingress.mobivious.data.*
 import org.json.JSONObject
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 internal val accountSettingsPages = setOf("Account", "Change username", "Change password", "Sessions & API tokens", "Create API token", "Delete account")
 
@@ -209,7 +206,7 @@ private fun CredentialForm(vm: AppViewModel, context: ApiContext, page: String, 
         dismissButton = { TextButton(enabled = !busy, onClick = { confirmDelete = false }) { Text("Cancel") } })
 }
 
-private fun accountDate(seconds: Long) = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm").withZone(ZoneId.systemDefault()).format(Instant.ofEpochSecond(seconds))
+private fun accountDate(seconds: Long) = DisplayFormats.timestamp(seconds).ifBlank { "Unknown date" }
 
 @Composable
 private fun AccountSessionsScreen(vm: AppViewModel, context: ApiContext, modifier: Modifier, create: () -> Unit) {

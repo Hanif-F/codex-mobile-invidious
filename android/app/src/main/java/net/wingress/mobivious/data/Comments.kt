@@ -10,7 +10,7 @@ import org.json.JSONObject
 
 enum class CommentSort(val apiValue: String, val label: String) { TOP("top", "Top"), NEWEST("new", "Newest") }
 data class CreatorHeart(val name: String, val thumbnail: String)
-data class Comment(val author: String, val text: String, val published: String, val likes: Long,
+data class Comment(val author: String, val text: String, val published: String, val likes: Long?,
     val id: String = "", val authorId: String = "", val authorUrl: String = "", val avatar: String = "",
     val html: String = "", val edited: Boolean = false, val verified: Boolean = false,
     val creator: Boolean = false, val pinned: Boolean = false, val member: Boolean = false,
@@ -25,13 +25,13 @@ data class CommentPage(val items: List<Comment>, val continuation: String = "", 
     companion object {
         fun parse(json: JSONObject): CommentPage = CommentPage(json.optJSONArray("comments")?.objects().orEmpty().map { c ->
             val replies = c.optJSONObject("replies")
-            Comment(c.text("author").ifBlank { "Unknown author" }, c.text("content"), c.text("publishedText"), c.optLong("likeCount").coerceAtLeast(0),
+            Comment(c.text("author").ifBlank { "Unknown author" }, c.text("content"), ApiParser.publicationText(c), c.nonNegativeLong("likeCount"),
                 c.text("commentId"), c.text("authorId"), c.text("authorUrl"), Avatars.parse(c),
                 c.text("contentHtml"), c.optBoolean("isEdited"), c.optBoolean("verified"),
                 c.optBoolean("authorIsChannelOwner"), c.optBoolean("isPinned"), c.optBoolean("isSponsor"),
                 c.optJSONObject("creatorHeart")?.let { CreatorHeart(it.text("creatorName"), it.text("creatorThumbnail")) },
                 replies?.optInt("replyCount")?.coerceAtLeast(0) ?: 0, replies?.text("continuation").orEmpty())
-        }, json.text("continuation"), (json.opt("commentCount") as? Number)?.toLong()?.takeIf { it >= 0 })
+        }, json.text("continuation"), json.nonNegativeLong("commentCount"))
     }
 }
 

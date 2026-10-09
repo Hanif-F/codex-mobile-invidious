@@ -34,7 +34,7 @@ sealed interface PostAttachment {
                     PlaylistItem(ApiParser.playlist(json)) else Unavailable
                 "poll", "quiz" -> Poll(json.optJSONArray("choices")?.objects().orEmpty().map {
                     PostChoice(it.text("text"), PostImage.parse(it.optJSONArray("image")), it.opt("isCorrect") as? Boolean)
-                }, (json.opt("totalVotes") as? Number)?.toLong()?.takeIf { it >= 0 }, json.text("type") == "quiz")
+                }, json.nonNegativeLong("totalVotes"), json.text("type") == "quiz")
                 else -> Unavailable
             }
         }
@@ -53,7 +53,7 @@ data class PostPage(val items: List<CommunityPost>, val continuation: String = "
             val comments = CommentPage.parse(json).items
             return PostPage(raw.zip(comments).map { (item, comment) ->
                 CommunityPost(comment, owner.ifBlank { comment.authorId },
-                    (item.opt("replyCount") as? Number)?.toLong()?.takeIf { it >= 0 }, PostAttachment.parse(item.optJSONObject("attachment")))
+                    item.nonNegativeLong("replyCount"), PostAttachment.parse(item.optJSONObject("attachment")))
             }, json.text("continuation"), owner)
         }
     }

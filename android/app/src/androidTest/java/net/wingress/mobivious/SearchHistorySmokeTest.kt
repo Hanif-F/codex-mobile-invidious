@@ -146,8 +146,9 @@ class SearchHistorySmokeTest {
         // Lazy lists can retain the first video's key when date headings arrive; bring the heading into view.
         compose.onNodeWithTag("browse-video-list").performScrollToIndex(0)
         compose.onNodeWithTag("history-group-TODAY").assertExists()
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Released: 2024-02-29"))
-        compose.onNodeWithText("Released: 2024-02-29").assertExists()
+        val released = "Released: ${net.wingress.mobivious.data.DisplayFormats.date(java.time.LocalDate.of(2024, 2, 29))}"
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText(released))
+        compose.onNodeWithText(released).assertExists()
         submit("history-search", "needle CAFÉ")
         assertEquals("oldvideo001", vm.browse.value.videos.single().id)
         assertEquals(1, vm.browse.value.history!!.total)

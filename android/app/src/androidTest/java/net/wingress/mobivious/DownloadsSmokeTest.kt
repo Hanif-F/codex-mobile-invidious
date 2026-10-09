@@ -35,7 +35,7 @@ class DownloadsSmokeTest {
     }
     private fun state() = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
     @Before fun open() {
-        command("reset"); command("downloads", """{"downloadDisabled":false,"downloadSlow":false,"downloadFailKey":"","downloadEndpointsMissing":false,"resetRequests":true}""")
+        command("reset"); command("downloads", """{"downloadDisabled":false,"downloadSlow":false,"downloadFailKey":"","downloadEndpointsMissing":false,"downloadDuration":12,"resetRequests":true}""")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
@@ -70,6 +70,14 @@ class DownloadsSmokeTest {
         until { var ready = false; compose.runOnUiThread { ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== old } }; ready }
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
     }
+    @Test fun downloadsOverAnHourUseAnHourTimestamp() {
+        command("downloads", """{"downloadDuration":3661}""")
+        val id = create(DownloadSelection(audio = "aes")); ready(id)
+        compose.runOnUiThread { activity.model.navigate("You", "downloads", rememberOrigin = true) }
+        compose.onNodeWithText("1:01:01").assertExists()
+        compose.onNodeWithText("61:01").assertDoesNotExist()
+    }
+
     @Test fun dialogRequiresMediaPreservesSelectionAndCreatesDuplicates() {
         compose.runOnUiThread { activity.model.openDownload(activity.model.browse.value.videos.first()) }
         until { activity.model.downloadDialog.value.catalog != null }

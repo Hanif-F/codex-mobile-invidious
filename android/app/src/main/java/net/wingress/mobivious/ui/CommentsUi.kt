@@ -54,7 +54,7 @@ internal fun CommentsEntry(state: CommentsState, open: () -> Unit) {
             Icon(Icons.Default.ChatBubbleOutline, null, tint = MaterialTheme.colorScheme.primary)
             Column(Modifier.weight(1f)) {
                 Text("Comments", style = MaterialTheme.typography.titleMedium)
-                state.feed.page.count?.let { Text("${commentCount(it)} comments", style = MaterialTheme.typography.bodySmall,
+                state.feed.page.count?.let { Text(DisplayFormats.audience(it, "comment"), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
             Icon(Icons.Default.ExpandLess, "Open comments")
@@ -171,7 +171,7 @@ internal fun CommentRow(comment: Comment, server: String, videoId: String, chann
                 if (date.isNotBlank()) Text(date, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 RichCommentText(comment, server, videoId, link)
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "${comment.likes} likes" },
+                    if (comment.likes != null) Row(Modifier.semantics(mergeDescendants = true) { contentDescription = DisplayFormats.audience(comment.likes, "like") },
                         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Icon(Icons.Default.ThumbUpOffAlt, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text(commentCount(comment.likes), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -296,4 +296,4 @@ internal fun NativeRichText(text: String, html: String, key: String, server: Str
     }
 }
 
-private fun commentCount(value: Long): String = java.text.NumberFormat.getIntegerInstance().format(value)
+private fun commentCount(value: Long): String = DisplayFormats.compact(value)

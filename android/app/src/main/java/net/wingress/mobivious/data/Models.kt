@@ -5,9 +5,10 @@ import org.json.JSONObject
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 data class Video(val id: String, val title: String, val author: String = "", val channelId: String = "",
-    val thumbnail: String = "", val duration: Long = 0, val views: Long = 0, val published: String = "",
+    val thumbnail: String = "", val duration: Long = 0, val views: Long? = null, val published: String = "",
     val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false,
-    val history: HistoryMetadata? = null, val playlistIndex: Int? = null, val authorAvatar: String = "")
+    val history: HistoryMetadata? = null, val playlistIndex: Int? = null, val authorAvatar: String = "",
+    val publishedAt: Long? = null, val viewCountPrecision: CountPrecision = CountPrecision.UNVERIFIED)
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,
@@ -19,7 +20,8 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
     val subscribers: String = "", val upcoming: Boolean? = null, val premiereTimestamp: Long? = null,
     val listed: Boolean? = null, val genre: String = "", val genreUrl: String = "", val license: String? = null,
     val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
-    val music: List<MusicCredit> = emptyList(), val notice: String = "", val liveChatReplay: Boolean = false, val storyboards: List<StoryboardTrack> = emptyList()) {
+    val music: List<MusicCredit> = emptyList(), val notice: String = "", val liveChatReplay: Boolean = false, val storyboards: List<StoryboardTrack> = emptyList(),
+    val likeCountPrecision: CountPrecision = CountPrecision.UNVERIFIED) {
     val chatAvailable: Boolean get() = liveChatReplay && !video.live && upcoming != true
     val chapters: List<VideoChapter> = ChapterRules.parse(description, video.duration, video.live)
 }
@@ -61,6 +63,8 @@ data class DeArrowSubmission(val title: String, val original: Boolean, val votes
 fun JSONArray.objects(): List<JSONObject> = (0 until length()).mapNotNull { optJSONObject(it) }
 fun JSONObject.text(key: String, fallback: String = ""): String = if (isNull(key)) fallback else optString(key, fallback)
 object ApiParser {
+    fun publicationText(json: JSONObject): String = if (json.has("published") &&
+        DisplayFormats.publication(json.nonNegativeLong("published")) == null) "" else json.text("publishedText").takeUnless { it.trim() in listOf("-", "—") }.orEmpty()
     fun preferences(json: JSONObject) = AccountPreferences.parse(json)
     fun dearrowSubmissions(json: JSONObject) = json.getJSONArray("titles").objects().map {
         DeArrowSubmission(it.getString("title"), it.getBoolean("original"), it.getInt("votes"), it.getBoolean("locked"), it.getString("UUID"))
@@ -71,24 +75,27 @@ object ApiParser {
     fun video(json: JSONObject): Video = Video(json.text("videoId", json.text("video_id")),
         json.text("title", "Unavailable video"), json.text("author", json.text("channel_name")),
         json.text("authorId", json.text("channel_id")), thumbnail(json),
-        json.optLong("lengthSeconds", json.optLong("length_seconds")), json.optLong("viewCount"),
-        json.text("publishedText", json.text("latest_watched")), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title") || json.text("author") == "[Deleted video]" || json.text("title") in listOf("[Deleted video]", "[Private video]"), json.opt("isMember") == true,
-        playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null, authorAvatar = Avatars.parse(json))
+        json.nonNegativeLong("lengthSeconds") ?: json.nonNegativeLong("length_seconds") ?: 0,
+        json.nonNegativeLong("viewCount").takeUnless { json.text("viewCountPrecision") == "unknown" },
+        publicationText(json), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title") || json.text("author") == "[Deleted video]" || json.text("title") in listOf("[Deleted video]", "[Private video]"), json.opt("isMember") == true,
+        playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null, authorAvatar = Avatars.parse(json),
+        publishedAt = DisplayFormats.publication(json.nonNegativeLong("published")), viewCountPrecision = CountPrecision.parse(json.text("viewCountPrecision")))
     fun videos(array: JSONArray): List<Video> = array.objects().filter { it.text("videoId", it.text("video_id")).isNotBlank() }.map(::video)
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",
         json.optJSONArray("captions")?.objects()?.map { Caption(it.text("label"), it.text("languageCode", it.text("language_code")), it.text("url")) } ?: emptyList(),
         json.optJSONArray("recommendedVideos")?.let { videos(it).distinctBy { video -> video.id } } ?: emptyList(),
         (json.optJSONArray("adaptiveFormats")?.objects().orEmpty() + json.optJSONArray("formatStreams")?.objects().orEmpty()).map(::streamFormat),
-        descriptionHtml = json.text("descriptionHtml"), likes = (json.opt("likeCount") as? Number)?.toLong()?.takeIf { it >= 0 },
+        descriptionHtml = json.text("descriptionHtml"), likes = json.nonNegativeLong("likeCount").takeUnless { json.text("likeCountPrecision") == "unknown" },
         authorVerified = json.opt("authorVerified") as? Boolean, subscribers = json.text("subCountText").takeUnless { it == "-" }.orEmpty(),
-        upcoming = json.opt("isUpcoming") as? Boolean, premiereTimestamp = (json.opt("premiereTimestamp") as? Number)?.toLong()?.takeIf { it > 0 },
+        upcoming = json.opt("isUpcoming") as? Boolean, premiereTimestamp = json.nonNegativeLong("premiereTimestamp")?.takeIf { it in 1_104_537_600..253_402_300_799L },
         listed = json.opt("isListed") as? Boolean, genre = json.text("genre"), genreUrl = json.text("genreUrl"), license = json.opt("license") as? String,
         familyFriendly = json.opt("isFamilyFriendly") as? Boolean, allowedRegions = json.optJSONArray("allowedRegions")?.let { a ->
             (0 until a.length()).mapNotNull { (a.opt(it) as? String)?.takeIf { code -> code.matches(Regex("[A-Z]{2}")) } }.distinct() },
         music = json.optJSONArray("musicTracks")?.objects().orEmpty().map { MusicCredit(it.text("song"), it.text("artist"), it.text("album"), it.text("license")) }
             .filter { it.song.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }, notice = json.text("error"), liveChatReplay = json.opt("liveChatReplay") == true, storyboards = json.optJSONArray("storyboards")?.objects().orEmpty().mapNotNull { sb ->
-            sb.text("url").takeIf(String::isNotBlank)?.let { StoryboardTrack(it, sb.optInt("width"), sb.optInt("height")) } })
+            sb.text("url").takeIf(String::isNotBlank)?.let { StoryboardTrack(it, sb.optInt("width"), sb.optInt("height")) } },
+        likeCountPrecision = CountPrecision.parse(json.text("likeCountPrecision")))
     fun streamFormat(j: JSONObject): StreamFormat {
         val size = j.text("size").split('x')
         val type = j.text("type", j.text("mimeType"))
@@ -108,18 +115,18 @@ object ApiParser {
             thumbnail.toHttpUrlOrNull()?.pathSegments?.getOrNull(1).orEmpty(), thumbnail.split('/').getOrNull(2).orEmpty(), id.removePrefix("RD"))
             .firstOrNull { it.matches(Regex("^[A-Za-z0-9_-]{11}$")) }.takeIf { id.startsWith("RD") }
         val owned = if (json.opt("isOwned") is Boolean) json.getBoolean("isOwned") else legacyOwned && id.startsWith("IV")
-        return Playlist(id, json.text("title"), json.optInt("videoCount", if (id.startsWith("RD")) -1 else 0),
+        return Playlist(id, json.text("title"), json.nonNegativeLong("videoCount")?.takeIf { it <= Int.MAX_VALUE }?.toInt() ?: -1,
             json.text("privacy", if (owned) "private" else "public").lowercase(), json.text("description"),
             thumbnail, json.text("author"), json.text("authorId"), owned,
             json.optBoolean("isSaved", legacyOwned && !id.startsWith("IV")), seed, Avatars.parse(json))
     }
     fun playlists(array: JSONArray) = array.objects().filter { it.text("playlistId", it.text("mixId")).isNotBlank() }.map { playlist(it) }
-    fun channel(json: JSONObject) = Channel(json.text("authorId"), json.text("author"), json.text("description"), json.text("subCountText", (json.opt("subCount") as? Number)?.toLong()?.takeIf { it >= 0 }?.toString().orEmpty()),
+    fun channel(json: JSONObject) = Channel(json.text("authorId"), json.text("author"), json.text("description"), json.text("subCountText").ifBlank { json.nonNegativeLong("subCount")?.toString().orEmpty() },
         Avatars.parse(json),
         json.optJSONArray("tabs")?.let { tabs -> (0 until tabs.length()).mapNotNull { tabs.opt(it) as? String } } ?: emptyList(),
         json.optJSONArray("authorBanners")?.objects()?.filter { it.optInt("width") > it.optInt("height") * 2 }
             ?.minByOrNull { kotlin.math.abs(it.optInt("width") - 1060) }?.text("url").orEmpty(),
         json.opt("authorVerified") == true, json.text("pronouns"), json.text("descriptionHtml"),
         json.opt("ageGated") == true, json.opt("autoGenerated") == true,
-        json.text("channelHandle"), (json.opt("videoCount") as? Number)?.toLong()?.takeIf { it >= 0 })
+        json.text("channelHandle"), json.nonNegativeLong("videoCount"))
 }

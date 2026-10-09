@@ -43,7 +43,7 @@ class CommunityPresentationTest {
         } }
         for (isDark in listOf(false, true)) {
             compose.runOnIdle { dark = isDark }
-            val likes = compose.onNodeWithContentDescription("7137 likes").assert(hasClickAction().not()).fetchSemanticsNode().boundsInRoot
+            val likes = compose.onNodeWithContentDescription(DisplayFormats.audience(7137, "like")).assert(hasClickAction().not()).fetchSemanticsNode().boundsInRoot
             val share = compose.onNodeWithContentDescription("Share post").assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
             val row = compose.onNodeWithTag("post-actions-Ugpost1").fetchSemanticsNode().boundsInRoot
             val shareBounds = share.fetchSemanticsNode().boundsInRoot
@@ -52,7 +52,7 @@ class CommunityPresentationTest {
             assertEquals(likes.center.y, shareBounds.center.y, 1f)
             for (value in listOf(1234L, 0L, null)) {
                 compose.runOnIdle { count = value }
-                val expected = value?.let { "Comments (${java.text.NumberFormat.getIntegerInstance().format(it)})" } ?: "Comments"
+                val expected = value?.let { "Comments (${DisplayFormats.compact(it)})" } ?: "Comments"
                 val button = compose.onNodeWithTag("post-comments-Ugpost1").assertTextEquals(expected).assertHeightIsAtLeast(48.dp)
                 val bounds = button.fetchSemanticsNode().boundsInRoot
                 assertEquals(row.left, bounds.left, 1f); assertEquals(row.width, bounds.width, 1f)

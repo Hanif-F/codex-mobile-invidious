@@ -62,8 +62,7 @@ import net.wingress.mobivious.data.ChapterRules
 
 internal fun playerTime(ms: Long): String {
     val seconds = ms.coerceAtLeast(0) / 1000
-    return if (seconds >= 3600) String.format(Locale.US, "%d:%02d:%02d", seconds / 3600, seconds / 60 % 60, seconds % 60)
-    else String.format(Locale.US, "%d:%02d", seconds / 60, seconds % 60)
+    return net.wingress.mobivious.data.DisplayFormats.clock(seconds)
 }
 internal fun speedLabel(speed: Float) = "${speed.toString().removeSuffix(".0")}×"
 

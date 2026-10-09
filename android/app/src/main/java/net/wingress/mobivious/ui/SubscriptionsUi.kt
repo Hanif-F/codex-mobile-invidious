@@ -1,6 +1,5 @@
 package net.wingress.mobivious.ui
 
-import android.text.format.DateUtils
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.SubscriptionChannelsState
 import net.wingress.mobivious.data.SubscriptionSort
+import net.wingress.mobivious.data.DisplayFormats
 
 @Composable
 internal fun SubscriptionChannelsScreen(state: SubscriptionChannelsState, server: String, thinMode: Boolean,
@@ -68,12 +68,11 @@ internal fun SubscriptionChannelsScreen(state: SubscriptionChannelsState, server
                 ListItem(headlineContent = { Text(channel.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
                     supportingContent = state.stats[channel.id]?.let { data -> ({
                         Column {
-                            val upload = data.latestUpload?.let { DateUtils.getRelativeTimeSpanString(it * 1000, System.currentTimeMillis(),
-                                DateUtils.MINUTE_IN_MILLIS, DateUtils.FORMAT_ABBREV_RELATIVE).toString() }
+                            val upload = relativePublication(data.latestUpload).takeIf(String::isNotBlank)
                             Text(upload?.let { "Last upload: $it" } ?: "Last upload unknown")
                             val total = state.effectiveSort == SubscriptionSort.MOST_WATCHED
                             val count = if (total) data.allTimeWatched else data.recentWatched
-                            Text("$count ${if (count == 1) "video" else "videos"} watched ${if (total) "all time" else "in the last 90 days"}")
+                            Text("${DisplayFormats.inventory(count.toLong(), "video")} watched ${if (total) "all time" else "in the last 90 days"}")
                         }
                     }) },
                     leadingContent = if (thinMode) null else ({ ChannelAvatar(server, channel.image, channel.name, 40.dp, "subscription-channel-avatar-${channel.id}") }),

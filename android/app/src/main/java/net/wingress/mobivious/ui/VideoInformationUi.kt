@@ -17,8 +17,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.*
-import java.text.DateFormat
-import java.util.Date
 import java.util.Locale
 
 /** Explicit browser targets prevent unsupported bundled links from returning to MainActivity. */
@@ -38,9 +36,7 @@ internal fun openExternalContent(context: Context, url: String, failed: () -> Un
 internal fun VideoNotices(details: VideoDetails) {
     if (details.listed == false) Text("Unlisted", Modifier.testTag("video-unlisted"), style = MaterialTheme.typography.labelLarge)
     if (details.upcoming == true || details.premiereTimestamp != null || details.notice.isNotBlank()) {
-        val date = details.premiereTimestamp?.takeIf { it <= Long.MAX_VALUE / 1000 }?.let {
-            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it * 1000))
-        }
+        val date = DisplayFormats.timestamp(details.premiereTimestamp).takeIf(String::isNotBlank)
         val notice = details.notice.ifBlank { if (details.upcoming == true) "Upcoming video" else "Premiere" }
         Text(listOfNotNull(notice, date).joinToString(" · "), Modifier.testTag("video-premiere"), style = MaterialTheme.typography.bodyMedium)
     }
@@ -51,9 +47,22 @@ internal fun VideoDescription(details: VideoDetails, occurrence: String, server:
     AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
         exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
         Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            VideoStatistics(details)
             NativeRichText(details.description, details.descriptionHtml, occurrence, server, details.video.id, link, tag = "watch-description-text")
             VideoInformation(details, occurrence, server, link)
         }
+    }
+}
+
+@Composable
+internal fun VideoStatistics(details: VideoDetails) {
+    val views = details.video.views.takeIf { details.video.viewCountPrecision == CountPrecision.EXACT }
+    val likes = details.likes.takeIf { details.likeCountPrecision == CountPrecision.EXACT }
+    if (views == null && likes == null && details.video.publishedAt == null) return
+    Column(Modifier.fillMaxWidth().testTag("video-statistics"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        DisplayFormats.inventory(views, "view").takeIf(String::isNotBlank)?.let { Text(it, Modifier.testTag("video-exact-views")) }
+        DisplayFormats.inventory(likes, "like").takeIf(String::isNotBlank)?.let { Text(it, Modifier.testTag("video-exact-likes")) }
+        details.video.publishedAt?.let { Text("Published: ${DisplayFormats.timestamp(it, dateOnly = true)}", Modifier.testTag("video-published-date")) }
     }
 }
 

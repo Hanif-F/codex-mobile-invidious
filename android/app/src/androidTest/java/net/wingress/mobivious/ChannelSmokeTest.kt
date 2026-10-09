@@ -61,6 +61,24 @@ class ChannelSmokeTest {
         compose.onNodeWithText("Load more").performClick()
     }
 
+    @Test fun shortsHideEpochDatesAndUnknownDurationsWithoutDetailRequests() {
+        command("""{"channelTabs":["videos","shorts"],"shortsMetadata":{"published":0,"publishedText":"56 years ago","lengthSeconds":0,"viewCount":5600000}}""")
+        openChannel()
+        fun detailRequests(): Int = fixture().getJSONArray("allRequests").let { raw ->
+            (0 until raw.length()).count { raw.getJSONObject(it).getString("path").startsWith("/api/v1/videos/") }
+        }
+        val before = detailRequests()
+        choose(ChannelTab.SHORTS)
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-metadata-testvideo01"))
+        compose.onNodeWithTag("video-metadata-testvideo01").assertTextEquals(net.wingress.mobivious.data.DisplayFormats.audience(5600000, "view"))
+        compose.onNodeWithText("56 years ago", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("0:00").assertDoesNotExist()
+        loadMore()
+        until { activity.model.browse.value.end }
+        assertEquals(2, activity.model.browse.value.videos.size)
+        assertEquals(before, detailRequests())
+    }
+
     @Test fun channelNavigationSwitchingAndIndependentPagination() {
         openChannel()
         assertNull(activity.model.browse.value.error)

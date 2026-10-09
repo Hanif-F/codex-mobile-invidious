@@ -42,8 +42,8 @@ internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Bool
             ChannelAuthor(server, channel.image, channel.name, !thinMode, size = 48.dp, tag = "related-avatar-${channel.id}")
             if (channel.verified) Text("Verified channel", style = MaterialTheme.typography.labelSmall)
             if (channel.handle.isNotBlank()) Text(channel.handle, style = MaterialTheme.typography.bodySmall)
-            if (channel.subscribers.isNotBlank()) Text("${channel.subscribers} subscribers", style = MaterialTheme.typography.bodySmall)
-            channel.videoCount?.let { Text("$it videos", style = MaterialTheme.typography.bodySmall) }
+            DisplayFormats.subscribers(channel.subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            channel.videoCount?.let { Text(DisplayFormats.inventory(it, "video"), style = MaterialTheme.typography.bodySmall) }
             if (channel.description.isNotBlank()) Text(channel.description, maxLines = 3, style = MaterialTheme.typography.bodyMedium)
         }
     }
@@ -82,7 +82,7 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, comments: 
                             }
                         }
                     }
-                    attachment.votes?.let { Text("${java.text.NumberFormat.getIntegerInstance().format(it)} votes", style = MaterialTheme.typography.bodySmall) }
+                    attachment.votes?.let { Text(DisplayFormats.audience(it, "vote"), style = MaterialTheme.typography.bodySmall) }
                 }
                 PostAttachment.Unavailable -> Text("Attachment unavailable", style = MaterialTheme.typography.bodyMedium)
                 null -> Unit
@@ -111,10 +111,10 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
     val validId = PostLinks.validId(post.id)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(Modifier.fillMaxWidth().testTag("post-actions-${post.key}"), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.semantics(mergeDescendants = true) { contentDescription = "${post.comment.likes} likes" },
+            if (post.comment.likes != null) Row(Modifier.semantics(mergeDescendants = true) { contentDescription = DisplayFormats.audience(post.comment.likes, "like") },
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(Icons.Default.ThumbUpOffAlt, null, Modifier.size(18.dp))
-                Text(java.text.NumberFormat.getIntegerInstance().format(post.comment.likes), style = MaterialTheme.typography.labelMedium)
+                Text(DisplayFormats.compact(post.comment.likes), style = MaterialTheme.typography.labelMedium)
             }
             Spacer(Modifier.weight(1f))
             IconButton(onClick = share, enabled = validId,
@@ -126,7 +126,7 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("post-comments-${post.key}")) {
             Icon(Icons.Default.ChatBubbleOutline, null, Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
-            Text(post.commentCount?.let { "Comments (${java.text.NumberFormat.getIntegerInstance().format(it)})" } ?: "Comments")
+            Text(post.commentCount?.let { "Comments (${DisplayFormats.compact(it)})" } ?: "Comments")
         }
     }
 }

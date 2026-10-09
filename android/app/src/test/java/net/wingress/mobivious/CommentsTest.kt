@@ -28,7 +28,7 @@ class CommentsTest {
     }
     @Test fun legacyCommentsAndMissingOptionalFieldsRemainReadable() {
         val c = CommentPage.parse(JSONObject("""{"comments":[{"author":"Viewer","content":"Plain","authorThumbnails":[{"url":"small"},{"url":"large"}],"likeCount":-1}]}""")).items.single()
-        assertEquals("large", c.avatar); assertEquals("Plain", c.text); assertEquals(0L, c.likes)
+        assertEquals("large", c.avatar); assertEquals("Plain", c.text); assertNull(c.likes)
         assertEquals("", c.html); assertEquals("", c.replyContinuation); assertNull(c.heart)
         assertEquals(c.key, c.copy().key)
         val empty = CommentPage.parse(JSONObject("""{"comments":[],"commentCount":0}"""))

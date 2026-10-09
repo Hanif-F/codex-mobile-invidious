@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import net.wingress.mobivious.data.Playlist
+import net.wingress.mobivious.data.DisplayFormats
 import net.wingress.mobivious.data.Avatars
 import net.wingress.mobivious.data.ContentVisibility
 
@@ -51,7 +52,7 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
                     Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     if (list.author.isNotBlank()) PlaylistAuthor(vm, list, prefs.thinMode)
-                    if (!list.mix && list.count >= 0) Text("${list.count} videos", style = MaterialTheme.typography.bodySmall)
+                    if (!list.mix && list.count >= 0) Text(DisplayFormats.inventory(list.count.toLong(), "video"), style = MaterialTheme.typography.bodySmall)
                 }
             }
             PlaylistSubscriptionButton(vm, list, signIn)
@@ -69,7 +70,7 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
         Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         if (list.author.isNotBlank()) PlaylistAuthor(vm, list, prefs.thinMode)
-        if (!list.mix && list.count >= 0) Text("${list.count} videos")
+        if (!list.mix && list.count >= 0) Text(DisplayFormats.inventory(list.count.toLong(), "video"))
         if (list.description.isNotBlank()) Text(list.description, style = MaterialTheme.typography.bodySmall)
         FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = play) { Icon(Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text("Play") }

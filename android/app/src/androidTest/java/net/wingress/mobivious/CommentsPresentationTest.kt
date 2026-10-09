@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import net.wingress.mobivious.data.Comment
 import net.wingress.mobivious.data.CreatorHeart
+import net.wingress.mobivious.data.DisplayFormats
 import net.wingress.mobivious.ui.CommentRow
 import org.junit.Rule
 import org.junit.Test
@@ -42,7 +43,7 @@ class CommentsPresentationTest {
         compose.onNodeWithText("Pinned").assertExists()
         compose.onNodeWithText("Creator").assertExists()
         compose.onNodeWithText("Member").assertExists()
-        compose.onNodeWithContentDescription("1234 likes").assert(hasClickAction().not())
+        compose.onNodeWithContentDescription(DisplayFormats.audience(1234, "like")).assert(hasClickAction().not())
     }
     @Test fun darkThemeLargeFontsAndNarrowLayoutKeepMetadataReadable() {
         content(true, 2f, 320)
@@ -55,6 +56,6 @@ class CommentsPresentationTest {
         content(false, 1.3f, 640)
         compose.onNodeWithTag("comment-body-rich").assertIsDisplayed()
         compose.onNodeWithContentDescription("Hearted by Studio").assertIsDisplayed()
-        compose.onNodeWithContentDescription("1234 likes").assert(hasClickAction().not())
+        compose.onNodeWithContentDescription(DisplayFormats.audience(1234, "like")).assert(hasClickAction().not())
     }
 }

@@ -148,9 +148,8 @@ object StreamCatalog {
         }.singleOrNull()
     }
     fun find(choices: List<StreamChoice>, key: StreamKey?) = key?.let { wanted -> choices.filter { it.key == wanted }.singleOrNull() }
-    private fun decimal(value: Double, digits: Int) = String.format(Locale.US, "%.${digits}f", value).trimEnd('0').trimEnd('.')
-    fun bitrateLabel(value: Long) = when { value >= 1_000_000 -> "${decimal(value / 1_000_000.0, 2)} Mbps"; value >= 1000 -> "${decimal(value / 1000.0, 1)} kbps"; value > 0 -> "$value bps"; else -> "" }
-    fun bytesLabel(value: Long) = when { value >= 1_000_000_000 -> "${decimal(value / 1_000_000_000.0, 1)} GB"; value >= 1_000_000 -> "${decimal(value / 1_000_000.0, 1)} MB"; value >= 1000 -> "${decimal(value / 1000.0, 1)} kB"; value > 0 -> "$value B"; else -> "" }
+    fun bitrateLabel(value: Long) = net.wingress.mobivious.data.DisplayFormats.bitrate(value)
+    fun bytesLabel(value: Long) = if (value > 0) net.wingress.mobivious.data.DisplayFormats.bytes(value) else ""
     fun codecLabel(codec: String, mime: String): String {
         val tokens = codec.split(',').map { it.trim() }.filter { it.isNotBlank() }
         val token = (if (mime.startsWith("video/")) tokens.firstOrNull { !Regex("^(mp4a|aac|ac-3|ec-3|opus|vorbis|flac)(\\.|$)", RegexOption.IGNORE_CASE).containsMatchIn(it) }

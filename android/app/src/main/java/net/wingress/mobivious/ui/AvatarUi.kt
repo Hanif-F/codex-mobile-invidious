@@ -32,6 +32,7 @@ import net.wingress.mobivious.data.Channel
 import net.wingress.mobivious.data.ChannelImages
 import net.wingress.mobivious.data.ContentVisibility
 import net.wingress.mobivious.data.Video
+import net.wingress.mobivious.data.DisplayFormats
 import java.io.File
 
 /** Shared image cache, keyed by the complete instance URL. */
@@ -89,7 +90,7 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
                     Icon(Icons.Default.Verified, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     Text("Verified channel", style = MaterialTheme.typography.labelSmall)
                 }
-                if (subscribers.isNotBlank()) Text("$subscribers subscribers", style = MaterialTheme.typography.bodySmall)
+                DisplayFormats.subscribers(subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
         }
         val button: @Composable () -> Unit = {
@@ -121,7 +122,7 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
                     Text("Verified channel", style = MaterialTheme.typography.labelSmall)
                 }
                 if (channel.pronouns.isNotBlank()) Text(channel.pronouns, style = MaterialTheme.typography.bodyMedium)
-                Text("${channel.subscribers} subscribers", style = MaterialTheme.typography.bodyMedium)
+                DisplayFormats.subscribers(channel.subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             }
             actions()
         }

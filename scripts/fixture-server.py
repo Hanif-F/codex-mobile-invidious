@@ -149,7 +149,7 @@ def reset_sponsorblock():
 reset_sponsorblock()
 
 def reset_channels():
-    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None, channelRichHeader=False, postRequests=[], postFailNext=False, postDelayNext=0, postEmpty=False, postLongText=False)
+    state.update(channelTabs=['videos', 'streams'], channelDescription='Fixture channel', channelRequests=[], channelFailNext=False, channelDelayNext=None, channelRichHeader=False, shortsMetadata={}, postRequests=[], postFailNext=False, postDelayNext=0, postEmpty=False, postLongText=False)
 reset_channels()
 
 def community_posts():
@@ -284,6 +284,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(dict(playlists=[source_playlist('PLlive' if token is None else 'RDopaque')], continuation=next_token if token is None else None))
             if tab in ('videos', 'shorts'):
                 item = video if token is None else dict(video, videoId='testvideo02', title='Another channel upload')
+                if tab == 'shorts': item = dict(item, **state['shortsMetadata'])
             else:
                 item = dict(video, videoId='streamvid01' if token is None else 'streamvid02', title='Channel stream one' if token is None else 'Channel stream two', liveNow=token is None)
             if state['visibilityVideos'] and token is None: return self.respond(dict(videos=[video, visibility_member], continuation=next_token))
@@ -401,7 +402,7 @@ class Handler(BaseHTTPRequestHandler):
             except (BrokenPipeError, ConnectionResetError): pass
         elif p.endswith('/downloads') and p.startswith('/api/v1/videos/'):
             if state.get('downloadEndpointsMissing'): return self.respond(dict(error='Not found'), 404)
-            metadata = dict(video, description='Downloaded fixture description', lengthSeconds=12)
+            metadata = dict(video, description='Downloaded fixture description', lengthSeconds=state.get('downloadDuration', 12))
             state['downloadRequests'].append(dict(kind='catalog', path=p))
             disabled = state.get('downloadDisabled', False)
             return self.respond(dict(video=metadata, allowed=not disabled, reason='Downloads are disabled by this instance.' if disabled else '', choices=[] if disabled else download_choices()))
@@ -706,7 +707,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/downloads':
-            for key in ('downloadDisabled', 'downloadSlow', 'downloadFailKey', 'downloadEndpointsMissing'):
+            for key in ('downloadDisabled', 'downloadSlow', 'downloadFailKey', 'downloadEndpointsMissing', 'downloadDuration'):
                 if key in data: state[key] = data[key]
             if data.get('resetRequests'): state['downloadRequests'] = []
             return self.respond({})
@@ -800,7 +801,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p in ('/test/channel', '/test/community'):
             if p == '/test/community': state.update(channelTabs=['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'playlists', 'posts', 'channels'], channelRichHeader=True)
-            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext', 'postFailNext', 'postDelayNext', 'postEmpty', 'postLongText'):
+            for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext', 'shortsMetadata', 'postFailNext', 'postDelayNext', 'postEmpty', 'postLongText'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':

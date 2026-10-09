@@ -105,6 +105,12 @@ Public browsing and playback use Invidious APIs. **Account features and some
 enhancements require this fork's mobile server extensions**; support varies on
 other or older instances. Optional metadata is hidden when it is unavailable.
 
+Readable counts and dates work on older instances. Verified exact view/like totals
+in expanded video details and cached Shorts dates/durations require the matching
+server update. Shorts metadata is bundled into the existing channel response;
+uncached dates and durations stay hidden. No database migration or renewed sign-in
+is needed for these display improvements.
+
 If a feature reports a missing API or permission, the instance may need an update.
 After server updates that add token permissions, sign out and sign in again.
 Installing an APK does not update the server.

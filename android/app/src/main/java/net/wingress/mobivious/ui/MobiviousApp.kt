@@ -492,7 +492,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (!generalSearch) items(state.channels, key = { "channel:${it.id}" }) { related ->
                             RelatedChannelCard(related, vm.store.server, prefs.thinMode) { navigate(tab, "channel:${related.id}") }
                         }
-                        if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { "$it videos" } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge) } }
+                        if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { DisplayFormats.inventory(it.toLong(), "video") } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge) } }
                         if (route.isEmpty() && tab == "Subscriptions" && subscriptions.isNotEmpty()) item {
                             androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 items(subscriptions, key = { it.id }) { c -> SubscriptionChannelChip(c, vm.store.server, prefs.thinMode) { navigate("Subscriptions", "channel:${c.id}") } }
@@ -568,8 +568,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
 @Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PlayCircleOutline, null, Modifier.size(48.dp), MaterialTheme.colorScheme.primary); Text(title, style = MaterialTheme.typography.titleLarge); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant); FilledTonalButton(onClick = onClick) { Text(action) } } }
 @Composable private fun ErrorCard(message: String, retry: () -> Unit) { Card(Modifier.padding(16.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(16.dp)) { Text(message); OutlinedButton(onClick = retry) { Text("Retry") } } } }
 internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
-internal fun time(seconds: Long): String = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60) else "%d:%02d".format(seconds / 60, seconds % 60)
-private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0); value >= 1000 -> "%.1fK".format(value / 1000.0); else -> "$value" }
+internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
 @Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove", avatarOwner: String? = null,
     removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true, aiGroup: AiPageGroup = vm.aiPageGroup()) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
@@ -591,7 +590,8 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     .background(Color.Black.copy(alpha = .8f)).padding(horizontal = 8.dp, vertical = 4.dp)
                     .testTag("video-watched-${video.id}"), color = Color.White, style = MaterialTheme.typography.labelMedium)
             }
-            Text(if(video.live) "LIVE" else if (video.history != null && video.duration <= 0) "Unknown duration" else time(video.duration), Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .8f)).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, fontSize = 12.sp)
+            val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
+            if (duration.isNotBlank()) Text(duration, Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .8f)).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, fontSize = 12.sp)
             indicator.bar?.let { fraction ->
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp)
                     .testTag("video-progress-${video.id}").semantics {
@@ -611,11 +611,10 @@ private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".fo
                     video.author.ifBlank { "Unknown channel" }, Avatars.show(prefs.thinMode, video.channelId, avatarOwner),
                     size = if (compact) 24.dp else 32.dp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
-                Text(listOf(if(video.views > 0) "${count(video.views)} views" else "", video.published).filter { it.isNotBlank() }.joinToString(" · "),
-                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                VideoMetadataLine(video, Modifier.padding(top = 4.dp))
                 video.history?.let { history ->
-                    Text("Released: ${history.released ?: "Unknown date"}", style = MaterialTheme.typography.bodySmall)
-                    Text("Watched: ${history.watched ?: "Unknown watch date"}", style = MaterialTheme.typography.bodySmall)
+                    Text("Released: ${DisplayFormats.date(history.released).ifBlank { "Unknown date" }}", style = MaterialTheme.typography.bodySmall)
+                    Text("Watched: ${DisplayFormats.date(history.watched).ifBlank { "Unknown watch date" }}", style = MaterialTheme.typography.bodySmall)
                     if (video.unavailable) Text("Video ID: ${video.id}", style = MaterialTheme.typography.bodySmall)
                     if (video.duration <= 0) Text("Duration: Unknown", style = MaterialTheme.typography.bodySmall)
                     else if (prefs.thinMode) Text("Duration: ${time(video.duration)}", style = MaterialTheme.typography.bodySmall)
@@ -755,7 +754,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         if (playback.downloadId != null) Text(details.video.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         else DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         VideoNotices(details)
-                        Text(listOf("${count(details.video.views)} views", details.likes?.let { "${count(it)} likes" }, details.video.published.takeIf(String::isNotBlank)).filterNotNull().joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        VideoMetadataLine(details.video, likes = details.likes)
                         if (playback.downloadId != null) DownloadChannelIdentity(details.video)
                         else WatchChannelIdentity(details.video, vm.store.server, prefs.thinMode,
                             subscriptions.any { it.id == details.video.channelId }, subscribe = {

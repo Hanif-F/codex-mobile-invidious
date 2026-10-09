@@ -119,7 +119,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
     }
     LaunchedEffect(Unit) { vm.downloads.refresh() }
     LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Downloaded", style = MaterialTheme.typography.headlineMedium); Text("Saved on this device · ${records.size} downloads", style = MaterialTheme.typography.bodySmall) }
+        item { Text("Downloaded", style = MaterialTheme.typography.headlineMedium); Text("Saved on this device · ${DisplayFormats.inventory(records.size.toLong(), "download")}", style = MaterialTheme.typography.bodySmall) }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = vm.downloads::refresh) { Text("Retry") } } }
         if (export.phase.isNotBlank()) item {
             Column { Text("Export: ${export.phase}", Modifier.testTag("download-export-status")); if (export.error.isNotBlank()) Text(export.error, color = MaterialTheme.colorScheme.error)
@@ -136,13 +136,14 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
                             Icon(Icons.Default.OndemandVideo, null)
                             if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         }
-                        Column(Modifier.weight(1f)) { Text(video.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis); Text("${video.duration / 60}:${(video.duration % 60).toString().padStart(2, '0')}", style = MaterialTheme.typography.bodySmall) }
+                        Column(Modifier.weight(1f)) { Text(video.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                            DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) } }
                     }
                     DownloadChannelIdentity(video)
                     record.assets.filterNot { it.artwork }.forEach { asset -> Text(choiceLabel(asset.choice), style = MaterialTheme.typography.bodySmall) }
                     val incomplete = record.assets.filterNot { it.artwork }.filter { it.status != DownloadStatus.COMPLETE }
                     val status = if (record.playable && incomplete.isEmpty()) "Downloaded" else if (incomplete.any { it.status == DownloadStatus.FAILED }) "Some files failed" else if (record.active) "Downloading" else "Cancelled"
-                    Text("$status · ${StreamCatalog.bytesLabel(record.bytes)}${if (record.total > 0) " / ${StreamCatalog.bytesLabel(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall)
+                    Text("$status · ${DisplayFormats.bytes(record.bytes)}${if (record.total > 0) " / ${DisplayFormats.bytes(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall)
                     if (record.active) { if (record.total > 0) LinearProgressIndicator(progress = { (record.bytes.toFloat() / record.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()) }
                     incomplete.firstOrNull { it.error.isNotBlank() }?.let { Text(it.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {

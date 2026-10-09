@@ -25,7 +25,7 @@ object History {
             else -> HistoryGroup.OLDER
         }
     }
-    private fun entry(json: JSONObject): Video = ApiParser.video(json).copy(published = "",
+    private fun entry(json: JSONObject): Video = ApiParser.video(json).copy(published = "", publishedAt = null,
         title = json.text("title").ifBlank { "Unavailable video" }, unavailable = json.text("title").isBlank(),
         author = json.text("channel_name").ifBlank { json.text("channel_id").ifBlank { "Unknown channel" } },
         history = HistoryMetadata(date(json.text("release_date")), date(json.text("latest_watched"))))

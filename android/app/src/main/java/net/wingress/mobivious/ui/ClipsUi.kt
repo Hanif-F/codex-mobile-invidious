@@ -66,10 +66,6 @@ import coil.transform.Transformation
 import kotlinx.coroutines.delay
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.R
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
@@ -81,9 +77,7 @@ internal fun copyClip(context: Context, clip: Clip, vm: AppViewModel) {
     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Clip", clip.permalink))
     vm.message.value = "Clip link copied"
 }
-private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
-    "Clipped " + DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).format(Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault()))
-}.orEmpty()
+private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.createdAt, dateOnly = true).takeIf(String::isNotBlank)?.let { "Clipped $it" }.orEmpty()
 
 @Composable internal fun ClipCard(vm: AppViewModel, clip: Clip, play: () -> Unit) {
     val context = LocalContext.current
@@ -164,7 +158,7 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
                     AsyncImage(resolved(clip.server, source.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    Text(time(source.duration), Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = .8f)).padding(3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                    DisplayFormats.duration(source.duration).takeIf(String::isNotBlank)?.let { Text(it, Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = .8f)).padding(3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall) }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(source.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
