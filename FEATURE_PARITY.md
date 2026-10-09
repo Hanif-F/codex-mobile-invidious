@@ -2,8 +2,8 @@
 
 Reviewed on **9 October 2026** against the local source checkouts:
 
-- Web: `../invidious` at `ebcba78c` plus the native AI classification API update. Includes this fork's custom features and native API extensions.
-- Android: `c19a818` plus native AiSList filtering. Configured version: `0.8.0` (version code 15); release tag: `v0.8.0`.
+- Web: `../invidious` at `745aee76`, including the native AI classification API update. Includes this fork's custom features and native API extensions.
+- Android: `bece3f7` plus release metadata. Configured version: `0.9.0` (version code 16); release tag: `v0.9.0`.
 
 **The status column describes implementation in the Android app compared with the web version, within the intended native scope.** The web feature is the baseline; a server endpoint by itself does not count as an Android feature unless the app uses it and provides the relevant interaction. Deliberately omitted web capabilities are recorded under [Intentionally excluded parity](#intentionally-excluded-parity) and do not make the related native feature Partial.
 

@@ -3020,3 +3020,44 @@ The server needs migration **22** and the matching `/api/v1/ai/status`,
 `/api/v1/ai/channels` and preference PATCH extensions. No new migration or token
 renewal is needed beyond those prerequisites. Older instances leave unresolved
 videos visible and explain the missing API in AI settings.
+
+## Mobivious 0.9.0 release — 9 October 2026
+
+The release includes native AiSList filtering from `bece3f7` and the Android
+Autofill improvements from `c19a818`. Version name is **0.9.0**, version code
+**16**, and application ID remains `net.wingress.mobivious`.
+
+| Check | Result |
+|---|---|
+| `scripts/build-release.sh` | Passed; signed release APK built |
+| Android unit/API tests | 329 passed, no failures or skipped tests |
+| Release lint | Passed; 30 warnings, no errors |
+| Android compatibility | Minimum API 26; target/compile API 37; arm64-v8a, armeabi-v7a, x86 and x86_64 |
+| Signing continuity | Same existing certificate as the published v0.8.0 APK |
+| APK SHA-256 | `f2fee4a6bcf93544d1be998f31c4f75a03b7a1b23d3f94e1cb0e9ded91a97e49` |
+| APK bytes | 18,650,330 |
+| Signed emulator update | v0.8.0/15 to v0.9.0/16 using `adb install -r`; original install timestamp retained |
+| Signed cold launch | Popular feed visible on emulator-5554; app process running without a fatal startup exception |
+
+The prior local v0.8.0 APK matches GitHub's published digest
+`17c451a0f893e025006bad5bb51bad6ae5352ae333560dfd37db653697259e62`.
+Both APKs use signing certificate SHA-256
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+
+The preceding AiSList entry records the 19 focused emulator scenarios, 21 Crystal
+examples and account/mobile API database harness for this implementation. Release
+acceptance adds the signed build, checksum/certificate checks and signed emulator
+update/cold launch. Real Proton Pass provider compatibility and accepted video
+conversion on physical hardware remain unverified as documented above.
+
+AI filtering requires the matching sibling server update `745aee76` and migration
+**22**, providing the public classification/status APIs and canonical preference
+patch fields. No additional migration or token renewal is introduced. Publishing
+the APK does not deploy the server; this release performs no production server
+changes.
+
+Assets are `artifacts/Mobivious-0.9.0.apk` and its `.apk.sha256` file, with notes
+in `artifacts/release-notes-0.9.0.md`. Build/lint, signing, metadata, screenshot and
+signed startup evidence is retained under the ignored `artifacts/release-0.9.0/`
+directory. Release target:
+[GitHub Releases v0.9.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.9.0).
