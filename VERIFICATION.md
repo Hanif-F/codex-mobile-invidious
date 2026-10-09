@@ -2944,3 +2944,32 @@ Artifacts are `artifacts/Mobivious-0.8.0.apk` and its `.apk.sha256` file; notes 
 `artifacts/release-notes-0.8.0.md`. Build/lint, signing, metadata and signed launch
 evidence is retained in the ignored `artifacts/release-0.8.0/` directory.
 Publication targets [GitHub Releases v0.8.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.8.0).
+
+## Sign-in and signup autofill — 9 October 2026
+
+Sign-in now exposes username and password content types to Android Autofill.
+Signup exposes new-username and new-password types, including its confirmation
+field. Password masking, in-memory credential state and CAPTCHA handling are
+unchanged. No backend or dependency update is required.
+
+| Check | Result |
+|---|---|
+| Android debug unit tests | 317 passed |
+| Debug app and instrumentation APK builds | Passed |
+| Android debug lint | Passed; 19 existing warnings, no errors or findings in the changed files |
+| Focused account emulator tests | 5 passed on Pixel 8 Pro, Android 16 / API 36 |
+| Real Proton Pass autofill | Pending; Proton Pass is not installed on this emulator |
+
+The three autofill scenarios in `AccountNavigationSmokeTest` verify field content
+types, field-specific `OnFillData` callbacks with either sign-in field focused,
+signup password/confirmation isolation and matching, successful fixture-backed
+sign-in/signup, and updated hints and cleared secrets when switching modes. The
+existing contextual signup/credential-change and session/token/deletion checks
+also passed. All account writes targeted the disposable localhost fixture.
+
+Automated callback checks do not establish Proton Pass provider compatibility.
+Manual acceptance remains: with Proton Pass configured as Android's autofill
+service and a saved login containing both values, select the login from each
+focused field in turn. Both values must fill their respective fields, and the
+password must never appear in the username field. Also check signup's generated
+password and confirmation fields.

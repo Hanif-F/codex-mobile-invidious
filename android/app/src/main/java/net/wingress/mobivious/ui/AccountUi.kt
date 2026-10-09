@@ -18,8 +18,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -85,10 +88,10 @@ internal fun AccountSettingsContent(vm: AppViewModel, page: String, modifier: Mo
 }
 
 @Composable
-private fun SecretField(value: String, update: (String) -> Unit, label: String, tag: String, enabled: Boolean) {
+private fun SecretField(value: String, update: (String) -> Unit, label: String, tag: String, enabled: Boolean, modifier: Modifier = Modifier) {
     OutlinedTextField(value, update, label = { Text(label) }, singleLine = true, enabled = enabled,
         visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        modifier = Modifier.fillMaxWidth().testTag(tag))
+        modifier = modifier.fillMaxWidth().testTag(tag))
 }
 
 @Composable
@@ -123,11 +126,14 @@ private fun AuthenticationForm(vm: AppViewModel, context: ApiContext) {
         FilterChip(signup, onClick = { if (!busy) signup = true }, label = { Text("Create account") })
     }
     OutlinedTextField(username, { username = it }, label = { Text("Username") }, singleLine = true,
-        enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("account-username"))
-    SecretField(password, { password = it }, "Password", "account-password", !busy)
+        enabled = !busy, modifier = Modifier.fillMaxWidth().testTag("account-username")
+            .semantics { contentType = if (signup) ContentType.NewUsername else ContentType.Username })
+    SecretField(password, { password = it }, "Password", "account-password", !busy,
+        Modifier.semantics { contentType = if (signup) ContentType.NewPassword else ContentType.Password })
     if (signup) {
         Text("Use 3–32 letters, numbers, underscores, dots or hyphens. Passwords need at least 15 characters, at most 72 UTF-8 bytes, and must not be common.", style = MaterialTheme.typography.bodySmall)
-        SecretField(confirmation, { confirmation = it }, "Confirm password", "account-confirm-password", !busy)
+        SecretField(confirmation, { confirmation = it }, "Confirm password", "account-confirm-password", !busy,
+            Modifier.semantics { contentType = ContentType.NewPassword })
         if (config?.enabled == false) Text("Registration is disabled on this instance.", color = MaterialTheme.colorScheme.error)
         if (config?.captchaImage?.isNotEmpty() == true) {
             AsyncImage(config!!.captchaImage, "CAPTCHA clock: enter its time as hour:minute:second", Modifier.size(200.dp).testTag("account-captcha"))

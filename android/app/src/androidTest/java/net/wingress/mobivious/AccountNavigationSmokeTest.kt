@@ -2,6 +2,11 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.autofill.FillableData
+import androidx.compose.ui.autofill.createFromText
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.geometry.Offset
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -59,6 +64,92 @@ class AccountNavigationSmokeTest {
             val requests = JSONObject(URL("http://127.0.0.1:18080/test/state").readText()).getJSONArray("preferencesRequests")
             (0 until requests.length()).any { !requests.getJSONObject(it).getBoolean("completed") }
         }
+    }
+
+    private fun openAuthentication() {
+        compose.onNodeWithTag("navigation-You").performClick()
+        compose.onNodeWithText("Sign in").performClick()
+        compose.onNodeWithTag("sign-in-screen").assertExists()
+    }
+
+    private fun assertAutofillType(tag: String, type: ContentType) {
+        compose.onNodeWithTag(tag).assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentType, type))
+    }
+
+    private fun focusField(tag: String) {
+        compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }.assertIsFocused()
+    }
+
+    private fun autofill(tag: String, value: String) {
+        val data = checkNotNull(FillableData.createFromText(value))
+        compose.onNodeWithTag(tag).performSemanticsAction(SemanticsActions.OnFillData) { assertTrue(it(data)) }
+    }
+
+    private fun fieldText(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().config[SemanticsProperties.InputText].text
+
+    @Test fun autofillSignInTargetsBothFieldsRegardlessOfFocus() {
+        openAuthentication()
+        assertAutofillType("account-username", ContentType.Username)
+        assertAutofillType("account-password", ContentType.Password)
+        for ((index, focused) in listOf("account-username", "account-password").withIndex()) {
+            focusField(focused)
+            // Autofill callbacks target field IDs, even when the other field has focus.
+            autofill("account-password", "a distinct autofill password $index")
+            autofill("account-username", "AutofillViewer$index")
+            assertEquals("AutofillViewer$index", fieldText("account-username"))
+            assertEquals("a distinct autofill password $index", fieldText("account-password"))
+            compose.onNodeWithTag(focused).assertIsFocused()
+        }
+        compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
+        until { vm.account.value?.username == "AutofillViewer1" && vm.route.isEmpty() }
+        compose.onNodeWithTag("sign-in-screen").assertDoesNotExist()
+    }
+
+    @Test fun autofillSignupKeepsNewPasswordsAndConfirmationSeparate() {
+        openAuthentication()
+        compose.onNodeWithText("Create account").performClick()
+        assertAutofillType("account-username", ContentType.NewUsername)
+        assertAutofillType("account-password", ContentType.NewPassword)
+        assertAutofillType("account-confirm-password", ContentType.NewPassword)
+        focusField("account-username")
+        autofill("account-password", "a distinct generated signup password")
+        assertEquals("", fieldText("account-username"))
+        assertEquals("", fieldText("account-confirm-password"))
+        focusField("account-password")
+        autofill("account-username", "GeneratedViewer")
+        autofill("account-confirm-password", "a different confirmation password")
+        compose.onNodeWithTag("account-auth-submit").assertIsNotEnabled()
+        autofill("account-confirm-password", "a distinct generated signup password")
+        assertEquals("GeneratedViewer", fieldText("account-username"))
+        assertEquals("a distinct generated signup password", fieldText("account-password"))
+        assertEquals("a distinct generated signup password", fieldText("account-confirm-password"))
+        until { compose.onAllNodes(hasTestTag("account-auth-submit") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
+        until { vm.account.value?.username == "GeneratedViewer" && vm.route.isEmpty() }
+        compose.onNodeWithTag("sign-in-screen").assertDoesNotExist()
+    }
+
+    @Test fun autofillHintsAndSecretsResetWhenSwitchingAuthenticationModes() {
+        openAuthentication()
+        autofill("account-username", "ModeViewer")
+        autofill("account-password", "an existing account password")
+        compose.onNodeWithText("Create account").performClick()
+        assertAutofillType("account-username", ContentType.NewUsername)
+        assertAutofillType("account-password", ContentType.NewPassword)
+        assertAutofillType("account-confirm-password", ContentType.NewPassword)
+        assertEquals("ModeViewer", fieldText("account-username"))
+        assertEquals("", fieldText("account-password"))
+        autofill("account-password", "a generated account password")
+        autofill("account-confirm-password", "a generated account password")
+        compose.onNode(hasText("Sign in") and isSelectable()).performClick()
+        assertAutofillType("account-username", ContentType.Username)
+        assertAutofillType("account-password", ContentType.Password)
+        compose.onNodeWithTag("account-confirm-password").assertDoesNotExist()
+        assertEquals("ModeViewer", fieldText("account-username"))
+        assertEquals("", fieldText("account-password"))
+        compose.onNodeWithTag("account-auth-submit").assertIsNotEnabled()
+        compose.onNodeWithText("Create account").performClick()
+        assertEquals("", fieldText("account-confirm-password"))
     }
 
     @Test fun delayedAccountPreferencesKeepThePageOpenedWhileTheyLoad() {
