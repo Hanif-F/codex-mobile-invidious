@@ -161,7 +161,7 @@ object LocalPreferences {
     }
     fun read(raw: JSONObject): AccountPreferences {
         val clean = typed(raw, AccountPreferences().json())
-        val p = AccountPreferences.parse(clean)
+        val p = AccountPreferences.parse(clean).copy(aiFilter = AiFilterSettings.parse(raw))
         val allowedHomes = listOf("", "Popular", "Trending")
         return p.copy(watchHistory = false, defaultPlaylist = "", latestOnly = false, unseenOnly = false, notificationsOnly = false,
             maxResults = p.maxResults.takeIf { it in 1..1500 } ?: 40,

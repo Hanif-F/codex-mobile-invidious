@@ -107,6 +107,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val offline by vm.offline.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
     val searchVisibility by vm.searchVisibility.collectAsStateWithLifecycle()
+    val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val search by vm.searchInput.collectAsStateWithLifecycle()
     val scopedSearch by vm.scopedSearch.collectAsStateWithLifecycle()
     val selectedTab by vm.navigation.collectAsStateWithLifecycle()
@@ -122,7 +123,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     LaunchedEffect(browseReset) {
         if (browseReset > handledBrowseReset) { browseList.scrollToItem(0); handledBrowseReset = browseReset }
     }
-    val visibleVideos = ContentVisibility.filter(state.videos, vm.contentSurface(), prefs.showMemberVideos, searchVisibility, blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty())
+    val visibleVideos = vm.visibleVideos(state.videos, aiState = aiState)
     var channelDescriptionOpen by rememberSaveable(vm.store.server, channel?.id, route) { mutableStateOf(false) }
     val presentation = rememberPlayerPresentation()
     val watch = presentation.watch
@@ -570,17 +571,20 @@ internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.reso
 internal fun time(seconds: Long): String = if (seconds >= 3600) "%d:%02d:%02d".format(seconds / 3600, seconds / 60 % 60, seconds % 60) else "%d:%02d".format(seconds / 60, seconds % 60)
 private fun count(value: Long): String = when { value >= 1_000_000 -> "%.1fM".format(value / 1_000_000.0); value >= 1000 -> "%.1fK".format(value / 1000.0); else -> "$value" }
 @Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove", avatarOwner: String? = null,
-    removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true) {
+    removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true, aiGroup: AiPageGroup = vm.aiPageGroup()) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val watched by vm.watched.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
     val context = ApiContext(server, account, vm.store.contextGeneration)
     val indicator = WatchedIndicators.forVideo(video, watched.takeIf { it.context == context } ?: WatchedState())
     val compact = prefs.uiDensity == "compact"
+    val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
+    val warning = vm.aiDecision(video, aiGroup, aiState).warning
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp)
         .testTag("video-card-${video.id}").semantics { if (indicator.description.isNotEmpty()) stateDescription = indicator.description }) {
-        if (!prefs.thinMode) Box(Modifier.fillMaxWidth().aspectRatio(if (compact) 2.4f else 16f/9f).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
-            AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), video.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        if (!prefs.thinMode || warning != null) Box(Modifier.fillMaxWidth().then(if (prefs.thinMode) Modifier.height(64.dp) else Modifier.aspectRatio(if (compact) 2.4f else 16f/9f)).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
+            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = prefs.thinMode)
+            else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), video.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             if (indicator.watched) {
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .18f)))
                 Text("Watched", Modifier.align(Alignment.TopStart).padding(8.dp).clip(RoundedCornerShape(5.dp))
@@ -706,6 +710,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val account by vm.account.collectAsStateWithLifecycle()
     val savedPrefs by vm.preferences.collectAsStateWithLifecycle()
+    val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
     val queue by vm.queue.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -786,7 +791,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 playback.details?.let { details ->
                     if (prefs.relatedVideos) {
                         item(key = "watch:up-next") { Text("Up next", Modifier.padding(16.dp).testTag("watch-up-next"), style = MaterialTheme.typography.titleLarge) }
-                        items(ContentVisibility.filter(details.recommendations, ContentSurface.RECOMMENDATIONS, prefs.showMemberVideos, blocked = blocked.takeIf { it.context == vm.api.context() }?.ids.orEmpty()), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn) }
+                        items(vm.visibleVideos(details.recommendations, ContentSurface.RECOMMENDATIONS, AiPageGroup.RECOMMENDATIONS, aiState), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn, aiGroup = AiPageGroup.RECOMMENDATIONS) }
                     }
                 }
             }

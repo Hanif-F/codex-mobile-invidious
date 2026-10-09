@@ -174,3 +174,17 @@ ultrawide media, comments, fullscreen, PiP and queue transitions on a real devic
 before runtime acceptance. Local connected tests are unverified because the
 emulator crashes before boot. No production deployment or release publishing was
 performed for this change.
+
+## Native AI channel filter
+
+Deploy the matching sibling server AI API update and run `--migrate` before server
+startup on existing installations. Migration **22** supplies `ai_slist_snapshots`
+and `channel_handles`; fresh installs already include them. This native extension
+adds no migration or token scopes, and existing native sessions remain valid.
+
+Android uses public `/api/v1/ai/status` and bounded `/api/v1/ai/channels` queries;
+the existing preference PATCH endpoint accepts the master switch and eight action
+fields. Lists and channel resolution stay on the instance. Verify guest/account
+settings, warning thumbnails and recommendation autoplay with the fixture checks
+in `VERIFICATION.md`. Old instances keep browsing and playback available and show
+an update-required message in AI settings. Downloads remain independent.

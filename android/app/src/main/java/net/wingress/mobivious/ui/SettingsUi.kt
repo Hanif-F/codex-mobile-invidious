@@ -62,6 +62,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                     item { HorizontalDivider(Modifier.padding(vertical = 12.dp)) }
                     item { SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate) }
                     item { SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate) }
+                    item { SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate) }
                     item { HorizontalDivider(Modifier.padding(vertical = 12.dp)) }
                     item { SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate) }
                     item { SettingsLink("About", "Version and community data", Icons.Default.Info, navigate) }
@@ -93,6 +94,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     var background by rememberSaveable { mutableStateOf(vm.store.background) }
     var pip by rememberSaveable { mutableStateOf(vm.store.pip) }
     val scope = rememberCoroutineScope()
+    val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
+    LaunchedEffect(page, context) { if (page == "AI channel filter") vm.aiFilter.refreshStatus() }
     val value = AccountPreferences.parse(JSONObject(draft))
     val edited = draft != baseline
     LaunchedEffect(prefs) { if (draft == baseline && !busy) { baseline = prefs.json().toString(); draft = baseline } }
@@ -103,6 +106,32 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
         LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("settings-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             when (page) {
+                "AI channel filter" -> {
+                    item {
+                        Column(Modifier.testTag("ai-filter-master")) {
+                            SettingsToggle("Enable AI Channel Filter", "Pause filtering and warnings without clearing your choices", value.aiFilter.enabled, !busy) { update(value.copy(aiFilter = value.aiFilter.copy(enabled = it))) }
+                        }
+                        if (!value.aiFilter.enabled) Text("Filtering is paused. Edit the actions, then enable the filter and Save to apply them.", style = MaterialTheme.typography.bodySmall)
+                        Text("AiSList is a community classification of channels. Blocklist means high confidence; Warnlist means moderate confidence. Classifications may be incorrect. Invidious does not perform automatic AI detection.", style = MaterialTheme.typography.bodySmall)
+                        aiState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("ai-status-error")) }
+                    }
+                    AiPageGroup.entries.forEach { group -> item {
+                        SettingsHeading(group.label)
+                        Text(when (group) {
+                            AiPageGroup.FEEDS -> "Videos in Popular and Trending."
+                            AiPageGroup.SEARCH -> "Global search and hashtag results."
+                            AiPageGroup.RECOMMENDATIONS -> "Hidden recommendations cannot become automatic playback targets."
+                            AiPageGroup.OTHER -> "Subscriptions, history, channel videos and scoped searches, playlists, mixes, clips and queues. These pages never hide AI matches. Downloads are unchanged."
+                        }, style = MaterialTheme.typography.bodySmall)
+                        AiListKind.entries.forEach { kind ->
+                            Box(Modifier.testTag("ai-choice-${kind.wire}-${group.wire}")) {
+                                SettingsChoice(kind.label, AiAction.entries.filter { group != AiPageGroup.OTHER || it != AiAction.HIDE }.map { it.wire to it.label },
+                                    value.aiFilter.saved(kind, group).wire, !busy) { update(value.copy(aiFilter = value.aiFilter.withAction(kind, group, AiAction.parse(it, group)))) }
+                            }
+                        }
+                    } }
+                    item { AiListDetails(aiState) { scope.launch { vm.aiFilter.refreshStatus() } } }
+                }
                 "Playback" -> {
                     item {
                         SettingsHeading("Playback defaults")
@@ -209,6 +238,28 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
 
 @Composable
 private fun SettingsHeading(title: String) { Text(title, Modifier.padding(top = 8.dp, bottom = 4.dp), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary) }
+
+@Composable
+private fun AiListDetails(state: AiFilterState, refresh: () -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val uri = LocalUriHandler.current
+    Column {
+        TextButton(onClick = { expanded = !expanded }, modifier = Modifier.testTag("ai-list-details")) { Text("List status and technical details") }
+        if (expanded) {
+            AiListKind.entries.forEach { kind ->
+                Text(kind.label, style = MaterialTheme.typography.titleSmall)
+                val list = state.lists[kind]
+                Text(if (list?.available != true) "List unavailable" else "${list.channelCount} channels · Downloaded ${list.updatedAt.orEmpty()}${if (list.stale) " · Stale; using the last successful copy" else ""}",
+                    Modifier.testTag("ai-status-${kind.wire}"), style = MaterialTheme.typography.bodySmall)
+            }
+            Text("Lists refresh on the server every six hours. Matching uses exact channel IDs or normalized handles. Missing handles use the instance’s shared channel cache; unresolved videos stay visible. No account identity or viewing history is sent to AiSList.", style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = refresh, enabled = !state.loading) { Text(if (state.loading) "Refreshing…" else "Refresh status") }
+            TextButton(onClick = { uri.openUri("https://aisloplist.com/") }) { Text("Community classification data: AiSList") }
+            TextButton(onClick = { uri.openUri("https://creativecommons.org/licenses/by-nc/4.0/") }) { Text("CC BY-NC 4.0") }
+            TextButton(onClick = { uri.openUri("https://github.com/Override92/AiSList") }) { Text("AiSList source") }
+        }
+    }
+}
 
 @Composable
 private fun SettingsToggle(label: String, detail: String, value: Boolean, enabled: Boolean, update: (Boolean) -> Unit) {

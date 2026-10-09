@@ -6,6 +6,7 @@ Bind localhost only; ADB reverse exposes it to the emulator for instrumentation.
 import argparse
 from datetime import date
 import json
+import re
 import time
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -48,6 +49,7 @@ default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_wor
                      sort='published', latest_only=False, unseen_only=False, notifications_only=False,
                      default_playlist=None, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
+default_prefs.update(ai_filter_enabled=False, **{f'ai_{kind}_{group}_action': 'off' for kind in ('blocklist', 'warnlist') for group in ('feeds', 'search', 'recommendations', 'other_pages')})
 state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
@@ -128,8 +130,15 @@ def reset_visibility():
     state.update(visibilityVideos=False, hiddenFirstPage=False, blockedChannels={}, failBlockedRead=False, failBlockedWrite=False, visibilityReads=[], memberCurrent=False)
 reset_visibility()
 
+def reset_ai():
+    state.update(aiMatches={}, aiPending=[], aiUnavailable=[], aiStale=[], aiVersion='2026-10-09T00:00:00Z', aiRequests=[], aiMissing=False, aiDelay=0, aiImages='')
+reset_ai()
+
 def browse_videos():
-    if state['visibilityVideos']: return [video, visibility_member, visibility_other]
+    if state['visibilityVideos']:
+        items = [video, visibility_member, visibility_other]
+        if state['aiImages']: return [dict(item, videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg?ai=' + state['aiImages'] + '-' + item['videoId'])]) for item in items]
+        return items
     return [video, recommended, unknown_video, live_video] if state['indicatorVideos'] else [video]
 
 sponsor_categories = ('sponsor', 'selfpromo', 'interaction', 'intro', 'outro', 'preview', 'music_offtopic', 'filler')
@@ -324,6 +333,21 @@ class Handler(BaseHTTPRequestHandler):
         p = url.path
         if not p.startswith('/test/'):
             state['allRequests'].append(dict(method='GET', path=self.path))
+        if p in ('/api/v1/ai/status', '/api/v1/ai/channels'):
+            if state['aiMissing']: return self.respond(dict(error='Not found'), 404)
+            params = parse_qs(url.query)
+            ids = params.get('ids', [''])[0].split(',')
+            kinds = params.get('lists', [''])[0].split(',')
+            lists = {kind: dict(available=kind not in state['aiUnavailable'], stale=kind in state['aiStale'] or kind in state['aiUnavailable'],
+                                channelCount=42 if kind not in state['aiUnavailable'] else 0,
+                                updatedAt=state['aiVersion'] if kind not in state['aiUnavailable'] else None) for kind in ('blocklist', 'warnlist')}
+            if p.endswith('/status'): return self.respond(dict(lists=lists))
+            if not 1 <= len(ids) <= 100 or not all(re.fullmatch(r'UC[A-Za-z0-9_-]{22}', id) for id in ids) or not 1 <= len(kinds) <= 2 or not all(kind in lists for kind in kinds):
+                return self.respond(dict(error='Invalid AI query'), 400)
+            state['aiRequests'].append(dict(ids=ids, lists=kinds, authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
+            if state['aiDelay']: time.sleep(state['aiDelay'] / 1000)
+            return self.respond(dict(lists=lists, channels={id: dict(matches=[kind for kind in kinds if kind in state['aiMatches'].get(id, []) and lists[kind]['available']],
+                                                                  resolved=id not in state['aiPending'] and all(lists[kind]['available'] for kind in kinds)) for id in set(ids)}))
         if p.startswith('/api/v1/storyboards/') and state['clipsEnabled']:
             state['storyboardRequests'].append(dict(path=p, authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
             if state.get('clipStoryboardFail', False): return self.respond(dict(error='No storyboard'), 404)
@@ -490,11 +514,13 @@ class Handler(BaseHTTPRequestHandler):
             tag = unquote(p.rsplit('/', 1)[-1]); page = int(parse_qs(urlparse(self.path).query).get('page', ['1'])[0])
             state['hashtagRequests'].append(dict(tag=tag, page=page, authorized=self.headers.get('Authorization') is not None))
             return self.respond(dict(results=[dict(video, videoId='hashvid%04d' % i, title='Hashtag video ' + str(i)) for i in range(60)] if page == 1 else [recommended]))
-        elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03'):
+        elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03', '/api/v1/videos/othervideo1', '/api/v1/videos/membervid01'):
             if state.get('videoFailNext'):
                 state['videoFailNext'] = False
                 return self.respond(dict(error='Fixture video temporarily unavailable'), 503)
             selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
+            if p.endswith('othervideo1'): selected = visibility_other
+            if p.endswith('membervid01'): selected = visibility_member
             codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
             dash = f'/media/codec/{codec_manifest}' if codec_manifest else '/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd'
             state['videoDetailRequests'].append(dict(videoId=selected['videoId'], query=parse_qs(urlparse(self.path).query)))
@@ -710,6 +736,7 @@ class Handler(BaseHTTPRequestHandler):
             reset_home_subscriptions()
             reset_playback()
             reset_visibility()
+            reset_ai()
             reset_search_history()
             reset_comments()
             reset_chat()
@@ -747,6 +774,11 @@ class Handler(BaseHTTPRequestHandler):
             if 'delayNextMillis' in data: state['preferencesDelayNext'] = data.pop('delayNextMillis')
             prefs.update(data)
             return self.respond(prefs)
+        if p == '/test/ai':
+            for key in ('aiMatches', 'aiPending', 'aiUnavailable', 'aiStale', 'aiVersion', 'aiMissing', 'aiDelay', 'aiImages'):
+                if key in data: state[key] = data[key]
+            if data.get('clearRequests'): state['aiRequests'].clear(); state['allRequests'].clear()
+            return self.respond({})
         if p == '/test/media-reset':
             state['mediaPaths'].clear()
             return self.respond({})

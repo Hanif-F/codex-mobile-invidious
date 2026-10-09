@@ -93,6 +93,9 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Playback defaults, browsing and feed preferences, and channel blocking.
 - **SponsorBlock:** optional segment skipping, category controls and channel overrides.
 - **DeArrow:** optional community titles, an original-title toggle and title contributions.
+- **AI channel filter:** optional AiSList Blocklist/Warnlist actions for discovery,
+  search, recommendations and library pages, with warning thumbnails and shared
+  account settings. Community classifications may be incorrect.
 - Supported preferences shared with the website when signed in; guest preferences
   saved locally for each instance.
 
@@ -105,6 +108,12 @@ other or older instances. Optional metadata is hidden when it is unavailable.
 If a feature reports a missing API or permission, the instance may need an update.
 After server updates that add token permissions, sign out and sign in again.
 Installing an APK does not update the server.
+
+The AI channel filter requires the sibling `/api/v1/ai/status` and
+`/api/v1/ai/channels` extensions and AI preference patch support. Existing server
+installations need migration **22** for the shared list/handle caches. Existing
+preference permissions suffice; signing in again is unnecessary. Unresolved
+channels remain visible, and saved downloads retain their original artwork.
 
 Native downloads require this fork's public `/api/v1/videos/:id/downloads` and
 `/api/v1/videos/:id/download?key=…` endpoints. Deploy the matching sibling server

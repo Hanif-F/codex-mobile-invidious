@@ -2973,3 +2973,50 @@ service and a saved login containing both values, select the login from each
 focused field in turn. Both values must fill their respective fields, and the
 password must never appear in the username field. Also check signup's generated
 password and confirmation fields.
+
+## 9 October 2026 — Native AiSList channel filter
+
+Implemented the final AI channel filter behavior from sibling commits `0756a26b`,
+`cb30cf01` and `ebcba78c`, with public native classification/status APIs and sparse
+account preference support. Downloads retain their existing artwork and playback.
+
+Completed local checks:
+
+- **329 Android unit/API tests passed**, including preferences and legacy parsing,
+  precedence, independent page groups, public request headers, batching/deduplication,
+  five-minute expiry, snapshot invalidation, late responses, context cancellation,
+  the two-second caller wait, background completion and one five-second retry.
+- Debug app and instrumentation APKs built; debug lint passed.
+- **19 emulator checks passed** on the already running `emulator-5554` (Pixel 8 Pro,
+  Android 16): seven `AiFilterSmokeTest` scenarios plus the existing
+  `VisibilitySmokeTest` and `PlaybackQueuePresentationTest` regressions. This covers
+  paused edits and guest saves, account drafts after failed saves, stale list status,
+  fully hidden search pagination, warnings in light/dark/compact/text-only layouts,
+  scoped searches, clips, duplicate queue occurrences and background autoplay.
+  Warning cards issued no original-thumbnail requests; direct playback remained
+  accessible and explicit queues retained ordering and eligibility.
+- **21 focused Crystal examples passed** across the existing AiSList specs, new
+  API specs and native preference validation specs.
+- The full account/mobile API database harness passed against a temporary
+  PostgreSQL 14 container and disposable `invidious_accounts_test` database.
+  New checks exercise public routes through production middleware, exact matching,
+  legacy canonicalization, concurrent sparse edits, unknown preference retention,
+  atomic rejection and CSRF. Normal and API-only server typechecks also passed.
+
+Inspected the settings, status, light/dark warnings, compact/text-only cards, clip
+cards and queue screenshots. Local evidence is saved under the ignored
+`.tools/ai-verification/` directory; generated media is synthetic. No production
+instance was deployed or release published. Physical-device acceptance remains
+outside these emulator checks.
+
+Repeat the focused checks using an already started emulator:
+
+```sh
+scripts/test-android.sh --offline --max-workers=2 \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AiFilterSmokeTest,net.wingress.mobivious.VisibilitySmokeTest,net.wingress.mobivious.PlaybackQueuePresentationTest
+```
+
+The server needs migration **22** and the matching `/api/v1/ai/status`,
+`/api/v1/ai/channels` and preference PATCH extensions. No new migration or token
+renewal is needed beyond those prerequisites. Older instances leave unresolved
+videos visible and explain the missing API in AI settings.

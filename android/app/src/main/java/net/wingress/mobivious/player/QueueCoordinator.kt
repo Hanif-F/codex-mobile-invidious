@@ -36,6 +36,11 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     fun update(value: PlaybackQueueSnapshot) { app.playbackQueue.value = value; changed() }
     fun settings(value: AccountPreferences) {
         prefs = value; prefsContext = app.api.context(); settingsVersion++
+        app.aiFilter.configure(value.aiFilter)
+        if (state.current?.downloadId == null) {
+            app.aiFilter.ensure(state.items.filter { it.downloadId == null }.map { it.video.channelId }, value.aiFilter.active(AiPageGroup.OTHER))
+            app.aiFilter.ensure(state.details?.recommendations.orEmpty().map { it.channelId }, value.aiFilter.active(AiPageGroup.RECOMMENDATIONS))
+        }
         if (state.current?.downloadId == null && value.dearrowEnabled) state.current?.video?.id?.let { app.dearrowTitles.ensure(it) }
         syncDisplayTitle()
     }
@@ -202,7 +207,9 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             if (version == settingsVersion) prefs = fetched
         }
         val prefs = state.effective(this.prefs)
+        app.aiFilter.configure(prefs.aiFilter)
         val details = app.api.video(entry.video.id, prefs.local, entry.linkPlayback?.options?.region, context)
+        app.aiFilter.ensure(details.recommendations.map { it.channelId }, prefs.aiFilter.active(AiPageGroup.RECOMMENDATIONS))
         entry.clip?.let { clip ->
             require(!details.video.live && details.upcoming != true && details.video.duration in 1..Long.MAX_VALUE / 1000 &&
                 clip.endMs <= details.video.duration * 1000 && clip.startMs >= 0 && clip.endMs > clip.startMs) {
@@ -327,8 +334,15 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                 val current = state.current ?: return@launch
                 load(current, token, context, playing = QueueRules.automaticStart(state.effective(prefs)), positionMs = current.linkPlayback?.startMs ?: 0); return@launch
             }
+            if (!state.explicitQueue && state.current?.downloadId == null) {
+                app.aiFilter.prepare((state.items.map { it.video } + state.details?.recommendations.orEmpty()).map { it.channelId }, prefs.aiFilter, AiPageGroup.RECOMMENDATIONS)
+                check(token, context)
+            }
+            fun aiHidden(video: Video) = AiFilter.decide(prefs.aiFilter, AiPageGroup.RECOMMENDATIONS,
+                app.aiFilter.state.value.takeIf { it.context == context }?.matches?.get(video.channelId).orEmpty()).hidden
             fun successor() = QueueRules.successor(state, direction, prefs.showMemberVideos,
-                if (state.explicitQueue) emptySet() else app.blocked.state.value.takeIf { it.context == context }?.ids.orEmpty())
+                if (state.explicitQueue) emptySet() else app.blocked.state.value.takeIf { it.context == context }?.ids.orEmpty() +
+                    state.items.map { it.video }.filter(::aiHidden).map { it.channelId })
             var next = successor()
             while (direction < 0 && QueueRules.missingPreviousIndex(state, next) != null) {
                 val before = state.items.size
@@ -357,7 +371,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             if (next == null && direction > 0 && !state.explicitQueue && state.effective(prefs).continueNext && state.effective(prefs).relatedVideos) {
                 val recommendation = ContentVisibility.filter(state.details?.recommendations.orEmpty(), ContentSurface.RECOMMENDATIONS,
                     prefs.showMemberVideos, blocked = app.blocked.state.value.takeIf { it.context == context }?.ids.orEmpty())
-                    .firstOrNull { !it.unavailable && it.id != state.current?.video?.id }
+                    .firstOrNull { !it.unavailable && it.id != state.current?.video?.id && !aiHidden(it) }
                 if (recommendation != null) { next = QueueOccurrence.local(recommendation); update(state.copy(items = state.items + next)) }
             }
             if (next != null) load(next, token, context,

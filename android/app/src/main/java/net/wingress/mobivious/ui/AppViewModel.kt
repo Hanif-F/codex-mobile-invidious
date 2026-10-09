@@ -192,6 +192,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
     fun openSponsorBlock(channelId: String = "") { sponsorSettingsChannel.value = channelId; refreshSharedSettings() }
     val dearrowTitles = app.dearrowTitles
+    val aiFilter = app.aiFilter
     val dearrowIdentity = MutableStateFlow<DeArrowIdentity?>(null)
     val dearrowIdentityError = MutableStateFlow<String?>(null)
     val dearrowContribution = MutableStateFlow(DeArrowContributionState())
@@ -369,6 +370,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (downloadDialog.value.context != null && downloadDialog.value.context != context) { downloadJob?.cancel(); downloadDialog.value = DownloadDialogState() }
         } }
         viewModelScope.launch { preferences.collect { syncComments(); syncChat(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
+        viewModelScope.launch {
+            combine(preferences, browse, navigation) { prefs, state, destination ->
+                Triple(prefs.aiFilter, AiPageGroup.browsing(destination.first, destination.second),
+                    (state.videos + state.clips.map { it.video } + state.searchResults.filterIsInstance<SearchResult.VideoItem>().map { it.video }).map { it.channelId }.distinct())
+            }.distinctUntilChanged().collect { (settings, group, ids) -> aiFilter.configure(settings); aiFilter.ensure(ids, settings.active(group)) }
+        }
         viewModelScope.launch { watched.map { it.context to it.historyRevision }.distinctUntilChanged().collect { (context, revision) ->
             if (revision > 0 && context == api.context() && subscriptionChannels.value.loaded) refreshSubscriptions()
         } }
@@ -493,13 +500,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         tab == "Subscriptions" -> ContentSurface.SUBSCRIPTIONS
         else -> ContentSurface.DISCOVERY
     }
-    fun visibleVideos(videos: List<Video>, surface: ContentSurface = contentSurface()): List<Video> =
+    fun aiPageGroup() = AiPageGroup.browsing(tab, route)
+    fun aiDecision(video: Video, group: AiPageGroup = aiPageGroup(), state: AiFilterState = aiFilter.state.value) =
+        AiFilter.decide(preferences.value.aiFilter, group, state.takeIf { it.context == api.context() }?.matches?.get(video.channelId).orEmpty())
+    fun visibleVideos(videos: List<Video>, surface: ContentSurface = contentSurface(), aiGroup: AiPageGroup = aiPageGroup(), aiState: AiFilterState = aiFilter.state.value): List<Video> =
         ContentVisibility.filter(videos, surface, preferences.value.showMemberVideos, searchVisibility.value,
-            blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
+            blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty()).filterNot { aiDecision(it, aiGroup, aiState).hidden }
     fun visiblePlaylists(lists: List<Playlist>): List<Playlist> = if (contentSurface() == ContentSurface.SEARCH && !searchVisibility.value.includeBlocked)
         lists.filter { it.channelId !in blocked.value.takeIf { state -> state.context == api.context() }?.ids.orEmpty() } else lists
     fun visibleSearchResults(items: List<SearchResult>) = SearchResults.visible(items, preferences.value.showMemberVideos,
-        searchVisibility.value, blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty())
+        searchVisibility.value, blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty()).filterNot { it is SearchResult.VideoItem && aiDecision(it.video, AiPageGroup.SEARCH).hidden }
     fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
     private fun syncDeArrowMetadata() {
         if (queue.value.current?.clip != null || queue.value.current?.downloadId != null) return
@@ -903,6 +913,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     selectedTab == "You" -> { if (context.account != null) { val loaded = api.playlists(context); if (context == api.context() && revision == playlistRevision) playlists.value = loaded }; emptyList() }
                     else -> api.discovery(selectedDiscovery, selectedRegion, selectedCategory, context)
                 }
+                if (generation == browseGeneration && context == api.context()) aiFilter.prepare(
+                    (videos + clips.map { it.video }).map { it.channelId }, preferences.value.aiFilter, AiPageGroup.browsing(selectedTab, selectedRoute))
                 if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
                     continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
                     posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id },

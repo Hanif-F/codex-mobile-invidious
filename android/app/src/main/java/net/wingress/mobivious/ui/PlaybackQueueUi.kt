@@ -43,6 +43,10 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
     val watched by vm.watched.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
     val titles by vm.dearrowTitles.titles.collectAsStateWithLifecycle()
+    val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
+    LaunchedEffect(state.items.map { it.video.channelId }, prefs.aiFilter) {
+        if (state.current?.downloadId == null) { vm.aiFilter.configure(prefs.aiFilter); vm.aiFilter.ensure(state.items.filter { it.downloadId == null }.map { it.video.channelId }, prefs.aiFilter.active(AiPageGroup.OTHER)) }
+    }
     val current = state.current?.video
     val currentTitle = current?.let { if (prefs.dearrowEnabled) titles[it.id] ?: it.title else it.title }
     val owned = state.source?.owned == true || lists.any { it.id == state.source?.id && it.owned }
@@ -54,6 +58,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
         val eligible = QueueRules.eligible(entry, prefs.showMemberVideos)
         QueueVideoRow(entry, entry.key == state.currentKey, vm.store.server, prefs.thinMode, indicator, eligible,
             hiddenMember = entry.video.membersOnly && !prefs.showMemberVideos,
+            aiWarning = if (entry.downloadId == null) vm.aiDecision(entry.video, AiPageGroup.OTHER, aiState).warning else null,
             play = { vm.selectQueue(entry.key) }, channel = channel,
             title = { modifier -> DeArrowTitle(vm, entry.video, MaterialTheme.typography.titleSmall, modifier, maxLines = 2,
                 fontWeight = if (entry.key == state.currentKey) FontWeight.Bold else FontWeight.Medium) }) {
@@ -140,7 +145,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
 
 @Composable
 internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: String, thinMode: Boolean,
-    indicator: VideoIndicator, eligible: Boolean, hiddenMember: Boolean = false,
+    indicator: VideoIndicator, eligible: Boolean, hiddenMember: Boolean = false, aiWarning: AiListKind? = null,
     play: () -> Unit, channel: (String) -> Unit,
     title: @Composable (Modifier) -> Unit = { modifier -> Text(entry.video.title, modifier, maxLines = 2,
         overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall,
@@ -158,8 +163,9 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
         .clickable(enabled = eligible, role = Role.Button, onClickLabel = "Play ${video.title}", onClick = play)
         .heightIn(min = 96.dp).padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!thinMode) Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface)) {
-            AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
+        if (!thinMode || aiWarning != null) Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface)) {
+            if (aiWarning != null) AiThumbnail(aiWarning, Modifier.fillMaxSize(), compact = true)
+            else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             indicator.bar?.let { fraction ->
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp)

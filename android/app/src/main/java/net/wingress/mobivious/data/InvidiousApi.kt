@@ -232,6 +232,9 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         return ApiParser.videos(JSONObject(scopedRead(path, mapOf("page" to page.toString()), false, context)).optJSONArray("results") ?: JSONArray())
     }
     suspend fun sponsorBlock(id: String, context: ApiContext) = SponsorBlockRules.segments(JSONObject(request("api/v1/sponsorblock/$id", context = context)))
+    suspend fun aiStatus(context: ApiContext) = AiResponse.parse(JSONObject(scopedRead("api/v1/ai/status", emptyMap(), false, context)))
+    suspend fun aiChannels(ids: List<String>, lists: Set<AiListKind>, context: ApiContext) = AiResponse.parse(JSONObject(scopedRead("api/v1/ai/channels",
+        mapOf("ids" to ids.joinToString(","), "lists" to AiListKind.entries.filter { it in lists }.joinToString(",") { it.wire }), false, context)))
     suspend fun channel(id: String, context: ApiContext = context()) =
         ApiParser.channel(JSONObject(scopedRead("api/v1/channels/$id", emptyMap(), false, context)))
     suspend fun channelVideos(id: String, continuation: String = "") = channelVideoPage(id, ChannelTab.VIDEOS, continuation)

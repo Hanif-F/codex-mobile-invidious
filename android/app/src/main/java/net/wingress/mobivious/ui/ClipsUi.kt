@@ -89,12 +89,15 @@ private fun clippedDate(clip: Clip): String = clip.createdAt?.let {
     val context = LocalContext.current
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
+    val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
+    val warning = vm.aiDecision(clip.video, AiPageGroup.OTHER, aiState).warning
     Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
         .padding(horizontal = 16.dp, vertical = 9.dp).testTag("clip-card-${clip.id}"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (!prefs.thinMode) Box(Modifier.width(140.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))
+        if (!prefs.thinMode || warning != null) Box(Modifier.width(140.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)) {
-            AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true)
+            else AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(Modifier.align(Alignment.BottomEnd).padding(5.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .82f))
                 .padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ContentCut, null, Modifier.size(13.dp), Color.White)
