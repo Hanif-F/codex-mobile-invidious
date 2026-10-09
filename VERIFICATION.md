@@ -3061,3 +3061,43 @@ in `artifacts/release-notes-0.9.0.md`. Build/lint, signing, metadata, screenshot
 signed startup evidence is retained under the ignored `artifacts/release-0.9.0/`
 directory. Release target:
 [GitHub Releases v0.9.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.9.0).
+
+## Mobivious 0.9.1 release — 9 October 2026
+
+The patch release includes the data-presentation improvements from `37c6121`:
+compact, locale-aware counts; verified exact totals in expanded video details;
+invalid-date suppression; and consistent durations, sizes and missing values.
+Version name is **0.9.1**, version code **17**, and application ID remains
+`net.wingress.mobivious`.
+
+| Check | Result |
+|---|---|
+| `scripts/build-release.sh` | Passed; signed release APK built |
+| Android unit/API tests | 335 passed, no failures, errors or skipped tests |
+| Release lint | Passed; 30 warnings, no errors |
+| Android compatibility | Minimum API 26; target/compile API 37; arm64-v8a, armeabi-v7a, x86 and x86_64 |
+| Signing continuity | Same certificate as the published v0.9.0 APK |
+| APK SHA-256 | `526a453e265f6ff2d343580455355d0539a449f7dfd7dcd55e001e68d82f584a` |
+| APK bytes | 18,650,330 |
+| Signed emulator update | v0.9.0/16 to v0.9.1/17 using `adb install -r`; original install timestamp retained |
+| Signed cold launch | Activity started successfully and app shell rendered on emulator-5554; no fatal startup exception |
+
+The previous local v0.9.0 APK matches GitHub's published SHA-256
+`f2fee4a6bcf93544d1be998f31c4f75a03b7a1b23d3f94e1cb0e9ded91a97e49`.
+Both APKs use certificate SHA-256
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+The live Popular request showed the server-error/retry state during the signed
+startup check, so that check confirms startup and update installation rather than
+successful production feed loading.
+
+Readable formatting and invalid-date suppression work on older instances.
+Verified exact totals and cached Shorts dates/durations require the sibling server
+metadata update `502af241`. Cache enrichment uses the existing channel response
+without added video-details requests. These display improvements need no new
+database migration or renewed sign-in. This release does not deploy the server.
+
+Assets are `artifacts/Mobivious-0.9.1.apk` and its `.apk.sha256` file, with notes
+in `artifacts/release-notes-0.9.1.md`. Build, lint, signature, package/update,
+startup and screenshot evidence is retained under the ignored
+`artifacts/release-0.9.1/` directory. Release target:
+[GitHub Releases v0.9.1](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.9.1).
