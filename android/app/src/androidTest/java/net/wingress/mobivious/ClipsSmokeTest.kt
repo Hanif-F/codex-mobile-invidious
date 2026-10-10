@@ -116,12 +116,13 @@ class ClipsSmokeTest {
         until { vm.playback.value.position in 4998L..5002L }
         val token = vm.queue.value.token
         val key = vm.queue.value.currentKey
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("mini-player-preview").performClick()
+        until { compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isNotEmpty() }
         val density = activity.resources.displayMetrics.density
         compose.onNodeWithTag("player-gestures").performTouchInput {
-            val start = Offset(width * .5f, height * .2f)
+            val start = Offset(width * .25f, height * .2f)
             swipe(start, start + Offset(0f, 96f * density), durationMillis = 600)
         }
         until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
@@ -262,9 +263,10 @@ class ClipsSmokeTest {
     @Test fun createPreviewFailedPublishDraftAndDeletionCompleteTheFlow() {
         incoming("/watch?v=testvideo01&t=45.6&autoplay=1"); ready()
         until { vm.playback.value.playing }
-        until { compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
-        if (compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
-        compose.onNodeWithTag("create-clip").performScrollTo().performClick()
+        until { compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+        if (compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
+        compose.onNodeWithTag("watch-more").performScrollTo().performClick()
+        compose.onNodeWithTag("create-clip").performClick()
         until { vm.clipEditor.value.open && !vm.clipEditor.value.loadingFrames }
         ui { assertFalse(vm.controller.value!!.playWhenReady) }
         assertEquals(6, vm.clipEditor.value.frames.size)
@@ -365,10 +367,11 @@ class ClipsSmokeTest {
         ui { vm.closePlayer(); vm.store.save(null) }; until { vm.account.value == null && !vm.preferences.value.watchHistory && vm.queue.value.token.isEmpty() && !vm.browse.value.loading }
         compose.waitForIdle()
         incoming("/watch?v=testvideo01&t=40&autoplay=1"); ready()
-        until { vm.playback.value.playing && (compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty()) }
-        if (compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
-        until { compose.onAllNodesWithTag("create-clip").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("create-clip").performScrollTo().performClick()
+        until { vm.playback.value.playing && (compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty()) }
+        if (compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
+        until { compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("watch-more").performScrollTo().performClick()
+        compose.onNodeWithTag("create-clip").performClick()
         until { vm.route == "sign-in" }
         compose.onNodeWithTag("account-username").performScrollTo().performTextInput("fixture-user")
         compose.onNodeWithTag("account-password").performScrollTo().performTextInput("fixture-password")
@@ -410,7 +413,7 @@ class ClipsSmokeTest {
         until { compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Exit full screen").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
         until { compose.onAllNodesWithTag("clip-details-list").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("mini-player-preview").performClick()
         until { compose.onAllNodesWithTag("clip-details-list").fetchSemanticsNodes().isNotEmpty() }

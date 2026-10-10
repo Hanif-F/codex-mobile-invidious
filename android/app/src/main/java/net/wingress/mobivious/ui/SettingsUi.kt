@@ -44,26 +44,28 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
         return
     }
     BackHandler { if (!saving && !accountBusy) back() }
-    Scaffold(topBar = {
-        TopAppBar(title = { Text(page) }, navigationIcon = {
-            IconButton(onClick = back, enabled = !saving && !accountBusy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back from $page") }
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
+        LiquidTopBar(page, large = page == "Settings", navigation = {
+            GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back from $page", enabled = !saving && !accountBusy, onClick = back)
         })
     }) { padding ->
         key(page, context) {
             when (page) {
-                "Settings" -> LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings-root"), contentPadding = PaddingValues(vertical = 12.dp)) {
+                "Settings" -> LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings-root"), contentPadding = PaddingValues(horizontal = Liquid.inset, vertical = 12.dp)) {
                     item { Text(account?.let { "Signed in as ${it.username}" } ?: "Preferences for this device and instance", Modifier.padding(horizontal = 20.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    item { SectionHeading("Your account") }
                     item { SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate) }
+                    item { SectionHeading("Preferences") }
                     item { SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate) }
                     item { SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate) }
                     item { SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate) }
                     item { SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate) }
                     item { SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate) }
-                    item { HorizontalDivider(Modifier.padding(vertical = 12.dp)) }
+                    item { SectionHeading("Community tools") }
                     item { SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate) }
                     item { SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate) }
                     item { SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate) }
-                    item { HorizontalDivider(Modifier.padding(vertical = 12.dp)) }
+                    item { SectionHeading("Connection & app") }
                     item { SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate) }
                     item { SettingsLink("About", "Version and community data", Icons.Default.Info, navigate) }
                 }
@@ -167,6 +169,9 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode, !busy) { update(value.copy(darkMode = it)) }
                     SettingsChoice("Video list density", listOf("balanced" to "Comfortable", "compact" to "Compact"), value.uiDensity, !busy) { update(value.copy(uiDensity = it)) }
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode, !busy) { update(value.copy(thinMode = it)) }
+                    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
+                    SettingsHeading("Accessibility")
+                    SettingsToggle("Reduce transparency", "Use solid controls for stronger contrast. Saves on this device immediately.", reduceTransparency, !busy) { vm.store.reduceTransparency(it) }
                 }
                 "Browsing" -> {
                     item {
@@ -176,7 +181,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     item {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
                         SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
-                        Text("Choose where the app opens. Popular, Trending, Subscriptions and You stay in the bottom bar. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
+                        Text("Choose where the app opens. Popular and Trending live in Discover; Subscriptions and You remain in navigation. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
                         RegionChoice(value.region, !busy, "settings-region") { update(value.copy(region = it)) }
                     }
                     item {
@@ -291,6 +296,12 @@ private fun AboutSettingsScreen(modifier: Modifier) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Mobivious ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall); Text("Powered by Invidious & Companion", Modifier.padding(top = 8.dp)) }
         item { CommunityDataLinks() }
+        item {
+            val uri = LocalUriHandler.current
+            Text("Open source", style = MaterialTheme.typography.titleMedium)
+            Text("Glass rendering uses Backdrop 1.0.6 by Kyant, licensed under Apache 2.0.", style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = { uri.openUri("https://github.com/Kyant0/AndroidLiquidGlass") }) { Text("Backdrop source & license") }
+        }
     }
 }
 

@@ -108,13 +108,12 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
 internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean,
     actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {}, subscribe: () -> Unit) {
     var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(16.dp)) {
+    Column(Modifier.fillMaxWidth().padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
-            AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().aspectRatio(6f)
-                .padding(bottom = 12.dp).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
+            AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(Liquid.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 64.dp, "channel-header-avatar")
+            if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 72.dp, "channel-header-avatar")
             Column(Modifier.weight(1f)) {
                 Text(channel.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                 if (channel.verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

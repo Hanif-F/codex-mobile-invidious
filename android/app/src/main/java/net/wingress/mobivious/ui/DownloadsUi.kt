@@ -118,8 +118,8 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
             .putExtra(Intent.EXTRA_TITLE, "$name-${record.id.take(8)}${asset?.choice?.language?.takeIf(String::isNotBlank)?.let { "-$it" }.orEmpty()}.$extension"))
     }
     LaunchedEffect(Unit) { vm.downloads.refresh() }
-    LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Downloaded", style = MaterialTheme.typography.headlineMedium); Text("Saved on this device · ${DisplayFormats.inventory(records.size.toLong(), "download")}", style = MaterialTheme.typography.bodySmall) }
+    LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = 8.dp, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        item { Text("Saved on this device · ${DisplayFormats.inventory(records.size.toLong(), "download")}", style = MaterialTheme.typography.bodySmall) }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = vm.downloads::refresh) { Text("Retry") } } }
         if (export.phase.isNotBlank()) item {
             Column { Text("Export: ${export.phase}", Modifier.testTag("download-export-status")); if (export.error.isNotBlank()) Text(export.error, color = MaterialTheme.colorScheme.error)
@@ -129,10 +129,10 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
         if (records.isEmpty()) item { Text("Your downloads will appear here. Open a video's Download action to save media and optional captions.") }
         items(records, key = { it.id }) { record ->
             val video = vm.downloads.localDetails(record).video
-            OutlinedCard(Modifier.fillMaxWidth().testTag("download-entry-${record.id}")) {
+            Card(Modifier.fillMaxWidth().testTag("download-entry-${record.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.width(112.dp).height(64.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.width(112.dp).height(64.dp).clip(Liquid.media), contentAlignment = Alignment.Center) {
                             Icon(Icons.Default.OndemandVideo, null)
                             if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         }

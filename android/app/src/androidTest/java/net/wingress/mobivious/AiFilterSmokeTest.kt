@@ -57,7 +57,7 @@ class AiFilterSmokeTest {
         until { !vm.browse.value.loading }
     }
     private fun settings() {
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithTag("settings-root").performScrollToNode(hasText("AI channel filter", substring = false))
         compose.onNodeWithText("AI channel filter", substring = false).performClick()
     }

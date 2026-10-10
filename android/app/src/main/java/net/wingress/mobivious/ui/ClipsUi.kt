@@ -86,7 +86,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val warning = vm.aiDecision(clip.video, AiPageGroup.OTHER, aiState).warning
     Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
-        .padding(horizontal = 16.dp, vertical = 9.dp).testTag("clip-card-${clip.id}"),
+        .padding(horizontal = Liquid.inset, vertical = 9.dp).testTag("clip-card-${clip.id}"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!prefs.thinMode || warning != null) Box(Modifier.width(140.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)) {
@@ -222,9 +222,9 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.ContentCut, null, Modifier.padding(8.dp), MaterialTheme.colorScheme.primary)
                         Text(if (editor.published == null) "Create clip" else "Your clip is ready", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        IconButton(onClick = vm::closeClipEditor, enabled = !editor.busy) { Icon(Icons.Default.Close, "Close clip editor") }
+                        GlassIconButton(Icons.Default.Close, "Close clip editor", enabled = !editor.busy, onClick = vm::closeClipEditor)
                     }
-                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = Liquid.inset), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         ClipPreview(vm, editor)
                         if (editor.published == null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {

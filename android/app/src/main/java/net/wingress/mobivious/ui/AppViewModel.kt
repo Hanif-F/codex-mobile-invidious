@@ -563,6 +563,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
         else if (refreshSaved || saved.browse.loading || afterSignIn && saved.tab in listOf("You", "Subscriptions")) load(false, refreshChannel = false)
     }
+    fun beginGlobalSearch() {
+        if (tab == "Search" && route.isEmpty()) return
+        searchReturn = captureBrowse()
+        browseJob?.cancel(); browseGeneration++
+        navigate("Search", loadContent = false)
+        searchInput.value = SearchInput()
+        browse.value = BrowseState(title = "Search", end = true)
+    }
     fun openGlobalSearch(text: String) {
         if (text.isBlank()) return
         if (tab != "Search" || route.isNotEmpty()) searchReturn = captureBrowse()

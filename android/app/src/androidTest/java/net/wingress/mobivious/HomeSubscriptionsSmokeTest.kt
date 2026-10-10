@@ -86,24 +86,24 @@ class HomeSubscriptionsSmokeTest {
             activity.model.refreshSharedSettings(); activity.model.openDefaultHome()
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.firstOrNull()?.title == "trending discovery fixture" }
-        compose.onNodeWithTag("navigation-Trending").assertIsSelected()
+        compose.onNodeWithTag("discover-Trending").assertIsSelected()
         command("""{"discoveryDelayNext":1800}""")
-        compose.onNodeWithTag("navigation-Popular").performClick()
-        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
-        compose.onNodeWithTag("navigation-Trending").assertIsNotSelected()
+        compose.selectDiscoveryFeed("Popular")
+        compose.onNodeWithTag("discover-Popular").assertIsSelected()
+        compose.onNodeWithTag("discover-Trending").assertIsNotSelected()
         until { fixture().getJSONArray("discoveryRequests").let { array -> (0 until array.length()).any { !array.getJSONObject(it).getBoolean("completed") } } }
         assertTrue(activity.model.browse.value.loading)
-        compose.onNodeWithTag("navigation-Trending").performClick()
+        compose.selectDiscoveryFeed("Trending")
         until { !activity.model.browse.value.loading }
-        compose.onNodeWithTag("navigation-Trending").assertIsSelected()
+        compose.onNodeWithTag("discover-Trending").assertIsSelected()
         until { fixture().getJSONArray("discoveryRequests").let { array -> (0 until array.length()).all { array.getJSONObject(it).getBoolean("completed") } } }
         assertEquals("trending discovery fixture", activity.model.browse.value.videos.single().title)
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         until { !activity.model.browse.value.loading }
         compose.onNodeWithContentDescription("Search").performClick()
-        compose.onNodeWithTag("navigation-Popular").performClick()
-        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
-        recreate(); compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        compose.selectDiscoveryFeed("Popular")
+        compose.onNodeWithTag("discover-Popular").assertIsSelected()
+        recreate(); compose.onNodeWithTag("discover-Popular").assertIsSelected()
         screenshot("home-selection")
     }
 
@@ -138,7 +138,7 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithText("Clear search").performClick()
         compose.onNodeWithText("Channel 00").assertIsDisplayed()
         screenshot("channel-directory")
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         compose.onNodeWithTag("subscription-channels-button").assertIsDisplayed()
         compose.onNodeWithTag("subscription-search").assertExists()
     }
@@ -177,11 +177,11 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithText("Sign in", substring = false).assertIsDisplayed()
     }
 
-    @Test fun guestWatchActionsHaveNoOverflowOrImplicitQueue() {
+    @Test fun guestWatchActionsHavePrimaryControlsAndMoreWithoutImplicitQueue() {
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
-        compose.onNodeWithTag("watch-actions-menu").assertDoesNotExist()
+        compose.onNodeWithTag("watch-more").assertIsDisplayed()
         compose.onNodeWithContentDescription("Video actions").assertDoesNotExist()
         compose.onNodeWithTag("channel-block-$channelId").assertDoesNotExist()
         compose.onNodeWithText("Playback queue").assertDoesNotExist()

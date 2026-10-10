@@ -101,7 +101,7 @@ class SubscriptionSortingSmokeTest {
         choose(SubscriptionSort.MOST_WATCHED)
         compose.onNodeWithTag("subscription-channel-$favorite").performClick()
         until { activity.model.channel.value != null && !activity.model.browse.value.loading }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { activity.model.route == "subscription-channels" && !activity.model.subscriptionChannels.value.loading }
         until { compose.onAllNodesWithTag("subscription-sort").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("subscription-sort").assertTextContains("Sort: Most watched")

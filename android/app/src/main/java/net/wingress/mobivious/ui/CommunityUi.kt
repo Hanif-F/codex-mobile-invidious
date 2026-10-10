@@ -36,8 +36,8 @@ import net.wingress.mobivious.data.*
 
 @Composable
 internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Boolean, open: () -> Unit) {
-    Card(onClick = open, enabled = ContentVisibility.validChannel(channel.id), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp)
-        .testTag("related-channel-${channel.id}")) {
+    Card(onClick = open, enabled = ContentVisibility.validChannel(channel.id), modifier = Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = 6.dp)
+        .testTag("related-channel-${channel.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             ChannelAuthor(server, channel.image, channel.name, !thinMode, size = 48.dp, tag = "related-avatar-${channel.id}")
             if (channel.verified) Text("Verified channel", style = MaterialTheme.typography.labelSmall)
@@ -55,7 +55,7 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, comments: 
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val body = post.comment
-    Card(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("post-${post.key}")) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = 8.dp).testTag("post-${post.key}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ChannelAuthor(vm.store.server, body.avatar, body.author, !prefs.thinMode, size = 40.dp,
                 tag = "post-avatar-${post.key}", onClick = body.authorId.takeIf(ContentVisibility::validChannel)?.let { { channel(it) } })
@@ -134,7 +134,7 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
 @Composable
 internal fun PostDetailScreen(vm: AppViewModel, state: PostDetailState, list: LazyListState, channel: (String) -> Unit,
     link: (String) -> Unit, play: (Video) -> Unit, playlist: (Playlist) -> Unit, signIn: () -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().testTag("post-detail"), state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("post-detail"), state = list, contentPadding = PaddingValues(bottom = LocalContentBottomInset.current)) {
         state.post?.let { post ->
             item {
                 CommunityPostCard(vm, post, comments = { vm.openPostComments() }, detail = true,

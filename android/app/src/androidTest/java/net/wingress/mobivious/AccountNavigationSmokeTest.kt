@@ -185,26 +185,26 @@ class AccountNavigationSmokeTest {
         }
     }
 
-    @Test fun fourTabsGuestSettingsAndSearchCancellationAndReturn() {
-        listOf("Popular", "Trending", "Subscriptions", "You").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
+    @Test fun discoverDockGuestSettingsAndBottomSearchCancellationAndReturn() {
+        listOf("Discover", "Subscriptions", "You").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
         compose.onNodeWithTag("main-search").assertDoesNotExist()
         val original = vm.browse.value
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
-        assertEquals("Popular", vm.tab); assertEquals(original.videos, vm.browse.value.videos)
-        back(); compose.onNodeWithTag("main-search").assertDoesNotExist()
-        compose.onNodeWithTag("global-search").performClick()
+        assertEquals("Search", vm.tab)
+        compose.onNodeWithContentDescription("Close search").performClick()
+        until { vm.tab == "Popular" }
+        assertEquals(original.videos, vm.browse.value.videos)
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextReplacement("fixture")
         compose.onNodeWithTag("main-search").performImeAction()
         until { vm.tab == "Search" && !vm.browse.value.loading }
-        compose.onNodeWithTag("main-search").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Search filters").assertExists()
-        compose.onNodeWithTag("global-search").performClick()
         compose.onNodeWithTag("main-search").assertTextContains("fixture")
-        back(); assertEquals("Search", vm.tab)
-        back(); until { vm.tab == "Popular" }; assertEquals(original.videos, vm.browse.value.videos)
+        compose.onNodeWithContentDescription("Search filters").assertExists()
+        compose.onNodeWithContentDescription("Close search").performClick()
+        until { vm.tab == "Popular" }; assertEquals(original.videos, vm.browse.value.videos)
         compose.onNodeWithTag("navigation-You").performClick()
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithTag("settings-root").assertExists()
         back(); compose.onNodeWithTag("you-guest").assertExists()
     }
@@ -218,7 +218,7 @@ class AccountNavigationSmokeTest {
         compose.onNodeWithTag("account-confirm-password").performTextInput("an uncommon signup password")
         compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
         until { vm.account.value != null && vm.tab == "You" }
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithText("Account", substring = false).performClick()
         compose.onNodeWithText("Change username").performClick()
         compose.onNodeWithTag("account-current-password").performTextInput("wrong")
@@ -234,7 +234,7 @@ class AccountNavigationSmokeTest {
 
     @Test fun sessionsTokenCreationAndDeletionConfirmation() {
         compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)); vm.navigate("You") }
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithText("Account", substring = false).performClick()
         compose.onNodeWithText("Sessions & API tokens").performClick()
         until { compose.onAllNodesWithText("This session").fetchSemanticsNodes().isNotEmpty() }

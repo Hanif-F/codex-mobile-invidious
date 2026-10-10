@@ -387,7 +387,7 @@ class PlaybackVisibilitySmokeTest {
         val token = activity.model.queue.value.token
         val occurrence = activity.model.queue.value.currentKey
         val selection = activity.model.playback.value.selection!!
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         compose.onNodeWithTag("mini-player").assertExists().assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(80f))
         ui {
             assertSame(controller, activity.model.controller.value)
@@ -414,7 +414,7 @@ class PlaybackVisibilitySmokeTest {
             assertEquals(selection, controller.trackSelectionParameters)
             assertEquals(token, activity.model.queue.value.token); assertEquals(occurrence, activity.model.queue.value.currentKey)
         }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         ui { activity.model.audioOnly(true) }
         until { C.TRACK_TYPE_VIDEO in activity.model.playback.value.selection!!.disabledTrackTypes }
         compose.onNodeWithTag("mini-player-artwork", useUnmergedTree = true).assertExists()
@@ -428,7 +428,7 @@ class PlaybackVisibilitySmokeTest {
         compose.onNode(hasText(title) and hasAnyAncestor(hasTestTag("mini-player"))).performClick()
         compose.onNodeWithTag("watch-details-list").assertExists()
         awake(false)
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         compose.onNodeWithContentDescription("Close player").performClick()
         until { activity.model.playback.value.details == null }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
@@ -453,7 +453,7 @@ class PlaybackVisibilitySmokeTest {
         awake(false)
         ui { assertTrue(activity.model.controller.value!!.playWhenReady) }
         foreground(); awake(true)
-        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
         awake(false)
         ui { assertTrue(playerViews().isEmpty()) }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
@@ -465,7 +465,7 @@ class PlaybackVisibilitySmokeTest {
         openVideo()
         ui { activity.model.insertQueue(Video("testvideo02", "Next video"), true) }
         until { activity.model.queue.value.items.size == 2 }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("mini-player").assertIsDisplayed()
         ui { activity.model.seekTo(119_700) }
@@ -498,7 +498,7 @@ class PlaybackVisibilitySmokeTest {
     @Test fun narrowLayoutsKeepActionsAndMiniPlayerAccessibleWithLargeTitles() {
         ui { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
         openVideo()
         ui { activity.model.controller.value!!.pause() }
@@ -539,14 +539,15 @@ class PlaybackVisibilitySmokeTest {
                     compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
                     compose.onNodeWithText("Suggest / vote on titles").assertDoesNotExist()
                     compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
-                    compose.onNodeWithText("DeArrow Title").performScrollTo().assertIsDisplayed().performClick()
+                    compose.onNodeWithTag("watch-more").performScrollTo().performClick()
+                    compose.onNodeWithText("DeArrow Title").assertIsDisplayed().performClick()
                     until { activity.model.dearrowContribution.value.open }
                     compose.onNodeWithText("Suggest / vote on titles").assertExists()
                     compose.onNodeWithContentDescription("Close DeArrow contributions").performClick()
                     shell("mkdir -p /data/local/tmp/mobivious-playback-visibility-screenshots")
                     compose.waitForIdle()
                     shell("screencap -p /data/local/tmp/mobivious-playback-visibility-screenshots/watch-$width-$mode-large-text.png")
-                    compose.onNodeWithContentDescription("Back").performClick()
+                    compose.navigateBack()
                     compose.onNodeWithTag("mini-player").assertIsDisplayed()
                     compose.onNodeWithTag("mini-player-preview").assertIsDisplayed()
                     compose.onNodeWithContentDescription("Play").assertIsDisplayed()

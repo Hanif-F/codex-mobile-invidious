@@ -68,12 +68,12 @@ import kotlinx.coroutines.launch
 import net.wingress.mobivious.MainActivity
 import net.wingress.mobivious.data.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Brush
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
 
-private val Teal = Color(0xFF006B61)
-private val dark = darkColorScheme(primary = Color(0xFF72DFD0), onPrimary = Color(0xFF003731), secondary = Color(0xFFB4CCC5), secondaryContainer = Color(0xFF264C44), onSecondaryContainer = Color(0xFFCBE8DE), background = Color(0xFF101817), surface = Color(0xFF101817), surfaceContainer = Color(0xFF1C2523))
-private val light = lightColorScheme(primary = Teal, onPrimary = Color.White, secondary = Color(0xFF4B635D), secondaryContainer = Color(0xFFCBE8DE), onSecondaryContainer = Color(0xFF153B32), background = Color(0xFFF6FAF7), surface = Color(0xFFF6FAF7), surfaceContainer = Color(0xFFE8F0EB))
-
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared: MutableState<Boolean>) {
@@ -102,6 +102,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val deviceContext = vm.api.context()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
+    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
     val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
@@ -113,6 +114,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val selectedTab by vm.navigation.collectAsStateWithLifecycle()
     val tab = selectedTab.first
     val route = selectedTab.second
+    val destination = ShellDestination.from(tab)
+    var lastDiscover by rememberSaveable { mutableStateOf("Popular") }
+    LaunchedEffect(tab) { if (PreferenceRules.isDiscovery(tab)) lastDiscover = tab }
     val browseReset by vm.browseReset.collectAsStateWithLifecycle()
     val browseList = key(selectedTab) {
         val position = state.position
@@ -255,6 +259,31 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         if (link != null) { if (vm.openContent(link)) openPlayer() else browsePlayer() }
         else { browsePlayer(); vm.openGlobalSearch(searchDraft) }
     }
+    fun selectDestination(selected: ShellDestination) {
+        vm.browsePosition(CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset))
+        originWatch = watch; authWatchId = ""; authSettings = ""; vm.cancelAccumulatedSeek(); browsePlayer()
+        if (selected == ShellDestination.SEARCH) {
+            originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset
+            searchDraft = search.submitted; vm.beginGlobalSearch(); searchOpen = true
+        } else {
+            searchOpen = false; keyboard?.hide()
+            vm.selectTab(when (selected) { ShellDestination.DISCOVER -> lastDiscover; ShellDestination.SUBSCRIPTIONS -> "Subscriptions"; else -> "You" })
+        }
+    }
+    var dockCompact by remember { mutableStateOf(false) }
+    val exploring = rememberPlayerTouchExploration()
+    LaunchedEffect(browseList, exploring, selectedTab) {
+        dockCompact = false
+        var previous = CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset)
+        snapshotFlow { CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset) }.collect { next ->
+            if (!exploring) {
+                val direction = if (next.index != previous.index) (next.index - previous.index) * 100 else next.offset - previous.offset
+                if (next.index == 0 && next.offset < 64 || direction < -8) dockCompact = false
+                else if (direction > 12) dockCompact = true
+            }
+            previous = next
+        }
+    }
     fun play(video: Video, source: Playlist? = null) { openPlayer(); vm.playVideo(video, source) }
     LaunchedEffect(message, blockUndo) { message?.let {
         val undo = blockUndo.takeIf { _ -> it == "Channel blocked" }
@@ -281,6 +310,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
     BackHandler(accountBusy) { }
+    val keyboardVisible = WindowInsets.isImeVisible
     val darkTheme = prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()
     SideEffect {
         WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
@@ -288,56 +318,83 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    MaterialTheme(colorScheme = if (darkTheme) dark else light) {
+    MaterialTheme(colorScheme = if (darkTheme) Liquid.dark else Liquid.light, typography = Liquid.typography, shapes = Liquid.shapes) {
+      val backdrop = rememberLayerBackdrop()
+      CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalReduceTransparency provides reduceTransparency) {
         Surface(Modifier.fillMaxSize()) {
-          PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip || clipEditor.open,
+          PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip || clipEditor.open || keyboardVisible && !pip && !watch,
             downloadDialog.video != null || fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) { openChatSettings ->
             if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = settingsParent(settingsPage) }, { signIn() }, { id -> settingsPage = ""; navigate("Popular", "channel:$id") })
-            else Scaffold(
-                modifier = Modifier.hiddenPlayerContent(pip || fullscreen && !presentation.active),
-                topBar = { TopAppBar(title = {
-                    if (searchOpen) SearchField(searchDraft, { searchDraft = it }, "Search or paste a link", "main-search",
-                        Modifier.fillMaxWidth().focusRequester(searchFocus)) { submitGlobalSearch() }
-                    else if (watch) Text("Now playing", style = MaterialTheme.typography.titleMedium)
-                    else if (tab == "Search" && route.isEmpty()) Text(search.submitted.ifBlank { "Search" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    else if (route == "sign-in") Text("Sign in")
-                    else if (route == "subscription-channels") Text("Subscribed channels", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    else if (route.isNotEmpty()) Text(channel?.name ?: playlist?.title ?: state.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    else Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.PlayCircle, null, tint = MaterialTheme.colorScheme.primary); Spacer(Modifier.width(8.dp)); Text("Mobivious", fontWeight = FontWeight.Bold) }
-                }, navigationIcon = { if (searchOpen || watch || route.isNotEmpty() || vm.hasBrowseBack) IconButton(enabled = !accountBusy, onClick = { vm.cancelAccumulatedSeek(); if (searchOpen) { searchOpen = false; keyboard?.hide() } else if (watch) backWatch() else vm.backBrowse() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") } }, actions = {
-                    if (!watch && account != null && route.isEmpty() && tab == "Subscriptions") {
-                        OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
-                            DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
-                            DropdownMenuItem(text = { Text("Export OPML") }, onClick = { close(); vm.openOpml() })
+            else BoxWithConstraints(Modifier.fillMaxSize()) {
+              val wideLayout = maxWidth >= 840.dp
+              val shellStart = if (wideLayout && !watch) 204.dp else 0.dp
+              val imeVisible = keyboardVisible
+              val edgeColor = MaterialTheme.colorScheme.background
+              Scaffold(
+                modifier = Modifier.padding(start = shellStart).hiddenPlayerContent(pip || fullscreen && !presentation.active),
+                containerColor = Color.Transparent,
+                topBar = {
+                    if (!watch && !fullscreen) LiquidTopBar(
+                        title = when {
+                            route == "sign-in" -> "Sign in"
+                            route == "subscription-channels" -> "Channels"
+                            route.isNotEmpty() -> channel?.name ?: playlist?.title ?: state.title
+                            else -> destination.label
+                        },
+                        large = route.isEmpty(),
+                        navigation = if (route.isNotEmpty() || vm.hasBrowseBack && tab != "Search") ({
+                            GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", enabled = !accountBusy) { vm.cancelAccumulatedSeek(); vm.backBrowse() }
+                        }) else null,
+                    ) {
+                        if (account != null && route.isEmpty() && tab == "Subscriptions") {
+                            OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
+                                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
+                                DropdownMenuItem(text = { Text("Export OPML") }, onClick = { close(); vm.openOpml() })
+                            }
                         }
-                    }
-                    if (!watch && route == "history") {
-                        OverflowMenu("History actions", vm.api.context(), Modifier.testTag("history-actions")) { close ->
+                        if (route == "history") OverflowMenu("History actions", vm.api.context(), Modifier.testTag("history-actions")) { close ->
                             DropdownMenuItem(text = { Text("Clear watch history") }, onClick = { close(); dialog = "clearHistory" })
                         }
+                        if (tab == "You" && route.isEmpty()) GlassIconButton(Icons.Default.Settings, "Settings",
+                            Modifier.testTag("global-settings"), enabled = !accountBusy) { vm.settingsOpened(); settingsPage = "Settings" }
                     }
-                    if (!watch && !searchOpen) IconButton(enabled = !accountBusy, onClick = { vm.settingsOpened(); settingsPage = "Settings" }, modifier = Modifier.testTag("global-settings")) { Icon(Icons.Default.Settings, "Settings") }
-                    if (!searchOpen) IconButton(enabled = !accountBusy, onClick = { searchDraft = search.submitted; searchOpen = true }, modifier = Modifier.testTag("global-search")) { Icon(Icons.Default.Search, "Search") }
-                }) },
+                },
                 snackbarHost = { SnackbarHost(snackbar) },
-                bottomBar = { Column {
-                    if (presentation.mode != PlayerPresentation.CLOSED && playback.details != null) MiniPlayer(vm, playback, presentation,
-                        ::restorePlayer, vm::togglePlay, ::closePlayer,
-                        gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link == null)
-                    BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val compactLabels = maxWidth < 360.dp || maxWidth < 400.dp && LocalDensity.current.fontScale > 1.3f
-                    NavigationBar(Modifier.playerAnchor { presentation.navigationBounds = it }) { PreferenceRules.navigation().map { name -> name to when(name) { "Popular" -> Icons.Default.LocalFireDepartment; "Trending" -> Icons.AutoMirrored.Filled.TrendingUp; "Subscriptions" -> Icons.Default.Subscriptions; else -> Icons.Default.AccountCircle } }.forEach { (name, icon) ->
-                        NavigationBarItem(modifier = Modifier.testTag("navigation-$name").semantics { contentDescription = name }, enabled = !accountBusy, selected = tab == name && !watch, onClick = {
-                            vm.browsePosition(CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset)); originWatch = false; authWatchId = ""; authSettings = ""; searchOpen = false; vm.cancelAccumulatedSeek(); browsePlayer(); vm.selectTab(name)
-                        }, icon = { Icon(icon, null) }, label = { Text(if (compactLabels && name == "Subscriptions") "Subs" else name, style = MaterialTheme.typography.labelMedium, maxLines = 1) })
-                    } }
+                bottomBar = {
+                    Column(Modifier.drawBehind {
+                        if (!watch) drawRect(Brush.verticalGradient(listOf(Color.Transparent, edgeColor.copy(alpha = .75f)),
+                            startY = -24.dp.toPx(), endY = size.height), topLeft = Offset(0f, -24.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(size.width, size.height + 24.dp.toPx()))
+                    }.navigationBarsPadding().imePadding()
+                        .graphicsLayer { alpha = if (watch) presentation.miniAlpha else 1f }
+                        .hiddenPlayerContent(watch || presentation.active || pip || fullscreen)) {
+                        if (presentation.mode != PlayerPresentation.CLOSED && playback.details != null && (!imeVisible || watch))
+                            MiniPlayer(vm, playback, presentation, ::restorePlayer, vm::togglePlay, ::closePlayer,
+                                gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link == null)
+                        if (!watch || presentation.active) {
+                            if (tab == "Search" && route.isEmpty()) Row(
+                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp).liquidGlass().padding(start = 4.dp, end = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                SearchField(searchDraft, { searchDraft = it }, "Search or paste a link", "main-search",
+                                    Modifier.weight(1f).focusRequester(searchFocus)) { submitGlobalSearch() }
+                                IconButton(onClick = { searchOpen = false; keyboard?.hide(); if (vm.hasBrowseBack) vm.backBrowse() else vm.selectTab(lastDiscover) }) {
+                                    Icon(Icons.Default.Close, "Close search")
+                                }
+                            }
+                            else if (!wideLayout) FloatingNavigation(destination, dockCompact, !accountBusy,
+                                Modifier.playerAnchor { presentation.navigationBounds = it }, ::selectDestination)
+                        }
                     }
-                } }
+                }
             ) { padding ->
-                Box(Modifier.fillMaxSize()) {
+              CompositionLocalProvider(LocalContentBottomInset provides (padding.calculateBottomPadding() + 20.dp)) {
+                Box(Modifier.fillMaxSize().layerBackdrop(backdrop)) {
+                  // Content controls must not sample the layer that records them.
+                  // Only the sibling floating chrome uses the shell's live backdrop.
+                  CompositionLocalProvider(LocalGlassBackdrop provides null) {
                 if (route == "sign-in") SignInScreen(vm, Modifier.padding(padding).hiddenPlayerContent(watch || presentation.active || pip))
-                else Column(Modifier.padding(padding).fillMaxSize().hiddenPlayerContent(watch || presentation.active || pip)) {
+                else Column(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().hiddenPlayerContent(watch || presentation.active || pip)) {
                     if(offline) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (account != null && blocked.error != null && vm.contentSurface() in listOf(ContentSurface.DISCOVERY, ContentSurface.SEARCH)) {
                         Column(Modifier.padding(horizontal = 16.dp)) {
@@ -353,7 +410,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         }
                     }
                     if (route.isEmpty() && tab == "Subscriptions") Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Subscriptions", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
+                        Text("Your latest uploads", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         FilledTonalButton(onClick = { navigate("Subscriptions", "subscription-channels") }, modifier = Modifier.testTag("subscription-channels-button")) {
                             Icon(Icons.Default.Subscriptions, null); Spacer(Modifier.width(8.dp)); Text("Channels")
                         }
@@ -368,14 +425,18 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (scopedSearch.submitted.isNotBlank() || scopedSearch.draft.isNotBlank()) OutlinedButton(onClick = vm::clearScopedSearch, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Clear search") }
                         if (historyScreen && state.history?.organized == false) Text("Update this server to enable organized history and history search.", Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
                     }
-                    if (route.isEmpty() && PreferenceRules.isDiscovery(tab)) Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(tab, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                            Text(if (tab == "Trending") "Trending in ${prefs.region}" else "Popular across your instance", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (route.isEmpty() && PreferenceRules.isDiscovery(tab)) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            LiquidSegments(listOf("Popular", "Trending"), tab, { it }, Modifier.weight(1f).testTag("discover-feeds"),
+                                tag = { "discover-$it" }, select = vm::selectTab)
+                            GlassIconButton(Icons.Default.Refresh, "Refresh $tab", Modifier.testTag("feed-refresh"), onClick = vm::refresh)
                         }
-                        IconButton(onClick = vm::refresh, modifier = Modifier.testTag("feed-refresh")) { Icon(Icons.Default.Refresh, "Refresh $tab") }
+                        Text(if (tab == "Trending") "Trending in ${prefs.region}" else "Popular across your instance",
+                            Modifier.padding(horizontal = Liquid.inset, vertical = 4.dp), style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
                     }
-                    if (route.isEmpty() && tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
                     if (route == "downloads") DownloadedScreen(vm, browseList) { id -> openPlayer(); vm.playDownload(id) }
                     else if (route.startsWith("post:")) PostDetailScreen(vm, postDetail, browseList,
                         { id -> navigate(tab, "channel:$id") }, ::openRichLink, { play(it) },
@@ -390,8 +451,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     else if (route == "clips" && account == null) EmptyState("My Clips", "Sign in to create and find your clips.", "Sign in") { signIn() }
                     else if (route.isEmpty() && tab == "You" && account == null) GuestYouScreen(vm.store.server, browseList, { navigate("You", "downloads") }) { signIn() }
                     else if (route.isEmpty() && tab == "Subscriptions" && account == null) EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
-                    else if (tab == "You" && route.isEmpty()) LazyColumn(Modifier.fillMaxSize().testTag("you-library-list"), state = browseList, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        item { Text("You", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+                    else if (tab == "You" && route.isEmpty()) LazyColumn(Modifier.fillMaxSize().testTag("you-library-list"), state = browseList, contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = 8.dp, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         item { YouIdentity(account, vm.store.server) }
                         item { DownloadShortcut { navigate("You", "downloads") } }
                         item { LibraryShortcuts({ navigate("You", "history") }, { vm.navigate("You", "clips", rememberOrigin = true) }) }
@@ -409,12 +469,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (state.loading) item { CircularProgressIndicator() }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::refresh) }
                     }
-                    else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(bottom = 12.dp)) {
+                    else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(bottom = LocalContentBottomInset.current)) {
                         if (route == "clips") item {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("My Clips", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
                                 Text("Most recent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (!state.loading && state.clips.isEmpty() && state.error == null) Text("Save a moment worth sharing. Open a video and choose Create clip.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (!state.loading && state.clips.isEmpty() && state.error == null) Text("Save a moment worth sharing. Open a video and choose More → Create clip.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         if (channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank() && !state.loading && state.clips.isEmpty() && state.error == null) item {
@@ -501,12 +560,18 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         val groups = if (generalSearch) emptyMap() else if (route == "history" && state.history?.organized == true) visibleVideos.groupBy { History.group(it.history?.watched, state.history?.today) } else mapOf(null to visibleVideos)
                         groups.forEach { (group, videos) ->
                             if (group != null) item(key = "history-group-$group") { Text(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
-                            items(videos, key = { it.id + it.indexId + (it.playlistIndex?.toString() ?: "") }) { video -> VideoCard(vm, video, vm.store.server, { play(video, playlist) }, { id -> navigate(tab, "channel:$id") }, { signIn() }, if (playlist?.let { list -> list.owned } == true || route == "history") ({
+                            val rows = videos.chunked(if (wideLayout && route.isEmpty() && PreferenceRules.isDiscovery(tab) && prefs.uiDensity != "compact") 2 else 1)
+                            items(rows, key = { row -> row.joinToString { it.id + it.indexId + (it.playlistIndex?.toString() ?: "") } }) { row ->
+                              Row(Modifier.fillMaxWidth()) {
+                                row.forEach { video -> Box(Modifier.weight(1f)) { VideoCard(vm, video, vm.store.server, { play(video, playlist) }, { id -> navigate(tab, "channel:$id") }, { signIn() }, if (playlist?.let { list -> list.owned } == true || route == "history") ({
                                 val list = playlist
                                 if (list != null) vm.removePlaylistVideo(list, video)
                                 else vm.removeHistory(video.id)
                             }) else null, audioPlay = { openPlayer(); vm.playVideo(video, playlist, audio = true) }, removalLabel = if (playlist != null) "Remove from playlist" else "Remove from history",
-                                avatarOwner = channel?.id.takeIf { route.startsWith("channel:") && channelTab?.videoTab == true }) }
+                                avatarOwner = channel?.id.takeIf { route.startsWith("channel:") && channelTab?.videoTab == true }) } }
+                                if (row.size == 1 && wideLayout && route.isEmpty() && PreferenceRules.isDiscovery(tab) && prefs.uiDensity != "compact") Spacer(Modifier.weight(1f))
+                              }
+                            }
                         }
                         if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty() && state.searchResults.isEmpty()) OutlinedButton(onClick = { dialog = ""; settingsPage = "Server" }, modifier = Modifier.padding(horizontal = 16.dp)) { Text("Configure server") } }
@@ -520,7 +585,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty() &&
                             state.clips.isEmpty() && route != "clips" && !(channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank())) item { EmptyState(
                             if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
-                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", "Refresh", vm::refresh) }
+                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", if (tab == "Search" && search.submitted.isBlank()) "" else "Refresh", vm::refresh) }
                         if (!state.end && !state.loading && state.error == null) item { OutlinedButton(onClick = vm::more, modifier = Modifier.fillMaxWidth()) { Text("Load more") } }
                     }
                 }
@@ -536,6 +601,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         { id -> navigate("Popular", "channel:$id") }, { play(it) }, { signIn() }, openChatSettings)
                 }
                 }
+                }
+              }
+            }
+              if (wideLayout && !watch && !fullscreen && !pip) FloatingSidebar(destination, !accountBusy,
+                  Modifier.align(Alignment.TopStart).statusBarsPadding().padding(top = 14.dp), ::selectDestination)
             }
           }
             if (fullscreen && !pip && chapterPanel.open && chapters.isNotEmpty()) ChaptersSheet(chapters, playback, chapterPanel, vm::seekTo)
@@ -562,10 +632,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (saveSheet.video != null && route != "sign-in" && !pip) SavePlaylistSheet(vm) { signIn() }
             if (!pip) { ClipDialogs(vm); ClipEditor(vm) }
         }
+      }
     }
 }
 
-@Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PlayCircleOutline, null, Modifier.size(48.dp), MaterialTheme.colorScheme.primary); Text(title, style = MaterialTheme.typography.titleLarge); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant); FilledTonalButton(onClick = onClick) { Text(action) } } }
+@Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Icon(Icons.Default.PlayCircleOutline, null, Modifier.size(48.dp), MaterialTheme.colorScheme.primary); Text(title, style = MaterialTheme.typography.titleLarge); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant); if (action.isNotBlank()) FilledTonalButton(onClick = onClick) { Text(action) } } }
 @Composable private fun ErrorCard(message: String, retry: () -> Unit) { Card(Modifier.padding(16.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(16.dp)) { Text(message); OutlinedButton(onClick = retry) { Text("Retry") } } } }
 internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
 internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
@@ -579,9 +650,8 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
     val compact = prefs.uiDensity == "compact"
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val warning = vm.aiDecision(video, aiGroup, aiState).warning
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp)
-        .testTag("video-card-${video.id}").semantics { if (indicator.description.isNotEmpty()) stateDescription = indicator.description }) {
-        if (!prefs.thinMode || warning != null) Box(Modifier.fillMaxWidth().then(if (prefs.thinMode) Modifier.height(64.dp) else Modifier.aspectRatio(if (compact) 2.4f else 16f/9f)).clip(RoundedCornerShape(16.dp)).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
+    val thumbnail: @Composable (Modifier) -> Unit = { thumbnailModifier ->
+        if (!prefs.thinMode || warning != null) Box(thumbnailModifier.then(if (prefs.thinMode) Modifier.height(64.dp) else Modifier.aspectRatio(16f/9f)).clip(Liquid.media).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
             if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = prefs.thinMode)
             else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), video.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             if (indicator.watched) {
@@ -599,17 +669,20 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                     }, color = MaterialTheme.colorScheme.primary, trackColor = Color.Black.copy(alpha = .3f), gapSize = 0.dp, drawStopIndicator = {})
             }
         }
-        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+    }
+    val metadata: @Composable (Modifier) -> Unit = { metadataModifier ->
+
+        Row(metadataModifier, verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 if (video.membersOnly) MembersBadge(video.id)
-                DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, Modifier.clickable(onClick = play), maxLines = if (compact) 1 else 2)
+                DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, Modifier.clickable(onClick = play), maxLines = 2)
                 if (prefs.thinMode) {
                     if (indicator.watched) Text("Watched", Modifier.testTag("video-watched-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
                     indicator.percent?.let { Text("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
                 }
                 if (video.author.isNotBlank() || video.channelId.isNotBlank()) ChannelAuthor(server, video.authorAvatar,
                     video.author.ifBlank { "Unknown channel" }, Avatars.show(prefs.thinMode, video.channelId, avatarOwner),
-                    size = if (compact) 24.dp else 32.dp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    size = 24.dp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
                 VideoMetadataLine(video, Modifier.padding(top = 4.dp))
                 video.history?.let { history ->
@@ -625,7 +698,17 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
             if(remove != null) IconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${video.title}") }
         }
     }
+    val cardModifier = Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = if (compact) 8.dp else 12.dp)
+        .testTag("video-card-${video.id}").semantics { if (indicator.description.isNotEmpty()) stateDescription = indicator.description }
+    if (compact) Row(cardModifier, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        thumbnail(Modifier.width(if (LocalDensity.current.fontScale > 1.3f) 96.dp else 128.dp))
+        metadata(Modifier.weight(1f))
+    } else Column(cardModifier) {
+        thumbnail(Modifier.fillMaxWidth())
+        metadata(Modifier.padding(top = 10.dp))
+    }
 }
+
 @Composable
 private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: PlayerPresentationState,
     open: () -> Unit, toggle: () -> Unit, close: () -> Unit, gesturesEnabled: Boolean) {
@@ -643,7 +726,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
         kotlin.math.abs(presentation.miniBounds.top - presentation.watchBounds.top).coerceAtLeast(160 * density.density),
         width, vm::cancelAccumulatedSeek, close)
     val currentDrag by rememberUpdatedState(drag)
-    Box(Modifier.fillMaxWidth().clipToBounds().hiddenPlayerContent(presentation.mode != PlayerPresentation.MINI || presentation.active)
+    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clipToBounds().hiddenPlayerContent(presentation.mode != PlayerPresentation.MINI || presentation.active)
         .layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
             layout(placeable.width, if (presentation.allocatesMini) placeable.height else 0) {
@@ -653,8 +736,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
         Surface(modifier = Modifier.graphicsLayer {
             translationX = dismissOffset
             alpha = presentation.miniAlpha
-        }, color = MaterialTheme.colorScheme.surfaceContainer, tonalElevation = 3.dp) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 80.dp).testTag("mini-player")
+        }.liquidGlass(Liquid.card), color = Color.Transparent, tonalElevation = 0.dp) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).testTag("mini-player")
                 .onGloballyPositioned { coordinates ->
                     origin = coordinates.positionInRoot()
                     width = coordinates.size.width.toFloat()
@@ -678,7 +761,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 .padding(start = 8.dp, top = 8.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 // The live preview is rendered above this slot by PlayerPresentationHost.
-                Box(Modifier.size(112.dp, 63.dp).clip(RoundedCornerShape(8.dp)).background(Color.Black)
+                Box(Modifier.padding(start = 8.dp).size(96.dp, 54.dp).clip(RoundedCornerShape(12.dp)).background(Color.Black)
                     .playerAnchor { presentation.miniBounds = it.translate(Offset(-dismissOffset, 0f)) }
                     .clickable(enabled = presentation.mode == PlayerPresentation.MINI && !presentation.active,
                         onClickLabel = "Open player", onClick = open).testTag("mini-player-preview"))
@@ -731,14 +814,13 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
             awaitEachGesture { awaitFirstDown().consume(); waitForUpOrCancellation()?.consume() }
         }) {
-        val playerWidth = (maxWidth - 16.dp).value
+        val sideBySide = maxWidth >= 840.dp
+        val playerWidth = (if (sideBySide) maxWidth * .62f - 16.dp else maxWidth - 16.dp).value
         val expandedHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false)
         val compactHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f)
         val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight > compactHeight && !drawerOpen)
         val playerHeight = if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
-        Column(Modifier.fillMaxSize()) {
-            Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
-                .playerAnchor { presentation.watchBounds = it })
+        val detailsContent: @Composable ColumnScope.() -> Unit = {
             if (chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,
                 playback.seekable && !playback.loading && playback.error == null, chapterPanel::close, vm::seekTo,
                 Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
@@ -761,19 +843,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                                 if (vm.account.value == null) signIn()
                                 else vm.toggleSubscribe(details.video.channelId)
                             }, channel = channel, verified = details.authorVerified == true, subscribers = details.subscribers)
-                        if (playback.downloadId == null) FlowRow(Modifier.fillMaxWidth().testTag("watch-actions"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            AssistChip(onClick = { vm.openDownload(details.video) }, enabled = !details.video.live && details.upcoming != true, label = { Text("Download") }, leadingIcon = { Icon(Icons.Default.Download, null) }, modifier = Modifier.testTag("watch-download"))
-                            AssistChip(onClick = { add(details.video) }, label = { Text("Save") }, leadingIcon = { Icon(Icons.AutoMirrored.Filled.PlaylistAdd, null) })
-                            AssistChip(onClick = { VideoLinks.share(vm.store.server, vm.queue.value, vm.controller.value?.currentPosition ?: playback.position)?.let { url ->
-                                runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url), "Share video")) }
-                                    .onFailure { vm.message.value = "No app could share this link." }
-                            } }, label = { Text("Share") }, leadingIcon = { Icon(Icons.Default.Share, null) })
-                            if (ClipRules.eligible(details)) AssistChip(onClick = {
-                                if (vm.account.value == null) { vm.requestClipSignIn(); signIn() } else vm.openClipEditor()
-                            }, label = { Text("Create clip") }, leadingIcon = { Icon(Icons.Default.ContentCut, null) }, modifier = Modifier.testTag("create-clip"))
-                            AssistChip(onClick = { vm.openDeArrow(details.video.id) }, label = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) })
-                        }
-                        if (account == null && playback.downloadId == null) Text("Sign in to suggest titles and vote.", style = MaterialTheme.typography.bodySmall)
+                        if (playback.downloadId == null) WatchPrimaryActions(vm, details, { add(details.video) }, signIn)
                         blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                         if (prefs.showYoutubeComments && playback.downloadId == null) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
                         ChatReplayEntry(chat) { chapterPanel.close(); vm.openChat() }
@@ -795,8 +865,17 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 }
             }
         }
+        if (sideBySide) Row(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(.62f).fillMaxHeight().padding(8.dp).playerAnchor { presentation.watchBounds = it })
+            Column(Modifier.weight(.38f).fillMaxHeight(), content = detailsContent)
+        } else Column(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
+                .playerAnchor { presentation.watchBounds = it })
+            detailsContent()
+        }
     }
 }
+
 
 @Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit, visibilityOnly: Boolean = false) {
     val context = remember { vm.api.context() }

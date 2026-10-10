@@ -11,12 +11,12 @@ Invidious account adds subscriptions, playlists and shared watch history.
 
 **[Download the latest APK](https://github.com/Hanif-F/codex-mobile-invidious/releases/latest)**
 
-Requires **Android 8.0 or newer**. Release APKs include all supported CPU
+Requires **Android 13 or newer**. Release APKs include all supported CPU
 architectures, so there is no separate device-specific download.
 
 1. Download and install the APK. Allow your browser or file manager to install
    apps when Android prompts you.
-2. Open the **Settings gear → Server** to choose an HTTPS Invidious instance.
+2. Open the **You → Settings gear → Server** to choose an HTTPS Invidious instance.
    The default is [invidious.wingress.net](https://invidious.wingress.net).
 3. Start browsing, or sign in to your Invidious account on the selected instance
    for account features. Registration is available when the instance allows it.
@@ -38,7 +38,7 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 ### Browse and discover
 
-- Separate Popular and Trending tabs; choose Livestreams or Gaming and search
+- Discover with independent Popular and Trending feeds; choose Livestreams or Gaming and search
   for a Trending country by name or code.
 - Search videos, channels and playlists together, or choose a specific result
   type; open channel results directly in the app.
@@ -67,7 +67,7 @@ An `OK` result confirms the APK matches the supplied checksum.
   watch history, with account management in **Settings → Account**.
 - Watched indicators and saved playback positions.
 - RSS links, subscription OPML exports and private playlist Atom exports.
-- **Clips:** create public 5–120 second moments with a title, precise timestamps,
+- **Clips:** use the watch page’s **More → Create clip** action to create public 5–120 second moments with a title, precise timestamps,
   draggable filmstrip and independent preview. Find My Clips in **You**, or browse
   public clips on a channel's Clips tab. Watch with a
   clip-relative timeline, loop, share or copy the permalink, continue the full
@@ -87,9 +87,10 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 ### Make it yours
 
-- Light, dark or system appearance; compact lists and optional hidden thumbnails.
-- Choose your launch homepage; retain your place across the fixed Popular, Trending,
-  Subscriptions, and You tabs.
+- Liquid Glass navigation with light, dark or system appearance; Reduce transparency
+  for solid controls, compact lists and optional hidden thumbnails.
+- Choose your launch homepage; retain your place in Popular and Trending within
+  Discover, Subscriptions, and You.
 - Playback defaults, browsing and feed preferences, and channel blocking.
 - **SponsorBlock:** optional segment skipping, category controls and channel overrides.
 - **DeArrow:** optional community titles, an original-title toggle and title contributions.
@@ -176,6 +177,8 @@ whether you are contributing directly or working with an AI coding agent.
 Debug builds appear as **Mobivious Preview** and install separately from the
 release app for local review.
 
+- [Design language](docs/LIQUID_GLASS.md) — Apple references, navigation, material
+  rendering and accessibility.
 - [Developer guide](docs/DEVELOPMENT.md) — repository orientation, prerequisites,
   builds, tests, signing, releases and upstream maintenance.
 - [Deployment guide](deploy/README.md) — install and update the server.

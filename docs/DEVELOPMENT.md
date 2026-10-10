@@ -52,6 +52,7 @@ For production setup, migrations, secrets and rollback, use the
 
 ### Prerequisites
 
+- Android 13 (API 33) or newer on target devices.
 - Android Studio, or an Android SDK installation with platform 37 and Build Tools 36.0.0.
 - JDK 17 or newer; Android Studio's bundled JBR can be used.
 - Python 3 for the release and fixture scripts.

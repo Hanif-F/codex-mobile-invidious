@@ -12,7 +12,7 @@ android {
     compileSdk { version = release(37) }
     defaultConfig {
         applicationId = "net.wingress.mobivious"
-        minSdk = 26
+        minSdk = 33
         targetSdk = 37
         versionCode = 17
         versionName = "0.9.1"
@@ -36,6 +36,7 @@ android {
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 dependencies {
+    implementation("io.github.kyant0:backdrop:1.0.6")
     implementation("com.google.re2j:re2j:1.8")
     implementation(platform("androidx.compose:compose-bom:2026.03.00"))
     implementation("androidx.activity:activity-compose:1.12.3")

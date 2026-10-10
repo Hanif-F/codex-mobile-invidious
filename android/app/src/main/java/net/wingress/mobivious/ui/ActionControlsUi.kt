@@ -8,6 +8,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -36,7 +37,8 @@ internal fun ActionRow(title: String, modifier: Modifier = Modifier, detail: Str
         supportingContent = detail?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f)) } },
         leadingContent = icon?.let { { Icon(it, null, tint = color) } },
         trailingContent = { Icon(trailingIcon, null, Modifier.rotate(trailingRotation), tint = color) },
-        modifier = modifier.fillMaxWidth().heightIn(min = 56.dp)
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        modifier = modifier.fillMaxWidth().padding(vertical = 3.dp).clip(Liquid.card).heightIn(min = 64.dp)
             .clickable(enabled = enabled, role = Role.Button, onClickLabel = actionLabel, onClick = onClick))
 }
 

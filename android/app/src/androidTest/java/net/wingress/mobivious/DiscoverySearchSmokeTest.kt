@@ -72,7 +72,7 @@ class DiscoverySearchSmokeTest {
         }
     }
     private fun search(text: String = "mixed") {
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextReplacement(text)
         compose.onNodeWithTag("main-search").performImeAction()
         until { vm.tab == "Search" && !vm.browse.value.loading && vm.query == text }
@@ -84,7 +84,7 @@ class DiscoverySearchSmokeTest {
     }
 
     @Test fun trendingControlsSaveGuestRegionCategoryAndRestoreAcrossTabsAndRecreation() {
-        compose.onNodeWithTag("navigation-Trending").performClick()
+        compose.selectDiscoveryFeed("Trending")
         until { !vm.browse.value.loading && vm.browse.value.videos.firstOrNull()?.title == "trending livestreams US" }
         compose.onNodeWithTag("trending-livestreams").assertIsSelected()
         compose.onNodeWithTag("trending-gaming").performClick()
@@ -95,19 +95,19 @@ class DiscoverySearchSmokeTest {
         assertEquals("ID", vm.store.guestDeArrow().region)
         assertEquals(TrendingCategory.GAMING, vm.store.trendingCategory(vm.api.context()))
         screenshot("trending-gaming-id")
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         until { !vm.browse.value.loading && vm.tab == "Popular" }
         compose.runOnUiThread { vm.refresh() }; until { !vm.browse.value.loading }
         val popular = discoveries().last { it.getString("kind") == "popular" }
         assertTrue(popular.isNull("region")); assertTrue(popular.isNull("type"))
-        compose.onNodeWithTag("navigation-Trending").performClick(); until { !vm.browse.value.loading }
+        compose.selectDiscoveryFeed("Trending"); until { !vm.browse.value.loading }
         recreate(); compose.onNodeWithTag("trending-gaming").assertIsSelected()
         assertEquals("trending gaming ID", vm.browse.value.videos.single().title)
     }
 
     @Test fun settingsCountryPickerKeepsDraftUntilSaveAndCancelDiscardsIt() {
         fun open() {
-            compose.onNodeWithTag("global-settings").performClick(); compose.onNodeWithText("Browsing").performClick()
+            compose.openAppSettings(); compose.onNodeWithText("Browsing").performClick()
             compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("settings-region"))
         }
         open(); country("settings-region", "Japan", "JP")
@@ -115,7 +115,7 @@ class DiscoverySearchSmokeTest {
         compose.onNodeWithText("Cancel").performClick(); back()
         open(); country("settings-region", "JP", "JP"); compose.onNodeWithTag("settings-save").performClick()
         until { vm.preferences.value.region == "JP" && compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
-        back(); compose.onNodeWithTag("navigation-Trending").performClick(); until { !vm.browse.value.loading }
+        back(); compose.selectDiscoveryFeed("Trending"); until { !vm.browse.value.loading }
         assertEquals("trending livestreams JP", vm.browse.value.videos.single().title)
         compose.onNodeWithTag("trending-region").performClick()
         compose.onNodeWithTag("region-search").performTextReplacement("Indonesia")
@@ -224,7 +224,7 @@ class DiscoverySearchSmokeTest {
     }
 
     @Test fun controlsAndMixedCardsRemainReachableOnCompactDisplays() {
-        compose.onNodeWithTag("navigation-Trending").performClick(); until { !vm.browse.value.loading }
+        compose.selectDiscoveryFeed("Trending"); until { !vm.browse.value.loading }
         compose.onNodeWithTag("trending-gaming").performClick(); until { !vm.browse.value.loading }
         screenshot("layout-trending")
         compose.onNodeWithTag("trending-region").performClick()

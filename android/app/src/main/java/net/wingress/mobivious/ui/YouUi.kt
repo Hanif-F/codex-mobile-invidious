@@ -1,6 +1,10 @@
 package net.wingress.mobivious.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -24,8 +28,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 internal fun YouIdentity(account: Account?, server: String) {
     Surface(color = MaterialTheme.colorScheme.surfaceContainer, shape = RoundedCornerShape(24.dp),
         modifier = Modifier.fillMaxWidth().testTag("you-identity")) {
-        Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(56.dp)) {
+        Row(Modifier.padding(18.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(48.dp)) {
                 Box(contentAlignment = Alignment.Center) {
                     if (account == null) Icon(Icons.Default.PersonOutline, null, Modifier.size(28.dp))
                     else Text(account.username.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -57,10 +61,14 @@ internal fun LibraryShortcuts(history: () -> Unit, clips: () -> Unit) {
 
 @Composable
 private fun LibraryShortcut(title: String, detail: String, icon: ImageVector, modifier: Modifier, action: () -> Unit) {
-    OutlinedCard(onClick = action, modifier = modifier, shape = RoundedCornerShape(20.dp)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-            Text(title, style = MaterialTheme.typography.titleMedium)
+    Row(modifier.clip(Liquid.card).background(MaterialTheme.colorScheme.surfaceContainer)
+        .clickable(role = Role.Button, onClick = action).heightIn(min = 88.dp).padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Box(Modifier.size(40.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
@@ -68,14 +76,13 @@ private fun LibraryShortcut(title: String, detail: String, icon: ImageVector, mo
 
 @Composable
 internal fun GuestYouScreen(server: String, state: LazyListState, downloaded: () -> Unit, signIn: () -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().testTag("you-guest"), state = state, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-        item { Text("You", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
+    LazyColumn(Modifier.fillMaxSize().testTag("you-guest"), state = state, contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = 8.dp, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(20.dp)) {
         item { YouIdentity(null, server) }
         item { DownloadShortcut(downloaded) }
         item {
             Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("Your videos, together", style = MaterialTheme.typography.headlineSmall)
-                Text("Save videos into playlists, revisit your watch history, and keep the moments you love. Sign in with your Invidious account to make this space yours.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Keep your playlists, history, and clips together with your Invidious account.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Button(onClick = signIn, modifier = Modifier.heightIn(min = 48.dp).testTag("you-sign-in")) {
                     Icon(Icons.AutoMirrored.Filled.Login, null); Spacer(Modifier.width(8.dp)); Text("Sign in")
                 }

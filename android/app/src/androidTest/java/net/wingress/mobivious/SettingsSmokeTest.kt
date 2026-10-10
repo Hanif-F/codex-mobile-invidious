@@ -35,7 +35,7 @@ class SettingsSmokeTest {
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
-    private fun open(page: String) { compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick(); compose.onNodeWithText(page).performScrollTo().performClick() }
+    private fun open(page: String) { compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings(); compose.onNodeWithText(page).performScrollTo().performClick() }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
     private fun save(page: String) { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
 
@@ -48,7 +48,7 @@ class SettingsSmokeTest {
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
         save("Browsing")
         assertFalse(activity.model.store.guestDeArrow().relatedVideos)
-        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
         compose.onNodeWithText("Playback").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Back from Playback").performClick()
         compose.onNodeWithTag("settings-root").assertExists()
@@ -60,7 +60,7 @@ class SettingsSmokeTest {
         open("Playback"); toggle("Autoplay opened videos"); toggle("Audio only by default"); save("Playback")
         open("History & library"); toggle("Remember playback position"); save("History & library")
         compose.runOnUiThread { activity.model.store.position("testvideo01", 35) }
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null && activity.model.playback.value.duration > 0 }
         assertFalse(activity.model.playback.value.playWhenReady)

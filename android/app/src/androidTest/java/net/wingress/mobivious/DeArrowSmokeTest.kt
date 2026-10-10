@@ -43,13 +43,13 @@ class DeArrowSmokeTest {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
     }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
-    private fun settings() { compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
+    private fun settings() { compose.openAppSettings(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
     private fun save() {
         compose.onNodeWithTag("settings-save").performClick()
         until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         if (activity.model.playback.value.details != null)
             compose.onNodeWithTag("mini-player-preview").performClick()
     }
@@ -61,7 +61,7 @@ class DeArrowSmokeTest {
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" }
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun openVideo(title: String) { compose.onNodeWithText(title).performClick(); until(40_000) { activity.model.playback.value.playing } }
@@ -97,11 +97,12 @@ class DeArrowSmokeTest {
         command("dearrow", """{"dearrow_enabled":true,"seedPlaylist":true}""")
         login()
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
         compose.onNode(hasContentDescription("Search") and hasAnyAncestor(hasSetTextAction()), useUnmergedTree = true).performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
-        compose.onNodeWithText("Subscriptions").performClick()
+        compose.onNodeWithContentDescription("Close search").performClick()
+        compose.onNodeWithTag("navigation-Subscriptions").performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("video-card-testvideo01"))).performClick()
         until { activity.model.channel.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
@@ -124,7 +125,7 @@ class DeArrowSmokeTest {
         until { controllerTitle() == replacement }
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasText("Another calm scene"))
         compose.onNodeWithText("Another calm scene").assertExists()
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 } // playlist card and mini-player
         compose.onNodeWithText("You").performClick(); compose.onNodeWithText("Watch history").performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }
@@ -138,7 +139,8 @@ class DeArrowSmokeTest {
     @Test fun contributionsGuidelinesFailuresAndPrivateIdentity() {
         login(); openVideo(original)
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
-        compose.onNodeWithText("DeArrow Title").performScrollTo().performClick()
+        compose.onNodeWithTag("watch-more").performScrollTo().performClick()
+        compose.onNodeWithText("DeArrow Title").performClick()
         until { activity.model.dearrowContribution.value.loaded }
         compose.onNodeWithTag("dearrow-contributions-list").performScrollToNode(hasContentDescription("Downvote: Locked community title"))
         compose.onNodeWithContentDescription("Downvote: Locked community title").assertIsNotEnabled()

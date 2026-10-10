@@ -113,7 +113,7 @@ class CommentsSmokeTest {
         until { activity.model.comments.value.threadKey == null }
         compose.waitForIdle()
         assertEquals(before, activity.model.comments.value.feed.position)
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         compose.onNodeWithTag("comments-drawer").assertDoesNotExist()
         compose.onNodeWithTag("watch-details-list").assertExists()
     }

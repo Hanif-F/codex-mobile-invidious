@@ -56,7 +56,7 @@ class VisibilitySmokeTest {
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun manager() {
-        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Blocked channels", substring = false).performClick()
         compose.onNodeWithTag("blocked-channel-manager").assertIsDisplayed()
@@ -76,13 +76,13 @@ class VisibilitySmokeTest {
 
     @Test fun guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts() {
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Show members-only videos", substring = false).performClick()
         compose.onNodeWithTag("settings-save").performClick()
         until { activity.model.preferences.value.showMemberVideos }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-membervid01"))
         compose.onNodeWithTag("video-members-membervid01", useUnmergedTree = true).assertIsDisplayed()
         save(activity.model.preferences.value.copy(thinMode = true, uiDensity = "compact", darkMode = "dark"))

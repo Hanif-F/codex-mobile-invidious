@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -42,11 +44,11 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
     val library by vm.playlists.collectAsStateWithLifecycle()
     val owned = list.owned || library.any { it.id == list.id && it.owned }
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
-    Card(onClick = open, modifier = Modifier.fillMaxWidth().testTag("playlist-card-${list.id}")) {
-        Column(Modifier.padding(12.dp)) {
+    Card(onClick = open, modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).testTag("playlist-card-${list.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+        Column(Modifier.padding(16.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
-                    Modifier.size(if (prefs.uiDensity == "compact") 80.dp else 112.dp, if (prefs.uiDensity == "compact") 45.dp else 63.dp), contentScale = ContentScale.Crop)
+                    Modifier.size(if (prefs.uiDensity == "compact") 80.dp else 112.dp, if (prefs.uiDensity == "compact") 45.dp else 63.dp).clip(Liquid.media), contentScale = ContentScale.Crop)
                 Column(Modifier.weight(1f)) {
                     Text(list.title, fontWeight = FontWeight.SemiBold)
                     Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
@@ -66,7 +68,9 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
     val library by vm.playlists.collectAsStateWithLifecycle()
     val owned = list.owned || library.any { it.id == list.id && it.owned }
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
-    Column(Modifier.padding(horizontal = 16.dp).testTag("playlist-header")) {
+    Column(Modifier.padding(horizontal = Liquid.inset, vertical = 12.dp).testTag("playlist-header"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
+            Modifier.fillMaxWidth().heightIn(max = 260.dp).aspectRatio(16f / 9f).clip(Liquid.media), contentScale = ContentScale.Crop)
         Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
         if (list.author.isNotBlank()) PlaylistAuthor(vm, list, prefs.thinMode)

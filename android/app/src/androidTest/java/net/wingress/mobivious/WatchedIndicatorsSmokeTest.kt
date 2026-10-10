@@ -162,7 +162,7 @@ class WatchedIndicatorsSmokeTest {
         until { activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) && activity.window.decorView.hasWindowFocus() && activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.seekTo(119_000) }
         until { first !in activity.model.watched.value.positions }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         watched(first).assertExists()
         assertEquals(1f, progress(first).fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current, .001f)
         screenshot("completed")

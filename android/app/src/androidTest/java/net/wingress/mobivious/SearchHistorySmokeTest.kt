@@ -52,7 +52,7 @@ class SearchHistorySmokeTest {
         until { !vm.browse.value.loading && vm.browse.value.history != null }
     }
     private fun submit(tag: String, text: String) {
-        if (tag == "main-search") compose.onNodeWithTag("global-search").performClick()
+        if (tag == "main-search") compose.openGlobalSearch()
         if (tag == "channel-search") compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag(tag))
         compose.onNodeWithTag(tag).performTextReplacement(text)
         compose.onNodeWithTag(tag).performImeAction()
@@ -79,11 +79,11 @@ class SearchHistorySmokeTest {
         until { !vm.browse.value.loading }
         submit("main-search", "first")
         until { requests().size == 1 }
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextReplacement("second")
         compose.onNodeWithTag("main-search-submit").performClick()
         until { !vm.browse.value.loading && requests().size == 2 }
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextReplacement("many")
         compose.onNodeWithTag("main-search").performClick()
         compose.onNodeWithTag("main-search").performKeyInput { keyDown(Key.Enter); keyUp(Key.Enter) }
@@ -96,7 +96,7 @@ class SearchHistorySmokeTest {
     @Test fun imeSubmissionPreservesPastedVideoTimestamps() {
         compose.runOnUiThread { vm.navigate("Search") }
         until { !vm.browse.value.loading }
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextReplacement("https://youtu.be/testvideo01?t=25")
         compose.onNodeWithTag("main-search").performImeAction()
         until { vm.playback.value.details != null && vm.playback.value.position >= 25_000 }

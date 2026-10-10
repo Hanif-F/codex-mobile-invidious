@@ -63,7 +63,7 @@ class AvatarsSmokeTest {
         val channels = state().getJSONArray("channelRequests")
         assertEquals(2, channels.length()) // Existing metadata + selected Videos page only.
         screenshot("channel")
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { activity.model.route.isEmpty() && !activity.model.browse.value.loading }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null }

@@ -284,7 +284,7 @@ class AppSmokeTest {
         compose.onNodeWithText("Password").performTextInput("fixture-password")
         compose.onNodeWithTag("account-auth-submit").performClick()
         waitFor { activity.model.account.value != null }
-        compose.onNodeWithTag("navigation-Popular").performClick()
+        compose.selectDiscoveryFeed("Popular")
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
         assertNull(activity.model.playback.value.error)
@@ -297,7 +297,7 @@ class AppSmokeTest {
         compose.onNodeWithText("1.5×").performClick()
         compose.onNodeWithContentDescription("Close player settings").performClick()
         compose.runOnUiThread { assertEquals(1.5f, activity.model.controller.value!!.playbackParameters.speed) }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         compose.onNodeWithContentDescription("Pause").assertExists()
         compose.onNodeWithTag("navigation-You").performClick()
         compose.onNodeWithText("New playlist").performClick()

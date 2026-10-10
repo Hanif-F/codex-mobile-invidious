@@ -71,7 +71,7 @@ class CommunitySmokeTest {
         until { activity.model.postComments.value.feed.loaded }
     }
     private fun feedComments(id: String) {
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-comments-$id"))
+        compose.revealInBrowse(hasTestTag("post-comments-$id"))
         compose.onNodeWithTag("post-comments-$id").performClick()
         until { activity.model.postComments.value.target == CommentTarget.Post(id, owner) && activity.model.postComments.value.feed.loaded }
     }
@@ -140,13 +140,13 @@ class CommunitySmokeTest {
         command("channel", """{"channelFailNext":true}""")
         more(); assertNotNull(activity.model.browse.value.error)
         assertEquals(8, activity.model.browse.value.posts.size)
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Retry"))
+        compose.revealInBrowse(hasText("Retry"))
         compose.onNodeWithText("Retry").performClick()
         until { !activity.model.browse.value.loading && activity.model.browse.value.error == null }
         assertEquals(9, activity.model.browse.value.posts.size); assertTrue(activity.model.browse.value.end)
         val requests = events("channelRequests").filter { it.getString("tab") == "posts" }
         assertEquals(listOf(null, "posts+/page=2%&", "posts+/page=2%&"), requests.map { if (it.isNull("continuation")) null else it.getString("continuation") })
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-comments-Ugpost3"))
+        compose.revealInBrowse(hasTestTag("post-comments-Ugpost3"))
         val original = activity.model.browse.value.position
         compose.onNodeWithTag("post-Ugpost3").assert(hasClickAction().not())
         screenshot("gallery-card-actions")

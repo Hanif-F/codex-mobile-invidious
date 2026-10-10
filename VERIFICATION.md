@@ -3101,3 +3101,64 @@ in `artifacts/release-notes-0.9.1.md`. Build, lint, signature, package/update,
 startup and screenshot evidence is retained under the ignored
 `artifacts/release-0.9.1/` directory. Release target:
 [GitHub Releases v0.9.1](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.9.1).
+
+## Liquid Glass redesign — 10 October 2026
+
+The Android app now requires Android 13 / API 33. Verification used the user's
+already-running Pixel 8 Pro emulator, Android 16 / API 36. The emulator stayed
+responsive throughout the implementation and checks.
+
+The design replaces the previous shell with Discover (Popular and Trending),
+Subscriptions, You and separate Search; Settings is in You. The watch page hides
+navigation, groups Save/Download/Share/More, preserves native video geometry and
+uses a floating mini-player while browsing. Shared typography, surfaces, cards,
+forms, menus, sheets and the launcher/splash use the new design language.
+[Apple references and rendering details](docs/LIQUID_GLASS.md) document the design.
+
+Completed device checks include:
+
+- Independent Popular/Trending positions, bottom Search and return to its origin.
+- Guest-accessible settings, device-wide Reduce transparency persistence, dark
+  compact lists, narrow layout with 1.5× text, and wide sidebar/two-column feeds.
+- Actual decoded portrait, square, 16:9 and ultrawide videos; a wide portrait watch
+  layout; service playback through mini-player, search, settings and fullscreen.
+- Hiding both mini-player controls and its video surface while the IME is visible,
+  including a floating IME with zero bottom inset. Playback continues in the service.
+- Navigation and player minimization with the system animator duration scale at 0.
+- Existing channel, playlist/RSS, community, clip, download, settings, subscription,
+  queue and portrait chat interactions. Offline downloads, exports, PiP and
+  background playback were exercised by the selected existing device tests.
+
+The initial 71-scenario secondary-screen selection exposed four failures. Two
+looked for the removed watch-page Back button; two tapped list controls underneath
+floating navigation. Tests now follow Minimize player and scroll touch targets
+clear of chrome. Focused reruns passed. Additional checks caught a mini-player
+surface remaining visible for a floating IME and early access to transition
+semantics; both were corrected and verified. The final 16-scenario selection
+passed 15 initially; its reduced-motion test was synchronized with Compose before
+pressing Back and passed on rerun. Tests follow the new navigation and wait for stable presentation before interacting.
+One hardware video-conversion scenario was skipped because the emulator did not
+meet its encoder capability requirement. The entire historical instrumentation
+suite was not rerun.
+
+Screenshots are saved under `/data/local/tmp/mobivious-liquid/` on the emulator
+and copied with the preview to `artifacts/liquid-glass/`. Generated test patterns
+are intentional playback/geometry fixtures. Test overrides for density, font
+scale, IME and animator duration scale are restored after the checks.
+
+An early app render crash was caused by a glass control sampling the same layer
+that recorded it. The content/chrome composition boundary now prevents this
+cycle. Subsequent emulator runs opened and exercised the app successfully.
+Media3 retains its service and decoding SurfaceView; video controls use
+translucent plates rather than sampling the video surface.
+
+No production server changes, database migrations, real account contributions,
+release signing or deployment were performed. Physical-device/OEM rendering,
+TalkBack traversal and moving live-window playback remain separate device checks.
+
+Final local checks: `testDebugUnitTest` passed all 335 tests; `lintDebug` completed
+with zero errors and 36 warnings; `assembleDebug` succeeded. The preview APK is
+packaged separately from the release app under `artifacts/liquid-glass/`.
+
+The relocated DeArrow action was also checked for guest sign-in cancellation and
+authenticated contribution/review/import behavior using only the local fixture.

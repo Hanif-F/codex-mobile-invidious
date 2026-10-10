@@ -88,7 +88,7 @@ class QueueLibrarySmokeTest {
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
         assertFalse(activity.model.queueExpanded.value)
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         compose.onNodeWithTag("mini-player-preview").performClick()
         showQueue()
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()

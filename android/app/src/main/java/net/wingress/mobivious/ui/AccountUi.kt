@@ -69,7 +69,7 @@ internal fun AccountSettingsContent(vm: AppViewModel, page: String, modifier: Mo
         page == "Sessions & API tokens" -> AccountSessionsScreen(vm, context, modifier) { navigate("Create API token") }
         page == "Create API token" -> TokenForm(vm, context, modifier) { navigate("Sessions & API tokens") }
         page != "Account" -> CredentialForm(vm, context, page, modifier) { navigate("Account") }
-        else -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 12.dp).testTag("account-settings-screen")) {
+        else -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = Liquid.inset, vertical = 12.dp).testTag("account-settings-screen")) {
             Text("Signed in as ${account!!.username}", Modifier.padding(horizontal = 20.dp, vertical = 12.dp), style = MaterialTheme.typography.titleLarge)
             Text(vm.store.server, Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             ActionRow("Change username", enabled = !busy, icon = Icons.Default.Person) { navigate("Change username") }

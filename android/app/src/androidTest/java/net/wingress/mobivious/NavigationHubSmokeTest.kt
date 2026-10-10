@@ -51,12 +51,12 @@ class NavigationHubSmokeTest {
         compose.waitForIdle()
     }
     private fun tab(name: String) {
-        compose.onNodeWithTag("navigation-$name").performClick()
+        if (name in listOf("Popular", "Trending")) compose.selectDiscoveryFeed(name) else compose.onNodeWithTag("navigation-$name").performClick()
         until { vm.tab == name && vm.route.isEmpty() && !vm.browse.value.loading }
         compose.waitForIdle()
     }
     private fun accountSettings() {
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithText("Account", substring = false).performClick()
     }
     private fun login() {
@@ -99,10 +99,10 @@ class NavigationHubSmokeTest {
         assertEquals(popular.position, vm.browse.value.position)
         tab("Trending")
         assertEquals(trending.position, vm.browse.value.position)
-        compose.onNodeWithTag("global-settings").performClick()
-        back()
+        compose.openAppSettings()
+        back(); tab("Trending")
         assertEquals(trending.position, vm.browse.value.position)
-        compose.onNodeWithTag("global-search").performClick()
+        compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
         compose.onNodeWithTag("main-search").performImeAction()
         until { vm.tab == "Search" && !vm.browse.value.loading }
@@ -190,7 +190,7 @@ class NavigationHubSmokeTest {
         until { vm.playback.value.playing }
         tab("Trending"); tab("You")
         val token = vm.queue.value.token
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithText("Account", substring = false).performClick()
         assertTrue(vm.playback.value.playing)
         assertEquals(token, vm.queue.value.token)
@@ -231,7 +231,7 @@ class NavigationHubSmokeTest {
         compose.waitForIdle()
         val position = vm.browse.value.position
         assertTrue(position.index > 0)
-        compose.onNodeWithTag("global-settings").performClick()
+        compose.openAppSettings()
         compose.onNodeWithText("Browsing", substring = false).performScrollTo().performClick()
         compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("settings-region"))
         compose.onNodeWithTag("settings-region").performClick()
@@ -286,7 +286,7 @@ class NavigationHubSmokeTest {
             screenshot("you-landscape-large-text")
             tab("Trending")
             compose.onNodeWithTag("feed-refresh").assertIsDisplayed()
-            compose.onNodeWithTag("navigation-Trending").assertIsSelected()
+            compose.onNodeWithTag("discover-Trending").assertIsSelected()
             screenshot("trending-landscape-large-text")
         } finally {
             shell(if (font == "null") "settings delete system font_scale" else "settings put system font_scale $font")

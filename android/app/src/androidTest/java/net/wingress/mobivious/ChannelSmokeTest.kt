@@ -159,7 +159,7 @@ class ChannelSmokeTest {
         command("""{"channelDelayNext":{"tab":"videos","millis":1500}}""")
         loadMore()
         until { requests().any { it.getString("tab") == "videos" && !it.getBoolean("completed") } }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { activity.model.route.isEmpty() && !activity.model.browse.value.loading }
         until { requests().all { it.getBoolean("completed") } }
         compose.waitForIdle()
@@ -173,7 +173,7 @@ class ChannelSmokeTest {
         command("""{"channelDelayNext":{"tab":"metadata","millis":1500}}""")
         compose.onNodeWithText("Mobivious Studio", substring = true).performClick()
         until { requests().any { it.getString("tab") == "metadata" && !it.getBoolean("completed") } }
-        compose.onNodeWithContentDescription("Back").performClick()
+        compose.navigateBack()
         until { activity.model.route.isEmpty() && !activity.model.browse.value.loading }
         until { requests().all { it.getBoolean("completed") } }
         compose.waitForIdle()

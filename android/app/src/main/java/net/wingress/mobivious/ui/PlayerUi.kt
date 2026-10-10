@@ -128,6 +128,7 @@ internal fun VideoPlayer(
             val bounds = it.boundsInWindow()
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
+        val playbackOffset = if (maxHeight < 300.dp) (-56).dp else 0.dp
         val compactPlay = maxHeight < 180.dp || !fullscreen && !settingsOpen && sponsor.active != null
         val showTimeline = maxHeight >= 96.dp
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
@@ -194,14 +195,14 @@ internal fun VideoPlayer(
                 Box(Modifier.fillMaxSize().testTag("player-controls").onFocusChanged { focused = it.hasFocus }.focusGroup()
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .75f))))) {
                     onCollapse?.let { collapse ->
-                        IconButton(onClick = { vm.cancelAccumulatedSeek(); collapse() }, modifier = Modifier.align(Alignment.TopEnd)
-                            .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier)) {
+                        IconButton(onClick = { vm.cancelAccumulatedSeek(); collapse() }, modifier = Modifier.align(Alignment.TopStart)
+                            .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier).padding(12.dp).mediaGlass(CircleShape)) {
                             Icon(Icons.Default.KeyboardArrowDown, if (fullscreen) "Return to watch page" else "Minimize player", tint = Color.White)
                         }
                     }
                     Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                         .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)) else Modifier)
-                        .padding(horizontal = 12.dp)) {
+                        .padding(horizontal = 12.dp, vertical = 10.dp).mediaGlass(Liquid.media).padding(horizontal = 12.dp, vertical = 4.dp)) {
                         val timelinePosition = scrub?.toLong() ?: playback.position
                         val sponsorLabels = sponsor.segments.filter { it.start <= timelinePosition && timelinePosition < it.end }
                             .map { it.category.label }.distinct()
@@ -250,7 +251,7 @@ internal fun VideoPlayer(
                             onFullscreen = { interact(); onFullscreen() },
                             onChapters = { vm.cancelAccumulatedSeek(); interact(); onChapters() }, onChat = onChat, chatOpen = replay.open)
                     }
-                    PlayerPlaybackButton(playback, compactPlay) { vm.togglePlay(); interact() }
+                    PlayerPlaybackButton(playback, compactPlay, playbackOffset) { vm.togglePlay(); interact() }
                 }
             }
             if (playback.loading || playback.buffering) CircularProgressIndicator(
@@ -297,11 +298,11 @@ internal fun VideoPlayer(
 }
 
 @Composable
-internal fun BoxScope.PlayerPlaybackButton(playback: PlaybackState, compact: Boolean, play: () -> Unit) {
+internal fun BoxScope.PlayerPlaybackButton(playback: PlaybackState, compact: Boolean, verticalOffset: androidx.compose.ui.unit.Dp = 0.dp, play: () -> Unit) {
     if (playback.loading || playback.error != null) return
     IconButton(onClick = play, enabled = playback.canPlay,
-        modifier = Modifier.align(Alignment.Center).size(if (compact) 48.dp else 64.dp)
-            .testTag("player-play-pause").clip(CircleShape).background(Color.Black.copy(alpha = .35f))) {
+        modifier = Modifier.align(Alignment.Center).offset(y = verticalOffset).size(if (compact) 48.dp else 64.dp)
+            .testTag("player-play-pause").mediaGlass(CircleShape)) {
         val ended = playback.playerState == Player.STATE_ENDED
         Icon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
             if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play",

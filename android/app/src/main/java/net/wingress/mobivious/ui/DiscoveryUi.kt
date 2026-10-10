@@ -9,6 +9,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -52,14 +55,19 @@ internal fun TrendingControls(vm: AppViewModel, region: String) {
     val category by vm.trendingCategory.collectAsStateWithLifecycle()
     val busy by vm.trendingRegionBusy.collectAsStateWithLifecycle()
     val error by vm.trendingRegionError.collectAsStateWithLifecycle()
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+    val locale = LocalConfiguration.current.locales[0]
+    var regionOpen by rememberSaveable { mutableStateOf(false) }
+    Column(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset)) {
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             TrendingCategory.entries.forEach { option ->
                 FilterChip(selected = category == option, onClick = { vm.selectTrendingCategory(option) },
                     label = { Text(option.label) }, modifier = Modifier.testTag("trending-${option.apiValue}"))
             }
         }
-        RegionChoice(region, !busy, "trending-region", vm::selectTrendingRegion)
+        TextButton(onClick = { regionOpen = true }, enabled = !busy, modifier = Modifier.testTag("trending-region")) {
+            Text(ContentRegions.label(region, locale)); Spacer(Modifier.width(4.dp)); Icon(Icons.Default.ExpandMore, null, Modifier.size(18.dp))
+        }
+        if (regionOpen) RegionPicker(region, { regionOpen = false }) { regionOpen = false; vm.selectTrendingRegion(it) }
         if (busy) Text("Saving region…", style = MaterialTheme.typography.bodySmall)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("trending-region-error")) }
     }
