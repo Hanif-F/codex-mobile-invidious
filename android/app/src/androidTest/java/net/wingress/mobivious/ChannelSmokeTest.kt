@@ -52,12 +52,12 @@ class ChannelSmokeTest {
         until { !activity.model.browse.value.loading && activity.model.channel.value != null }
     }
     private fun choose(tab: ChannelTab) {
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("channel-tab-${tab.path}"))
+        compose.onNodeWithTag("channel-tab-${tab.path}").performScrollTo()
         compose.onNodeWithTag("channel-tab-${tab.path}").performClick()
         until { !activity.model.browse.value.loading && activity.model.channelTab.value == tab }
     }
     private fun loadMore() {
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Load more"))
+        compose.revealInBrowse(hasText("Load more"))
         compose.onNodeWithText("Load more").performClick()
     }
 
@@ -130,7 +130,7 @@ class ChannelSmokeTest {
         command("""{"channelFailNext":true}""")
         compose.runOnUiThread { activity.model.refresh() }
         until { activity.model.browse.value.error != null }
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Retry"))
+        compose.revealInBrowse(hasText("Retry"))
         compose.onNodeWithText("Fixture channel temporarily unavailable").assertExists()
         compose.onNodeWithText("Retry").performClick()
         until { !activity.model.browse.value.loading && activity.model.browse.value.error == null }

@@ -12,7 +12,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.hideFromAccessibility
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.*
 
@@ -48,16 +57,30 @@ internal fun WatchActionRow(downloadEnabled: Boolean, save: () -> Unit, download
     share: () -> Unit, more: () -> Unit, moreMenu: @Composable () -> Unit = {}) {
     BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 8.dp).testTag("watch-actions")) {
         val size = if (maxWidth < 272.dp) 48.dp else 56.dp
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically) {
-            WatchIconButton(Icons.AutoMirrored.Filled.PlaylistAdd, "Save", Modifier.testTag("watch-save"), size = size, onClick = save)
-            WatchIconButton(Icons.Default.Download, "Download", Modifier.testTag("watch-download"),
-                enabled = downloadEnabled, size = size, onClick = download)
-            WatchIconButton(Icons.Default.Share, "Share", Modifier.testTag("watch-share"), size = size, onClick = share)
-            Box {
-                WatchIconButton(Icons.Default.MoreHoriz, "More", Modifier.testTag("watch-more"), size = size, onClick = more)
-                moreMenu()
-            }
+        val style = MaterialTheme.typography.labelMedium
+        val available = with(LocalDensity.current) { (maxWidth / 4 - 4.dp).toPx() }
+        val longest = rememberTextMeasurer().measure(AnnotatedString("Download"), style, softWrap = false).size.width
+        val fit = (available / longest.coerceAtLeast(1)).coerceAtMost(1f)
+        val labelStyle = style.copy(fontSize = style.fontSize * fit, lineHeight = style.lineHeight * fit)
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            WatchLabeledAction(Icons.AutoMirrored.Filled.PlaylistAdd, "Save", "watch-save", size, Modifier.weight(1f), labelStyle, onClick = save)
+            WatchLabeledAction(Icons.Default.Download, "Download", "watch-download", size, Modifier.weight(1f), labelStyle, downloadEnabled, download)
+            WatchLabeledAction(Icons.Default.Share, "Share", "watch-share", size, Modifier.weight(1f), labelStyle, onClick = share)
+            WatchLabeledAction(Icons.Default.MoreHoriz, "More", "watch-more", size, Modifier.weight(1f), labelStyle, onClick = more, menu = moreMenu)
         }
+    }
+}
+
+@Composable
+private fun WatchLabeledAction(icon: ImageVector, label: String, tag: String, size: Dp,
+    modifier: Modifier, labelStyle: TextStyle, enabled: Boolean = true, onClick: () -> Unit, menu: @Composable () -> Unit = {}) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box {
+            WatchIconButton(icon, label, Modifier.testTag(tag), enabled = enabled, size = size, onClick = onClick)
+            menu()
+        }
+        Text(label, Modifier.fillMaxWidth().semantics { hideFromAccessibility() }, textAlign = TextAlign.Center,
+            style = labelStyle, maxLines = 1,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) .85f else .38f))
     }
 }

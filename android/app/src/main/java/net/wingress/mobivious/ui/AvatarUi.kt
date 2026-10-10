@@ -119,33 +119,54 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
 internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean,
     actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {}, subscribe: () -> Unit) {
     var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
-            AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(Liquid.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 72.dp, "channel-header-avatar")
-            Column(Modifier.weight(1f)) {
-                Text(channel.name, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                if (channel.verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(Icons.Default.Verified, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text("Verified channel", style = MaterialTheme.typography.labelSmall)
-                }
-                if (channel.pronouns.isNotBlank()) Text(channel.pronouns, style = MaterialTheme.typography.bodyMedium)
-                DisplayFormats.subscribers(channel.subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    BrowseArtworkSurface(if (thinMode || bannerFailed) null else ChannelImages.url(server, channel.banner)) {
+        Column(Modifier.fillMaxWidth().padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
+                AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(Liquid.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
             }
-            actions()
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val identity: @Composable () -> Unit = {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(channel.name, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                            if (channel.verified) Icon(Icons.Default.Verified, "Verified channel", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                        }
+                        if (channel.handle.isNotBlank()) Text(channel.handle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (channel.pronouns.isNotBlank()) Text(channel.pronouns, style = MaterialTheme.typography.bodyMedium)
+                        DisplayFormats.subscribers(channel.subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                    }
+                }
+                if (maxWidth < 320.dp || LocalDensity.current.fontScale > 1.3f) Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 72.dp, "channel-header-avatar")
+                        Spacer(Modifier.weight(1f)); actions()
+                    }
+                    identity()
+                } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 72.dp, "channel-header-avatar")
+                    Box(Modifier.weight(1f)) { identity() }
+                    actions()
+                }
+            }
+            if (channel.description.isNotBlank()) {
+                Text(channel.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+                TextButton(onClick = readDescription, modifier = Modifier.testTag("channel-description-open")) { Text("Read full description") }
+            }
+            TextButton(onClick = subscribe, modifier = Modifier.heightIn(min = 48.dp).browseGlass(prominent = true),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)) { Text(if (subscribed) "Subscribed" else "Subscribe") }
         }
-        if (channel.description.isNotBlank()) {
-            Text(channel.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-            TextButton(onClick = readDescription, modifier = Modifier.testTag("channel-description-open")) { Text("Read full description") }
-        }
-        Button(onClick = subscribe) { Text(if (subscribed) "Subscribed" else "Subscribe") }
     }
 }
 
 @Composable
 internal fun SubscriptionChannelChip(channel: Channel, server: String, thinMode: Boolean, open: () -> Unit) {
-    AssistChip(onClick = open, label = { Text(channel.name) },
-        leadingIcon = if (!thinMode) ({ ChannelAvatar(server, channel.image, channel.name, 24.dp, "subscription-avatar-${channel.id}") }) else null)
+    val width = (if (thinMode) 112.dp else 88.dp) * LocalDensity.current.fontScale.coerceIn(1f, 2f)
+    Column(Modifier.width(width).clip(Liquid.media)
+        .clickable(role = Role.Button, onClickLabel = "Open ${channel.name}'s channel", onClick = open)
+        .heightIn(min = 48.dp).padding(horizontal = 4.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!thinMode) ChannelAvatar(server, channel.image, channel.name, 48.dp, "subscription-avatar-${channel.id}")
+        Text(channel.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+    }
 }

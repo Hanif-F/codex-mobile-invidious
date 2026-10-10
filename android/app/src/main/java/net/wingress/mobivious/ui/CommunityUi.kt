@@ -11,6 +11,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUpOffAlt
@@ -36,16 +37,23 @@ import net.wingress.mobivious.data.*
 
 @Composable
 internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Boolean, open: () -> Unit) {
-    Card(onClick = open, enabled = ContentVisibility.validChannel(channel.id), modifier = Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = 6.dp)
-        .testTag("related-channel-${channel.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ChannelAuthor(server, channel.image, channel.name, !thinMode, size = 48.dp, tag = "related-avatar-${channel.id}")
-            if (channel.verified) Text("Verified channel", style = MaterialTheme.typography.labelSmall)
-            if (channel.handle.isNotBlank()) Text(channel.handle, style = MaterialTheme.typography.bodySmall)
-            DisplayFormats.subscribers(channel.subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-            channel.videoCount?.let { Text(DisplayFormats.inventory(it, "video"), style = MaterialTheme.typography.bodySmall) }
-            if (channel.description.isNotBlank()) Text(channel.description, maxLines = 3, style = MaterialTheme.typography.bodyMedium)
-        }
+    Column(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset)) {
+        ListItem(headlineContent = { Text(channel.name, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+            supportingContent = {
+                Column {
+                    if (channel.handle.isNotBlank()) Text(channel.handle)
+                    DisplayFormats.subscribers(channel.subscribers).takeIf(String::isNotBlank)?.let { Text(it) }
+                    channel.videoCount?.let { Text(DisplayFormats.inventory(it, "video")) }
+                    if (channel.description.isNotBlank()) Text(channel.description, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                }
+            },
+            leadingContent = if (thinMode) null else ({ ChannelAvatar(server, channel.image, channel.name, 40.dp, "related-avatar-${channel.id}") }),
+            trailingContent = { if (channel.verified) Icon(Icons.Default.Verified, "Verified channel", tint = MaterialTheme.colorScheme.primary) },
+            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            modifier = Modifier.heightIn(min = 80.dp).testTag("related-channel-${channel.id}")
+                .clickable(enabled = ContentVisibility.validChannel(channel.id), role = androidx.compose.ui.semantics.Role.Button,
+                    onClickLabel = "Open ${channel.name}'s channel", onClick = open))
+        HorizontalDivider(Modifier.padding(start = if (thinMode) 16.dp else 72.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .6f))
     }
 }
 

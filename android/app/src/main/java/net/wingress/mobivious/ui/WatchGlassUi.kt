@@ -28,7 +28,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -140,6 +143,25 @@ internal fun WatchDisclosureRow(title: String, icon: ImageVector, modifier: Modi
 @Composable
 internal fun WatchPanelSurface(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     WatchGlassScene(modifier.clip(Liquid.card)) { Column(Modifier.fillMaxSize(), content = content) }
+}
+
+/** Only the reading surface is recorded; floating toolbar glass is a sibling of its source. */
+@Composable
+internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () -> Unit,
+    content: @Composable (Modifier, Dp) -> Unit) {
+    val backdrop = rememberLayerBackdrop()
+    val density = LocalDensity.current
+    var toolbarHeight by remember { mutableStateOf(136.dp) }
+    val surface = MaterialTheme.colorScheme.surface
+    Box(modifier.clip(Liquid.card).background(surface)) {
+        CompositionLocalProvider(LocalGlassBackdrop provides null, LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            content(Modifier.fillMaxSize().layerBackdrop(backdrop).background(surface), toolbarHeight + 8.dp)
+        }
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            Column(Modifier.fillMaxWidth().testTag("comments-toolbar").onSizeChanged { toolbarHeight = with(density) { it.height.toDp() } }
+                .padding(bottom = 8.dp)) { toolbar() }
+        }
+    }
 }
 
 /** The toolbar is one glass surface; the controls inside it deliberately have no glass plate. */

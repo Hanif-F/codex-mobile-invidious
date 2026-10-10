@@ -19,16 +19,16 @@ import androidx.compose.ui.unit.dp
 /** All submission paths share this action; consume hardware Enter before the IME sees it. */
 @Composable
 internal fun SearchField(value: String, update: (String) -> Unit, label: String, tag: String,
-    modifier: Modifier = Modifier, enabled: Boolean = true, submit: () -> Unit) {
+    modifier: Modifier = Modifier, enabled: Boolean = true, glass: Boolean = false, submit: () -> Unit) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val search = { keyboard?.hide(); focus.clearFocus(); submit() }
     OutlinedTextField(value, update, placeholder = { Text(label, style = MaterialTheme.typography.bodyMedium) }, singleLine = true, enabled = enabled,
         shape = Liquid.pill, colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
-            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+            focusedContainerColor = if (glass) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
+            unfocusedContainerColor = if (glass) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
             unfocusedBorderColor = Color.Transparent, focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = .35f)),
-        modifier = modifier.testTag(tag).onPreviewKeyEvent { event ->
+        modifier = modifier.then(if (glass) Modifier.browseGlass() else Modifier).testTag(tag).onPreviewKeyEvent { event ->
             if (enabled && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
                 if (event.type == KeyEventType.KeyUp) search()
                 true

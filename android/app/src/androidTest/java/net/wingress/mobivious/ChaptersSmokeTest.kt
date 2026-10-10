@@ -3,6 +3,7 @@ package net.wingress.mobivious
 import android.content.Intent
 import android.content.res.Configuration
 import androidx.compose.ui.test.*
+import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.test.espresso.Espresso.pressBack
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -96,7 +97,7 @@ class ChaptersSmokeTest {
         assertEquals(0, fixture().getJSONArray("chapterAssetRequests").length())
     }
 
-    @Test fun inlineFooterAndCenteredPlaybackStayInPlaceAcrossFullscreen() {
+    @Test fun fullWidthTimelineAndCenteredPlaybackStayInPlaceAcrossFullscreen() {
         incoming("/watch?v=testvideo01&autoplay=0"); ready()
         fun checkControls(fullscreen: Boolean) {
             val surface = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
@@ -105,14 +106,22 @@ class ChaptersSmokeTest {
             assertEquals((surface.top + surface.bottom).value / 2, (button.top + button.bottom).value / 2, .5f)
             val timeline = compose.onNodeWithTag("player-timeline").getUnclippedBoundsInRoot()
             val time = compose.onNodeWithTag("player-time").getUnclippedBoundsInRoot()
+            val line = compose.onNodeWithTag("player-seek-track", useUnmergedTree = true).getUnclippedBoundsInRoot()
             val chapter = compose.onNodeWithTag("player-chapter-title").getUnclippedBoundsInRoot()
             val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
-            val expand = compose.onNodeWithContentDescription(if (fullscreen) "Exit full screen" else "Full screen").getUnclippedBoundsInRoot()
+            val expand = compose.onNodeWithContentDescription(if (fullscreen) "Exit full screen" else "Full screen", useUnmergedTree = true).getUnclippedBoundsInRoot()
             val rail = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
             assertTrue("Time $time must fit in rail $rail", time.top >= rail.top && time.bottom <= rail.bottom)
             assertTrue("Seek target $timeline must fit in rail $rail", timeline.top >= rail.top && timeline.bottom <= rail.bottom)
-            assertTrue(chapter.bottom < timeline.top)
-            assertTrue(chapter.right <= settings.left && settings.right <= expand.left)
+            assertTrue(chapter.top >= rail.top && chapter.bottom <= rail.bottom)
+            assertEquals((expand.top + expand.bottom).value / 2, (time.top + time.bottom).value / 2, .5f)
+            val gap = (line.top + line.bottom - time.top - time.bottom).value / 2
+            assertEquals(if (fullscreen) 48f else 24f, gap, .5f)
+            assertTrue("Time $time overlaps chapter $chapter", time.right <= chapter.left)
+            assertTrue("Chapter $chapter must sit above timeline $timeline", chapter.bottom <= timeline.top)
+            assertTrue("Fullscreen $expand must sit above timeline $timeline", expand.bottom <= timeline.top)
+            assertTrue("Timeline $timeline must span rail $rail", timeline.left - rail.left <= 12.dp && rail.right - timeline.right <= 12.dp)
+            assertTrue(settings.bottom <= rail.top)
         }
         checkControls(false)
         compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()

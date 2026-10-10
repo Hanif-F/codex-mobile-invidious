@@ -86,14 +86,13 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
     }
     val content: @Composable () -> Unit = {
         BackHandler { back() }
-        Column((if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.fillMaxWidth().heightIn(max = height)).imePadding().testTag("sponsorblock-sheet")) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (fullScreen || page != "Global SponsorBlock settings") IconButton(onClick = ::back, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to SponsorBlock settings") }
-                Text(page, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                if (!fullScreen) IconButton(onClick = dismiss, enabled = !busy) { Icon(Icons.Default.Close, "Close SponsorBlock settings") }
-            }
-            HorizontalDivider()
-            LazyColumn(Modifier.weight(1f, fill = fullScreen).fillMaxWidth().testTag("sponsorblock-settings-list"), contentPadding = PaddingValues(16.dp)) {
+        BrowseGlassSurface((if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.fillMaxWidth().height(height))
+            .imePadding().testTag("sponsorblock-sheet"), toolbar = {
+            BrowsePanelToolbar(page, "Close SponsorBlock settings", dismiss,
+                back = if (fullScreen || page != "Global SponsorBlock settings") ::back else null, enabled = !busy)
+        }) { contentModifier, topInset ->
+        Column(contentModifier) {
+            LazyColumn(Modifier.weight(1f, fill = fullScreen).fillMaxWidth().testTag("sponsorblock-settings-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topInset, bottom = 16.dp)) {
                 when (page) {
                     "Global SponsorBlock settings" -> {
                         item {
@@ -161,6 +160,7 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                     Button(onClick = { save() }, enabled = !busy && !loading && (page != "Global SponsorBlock settings" || global.colors.values.all(SponsorBlockRules::validColor))) { Text(if (busy) "Saving…" else "Save") }
                 }
             }
+        }
         }
     }
     if (fullScreen) Surface { content() }

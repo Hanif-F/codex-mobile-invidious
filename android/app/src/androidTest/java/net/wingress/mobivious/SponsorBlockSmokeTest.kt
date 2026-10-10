@@ -65,7 +65,7 @@ class SponsorBlockSmokeTest {
     @Test fun guestSheetColorValidationPersistenceAndMarkers() {
         command("sponsorblock", """{"sponsorSegments":[{"id":"a","category":"sponsor","start":10,"end":20}]}""")
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
-        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings(); compose.onNodeWithText("SponsorBlock").performClick()
+        compose.openAppSettings(); compose.onNodeWithText("SponsorBlock").performClick()
         compose.onNode(isToggleable() and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
         val color = compose.onNode(hasSetTextAction() and hasText("Sponsor color (#RRGGBB)"))
         color.performScrollTo().performTextReplacement("bad")

@@ -53,13 +53,13 @@ class SearchHistorySmokeTest {
     }
     private fun submit(tag: String, text: String) {
         if (tag == "main-search") compose.openGlobalSearch()
-        if (tag == "channel-search") compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag(tag))
+        if (tag == "channel-search") compose.onNodeWithTag(tag).assertIsDisplayed()
         compose.onNodeWithTag(tag).performTextReplacement(text)
         compose.onNodeWithTag(tag).performImeAction()
         until { !vm.browse.value.loading }
     }
     private fun choose(tab: ChannelTab) {
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("channel-tab-${tab.path}"))
+        compose.onNodeWithTag("channel-tab-${tab.path}").performScrollTo()
         compose.onNodeWithTag("channel-tab-${tab.path}").performClick()
         until { !vm.browse.value.loading && vm.channelTab.value == tab }
     }
@@ -108,16 +108,16 @@ class SearchHistorySmokeTest {
         compose.runOnUiThread { vm.navigate("Popular", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
         until { !vm.browse.value.loading && vm.channel.value != null }
         choose(ChannelTab.STREAMS)
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("channel-search"))
+        compose.onNodeWithTag("channel-search").assertIsDisplayed()
         compose.onNodeWithTag("channel-search").performTextReplacement("many")
         assertTrue(requests().isEmpty()); assertEquals("streamvid01", vm.browse.value.videos.single().id)
         compose.onNodeWithTag("channel-search").performImeAction()
         until { !vm.browse.value.loading && vm.browse.value.videos.size == 20 }
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Load more"))
+        compose.revealInBrowse(hasText("Load more"))
         compose.onNodeWithText("Load more").performClick()
         until { !vm.browse.value.loading && vm.browse.value.end }
         assertEquals(21, vm.browse.value.videos.size)
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Clear search"))
+        compose.onNodeWithText("Clear search").assertIsDisplayed()
         compose.onNodeWithText("Clear search").performClick()
         until { !vm.browse.value.loading && vm.scopedSearch.value.submitted.isEmpty() }
         assertEquals(ChannelTab.STREAMS, vm.channelTab.value)
@@ -131,7 +131,7 @@ class SearchHistorySmokeTest {
         until { !vm.browse.value.loading }
         submit("subscription-search", "hidden")
         assertEquals(20, vm.browse.value.videos.size); assertFalse(vm.browse.value.end)
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Load more"))
+        compose.revealInBrowse(hasText("Load more"))
         compose.onNodeWithText("Load more").performClick()
         until { !vm.browse.value.loading && vm.browse.value.end }
         assertTrue(vm.visibleVideos(vm.browse.value.videos).any { it.id == "testvideo01" })
@@ -157,7 +157,7 @@ class SearchHistorySmokeTest {
         compose.onNodeWithText("Clear search").performClick()
         until { !vm.browse.value.loading && vm.browse.value.videos.size == 2 }
         repeat(2) {
-            compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Load more"))
+            compose.revealInBrowse(hasText("Load more"))
             compose.onNodeWithText("Load more").performClick()
             until { !vm.browse.value.loading }
         }

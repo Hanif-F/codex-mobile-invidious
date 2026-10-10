@@ -146,7 +146,7 @@ migrations and token renewal. The [feature checklist](FEATURE_PARITY.md) records
 individual capabilities and their dependencies.
 
 Archived livestreams with `liveChatReplay` support offer on-demand chat replay
-through the player chat button or watch-page entry. Replay follows playback and
+through the player chat button. Replay follows playback and
 seeks, with compact docked and movable/resizable overlay modes. The side panel
 can use 10–70% of the screen. Use the chat menu to open settings or choose
 **Adjust overlay**; attached handles move and resize the panel, with Done and

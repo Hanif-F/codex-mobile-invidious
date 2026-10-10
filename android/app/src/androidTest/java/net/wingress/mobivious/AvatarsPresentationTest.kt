@@ -70,7 +70,7 @@ class AvatarsPresentationTest {
                 CommentRow(Comment("Viewer", "Body", "today", 0, id = "comment"), server, "abcdefghijk", {}, {})
             }
         } }
-        compose.onNodeWithTag("subscription-avatar-${channel.id}", true).assertWidthIsEqualTo(24.dp)
+        compose.onNodeWithTag("subscription-avatar-${channel.id}", true).assertWidthIsEqualTo(48.dp)
         compose.onNodeWithTag("compact", true).assertWidthIsEqualTo(24.dp)
         compose.onNodeWithTag("comment-avatar-comment", true).assertWidthIsEqualTo(40.dp)
         compose.onNodeWithText("Viewer").assert(hasClickAction().not())

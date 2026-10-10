@@ -39,6 +39,34 @@ and DeArrow title contributions. On wide displays, metadata and comments sit
 beside the video. Native portrait, square, landscape and ultrawide geometry is
 preserved. The mini-player floats above navigation while browsing.
 
+## Subscriptions and channels
+
+Subscriptions keeps the upload feed primary, with a pinned Channels pill and
+compact avatar/name shortcuts. Its page-owned toolbar contains refresh, RSS/OPML
+and scoped search. Channels uses a continuous directory with quiet separators,
+40dp avatars, viewing statistics and a matching-channel count. Local search,
+saved sorting and the statistics fallback remain independent of presentation.
+
+`BrowseGlassUi.kt` records scrolling content separately from sibling floating
+search, tab and sort controls. Measured toolbar height sets the initial list
+padding, while scrolling artwork and rows can pass behind the glass. The shell
+continues to own the dock, sidebar and mini-player. No glass control samples the
+recording that contains it. The browse material uses the existing Liquid palette,
+refraction, subtle tint and fine rim, with solid accessibility/software fallbacks.
+
+Creator pages retain server-provided tabs and native content behavior. Banner and
+avatar lead the identity, verification sits beside the name, and Subscribe uses
+a glass pill over a separately recorded artwork wash. Narrow layouts and large
+text stack the identity. Search, horizontally scrolling tabs and compact sorting
+menus stay accessible above the content. Comfortable subscription and channel
+video feeds use two columns at wide widths; the directory stays one column,
+centered at a maximum of 800dp.
+
+Channel descriptions, RSS/OPML and SponsorBlock panels use floating glass
+toolbars over quiet scrolling bodies. Private-feed warnings, file operations,
+rich links and settings semantics remain intact. Presentation and journey tests
+save screenshots under `/data/local/tmp/mobivious-subscriptions-glass/`.
+
 ## Expanded watch
 
 The watch page records its own background independently of its controls. A subtle
@@ -47,23 +75,39 @@ offline playback use a neutral wash. `WatchGlassUi.kt` owns the background,
 refractive materials, disclosure rows and panel toolbars. It never records the
 glass into the backdrop that glass samples.
 
-Save, Download, Share and More use evenly spaced 56dp circles, reducing to 48dp
-on narrow layouts. Accessible names, disabled states and long-press tooltips
-remain available. The title wraps at 20sp semibold, verification sits beside the
-channel name, and Subscribe uses a glass pill. Comments, Description, Chapters
-and Chat replay share disclosure styling. Description expands inline; comments
-remain below the picture. Reading areas and lists stay on quiet surfaces.
+Save, Download, Share and More use equal-width columns with centered labels below
+56dp glass circles, reducing to 48dp on narrow layouts. Labels fit as whole words
+on narrow layouts with large text. Accessible names, disabled states and long-press
+tooltips remain available. The title wraps at 20sp semibold,
+verification sits beside the channel name, and Subscribe uses a glass pill.
+Comments and Description are the two disclosure rows; Description expands inline.
+Chapters and chat replay are opened from the player.
 
-`PlayerControlsUi.kt` measures the top controls, notices and shallow timeline
-rail. Play/Pause/Replay sits at the picture's center between 10-second seek
-buttons when their touch targets fit separately. Short pictures move Play/Pause
-into the rail and retain double-tap seeking. Minimize, chapter title, chat,
-settings and fullscreen live above the picture; exceptionally short layouts
-consolidate controls into the rail. Loading and retry also fit inside the rail.
-The seek track retains buffering, chapter separators, SponsorBlock ranges and
-scrubbing labels. Comments, chapters, chat replay and player settings use glass
-toolbars without turning their reading surfaces into glass cards. Shared
-community comments retain their existing styling through an explicit watch flag.
+`PlayerControlsUi.kt` uses white icons, text shadows and shallow neutral edge
+contrast rather than tinted capsules or a full-picture scrim. Collapse is at the
+top left, with chat beside settings at the top right. The footer puts the timestamp,
+clickable current chapter and fullscreen above a full-width seek track. Separate
+48dp rows keep their touch targets clear of seeking. In portrait the visible labels
+sit lower and the seek track sits higher within those targets, giving closer spacing;
+landscape retains the more open spacing. It measures time labels;
+long chapters truncate, while narrow
+layouts with large text use elapsed time and a chapter chevron while retaining
+full accessibility descriptions. Play/Pause/Replay is centered when measured
+chrome leaves room, otherwise it moves beside collapse. Very shallow pictures
+share the upper footer row with header controls; minimize remains available through
+the player's accessibility actions if narrow widths leave no room for its icon.
+Seeking uses double taps,
+the accessible timeline or the existing accessibility actions. Loading/retry,
+buffering, chapter separators, SponsorBlock ranges and scrubbing labels remain.
+Reduce transparency gives controls solid neutral contrast surfaces.
+
+Watch comments have a floating glass toolbar and a segmented Top/Newest control.
+The reading surface is recorded separately from its sibling glass controls;
+scrolling comments pass behind them without a recursive backdrop. Measured header
+padding keeps the first comment readable. Avatars sit beside comment bodies,
+separators are quiet and replies use lightweight text controls. Community comments
+retain their existing presentation through the explicit watch flag. Chapters,
+chat replay and settings keep their existing glass toolbars and quiet lists.
 
 ## Shared components
 

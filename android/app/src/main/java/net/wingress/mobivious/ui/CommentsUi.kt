@@ -17,6 +17,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -82,33 +85,17 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                     savePosition(key, position)
             }
     }
-    val content: @Composable ColumnScope.() -> Unit = {
-            if (watchStyle) WatchPanelToolbar(if (thread != null) "Replies" else "Comments", "Close comments", close,
-                Icons.Default.ChatBubbleOutline, detail = if (thread == null) state.feed.page.count?.let { commentCount(it) } else null,
-                backLabel = "Back to comments", back = if (thread != null) back else null)
-            else Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (thread != null) IconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
-                else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
-                Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() },
-                    style = MaterialTheme.typography.titleLarge)
-                if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
-                IconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
-            }
-            if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,
-                    onClick = { changeSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
-            }
-            if (!watchStyle) HorizontalDivider()
-            LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag(if (thread == null) "comments-list" else "comment-replies-list"),
-                state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
+    val reading: @Composable (Modifier, PaddingValues) -> Unit = { listModifier, padding ->
+            LazyColumn(listModifier.fillMaxWidth().testTag(if (thread == null) "comments-list" else "comment-replies-list"),
+                state = list, contentPadding = padding) {
                 if (thread != null) item(key = "parent") {
-                    CommentRow(thread.parent, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link, parent = true, thinMode = thinMode)
+                    CommentRow(thread.parent, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link, parent = true, thinMode = thinMode, watchStyle = watchStyle)
                     Text("Replies", Modifier.padding(horizontal = 16.dp, vertical = 8.dp).semantics { heading() },
                         style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
                 }
                 items(feed.page.items, key = { "comment:${it.key}" }) { comment ->
                     CommentRow(comment, state.context?.server.orEmpty(), state.videoId.orEmpty(), channel, link,
-                        replies = if (thread == null) ({ replies(comment) }) else null, thinMode = thinMode)
+                        replies = if (thread == null) ({ replies(comment) }) else null, thinMode = thinMode, watchStyle = watchStyle)
                 }
                 if (feed.loading) item { Column(Modifier.fillMaxWidth().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(Modifier.size(28.dp)); Text("Loading ${if (thread == null) "comments" else "replies"}…", Modifier.padding(top = 12.dp))
@@ -134,26 +121,70 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                 }
             }
     }
-    if (watchStyle) WatchPanelSurface(modifier.testTag("comments-drawer"), content)
+    if (watchStyle) WatchCommentsSurface(modifier.testTag("comments-drawer"), toolbar = {
+        WatchPanelToolbar(if (thread != null) "Replies" else "Comments", "Close comments", close,
+            Icons.Default.ChatBubbleOutline, detail = if (thread == null) state.feed.page.count?.let { commentCount(it) } else null,
+            backLabel = "Back to comments", back = if (thread != null) back else null)
+        if (thread == null) WatchCommentSort(state.sort, changeSort)
+    }) { listModifier, topPadding -> reading(listModifier, PaddingValues(top = topPadding, bottom = 24.dp)) }
     else Surface(modifier.testTag("comments-drawer"), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) { Column(Modifier.fillMaxSize(), content = content) }
+        color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
+        Column(Modifier.fillMaxSize()) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (thread != null) IconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
+                else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
+                Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
+                IconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
+            }
+            if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,
+                    onClick = { changeSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
+            }
+            HorizontalDivider()
+            reading(Modifier.weight(1f), PaddingValues(bottom = 24.dp))
+        }
+    }
+}
+
+@Composable
+private fun WatchCommentSort(selected: CommentSort, changeSort: (CommentSort) -> Unit) {
+    Row(Modifier.padding(horizontal = 16.dp).watchGlass(Liquid.pill).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        CommentSort.entries.forEach { sort ->
+            Box(Modifier.clip(Liquid.pill)
+                .background(if (selected == sort) MaterialTheme.colorScheme.onSurface.copy(alpha = .08f) else Color.Transparent)
+                .selectable(selected == sort, role = Role.Tab, onClick = { changeSort(sort) })
+                .heightIn(min = 48.dp).padding(horizontal = 20.dp, vertical = 8.dp)
+                .testTag("comments-sort-${sort.apiValue}"), contentAlignment = Alignment.Center) {
+                Text(sort.label, style = MaterialTheme.typography.labelLarge,
+                    color = if (selected == sort) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }
 
 @Composable
 internal fun CommentRow(comment: Comment, server: String, videoId: String, channel: (String) -> Unit,
-    link: (String) -> Unit, replies: (() -> Unit)? = null, parent: Boolean = false, thinMode: Boolean = false) {
+    link: (String) -> Unit, replies: (() -> Unit)? = null, parent: Boolean = false, thinMode: Boolean = false,
+    watchStyle: Boolean = false) {
     val validAuthor = ContentVisibility.validChannel(comment.authorId)
     val canOpenAuthor = validAuthor || CommentLinks.resolve(comment.authorUrl, server, videoId) != null && comment.authorUrl.isNotBlank()
     val authorClick = { if (validAuthor) channel(comment.authorId) else if (comment.authorUrl.isNotBlank()) link(comment.authorUrl) }
     Column(Modifier.fillMaxWidth().background(if (parent) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent)
         .testTag(if (parent) "comment-parent" else "comment-row-${comment.key}")) {
-        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = if (watchStyle) 14.dp else 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (watchStyle && !thinMode) Box(Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+                .then(if (canOpenAuthor) Modifier.clickable(onClickLabel = "Open ${comment.author}'s channel", onClick = authorClick) else Modifier),
+                contentAlignment = Alignment.TopCenter) {
+                ChannelAvatar(server, comment.avatar, comment.author, 40.dp, "comment-avatar-${comment.key}")
+            }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (comment.pinned) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     Icon(Icons.Default.PushPin, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Pinned", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                ChannelAuthor(server, comment.avatar, comment.author, !thinMode, size = 40.dp,
+                ChannelAuthor(server, comment.avatar, comment.author, !thinMode && !watchStyle, size = 40.dp,
                     modifier = Modifier.fillMaxWidth(), tag = "comment-avatar-${comment.key}", onClick = authorClick.takeIf { canOpenAuthor })
                 if (comment.creator || comment.verified || comment.member) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (comment.creator) Text("Creator", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
@@ -176,13 +207,21 @@ internal fun CommentRow(comment: Comment, server: String, videoId: String, chann
                         Icon(Icons.Default.Favorite, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     } }
                 }
-                if (replies != null && comment.replyContinuation.isNotBlank()) AssistChip(onClick = replies,
-                    modifier = Modifier.heightIn(min = 48.dp).testTag("comment-replies-${comment.key}"),
-                    leadingIcon = { Icon(Icons.Default.Forum, null, Modifier.size(18.dp)) },
-                    label = { Text(if (comment.replyCount > 0) "${commentCount(comment.replyCount.toLong())} ${if (comment.replyCount == 1) "reply" else "replies"}" else "View replies") })
+                if (replies != null && comment.replyContinuation.isNotBlank()) {
+                    val label = if (comment.replyCount > 0) "${commentCount(comment.replyCount.toLong())} ${if (comment.replyCount == 1) "reply" else "replies"}" else "View replies"
+                    if (watchStyle) TextButton(onClick = replies,
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("comment-replies-${comment.key}"),
+                        contentPadding = PaddingValues(horizontal = 4.dp)) {
+                        Icon(Icons.Default.Forum, null, Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp)); Text(label); Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp))
+                    } else AssistChip(onClick = replies,
+                        modifier = Modifier.heightIn(min = 48.dp).testTag("comment-replies-${comment.key}"),
+                        leadingIcon = { Icon(Icons.Default.Forum, null, Modifier.size(18.dp)) }, label = { Text(label) })
+                }
             }
         }
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 1.dp)
+        HorizontalDivider(Modifier.padding(start = if (!watchStyle) 0.dp else if (!thinMode) 76.dp else 16.dp, end = if (watchStyle) 16.dp else 0.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = if (watchStyle) .45f else 1f), thickness = if (watchStyle) .5.dp else 1.dp)
     }
 }
 

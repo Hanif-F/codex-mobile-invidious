@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.ChapterRules
 import net.wingress.mobivious.data.VideoChapter
@@ -56,25 +57,22 @@ internal class ChapterPanelState(initialOpen: Boolean = false, val list: LazyLis
 @Composable
 internal fun rememberChapterPanelState(): ChapterPanelState = rememberSaveable(saver = ChapterPanelState.saver) { ChapterPanelState() }
 
+/** The footer chapter action keeps a full accessible title even in its compact chevron form. */
 @Composable
-internal fun ChaptersEntry(chapters: List<VideoChapter>, positionMs: Long, open: () -> Unit) {
+internal fun PlayerChapterTitle(chapters: List<VideoChapter>, positionMs: Long, modifier: Modifier = Modifier,
+    compact: Boolean = false, contentOffset: Dp = 0.dp, open: () -> Unit) {
     if (chapters.isEmpty()) return
-    WatchDisclosureRow("Chapters", Icons.Default.FormatListNumbered, Modifier.testTag("chapters-entry"),
-        detail = ChapterRules.current(chapters, positionMs)?.title ?: "${chapters.size} chapters", onClick = open)
-}
-
-/** The chapter action truncates inside the top control row without crowding its neighbors. */
-@Composable
-internal fun PlayerChapterTitle(chapters: List<VideoChapter>, positionMs: Long, modifier: Modifier = Modifier, open: () -> Unit) {
-    if (chapters.isEmpty()) return
+    val title = ChapterRules.current(chapters, positionMs)?.title ?: "Chapters"
     Row(modifier.heightIn(min = 48.dp)
         .clickable(role = Role.Button, onClickLabel = "Open chapters", onClick = open)
-        .testTag("player-chapter-title").padding(horizontal = 12.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(ChapterRules.current(chapters, positionMs)?.title ?: "Chapters",
-            Modifier.weight(1f).testTag("player-current-chapter"), color = Color.White, style = MaterialTheme.typography.labelMedium,
+        .semantics { contentDescription = "Current chapter: $title" }
+        .testTag("player-chapter-title").padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+        if (!compact) Text(title,
+            Modifier.weight(1f).offset(y = contentOffset).testTag("player-current-chapter"), color = Color.White,
+            style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow),
             maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp), tint = Color.White.copy(alpha = .8f))
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp).offset(y = contentOffset), tint = Color.White.copy(alpha = .8f))
     }
 }
 

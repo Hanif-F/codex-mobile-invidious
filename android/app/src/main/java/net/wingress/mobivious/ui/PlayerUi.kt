@@ -190,7 +190,7 @@ internal fun VideoPlayer(
                     { id -> vm.sponsorCommand(PlaybackService.SPONSOR_DISMISS, id) })
             }) else null
             PlayerControlsLayout(playback, timelinePosition, fullscreen, controller != null,
-                onPlay = { vm.togglePlay(); interact() }, onSeek = ::seek,
+                onPlay = { vm.togglePlay(); interact() },
                 onSettings = { vm.cancelAccumulatedSeek(); interact(); onSettings() },
                 onFullscreen = { interact(); onFullscreen() },
                 onChapters = { vm.cancelAccumulatedSeek(); interact(); onChapters() },
@@ -212,7 +212,7 @@ internal fun VideoPlayer(
                                         if (playback.seekable && !playback.loading && playback.error == null) Color.White else Color.Transparent))
                                 },
                                 track = { slider ->
-                                    Canvas(Modifier.fillMaxWidth().offset(y = trackOffset).height(3.dp)) {
+                                    Canvas(Modifier.fillMaxWidth().offset(y = trackOffset).height(3.dp).testTag("player-seek-track")) {
                                         val end = playback.duration.coerceAtLeast(1).toFloat()
                                         fun line(fraction: Float, color: Color) {
                                             if (fraction > 0f) drawLine(color, Offset(0f, size.height / 2), Offset(size.width * fraction.coerceIn(0f, 1f), size.height / 2), size.height, StrokeCap.Round)
@@ -232,7 +232,7 @@ internal fun VideoPlayer(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxSize().testTag("player-timeline").semantics {
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp).testTag("player-timeline").semantics {
                                     contentDescription = "Playback position"
                                     stateDescription = (listOfNotNull(ChapterRules.current(chapters, timelinePosition)?.title) + sponsorLabels).joinToString(", ")
                                 },

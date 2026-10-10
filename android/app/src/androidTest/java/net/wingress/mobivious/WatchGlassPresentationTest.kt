@@ -9,6 +9,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -24,7 +26,7 @@ import org.junit.runner.RunWith
 class WatchGlassPresentationTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun actionsAreCircularIconOnlyNamedAndRespectDisabledDownloads() {
+    @Test fun actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads() {
         val width = mutableIntStateOf(320)
         val enabled = mutableStateOf(true)
         val clicks = IntArray(4)
@@ -36,7 +38,10 @@ class WatchGlassPresentationTest {
         for ((index, name) in listOf("Save", "Download", "Share", "More").withIndex()) {
             compose.onNodeWithContentDescription(name).assertIsDisplayed().assertWidthIsEqualTo(56.dp)
                 .assertHeightIsEqualTo(56.dp).performClick()
-            compose.onNodeWithText(name).assertDoesNotExist()
+            compose.onNodeWithText(name).assertIsDisplayed()
+            val icon = compose.onNodeWithContentDescription(name).getUnclippedBoundsInRoot()
+            val label = compose.onNodeWithText(name).getUnclippedBoundsInRoot()
+            org.junit.Assert.assertTrue(label.top >= icon.bottom)
             assertEquals(1, clicks[index])
         }
         compose.runOnIdle { width.intValue = 240; enabled.value = false }
@@ -44,6 +49,21 @@ class WatchGlassPresentationTest {
             .assertHeightIsEqualTo(48.dp).performClick()
         assertEquals(1, clicks[1])
         compose.onNodeWithContentDescription("More").assertIsDisplayed().assertWidthIsEqualTo(48.dp)
+    }
+
+    @Test fun narrowLargeTextKeepsActionLabelsWhole() {
+        compose.setContent { MaterialTheme(typography = Liquid.typography) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                WatchGlassScene(Modifier.width(240.dp)) { WatchActionRow(true, {}, {}, {}, {}) }
+            }
+        } }
+        for (label in listOf("Save", "Download", "Share", "More")) {
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(label).assertIsDisplayed()
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertEquals(1, layouts.single().lineCount)
+            org.junit.Assert.assertFalse(layouts.single().hasVisualOverflow)
+        }
     }
 
     @Test fun disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode() {
@@ -72,7 +92,7 @@ class WatchGlassPresentationTest {
             WatchGlassScene(Modifier.width(320.dp)) { WatchActionRow(true, { saved++ }, {}, {}, {}) }
         } }
         compose.onNodeWithContentDescription("Save").performTouchInput { longClick() }
-        compose.onNodeWithText("Save").assertIsDisplayed()
+        compose.onAllNodesWithText("Save").assertCountEquals(2)
         assertEquals(0, saved)
     }
 }

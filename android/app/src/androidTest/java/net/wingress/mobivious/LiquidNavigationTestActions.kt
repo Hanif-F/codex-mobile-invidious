@@ -52,5 +52,9 @@ internal fun ComposeTestRule.revealInBrowse(matcher: SemanticsMatcher) {
         .fetchSemanticsNodes().minOfOrNull { it.boundsInRoot.top }
     if (chrome != null && target.bottom > chrome - 48f)
         list.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(0f, target.bottom - chrome + 48f) }
+    val toolbar = onAllNodesWithTag("browse-glass-toolbar").fetchSemanticsNodes().maxOfOrNull { it.boundsInRoot.bottom }
+    val revealed = onNode(matcher).fetchSemanticsNode().boundsInRoot
+    if (toolbar != null && revealed.top < toolbar + 24f)
+        list.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(0f, revealed.top - toolbar - 24f) }
     waitForIdle()
 }

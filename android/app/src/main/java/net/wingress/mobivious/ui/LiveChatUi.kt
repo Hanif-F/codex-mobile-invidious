@@ -46,11 +46,6 @@ import net.wingress.mobivious.data.*
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-@Composable internal fun ChatReplayEntry(state: ChatReplayState, open: () -> Unit) {
-    if (state.available) WatchDisclosureRow("Chat replay", Icons.AutoMirrored.Filled.Chat,
-        Modifier.testTag("chat-entry"), onClick = open)
-}
-
 @Composable internal fun ChatReplayPanel(
     vm: AppViewModel, modifier: Modifier, settings: () -> Unit, overlay: Boolean = false,
     adjustOverlay: (() -> Unit)? = null, editorHeader: (@Composable () -> Unit)? = null,

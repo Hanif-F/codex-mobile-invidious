@@ -241,10 +241,12 @@ class LiquidRedesignSmokeTest {
         until { vm.comments.value.feed.loaded }
         screenshot("watch-glass-comments")
         compose.onNodeWithContentDescription("Close comments").performClick()
-        compose.onNodeWithTag("chapters-entry").performScrollTo().performClick()
+        compose.onNodeWithTag("chapters-entry").assertDoesNotExist()
+        compose.onNodeWithTag("player-chapter-title").performClick()
         screenshot("watch-glass-chapters")
         compose.onNodeWithContentDescription("Close chapters").performClick()
-        compose.onNodeWithTag("chat-entry").performScrollTo().performClick()
+        compose.onNodeWithTag("chat-entry").assertDoesNotExist()
+        compose.onNodeWithTag("player-chat").performClick()
         until { vm.chatReplay.value.loaded }
         screenshot("watch-glass-chat")
         compose.onNodeWithContentDescription("Close chat replay").performClick()

@@ -22,20 +22,13 @@ internal fun ChannelDescriptionSheet(channel: Channel, server: String = "", link
     val maxHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     ModalBottomSheet(onDismissRequest = dismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) {
-        Column(Modifier.fillMaxWidth().heightIn(max = maxHeight).testTag("channel-description-sheet")) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-                    Text("Channel description", style = MaterialTheme.typography.titleLarge)
-                    Text(channel.name, style = MaterialTheme.typography.bodyMedium)
-                }
-                IconButton(onClick = dismiss, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close channel description") }
-            }
-            Column(Modifier.weight(1f, fill = false).fillMaxWidth()
-                .verticalScroll(rememberScrollState()).testTag("channel-description-scroll")) {
-                Column(Modifier.fillMaxWidth().padding(16.dp)) {
-                    RichCommentText(Comment(channel.name, channel.description, "", 0, id = "channel:${channel.id}", html = channel.descriptionHtml),
-                        server, "", link, collapsedLines = Int.MAX_VALUE, tag = "channel-description-text")
-                }
+        BrowseGlassSurface(Modifier.fillMaxWidth().height(maxHeight).testTag("channel-description-sheet"), toolbar = {
+            BrowsePanelToolbar("Channel description", "Close channel description", dismiss, channel.name)
+        }) { contentModifier, topInset ->
+            Column(contentModifier.verticalScroll(rememberScrollState()).testTag("channel-description-scroll")
+                .padding(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = 24.dp)) {
+                RichCommentText(Comment(channel.name, channel.description, "", 0, id = "channel:${channel.id}", html = channel.descriptionHtml),
+                    server, "", link, collapsedLines = Int.MAX_VALUE, tag = "channel-description-text")
             }
         }
     }

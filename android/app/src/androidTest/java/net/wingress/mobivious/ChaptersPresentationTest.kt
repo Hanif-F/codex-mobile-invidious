@@ -39,13 +39,13 @@ class ChaptersPresentationTest {
         panel = key(occurrence.value) { rememberChapterPanelState() }
         Column(Modifier.width(320.dp).height(400.dp)) {
             if (panel.open) ChaptersPanel(chapters, position.longValue, panel, true, panel::close, { selected = it; position.longValue = it }, Modifier.weight(1f))
-            else ChaptersEntry(chapters, position.longValue) { panel.show(chapters, position.longValue) }
+            else PlayerChapterTitle(chapters, position.longValue) { panel.show(chapters, position.longValue) }
         }
     }
 
     @Test fun openingRevealsCurrentChapterAndSeekingKeepsThePanelOpen() {
         compose.setContent { MaterialTheme { Content() } }
-        compose.onNodeWithTag("chapters-entry").performClick()
+        compose.onNodeWithTag("player-chapter-title").performClick()
         compose.onNodeWithTag("chapter-180000").assertIsDisplayed().assertIsSelected().performClick()
         assertEquals(180000L, selected)
         compose.onNodeWithTag("chapters-panel").assertExists()
@@ -54,14 +54,14 @@ class ChaptersPresentationTest {
         compose.runOnIdle { position.longValue = 250000 }
         assertEquals(index, compose.runOnIdle { panel.list.firstVisibleItemIndex })
         compose.onNodeWithContentDescription("Close chapters").performClick()
-        compose.onNodeWithTag("chapters-entry").performClick()
+        compose.onNodeWithTag("player-chapter-title").performClick()
         compose.onNodeWithTag("chapter-250000").assertIsDisplayed().assertIsSelected()
     }
 
     @Test fun restorationKeepsOpenStateAndScrollButNewOccurrencesResetIt() {
         val restoration = StateRestorationTester(compose)
         restoration.setContent { MaterialTheme { Content() } }
-        compose.onNodeWithTag("chapters-entry").performClick()
+        compose.onNodeWithTag("player-chapter-title").performClick()
         compose.onNodeWithTag("chapters-list").performScrollToIndex(3)
         val scroll = compose.runOnIdle { panel.list.firstVisibleItemIndex to panel.list.firstVisibleItemScrollOffset }
         restoration.emulateSavedInstanceStateRestore()
@@ -83,10 +83,7 @@ class ChaptersPresentationTest {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalLayoutDirection provides LayoutDirection.Rtl) {
                 val state = rememberChapterPanelState()
                 Column(Modifier.width(320.dp).height(600.dp)) {
-                    PlayerControlHeader(PlaybackState(details = VideoDetails(Video("abcdefghijk", "Video", "Studio", duration = 20),
-                        entries.joinToString("\n") { "${playerTime(it.startMs)} ${it.title}" }, "", "", "", emptyList(), emptyList()),
-                        mediaId = "abcdefghijk", duration = 20000),
-                        5000, false, true, {}, {}, { state.show(entries, 5000) })
+                    PlayerChapterTitle(entries, 5000, Modifier.width(240.dp)) { state.show(entries, 5000) }
                     PlayerSeekSponsorLabels(listOf("Sponsor", "Intro"))
                     ChaptersPanel(entries, 5000, state, true, state::close, { selected = it }, Modifier.weight(1f))
                 }
@@ -109,11 +106,11 @@ class ChaptersPresentationTest {
         compose.setContent { MaterialTheme {
             val state = rememberChapterPanelState()
             Column(Modifier.height(300.dp)) {
-                ChaptersEntry(emptyList(), 0) { fail("No chapter action should exist") }
+                PlayerChapterTitle(emptyList(), 0) { fail("No chapter action should exist") }
                 ChaptersPanel(chapters, 0, state, false, state::close, { fail("Disabled seek") }, Modifier.weight(1f))
             }
         } }
-        compose.onNodeWithTag("chapters-entry").assertDoesNotExist()
+        compose.onNodeWithTag("player-chapter-title").assertDoesNotExist()
         compose.onNodeWithTag("chapter-0").assertIsNotEnabled()
     }
 }

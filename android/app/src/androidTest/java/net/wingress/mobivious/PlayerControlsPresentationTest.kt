@@ -1,6 +1,8 @@
 package net.wingress.mobivious
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,7 +52,6 @@ class PlayerControlsPresentationTest {
     private var settingsClicks = 0
     private var playClicks = 0
     private var retries = 0
-    private val seeks = mutableListOf<Long>()
     private lateinit var inputModeManager: InputModeManager
 
     @Composable private fun Content() {
@@ -58,20 +59,24 @@ class PlayerControlsPresentationTest {
         MaterialTheme {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue),
                 LocalLayoutDirection provides direction.value) {
-                Box(Modifier.width(width.intValue.dp).height(height.intValue.dp).testTag("controls-surface")) {
+                Box(Modifier.width(width.intValue.dp).height(height.intValue.dp).testTag("controls-surface").background(Color(0xFF535862))) {
                     PlayerControlsLayout(playback.value, position.longValue, fullscreen.value, true,
                         onPlay = {
                             playClicks++
                             playback.value = playback.value.copy(playWhenReady = !playback.value.playWhenReady)
-                        }, onSeek = { seeks += it }, onSettings = { settingsClicks++ },
+                        }, onSettings = { settingsClicks++ },
                         onFullscreen = { fullscreen.value = !fullscreen.value }, onChapters = { chapterClicks++ },
-                        onCollapse = {}, onRetry = { retries++ }, timeline = { modifier, _ -> Box(modifier.testTag("test-timeline")) })
+                        onCollapse = {}, onChat = {}, onRetry = { retries++ }, timeline = { modifier, trackOffset ->
+                            Box(modifier.testTag("test-timeline")) {
+                                Box(Modifier.align(Alignment.Center).fillMaxWidth().offset(y = trackOffset).height(3.dp).testTag("test-seek-track"))
+                            }
+                        })
                 }
             }
         }
     }
 
-    @Test fun measuredChromeKeepsTransportCenteredOrInsideTheCompactRailWithoutOverlap() {
+    @Test fun measuredChromeKeepsTransportCenteredOrInHeaderAboveFullWidthSeeking() {
         compose.setContent { Content() }
         for ((wide, tall, scale, rtl, full) in listOf(
             Layout(320, 220, 1f, false, false), Layout(320, 160, 2f, false, false),
@@ -88,48 +93,85 @@ class PlayerControlsPresentationTest {
             val rail = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
             val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
             val expand = compose.onNodeWithContentDescription(if (full) "Exit full screen" else "Full screen").getUnclippedBoundsInRoot()
-            assertTrue(settings.right <= expand.left || expand.right <= settings.left)
+            if (tall >= 144) assertTrue(settings.bottom <= rail.top)
+            else assertTrue(settings.top >= rail.top && settings.bottom <= rail.bottom)
+            assertTrue(expand.top >= rail.top && expand.bottom <= rail.bottom)
             assertTrue(button.top >= surface.top && button.bottom <= surface.bottom)
             val centered = compose.onAllNodesWithTag("player-transport").fetchSemanticsNodes().isNotEmpty()
             if (centered) {
                 assertEquals(surface.middleX, button.middleX, .5f)
                 assertEquals(surface.middleY, button.middleY, .5f)
-                assertEquals(64f, (button.right - button.left).value, .5f)
+                assertTrue(button.right - button.left >= 48.dp)
                 val header = compose.onNodeWithTag("player-header").getUnclippedBoundsInRoot()
                 assertTrue(header.bottom < button.top)
                 assertTrue(button.bottom < rail.top)
-                compose.onNodeWithContentDescription("Back 10 seconds").assertIsDisplayed()
-                compose.onNodeWithContentDescription("Forward 10 seconds").assertIsDisplayed()
+
             } else {
                 assertEquals(48f, (button.right - button.left).value, .5f)
-                assertTrue(button.top >= rail.top && button.bottom <= rail.bottom)
+                val header = compose.onNodeWithTag("player-header").getUnclippedBoundsInRoot()
+                assertTrue(button.top >= header.top && button.bottom <= header.bottom)
                 compose.onNodeWithTag("player-back-10").assertDoesNotExist()
                 compose.onNodeWithTag("player-forward-10").assertDoesNotExist()
             }
-            if (tall > 96) {
+            run {
                 val chapter = compose.onNodeWithTag("player-chapter-title").getUnclippedBoundsInRoot()
                 assertTrue(chapter.right - chapter.left >= 48.dp)
-                assertTrue(chapter.right <= settings.left || settings.right <= chapter.left)
-                val layouts = mutableListOf<TextLayoutResult>()
-                compose.onNodeWithTag("player-current-chapter", true).assertTextEquals(title)
-                    .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-                assertEquals(1, layouts.single().lineCount)
-                assertTrue(layouts.single().isLineEllipsized(0))
+                assertTrue(chapter.top >= rail.top && chapter.bottom <= rail.bottom)
+                val track = compose.onNodeWithTag("test-timeline").getUnclippedBoundsInRoot()
+                assertTrue(track.right - track.left >= 64.dp)
+                assertTrue(chapter.bottom <= track.top)
+                assertTrue(expand.bottom <= track.top)
+                assertEquals(rail.left.value, track.left.value, .5f)
+                assertEquals(rail.right.value, track.right.value, .5f)
+                val line = compose.onNodeWithTag("test-seek-track").getUnclippedBoundsInRoot()
+                val time = compose.onNodeWithTag("player-time").getUnclippedBoundsInRoot()
+                val gap = line.middleY - time.middleY
+                if (!full && tall >= 144) assertTrue("Portrait spacing: $gap", gap in 23.5f..32.5f)
+                else assertEquals(48f, gap, .5f)
+                compose.onNodeWithTag("player-chapter-title").assertContentDescriptionEquals("Current chapter: $title")
+                if (compose.onAllNodesWithTag("player-current-chapter", true).fetchSemanticsNodes().isNotEmpty()) {
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    compose.onNodeWithTag("player-current-chapter", true).assertTextEquals(title)
+                        .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                    assertEquals(1, layouts.single().lineCount)
+                    assertTrue(layouts.single().isLineEllipsized(0))
+                }
             }
             compose.onNodeWithTag("player-time").assertIsDisplayed()
             if (rtl) captureWatchScreenshot("watch-controls-rtl-large-text")
         }
     }
 
-    @Test fun explicitSeekButtonsDispatchAndRespectUnavailableSeeking() {
-        height.intValue = 240
+    @Test fun noSeekButtonsAndChatStaysToTheLeftOfSettings() {
+        playback.value = playback.value.copy(details = playback.value.details!!.copy(liveChatReplay = true))
         compose.setContent { Content() }
-        compose.onNodeWithContentDescription("Back 10 seconds").performClick()
-        compose.onNodeWithContentDescription("Forward 10 seconds").performClick()
-        assertEquals(listOf(-10000L, 10000L), seeks)
-        compose.runOnIdle { playback.value = playback.value.copy(seekable = false) }
-        compose.onNodeWithContentDescription("Back 10 seconds").assertIsNotEnabled()
-        compose.onNodeWithContentDescription("Forward 10 seconds").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("Back 10 seconds").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Forward 10 seconds").assertDoesNotExist()
+        for (tall in listOf(180, 96)) {
+            compose.runOnIdle { height.intValue = tall }
+            val chat = compose.onNodeWithTag("player-chat").assertIsDisplayed().getUnclippedBoundsInRoot()
+            val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
+            assertTrue(chat.right <= settings.left)
+            assertEquals(chat.middleY, settings.middleY, .5f)
+            compose.onNodeWithTag("player-chapter-title").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Full screen").assertIsDisplayed()
+        }
+        captureWatchScreenshot("watch-controls-chat-shallow")
+        compose.runOnIdle { playback.value = playback.value.copy(live = true) }
+        compose.onNodeWithTag("player-chat").assertDoesNotExist()
+    }
+
+    @Test fun multiHourTimestampCompactsAtLargeFontsWithoutLosingChapterOrSeeking() {
+        width.intValue = 240
+        fontScale.floatValue = 2f
+        playback.value = playback.value.copy(duration = 14_672_000)
+        compose.setContent { Content() }
+        compose.onNodeWithTag("player-time").assertTextEquals("0:05").assertContentDescriptionEquals("0:05 / 4:04:32")
+        compose.onNodeWithTag("player-chapter-title").assertIsDisplayed().performClick()
+        assertEquals(1, chapterClicks)
+        compose.onNodeWithTag("test-timeline").assertWidthIsAtLeast(64.dp)
+        compose.onNodeWithContentDescription("Full screen").assertIsDisplayed()
+        captureWatchScreenshot("watch-controls-multi-hour-large-text")
     }
 
     @Test fun loadingAndRetryRemainInsideTheRailInShallowVideo() {

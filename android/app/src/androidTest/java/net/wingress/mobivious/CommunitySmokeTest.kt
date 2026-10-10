@@ -51,12 +51,12 @@ class CommunitySmokeTest {
         if (::activity.isInitialized) ui { activity.model.closePlayer(); activity.finishAndRemoveTask() }
     }
     private fun choose(tab: ChannelTab) {
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("channel-tabs"))
+        compose.onNodeWithTag("channel-tabs").assertIsDisplayed()
         compose.onNodeWithTag("channel-tab-${tab.path}").performScrollTo().performClick()
         until { !activity.model.browse.value.loading && activity.model.channelTab.value == tab }
     }
     private fun more() {
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Load more"))
+        compose.revealInBrowse(hasText("Load more"))
         compose.onNodeWithText("Load more").performClick()
         until { !activity.model.browse.value.loading }
     }
@@ -97,10 +97,11 @@ class CommunitySmokeTest {
 
     @Test fun specializedTabsSortAndRestoreAfterSearchAndChildNavigation() {
         compose.onNodeWithText("they/them").assertExists()
-        compose.onNodeWithText("Verified channel").assertExists()
+        compose.onNodeWithContentDescription("Verified channel").assertExists()
         compose.onNodeWithTag("channel-banner").assertExists()
         choose(ChannelTab.SHORTS)
-        compose.onNodeWithTag("channel-sort-popular").performScrollTo().performClick()
+        compose.onNodeWithTag("channel-sort").performClick()
+        compose.onNodeWithTag("channel-sort-popular").performClick()
         until { !activity.model.browse.value.loading && activity.model.channelVideoSort.value == ChannelSort.POPULAR }
         more(); assertEquals(2, activity.model.browse.value.videos.size)
         choose(ChannelTab.STREAMS)
@@ -244,14 +245,14 @@ class CommunitySmokeTest {
     @Test fun longFeedPostsExpandInlineAcrossScrollingRecreationAndComments() {
         command("community", """{"postLongText":true}""")
         choose(ChannelTab.POSTS)
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-expand-Ugpost1"))
+        compose.revealInBrowse(hasTestTag("post-expand-Ugpost1"))
         assertEquals(6, postBodyLayout("Ugpost1").lineCount)
         screenshot("long-post-collapsed")
         compose.onNodeWithTag("post-expand-Ugpost1").assertTextEquals("Read more").performClick()
         assertTrue(postBodyLayout("Ugpost1").lineCount > 6)
         screenshot("long-post-expanded")
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-comments-Ugpost8"))
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-expand-Ugpost1"))
+        compose.revealInBrowse(hasTestTag("post-expand-Ugpost1"))
         compose.onNodeWithTag("post-expand-Ugpost1").assertTextEquals("Show less")
         recreate()
         compose.onNodeWithTag("post-expand-Ugpost1").assertTextEquals("Show less")
@@ -261,7 +262,7 @@ class CommunitySmokeTest {
         recreate()
         compose.onNodeWithTag("post-comments-sheet").assertIsDisplayed()
         compose.onNodeWithContentDescription("Close comments").performClick()
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("post-expand-Ugpost1"))
+        compose.revealInBrowse(hasTestTag("post-expand-Ugpost1"))
         compose.onNodeWithTag("post-expand-Ugpost1").performClick()
         assertEquals(6, postBodyLayout("Ugpost1").lineCount)
         compose.onNodeWithTag("post-expand-Ugpost1").performClick()

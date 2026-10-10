@@ -79,16 +79,16 @@ internal fun RssSheet(vm: AppViewModel) {
         }
     }
     ModalBottomSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp).testTag("rss-sheet"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(state.title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                IconButton(onClick = vm::dismissRss) { Icon(Icons.Default.Close, "Close feed") }
-            }
+        val maxHeight = with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp() * .85f }
+        BrowseGlassSurface(Modifier.fillMaxWidth().height(480.dp.coerceAtMost(maxHeight)).testTag("rss-sheet"), toolbar = {
+            BrowsePanelToolbar(state.title, "Close feed", vm::dismissRss)
+        }) { contentModifier, topInset ->
+        Column(contentModifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.privateLink) Text("Anyone with this link can read your subscription feed. Share it only when you want to grant that access.")
             if (state.playlist?.let { it.owned && it.privacy == "private" } == true) Text("This exports a snapshot of your private playlist. The file does not update automatically.")
             if (state.opml) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = state.format == "rss", onClick = { vm.openOpml("rss") }, label = { Text("Invidious feeds") })
-                FilterChip(selected = state.format == "newpipe", onClick = { vm.openOpml("newpipe") }, label = { Text("YouTube feeds") })
+                FilterChip(selected = state.format == "rss", onClick = { vm.openOpml("rss") }, label = { Text("Invidious feeds") }, modifier = Modifier.heightIn(min = 48.dp))
+                FilterChip(selected = state.format == "newpipe", onClick = { vm.openOpml("newpipe") }, label = { Text("YouTube feeds") }, modifier = Modifier.heightIn(min = 48.dp))
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(onClick = vm::retryRss) { Text("Retry") } }
@@ -108,5 +108,6 @@ internal fun RssSheet(vm: AppViewModel) {
                 OutlinedButton(onClick = { fileIntent(true) }) { Text("Share") }
             }
         }
+    }
     }
 }

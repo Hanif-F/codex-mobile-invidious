@@ -3218,3 +3218,130 @@ Density, font, animation, appearance and IME overrides were restored by test
 cleanup. No server changes, public API or preference migrations, real account writes,
 release signing or deployment were needed. Physical/OEM rendering, software
 rendering on a device, and TalkBack traversal remain separate checks.
+
+
+## 2026-10-10 — Watch-page action labels, minimal player and floating comments
+
+The watch page now labels its four circular glass actions and keeps only Comments
+and Description below them. Player chrome uses white icons and shallow neutral
+edge contrast, with chat/settings above and timestamp, clickable chapter, seeking
+and fullscreen on one footer row. Visible 10-second seek buttons are removed;
+double-tap and accessibility seeking remain. Watch comments record their reading
+surface separately from the floating glass toolbar/sort selector and place avatars
+beside comment bodies. Community comments keep their previous presentation.
+
+| Check | Result |
+| --- | --- |
+| `testDebugUnitTest` | 335 passed; zero failures, errors or skips |
+| Focused device checks | 39 distinct scenarios passed across selections and corrected reruns; zero outstanding failures or skips |
+| Debug app and instrumentation APK builds | Passed |
+| `lintDebug` | Passed; zero errors, 36 warnings |
+| Preview installation | Installed on the already-running Pixel 8 Pro, Android 16 / API 36 |
+
+Checks cover circular controls and visible labels, narrow layouts and 200% text,
+RTL, multi-hour time labels, absent seek buttons, chapter/chat availability,
+loading/retry, keyboard chapter access, sorting/replies/pagination and scroll
+restoration, rich timestamp links, scrubbing, settings, auto-hide, double-tap and
+accessible seeking, fullscreen, PiP return, mini-player and panel transitions.
+Screenshots were visually reviewed in light/dark and reduced transparency, wide,
+narrow and fullscreen layouts. Review caught dark text inheriting the wrong
+content color; explicit watch-comment content colors fixed it. A runtime geometry
+assertion exposed a slider hit region extending 6dp into the chapter control;
+insetting the slider fixed the overlap. Labels now fit whole words at large text.
+
+Final device selection: 15/15 passed, including the corrected footer bounds,
+action-label presentation, real gesture/scrub/fullscreen checks and both watch-page
+appearance/layout scenarios. Earlier 18-test and 25-test reports plus the passing
+rerun remain in `.tools/watch-refresh/`; `artifacts/watch-refresh/selected-results.txt`
+lists the latest result for each distinct scenario. The complete historical device
+suite was not rerun. Physical/OEM devices, software rendering and TalkBack traversal
+remain separate acceptance checks.
+
+The review package is `artifacts/watch-refresh/`, including the verified Preview
+APK, SHA-256 file and screenshots. Emulator density and font settings returned to
+480dpi and 100%. The installed Preview was left paused on the WAN Show video
+from the supplied screenshots through the normal instance; the watch page and
+comments were also visually reviewed with real content. No server changes, public
+APIs, migrations, release signing or publishing were required.
+
+### Follow-up — full-width seeking and portrait spacing
+
+The seek track now fills its own row, with playback time, the clickable chapter
+and fullscreen above it. Portrait brings the visible labels and track closer
+together inside their separate 48dp touch targets. Landscape retains the reviewed
+spacing. Very shallow players share the upper row with the header controls so
+chapter/chat/settings access and full-width seeking remain reachable.
+
+Follow-up validation passed all 11 selected device scenarios across the selection
+and corrected geometry-test rerun, plus 335 unit tests, debug app/instrumentation
+APK builds and lint (zero errors, 36 warnings). Geometry checks now measure the
+visible track/icon separately from their larger touch targets; the intermediate
+test lookup/assertion failures and passing rerun are retained under
+`.tools/watch-refresh/portrait-spacing-*`. Checks cover portrait/fullscreen
+spacing, 200% text, narrow/RTL layouts, multi-hour timestamps, shallow chat controls,
+loading/retry, chapter access, scrubbing and double-tap seeking. The landscape
+fixture screenshot is identical to the preceding approved screenshot.
+
+The refreshed review APK is `artifacts/watch-refresh/Mobivious-Watch-Refresh-Preview.apk`.
+SHA-256: `e77574b69d953af8b4cc982b1d1c2df5e4d4de50b56d2b34d9abebf204d3f796`.
+It is installed on the running emulator; the normal-instance WAN Show watch page
+is open for review.
+
+## 2026-10-10 — Subscriptions and Channels Liquid Glass
+
+Subscriptions now owns its floating title, refresh/actions, scoped search and
+Channels pill. Avatar/name shortcuts open creator pages. Channels remains a
+separate, centered directory with continuous rows, 40dp avatars, upload/viewing
+statistics, all four sorts, local filtering and a matching-channel count.
+Creator pages retain their banner/avatar identity, server-provided tabs, content
+and search behavior, with floating navigation, scrolling glass tabs and compact
+sort menus. Descriptions, RSS/OPML and SponsorBlock have matching floating panel
+toolbars. Comfortable video feeds use two columns at widths of at least 840dp;
+the directory stays a single column capped at 800dp.
+
+The shared browse surface records content separately from sibling controls and
+measures toolbar height for list padding. Creator glass samples a separate
+background-only artwork wash. Reduce transparency and software rendering use
+opaque plates. Existing dock/sidebar, mini-player and watch-page changes remain
+in place; network APIs and stored formats are unchanged.
+
+| Check | Result |
+| --- | --- |
+| `testDebugUnitTest` | 335 passed; zero failures, errors or skips |
+| Focused device selection | 68/68 passed on Pixel_8_Pro, API 36 |
+| Final accessibility refinement | 14/14 affected scenarios passed again |
+| `assembleDebug` and `assembleDebugAndroidTest` | Passed |
+| `lintDebug` | Passed; zero errors, 36 warnings |
+| `git diff --check` | Passed |
+
+The 68-scenario selection includes subscription presentation, Home/Subscriptions,
+subscription sorting, creator channels, search/history, community/related
+channels, description presentation, avatars, playlist/RSS and SponsorBlock.
+The new journey uses disposable local accounts and actual Media3 playback to
+check scrolling beneath glass, scoped search with a visible IME, mini-player
+visibility and continuous playback across directory, creator and sheet navigation.
+Existing focused cases cover search submission/pagination, subscribe/unsubscribe,
+statistics fallback, retry with retained content, account changes and restored
+navigation/list state. Initial failures from outdated sort/verification selectors
+and taps beneath the pinned toolbar were corrected, then the complete focused
+selection passed.
+
+Presentation captures cover light/dark, opaque materials, 320dp with 200% text,
+an actual narrow phone configuration with 150% text, normal phone width, wide
+two-column feeds, centered directories, thin mode and reduced motion. Avatar
+cases cover absent/failing artwork. Geometry checks cover 48dp toolbar targets,
+content below the measured header and unobstructed final rows. Visual review
+prompted a stronger title fade and shortcut widths that scale with text size.
+Physical/OEM rendering, software rendering on-device and TalkBack traversal
+remain separate checks; the complete historical device suite was not rerun.
+
+Evidence is in `artifacts/subscriptions-glass/REVIEW.md`, including screenshots,
+the 68-scenario log, the final 14-scenario rerun, build log and preview APK.
+The APK uses the separate debug package and is installed on the emulator.
+SHA-256: `2d11d924f724f13123fe700d18c028249e54e9a4ce4c6838787cee87a786a874`.
+Density, font size, animation and IME overrides were restored after validation.
+The disposable fixture server and ADB forwarding were removed, and the app
+returned to its normal default instance as a guest on Subscriptions.
+The emulator remained connected throughout; no AVD recovery or data wipe was
+needed. No real account writes, server changes, signing or publishing were
+required.
