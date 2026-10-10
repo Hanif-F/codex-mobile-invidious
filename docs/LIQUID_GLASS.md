@@ -177,8 +177,11 @@ provides the shared action/settings rows. Comfortable video cards keep 16:9
 artwork; compact density uses thumbnail rows. Thumbnail display preferences,
 watched states, warnings, menus and content visibility continue to apply.
 
-The palette uses pearl and charcoal content surfaces with a restrained blue
-accent. Main margins are 20dp, cards 24dp, media 20dp and floating controls pills
+Light appearance uses pearl content surfaces with a restrained blue accent. Dark
+appearance uses neutral charcoal surfaces and pearl emphasis for actions, links
+and selection; semantic error colors remain distinct. Neutral selection pills
+include a small pearl marker so selection does not rely on hue. Main margins are
+20dp, cards 24dp, media 20dp and floating controls pills
 or circles. Controls have at least 48dp targets; larger text can hide dock labels
 while retaining accessible destination names. Press feedback uses interruptible
 Compose springs and Compose respects the system animator duration scale.
@@ -189,6 +192,16 @@ The shell records content into a Backdrop layer. Floating chrome, which is a
 sibling of that recorded content, samples the layer with blur, vibrancy, lens
 refraction, a tint plate and a fine highlight. A recording layer must never sample
 itself: recorded content receives a null backdrop. This prevents render cycles.
+
+Dark shell, browse and watch controls share `DarkGlass` tokens and one material
+renderer in `LiquidDesign.kt`. Sampled content is blurred and refracted, with
+restrained saturation and exposure to keep pearl labels legible over bright
+artwork. The content outside the glass and the foreground labels are not filtered.
+Soft internal reflections and a fine directional rim define the glass instead of
+bright silver outlines. Neutral ambient washes and localized, fading artwork color
+give media headers depth without a persistent blue cast. Light material retains
+its original rendering. Video overlays use a separate neutral contrast plate and
+never sample the decoding surface.
 
 Media3 retains its decoding SurfaceView and service ownership. Video overlays
 use dark translucent plates and do not read back the decoding surface. This
@@ -209,3 +222,13 @@ native video shapes, playback continuity, wide layout, narrow layout with large
 text and system reduced motion. Screenshots are saved on-device
 under `/data/local/tmp/mobivious-liquid/`. The dated verification record records
 actual completed checks and limitations.
+
+`DarkGlassPresentationTest` captures ordinary and prominent shell, browse and
+watch glass over black, white, saturated and checkerboard backdrops. It checks
+rendered dark-mode secondary-text contrast at 4.5:1 with transparency enabled and
+in opaque mode, and verifies palette text/action/status contrast. Its light capture
+provides a regression comparison. Library and subscription presentation scenarios
+exercise dark transparency separately from Reduce transparency; the shell journey
+also captures matching light/dark discovery, search, library, settings, watch,
+menu and comment screens, plus System appearance changes and an explicit Light
+override while the device uses dark appearance.

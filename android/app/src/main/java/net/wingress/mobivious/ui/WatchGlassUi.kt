@@ -55,17 +55,18 @@ internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = n
     val backdrop = rememberLayerBackdrop()
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
+    val washHeight = if (dark) 280.dp else 380.dp
     var artworkFailed by remember(artwork) { mutableStateOf(false) }
     Box(modifier) {
         Box(Modifier.matchParentSize().clipToBounds().layerBackdrop(backdrop)
             .background(colors.surface)) {
-            Box(Modifier.fillMaxWidth().height(380.dp).background(Brush.verticalGradient(listOf(
-                colors.primaryContainer.copy(alpha = if (dark) .32f else .48f), Color.Transparent))))
+            Box(Modifier.fillMaxWidth().height(washHeight).background(Brush.verticalGradient(listOf(
+                colors.primaryContainer.copy(alpha = if (dark) .24f else .48f), Color.Transparent))))
             if (artwork != null && !artworkFailed && !LocalReduceTransparency.current) {
-                AsyncImage(artwork, null, Modifier.fillMaxWidth().height(380.dp)
-                    .graphicsLayer { alpha = if (dark) .24f else .18f }.blur(64.dp),
+                AsyncImage(artwork, null, Modifier.fillMaxWidth().height(washHeight)
+                    .graphicsLayer { alpha = if (dark) .12f else .18f }.blur(64.dp),
                     contentScale = ContentScale.Crop, onError = { artworkFailed = true })
-                Box(Modifier.fillMaxWidth().height(380.dp).background(Brush.verticalGradient(listOf(
+                Box(Modifier.fillMaxWidth().height(washHeight).background(Brush.verticalGradient(listOf(
                     colors.surface.copy(alpha = .25f), colors.surface))))
             }
         }
@@ -73,25 +74,26 @@ internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = n
     }
 }
 
-/** Stronger optical definition than shell chrome, scoped to the watch experience. */
+/** Watch controls share the dark optical material; light retains its stronger definition. */
 @Composable
 internal fun Modifier.watchGlass(shape: Shape = Liquid.card, prominent: Boolean = false): Modifier {
     val source = LocalGlassBackdrop.current
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
+    if (dark) return darkLiquidGlass(shape, prominent)
     val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    val plate = if (prominent) colors.primaryContainer else if (dark) Color(0xFF252C38) else Color.White
+    val plate = if (prominent) colors.primaryContainer else Color.White
     val material = if (opaque || source == null) Modifier.background(plate, shape) else Modifier.drawBackdrop(
         backdrop = source, shape = { shape },
         effects = { vibrancy(); blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx()) },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .64f else if (dark) .52f else .46f)) },
+        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .64f else .46f)) },
     )
     return shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .12f))
         .then(material)
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) .10f else .30f),
+        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .30f),
             Color.White.copy(alpha = .02f), Color.Black.copy(alpha = .025f))), shape)
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) .42f else .95f),
-            Color.White.copy(alpha = .08f), Color.White.copy(alpha = if (dark) .20f else .65f))), shape).clip(shape)
+        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .95f),
+            Color.White.copy(alpha = .08f), Color.White.copy(alpha = .65f))), shape).clip(shape)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

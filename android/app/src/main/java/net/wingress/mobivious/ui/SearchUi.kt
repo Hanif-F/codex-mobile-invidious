@@ -27,7 +27,8 @@ internal fun SearchField(value: String, update: (String) -> Unit, label: String,
         shape = Liquid.pill, colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = if (glass) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
             unfocusedContainerColor = if (glass) Color.Transparent else MaterialTheme.colorScheme.surfaceContainer,
-            unfocusedBorderColor = Color.Transparent, focusedBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = .35f)),
+            unfocusedBorderColor = Color.Transparent, focusedBorderColor = MaterialTheme.colorScheme.primary.copy(
+                alpha = if (MaterialTheme.colorScheme.background.red < .3f) .60f else .35f)),
         modifier = modifier.then(if (glass) Modifier.browseGlass() else Modifier).testTag(tag).onPreviewKeyEvent { event ->
             if (enabled && (event.key == Key.Enter || event.key == Key.NumPadEnter)) {
                 if (event.type == KeyEventType.KeyUp) search()

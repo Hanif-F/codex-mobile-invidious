@@ -88,7 +88,7 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
 
 @Composable
 private fun Modifier.playerEdgeContrast(top: Boolean): Modifier {
-    if (LocalReduceTransparency.current) return background(Color(0xFF171B24))
+    if (LocalReduceTransparency.current) return background(if (MaterialTheme.colorScheme.background.red < .3f) Color(0xFF181A1D) else Color(0xFF171B24))
     val edge = Color.Black.copy(alpha = .18f)
     return background(Brush.verticalGradient(if (top) listOf(edge, Color.Transparent) else listOf(Color.Transparent, edge)))
 }
@@ -214,7 +214,8 @@ internal fun PlayerPlayControl(playback: PlaybackState, modifier: Modifier = Mod
     val icon = if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow
     val description = if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play"
     IconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.testTag("player-play-pause")
-        .then(if (LocalReduceTransparency.current) Modifier.background(Color(0xFF171B24), CircleShape) else Modifier)) {
+        .then(if (LocalReduceTransparency.current) Modifier.background(
+            if (MaterialTheme.colorScheme.background.red < .3f) Color(0xFF181A1D) else Color(0xFF171B24), CircleShape) else Modifier)) {
         PlayerIcon(icon, description, size = 36.dp, enabled = playback.canPlay)
         if (playback.buffering) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Buffering" },
             color = Color.White, strokeWidth = 2.dp)

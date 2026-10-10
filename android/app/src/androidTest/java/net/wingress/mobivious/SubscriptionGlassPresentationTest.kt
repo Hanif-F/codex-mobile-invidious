@@ -48,8 +48,8 @@ class SubscriptionGlassPresentationTest {
                 }
             }
         } }
-        for (isDark in listOf(false, true)) {
-            compose.runOnIdle { dark = isDark; opaque = isDark }
+        for ((isDark, isOpaque) in listOf(false to false, true to false, true to true)) {
+            compose.runOnIdle { dark = isDark; opaque = isOpaque }
             val header = compose.onNodeWithTag("browse-glass-toolbar").fetchSemanticsNode().boundsInRoot
             val first = compose.onNodeWithTag("upload-0").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             assertTrue(first.top >= header.bottom)
@@ -59,10 +59,10 @@ class SubscriptionGlassPresentationTest {
             compose.onNodeWithText("Clear search").performClick()
             compose.onNodeWithTag("feed").performScrollToIndex(19)
             compose.onNodeWithTag("subscription-channels-button").assertIsDisplayed()
-            capture(if (isDark) "feed-narrow-dark-opaque-large" else "feed-narrow-light-large")
+            capture(if (isDark) "feed-narrow-dark-${if (isOpaque) "opaque" else "transparent"}-large" else "feed-narrow-light-large")
             compose.onNodeWithTag("feed").performScrollToIndex(0)
         }
-        assertEquals(2, opened); assertEquals(2, submitted); assertEquals("", query)
+        assertEquals(3, opened); assertEquals(3, submitted); assertEquals("", query)
     }
 
     @Test fun directoryLastRowAndCountStayAccessibleWithLargeTextAndOpaqueGlass() {

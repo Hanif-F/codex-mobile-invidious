@@ -3525,3 +3525,77 @@ in `artifacts/release-notes-0.10.0.md`. Build/lint, metadata, signing, update,
 startup, UI and screenshot evidence is retained in the ignored
 `artifacts/release-0.10.0/` directory. Release target:
 [GitHub Releases v0.10.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.10.0).
+
+## Neutral Liquid Glass dark appearance — 10 October 2026
+
+Verification used the user's already-running Pixel_8_Pro emulator, Android 16 /
+API 36 (`emulator-5554`). The emulator remained responsive; no restart was needed.
+The tests restored system appearance, display density, font scale and keyboard
+settings after their checks. No release publication or server deployment was done.
+
+| Check | Result |
+| --- | --- |
+| Android unit/API tests | 338 passed |
+| Debug app and instrumentation APK build | Passed |
+| Focused glass presentation, navigation and journey cases | 35 unique cases passed after targeted reruns |
+| Rendered secondary-text contrast over black, white, saturated and detailed backdrops | At least 4.5:1 for ordinary/prominent dark glass, transparent and opaque |
+| Light material regression capture | Body pixels identical to the pre-change capture, excluding system-bar areas |
+| Dark adaptive layouts and appearance | Wide sidebar, narrow large text, System light/dark and explicit Light override passed |
+| Debug lint | 0 errors, 20 existing warnings |
+
+The focused checks cover shell/browse/watch materials, selection, disabled and
+pending controls, guest/account library flows, subscription navigation, search
+and IME behavior, settings and popup menus, comments, descriptions, playback,
+mini-player, fullscreen and reduced motion. Dark transparency is exercised
+separately from Reduce transparency in the subscription and library presentation
+tests. Actual light/dark discovery, search, You, Downloads, settings, watch, menu
+and comment captures were inspected, along with dark subscription/library pages.
+
+The broad run passed 33 of 34 cases. Its wide-layout test initially timed out
+because the newly added dark-appearance setup disabled autoplay while that test
+expected playback to start. Preserving the test's playback defaults fixed the
+setup; the corrected case and the added System appearance case passed in the
+five-case acceptance run. A final two-case material run also passed with contrast
+sampled beside the glyphs at text height, including the upper reflection.
+
+Local evidence is retained in `.tools/dark-glass/`: pre-change and final captures,
+raw broad/acceptance/contrast results and a combined latest-result index under
+`validation/`. Runner logs are `.tools/dark-glass-final.log`,
+`.tools/dark-glass-acceptance.log` and `.tools/dark-glass-final-contrast.log`.
+The updated debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
+Physical devices and other GPU/OEM renderers were not tested in this revision.
+
+## Mobivious 0.10.1 release — 10 October 2026
+
+This patch ships the neutral dark appearance and shared glass treatment recorded
+above. Version name is **0.10.1**, version code **19**, and application ID remains
+`net.wingress.mobivious`. Light appearance keeps its existing blue accent.
+
+| Check | Result |
+| --- | --- |
+| `scripts/build-release.sh` | Passed; signed release built in 1m27s |
+| Unit/API tests | 338 passed; zero failures, errors or skips |
+| Release lint | Passed; zero errors, 36 warnings |
+| Focused implementation device checks | 35 unique cases passed, as detailed above |
+| Android compatibility | Minimum API 33; target/compile API 37; arm64-v8a, armeabi-v7a, x86 and x86_64 |
+| Signing continuity | Same certificate as the v0.10.0 APK; release APK is not debuggable |
+| APK SHA-256 | `d4ee9515f4621ddcc7c38ba72b3969a3c8bc68062d57303a2883b721c12fdf7b` |
+| APK bytes | 58,955,686 |
+| Signed update | v0.10.0/18 to v0.10.1/19 using `adb install -r`; original installation timestamp retained |
+| Preference preservation | Saved Dark appearance retained; original System choice restored after acceptance |
+| Signed cold launch and navigation | Discover feed, You dashboard, Settings and Appearance rendered; crash buffer unchanged |
+
+Release acceptance used the user's already-running Pixel_8_Pro emulator
+(`emulator-5554`, Android 16/API 36). It remained responsive without a restart.
+The installed release retained its original `2026-10-10 19:07:56` installation
+timestamp. Both APKs use certificate SHA-256
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+The version-only bump did not require repeating the focused implementation device
+suite. Physical/OEM rendering remains unverified. There are no new server
+migrations or sign-in renewal requirements; no server deployment was performed.
+
+Assets are `artifacts/Mobivious-0.10.1.apk` and its `.apk.sha256` file, with notes
+in `artifacts/release-notes-0.10.1.md`. Build, unit/lint, metadata, signing, update,
+startup and appearance evidence is retained in the ignored
+`artifacts/release-0.10.1/` directory. Release target:
+[GitHub Releases v0.10.1](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.10.1).

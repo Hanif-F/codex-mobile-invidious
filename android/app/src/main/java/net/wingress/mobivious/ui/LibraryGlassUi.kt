@@ -44,7 +44,7 @@ internal fun LibraryControlScene(modifier: Modifier = Modifier, content: @Compos
     Box(modifier) {
         Box(Modifier.matchParentSize().clipToBounds().layerBackdrop(backdrop).background(colors.surface).drawBehind {
             val radius = size.minDimension * .6f
-            if (radius > 0) drawRect(Brush.radialGradient(listOf(colors.primaryContainer.copy(alpha = .65f), colors.surface),
+            if (radius > 0) drawRect(Brush.radialGradient(listOf(colors.primaryContainer.copy(alpha = if (colors.background.red < .3f) .42f else .65f), colors.surface),
                 center = Offset(size.width / 2, size.height / 2), radius = radius))
         })
         CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalContentColor provides colors.onSurface) { content() }

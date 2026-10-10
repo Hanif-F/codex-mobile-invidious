@@ -83,16 +83,17 @@ internal fun Modifier.browseGlass(shape: Shape = Liquid.pill, prominent: Boolean
     val source = LocalGlassBackdrop.current
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
-    val plate = if (prominent) colors.primaryContainer else if (dark) Color(0xFF252C38) else Color.White
+    if (dark) return darkLiquidGlass(shape, prominent)
+    val plate = if (prominent) colors.primaryContainer else Color.White
     val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
     val material = if (opaque || source == null) Modifier.background(plate, shape) else Modifier.drawBackdrop(
         backdrop = source, shape = { shape },
         effects = { vibrancy(); blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx()) },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .64f else if (dark) .58f else .50f)) })
+        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .64f else .50f)) })
     return shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .12f))
         .then(material)
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = if (dark) .40f else .95f),
-            Color.White.copy(alpha = .08f), Color.White.copy(alpha = if (dark) .20f else .60f))), shape).clip(shape)
+        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .95f),
+            Color.White.copy(alpha = .08f), Color.White.copy(alpha = .60f))), shape).clip(shape)
 }
 
 /** A separate background-only source gives the hero's Subscribe control its own safe material. */
@@ -104,7 +105,9 @@ internal fun BrowseArtworkSurface(artwork: String?, content: @Composable () -> U
     Box(Modifier.fillMaxWidth()) {
         Box(Modifier.matchParentSize().clipToBounds().layerBackdrop(backdrop).background(surface)) {
             if (artwork != null && !failed && !LocalReduceTransparency.current) {
-                AsyncImage(artwork, null, modifier = Modifier.matchParentSize().graphicsLayer { alpha = .18f }.blur(56.dp),
+                AsyncImage(artwork, null, modifier = Modifier.matchParentSize().graphicsLayer {
+                    alpha = if (surface.red < .3f) .12f else .18f
+                }.blur(56.dp),
                     contentScale = ContentScale.Crop, imageLoader = AvatarImageLoader.get(androidx.compose.ui.platform.LocalContext.current), onError = { failed = true })
             }
             Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, surface))))
@@ -157,7 +160,7 @@ internal fun <T> BrowseTabs(options: List<T>, selected: T?, label: (T) -> String
     Row(modifier.browseGlass().horizontalScroll(rememberScrollState()).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option ->
             val active = option == selected
-            Box(Modifier.clip(Liquid.pill).background(if (active) MaterialTheme.colorScheme.primary.copy(alpha = .12f) else Color.Transparent)
+            Box(Modifier.clip(Liquid.pill).liquidSelection(active)
                 .heightIn(min = 48.dp).selectable(active, enabled = enabled && available(option), role = Role.Tab, onClick = { select(option) }).testTag(tag(option))
                 .padding(horizontal = 16.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
                 Text(label(option), style = MaterialTheme.typography.labelLarge,

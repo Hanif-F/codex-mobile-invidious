@@ -3,6 +3,7 @@ package net.wingress.mobivious
 import android.content.Intent
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.*
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -129,6 +130,77 @@ class LiquidRedesignSmokeTest {
         compose.onNodeWithTag("downloads-page").assertExists()
         screenshot("downloads-dark")
     }
+    @Test fun transparentGlassKeepsActionsReachableAcrossLightAndDarkPages() {
+        for (appearance in listOf("light", "dark")) {
+            preferences(AccountPreferences(darkMode = appearance, autoplay = false, continueAutoplay = false))
+            compose.onNodeWithTag("navigation-Discover").performClick().assertIsSelected()
+            screenshot("neutral-discover-$appearance")
+            compose.onNodeWithTag("global-search").performClick()
+            compose.onNodeWithTag("main-search").performTextReplacement("fixture")
+            until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+            compose.onNodeWithTag("main-search").performImeAction()
+            until { !vm.browse.value.loading && vm.searchInput.value.submitted == "fixture" }
+            screenshot("neutral-search-$appearance")
+            compose.onNodeWithContentDescription("Close search").performClick()
+            compose.onNodeWithTag("navigation-You").performClick().assertIsSelected()
+            screenshot("neutral-you-$appearance")
+            compose.onNodeWithTag("you-downloads").performClick()
+            compose.onNodeWithTag("downloads-page").assertExists()
+            screenshot("neutral-downloads-$appearance")
+            back()
+            compose.onNodeWithTag("global-settings").performClick()
+            compose.onNodeWithTag("settings-root").assertExists()
+            screenshot("neutral-settings-$appearance")
+            back()
+            compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+            until { !vm.playback.value.loading && vm.playback.value.duration > 0 }
+            compose.runOnUiThread { vm.controller.value!!.pause() }
+            compose.onNodeWithTag("watch-more").assertIsDisplayed()
+            screenshot("neutral-watch-$appearance")
+            compose.onNodeWithTag("watch-more").performClick()
+            compose.onNodeWithText("Create clip").assertIsDisplayed()
+            screenshot("neutral-menu-$appearance")
+            shell("input keyevent KEYCODE_BACK")
+            compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+            compose.onNodeWithTag("watch-description-text").assertExists()
+            compose.onNodeWithTag("comments-entry").performScrollTo().performClick()
+            until { vm.comments.value.feed.loaded }
+            screenshot("neutral-comments-$appearance")
+            compose.onNodeWithContentDescription("Close comments").performClick()
+            back()
+            compose.onNodeWithTag("navigation-Discover").performClick()
+            compose.runOnUiThread { vm.closePlayer() }
+        }
+    }
+    @Test fun systemAppearanceUsesDarkGlassAndHonorsAnExplicitLightChoice() {
+        val original = shell("cmd uimode night").substringAfter(":").trim()
+        assertTrue(original in listOf("yes", "no", "auto", "custom"))
+        fun waitForSurface(expected: androidx.compose.ui.graphics.Color) {
+            until {
+                val image = compose.onRoot().captureToImage()
+                val actual = image.toPixelMap()[1, image.height / 2]
+                kotlin.math.abs(actual.red - expected.red) < .005f
+            }
+        }
+        try {
+            preferences(AccountPreferences(darkMode = ""))
+            shell("cmd uimode night yes")
+            until { currentActivity(); activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES }
+            waitForSurface(net.wingress.mobivious.ui.Liquid.dark.surface)
+            screenshot("neutral-system-dark")
+            preferences(AccountPreferences(darkMode = "light"))
+            waitForSurface(net.wingress.mobivious.ui.Liquid.light.surface)
+            screenshot("neutral-explicit-light")
+            preferences(AccountPreferences(darkMode = ""))
+            shell("cmd uimode night no")
+            until { currentActivity(); activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_NO }
+            waitForSurface(net.wingress.mobivious.ui.Liquid.light.surface)
+            screenshot("neutral-system-light")
+        } finally {
+            shell("cmd uimode night $original")
+            currentActivity()
+        }
+    }
     @Test fun watchPreservesFourAspectRatiosAndPlaybackThroughMiniSearchAndSettings() {
         for ((id, ratio) in listOf("portrait001" to 9f/16f, "square00001" to 1f, "landscape01" to 16f/9f, "ultrawide01" to 8f/3f)) {
             compose.runOnUiThread { vm.openLink(VideoLink(id)); activity.sharedVideo.value = true }
@@ -168,6 +240,8 @@ class LiquidRedesignSmokeTest {
         compose.onNodeWithTag("navigation-Discover").assertIsDisplayed()
         compose.onNodeWithTag("global-search").assertIsDisplayed()
         screenshot("discover-wide")
+        preferences(AccountPreferences(darkMode = "dark"))
+        screenshot("discover-wide-dark")
         compose.runOnUiThread { vm.openLink(VideoLink("portrait001")); activity.sharedVideo.value = true }
         until { vm.playback.value.playing && vm.playback.value.geometry.ratio != null }
         compose.onNodeWithTag("watch-more").assertIsDisplayed()

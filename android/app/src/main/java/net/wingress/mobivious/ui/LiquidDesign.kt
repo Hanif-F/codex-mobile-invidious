@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
@@ -38,6 +39,8 @@ import androidx.compose.ui.platform.testTag
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
+import com.kyant.backdrop.effects.colorControls
+import com.kyant.backdrop.effects.exposureAdjustment
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 
@@ -59,16 +62,28 @@ internal object Liquid {
         outlineVariant = Color(0xFFDCE1E9), surfaceTint = Color.Transparent,
     )
     val dark = darkColorScheme(
-        primary = Color(0xFF8DBAFF), onPrimary = Color(0xFF082E66),
-        primaryContainer = Color(0xFF18355E), onPrimaryContainer = Color(0xFFCEE1FF),
-        secondary = Color(0xFFBCC7D9), onSecondary = Color(0xFF273347),
-        secondaryContainer = Color(0xFF2A3241), onSecondaryContainer = Color(0xFFE0E7F3),
-        tertiary = Color(0xFFA9BEDD), background = Color(0xFF101115),
-        surface = Color(0xFF101115), surfaceContainer = Color(0xFF1D2027),
-        surfaceContainerLow = Color(0xFF17191F), surfaceContainerHigh = Color(0xFF282C35),
-        surfaceContainerHighest = Color(0xFF323744), onSurface = Color(0xFFF2F4F8),
-        onSurfaceVariant = Color(0xFFB2BAC8), outline = Color(0xFF8993A4),
-        outlineVariant = Color(0xFF353B47), surfaceTint = Color.Transparent,
+        primary = Color(0xFFE7E9ED), onPrimary = Color(0xFF202225),
+        primaryContainer = Color(0xFF34363A), onPrimaryContainer = Color(0xFFF0F1F3),
+        inversePrimary = Color(0xFF53565C),
+        secondary = Color(0xFFC6C8CD), onSecondary = Color(0xFF24262A),
+        secondaryContainer = Color(0xFF2B2D31), onSecondaryContainer = Color(0xFFE5E7EB),
+        tertiary = Color(0xFFD0D2D6), onTertiary = Color(0xFF282A2E),
+        tertiaryContainer = Color(0xFF303236), onTertiaryContainer = Color(0xFFE8EAED),
+        background = Color(0xFF111214), onBackground = Color(0xFFEEF0F3),
+        surface = Color(0xFF111214), onSurface = Color(0xFFEEF0F3),
+        surfaceDim = Color(0xFF111214), surfaceBright = Color(0xFF383A3E),
+        surfaceContainerLowest = Color(0xFF0D0E10), surfaceContainerLow = Color(0xFF17191C),
+        surfaceContainer = Color(0xFF1C1E21), surfaceContainerHigh = Color(0xFF282A2E),
+        surfaceContainerHighest = Color(0xFF34363A), surfaceVariant = Color(0xFF34363A),
+        onSurfaceVariant = Color(0xFFC3C5CA), outline = Color(0xFF909399),
+        outlineVariant = Color(0xFF393C41), surfaceTint = Color.Transparent,
+        inverseSurface = Color(0xFFE5E7EB), inverseOnSurface = Color(0xFF292B2F),
+        primaryFixed = Color(0xFFE5E7EB), primaryFixedDim = Color(0xFFC5C7CD),
+        onPrimaryFixed = Color(0xFF202225), onPrimaryFixedVariant = Color(0xFF44474D),
+        secondaryFixed = Color(0xFFE0E2E6), secondaryFixedDim = Color(0xFFC2C4C9),
+        onSecondaryFixed = Color(0xFF24262A), onSecondaryFixedVariant = Color(0xFF44474D),
+        tertiaryFixed = Color(0xFFE4E5E6), tertiaryFixedDim = Color(0xFFC7C8CA),
+        onTertiaryFixed = Color(0xFF282A2E), onTertiaryFixedVariant = Color(0xFF44474D),
     )
     val typography = Typography(
         headlineLarge = TextStyle(fontSize = 34.sp, lineHeight = 40.sp, fontWeight = FontWeight.Bold, letterSpacing = (-1).sp),
@@ -92,19 +107,75 @@ internal val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 internal val LocalReduceTransparency = staticCompositionLocalOf { false }
 internal val LocalContentBottomInset = staticCompositionLocalOf { 20.dp }
 
+/** One optical treatment for dark navigation, browse and watch chrome. */
+internal object DarkGlass {
+    val plate = Color(0xFF292B2E)
+    const val tintAlpha = .58f
+    const val prominentTintAlpha = .62f
+    const val saturation = .78f
+    // Android color filters operate in the renderer's working color space; validate the composed result on-device.
+    const val exposure = -2.8f
+    val reflection = Brush.verticalGradient(listOf(Color.White.copy(alpha = .035f),
+        Color.White.copy(alpha = .008f), Color.Transparent))
+    val rim = Brush.linearGradient(listOf(Color.White.copy(alpha = .20f),
+        Color.White.copy(alpha = .035f), Color.White.copy(alpha = .10f)))
+}
+
+@Composable
+internal fun Modifier.darkLiquidGlass(shape: Shape, prominent: Boolean): Modifier {
+    val source = LocalGlassBackdrop.current
+    val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
+    val plate = if (prominent) MaterialTheme.colorScheme.primaryContainer else DarkGlass.plate
+    val material = if (opaque || source == null) Modifier.background(plate, shape) else Modifier.drawBackdrop(
+        backdrop = source, shape = { shape },
+        effects = {
+            blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx())
+            // Bound bright artwork inside the material, without dimming the actual content or its labels.
+            colorControls(saturation = DarkGlass.saturation); exposureAdjustment(DarkGlass.exposure)
+        },
+        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) DarkGlass.prominentTintAlpha else DarkGlass.tintAlpha)) },
+    )
+    return shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = .12f), spotColor = Color.Black.copy(alpha = .20f))
+        .then(material)
+        .then(if (opaque) Modifier else Modifier.background(DarkGlass.reflection, shape))
+        .border(.75.dp, DarkGlass.rim, shape).clip(shape)
+}
+
+/** The small marker makes neutral selection recognizable independently of the fill's brightness. */
+internal fun DrawScope.drawLiquidSelection(fill: Color, indicator: Color?, topLeft: Offset = Offset.Zero,
+    selectionSize: Size = size) {
+    drawRoundRect(fill, topLeft, selectionSize, CornerRadius(selectionSize.height / 2))
+    if (indicator != null) {
+        val width = minOf(20.dp.toPx(), selectionSize.width / 3)
+        val height = 2.dp.toPx()
+        drawRoundRect(indicator, Offset(topLeft.x + (selectionSize.width - width) / 2,
+            topLeft.y + selectionSize.height - 5.dp.toPx()), Size(width, height), CornerRadius(height))
+    }
+}
+
+@Composable
+internal fun Modifier.liquidSelection(active: Boolean): Modifier {
+    if (!active) return this
+    val colors = MaterialTheme.colorScheme
+    val fill = colors.primary.copy(alpha = .12f)
+    val indicator = colors.primary.takeIf { colors.background.red < .3f }
+    return drawBehind { drawLiquidSelection(fill, indicator) }
+}
+
 /** Only content is recorded by the shell. Glass must never record itself into its own source. */
 @Composable
 internal fun Modifier.liquidGlass(shape: Shape = Liquid.pill, prominent: Boolean = false): Modifier {
     val source = LocalGlassBackdrop.current
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
+    if (dark) return darkLiquidGlass(shape, prominent)
     val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    val plate = if (prominent) colors.primaryContainer else if (dark) Color(0xFF252A34) else Color.White
-    val rim = if (dark) Color.White.copy(alpha = .16f) else Color.White.copy(alpha = .85f)
+    val plate = if (prominent) colors.primaryContainer else Color.White
+    val rim = Color.White.copy(alpha = .85f)
     val glass = if (source == null || opaque) Modifier.background(plate, shape) else Modifier.drawBackdrop(
         backdrop = source, shape = { shape },
         effects = { vibrancy(); blur(12.dp.toPx()); lens(12.dp.toPx(), 20.dp.toPx()) },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .85f else if (dark) .80f else .78f)) },
+        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .85f else .78f)) },
     )
     return shadow(12.dp, shape, ambientColor = Color.Black.copy(alpha = .12f), spotColor = Color.Black.copy(alpha = .12f))
         .then(glass).border(.75.dp, rim, shape).clip(shape)
@@ -114,6 +185,12 @@ internal fun Modifier.liquidGlass(shape: Shape = Liquid.pill, prominent: Boolean
 @Composable
 internal fun Modifier.mediaGlass(shape: Shape = Liquid.pill): Modifier {
     val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
+    if (MaterialTheme.colorScheme.background.red < .3f) {
+        // SurfaceView video is never sampled. Keep a contrast plate even in transparent mode.
+        return shadow(8.dp, shape).background(if (opaque) Color(0xFF181A1D) else Color(0xD9181A1D), shape)
+            .then(if (opaque) Modifier else Modifier.background(DarkGlass.reflection, shape))
+            .border(.75.dp, DarkGlass.rim, shape).clip(shape)
+    }
     return shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = .16f), spotColor = Color.Black.copy(alpha = .2f))
         .background(if (opaque) Color(0xFF171B24) else Color(0x99171B24), shape)
         .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .16f), Color.White.copy(alpha = .025f),
@@ -167,10 +244,11 @@ internal fun <T> LiquidSegments(options: List<T>, selected: T, label: (T) -> Str
     val position by animateFloatAsState(options.indexOf(selected).coerceAtLeast(0).toFloat(),
         spring(dampingRatio = .86f, stiffness = 420f), label = "segment-selection")
     val selection = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
+    val indicator = MaterialTheme.colorScheme.primary.takeIf { MaterialTheme.colorScheme.background.red < .3f }
     Row(modifier.browseGlass().padding(4.dp).selectableGroup().drawBehind {
         val gap = 4.dp.toPx()
         val cell = (size.width - gap * (options.size - 1)) / options.size
-        drawRoundRect(selection, Offset(position * (cell + gap), 0f), Size(cell, size.height), CornerRadius(size.height / 2))
+        drawLiquidSelection(selection, indicator, Offset(position * (cell + gap), 0f), Size(cell, size.height))
     },
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option ->

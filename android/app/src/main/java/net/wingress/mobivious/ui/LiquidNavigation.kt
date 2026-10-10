@@ -7,8 +7,6 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
@@ -44,13 +42,13 @@ internal fun FloatingNavigation(selected: ShellDestination, compact: Boolean, en
     val activePosition by animateFloatAsState(selected.ordinal.coerceAtMost(2).toFloat(),
         spring(dampingRatio = .86f, stiffness = 420f), label = "navigation-selection")
     val selectionColor = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
+    val indicator = MaterialTheme.colorScheme.primary.takeIf { MaterialTheme.colorScheme.background.red < .3f }
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(Modifier.weight(1f).liquidGlass().padding(5.dp).drawBehind {
             val gap = 2.dp.toPx()
             val cell = (size.width - gap * 2) / 3
-            drawRoundRect(selectionColor, Offset(activePosition * (cell + gap), 0f), Size(cell, size.height),
-                CornerRadius(size.height / 2, size.height / 2))
+            drawLiquidSelection(selectionColor, indicator, Offset(activePosition * (cell + gap), 0f), Size(cell, size.height))
         }, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
             ShellDestination.entries.filter { it != ShellDestination.SEARCH }.forEach { destination ->
                 val active = destination == selected
@@ -82,8 +80,7 @@ internal fun FloatingSidebar(selected: ShellDestination, enabled: Boolean, modif
         Text("Mobivious", Modifier.padding(12.dp), style = MaterialTheme.typography.titleLarge)
         ShellDestination.entries.forEach { destination ->
             val active = destination == selected
-            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).background(
-                if (active) MaterialTheme.colorScheme.primary.copy(alpha = .12f) else androidx.compose.ui.graphics.Color.Transparent, Liquid.pill)
+            Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(Liquid.pill).liquidSelection(active)
                 .selectable(active, enabled = enabled, role = Role.Tab, onClick = { select(destination) })
                 .testTag(if (destination == ShellDestination.SEARCH) "global-search" else "navigation-${destination.label}")
                 .semantics { contentDescription = destination.label }.padding(12.dp),

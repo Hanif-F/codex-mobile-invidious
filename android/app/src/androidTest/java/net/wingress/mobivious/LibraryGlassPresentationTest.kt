@@ -47,15 +47,15 @@ class LibraryGlassPresentationTest {
                 }
             }
         } }
-        for (isDark in listOf(false, true)) {
-            compose.runOnIdle { dark = isDark; opaque = isDark }
+        for ((isDark, isOpaque) in listOf(false to false, true to false, true to true)) {
+            compose.runOnIdle { dark = isDark; opaque = isOpaque }
             for (destination in listOf("playlists", "clips", "history", "downloads")) {
                 compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("you-$destination"))
                 compose.onNodeWithTag("you-$destination").assertHeightIsAtLeast(48.dp).performClick()
             }
-            capture(if (isDark) "dashboard-narrow-large-dark-opaque" else "dashboard-narrow-large-light")
+            capture(if (isDark) "dashboard-narrow-large-dark-${if (isOpaque) "opaque" else "transparent"}" else "dashboard-narrow-large-light")
         }
-        assertEquals(listOf("playlists", "clips", "history", "downloads", "playlists", "clips", "history", "downloads"), opened)
+        assertEquals(List(3) { listOf("playlists", "clips", "history", "downloads") }.flatten(), opened)
     }
 
     @Test fun wideDashboardUsesTwoColumnsAndGuestDownloadsRemainAvailable() {
