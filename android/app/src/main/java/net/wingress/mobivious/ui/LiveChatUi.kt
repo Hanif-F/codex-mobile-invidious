@@ -47,7 +47,8 @@ import org.json.JSONObject
 import kotlin.math.roundToInt
 
 @Composable internal fun ChatReplayEntry(state: ChatReplayState, open: () -> Unit) {
-    if (state.available) ActionRow("Chat replay", modifier = Modifier.testTag("chat-entry"), trailingIcon = Icons.AutoMirrored.Filled.Chat, onClick = open)
+    if (state.available) WatchDisclosureRow("Chat replay", Icons.AutoMirrored.Filled.Chat,
+        Modifier.testTag("chat-entry"), onClick = open)
 }
 
 @Composable internal fun ChatReplayPanel(
@@ -84,9 +85,9 @@ import kotlin.math.roundToInt
     val colors = MaterialTheme.colorScheme
     val background = colors.surfaceContainer.copy(alpha = if (overlay) appearance.opacity / 100f else 1f)
     val shape = RoundedCornerShape(12.dp)
-    Column(modifier.clip(shape).background(background).testTag("chat-panel")) {
-        if (editorHeader != null) editorHeader() else ChatPanelHeader(settings, vm::closeChat, adjustOverlay)
-        HorizontalDivider(color = colors.outlineVariant)
+    val content: @Composable ColumnScope.() -> Unit = {
+        if (editorHeader != null) editorHeader() else ChatPanelHeader(settings, vm::closeChat, adjustOverlay, watchStyle = !overlay)
+        if (overlay) HorizontalDivider(color = colors.outlineVariant)
         LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("chat-list"), state = list,
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
             if (!state.following) item(key = "older") { TextButton(onClick = vm::olderChat) { Text("Earlier messages") } }
@@ -122,13 +123,16 @@ import kotlin.math.roundToInt
         if (!state.following) TextButton(onClick = vm::followChat, modifier = Modifier.fillMaxWidth().testTag("chat-follow")) { Text("Follow playback") }
         editorFooter?.invoke()
     }
+    if (overlay) Column(modifier.clip(shape).background(background).testTag("chat-panel"), content = content)
+    else WatchPanelSurface(modifier.testTag("chat-panel"), content)
 }
 
-@Composable private fun ChatPanelHeader(settings: () -> Unit, close: () -> Unit, adjustOverlay: (() -> Unit)?) {
+@Composable private fun ChatPanelHeader(settings: () -> Unit, close: () -> Unit, adjustOverlay: (() -> Unit)?, watchStyle: Boolean = false) {
     var menu by remember { mutableStateOf(false) }
-    BoxWithConstraints(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
+    BoxWithConstraints(Modifier.fillMaxWidth().then(if (watchStyle) Modifier.padding(horizontal = 12.dp, vertical = 8.dp).watchGlass()
+        else Modifier.background(MaterialTheme.colorScheme.surfaceContainer))) {
         val compact = maxWidth < 200.dp
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = if (compact) 0.dp else 12.dp),
+        Row(Modifier.fillMaxWidth().heightIn(min = if (watchStyle) 56.dp else 48.dp).padding(start = if (compact) 0.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (compact) Arrangement.End else Arrangement.Start) {
             if (!compact) Text("Chat replay", Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)

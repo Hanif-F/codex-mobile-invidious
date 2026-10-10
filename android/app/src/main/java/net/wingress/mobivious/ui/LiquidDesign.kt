@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -106,8 +107,15 @@ internal fun Modifier.liquidGlass(shape: Shape = Liquid.pill, prominent: Boolean
 
 /** Video controls use a translucent plate; decoding surfaces are deliberately never sampled. */
 @Composable
-internal fun Modifier.mediaGlass(shape: Shape = Liquid.pill): Modifier =
-    background(if (LocalReduceTransparency.current) Color(0xFF171B24) else Color(0xCC171B24), shape).border(.75.dp, Color.White.copy(alpha = .22f), shape).clip(shape)
+internal fun Modifier.mediaGlass(shape: Shape = Liquid.pill): Modifier {
+    val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
+    return shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = .16f), spotColor = Color.Black.copy(alpha = .2f))
+        .background(if (opaque) Color(0xFF171B24) else Color(0x99171B24), shape)
+        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .16f), Color.White.copy(alpha = .025f),
+            Color.Black.copy(alpha = .08f))), shape)
+        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .62f), Color.White.copy(alpha = .08f),
+            Color.White.copy(alpha = .28f))), shape).clip(shape)
+}
 
 @Composable
 internal fun GlassIconButton(icon: ImageVector, description: String, modifier: Modifier = Modifier,

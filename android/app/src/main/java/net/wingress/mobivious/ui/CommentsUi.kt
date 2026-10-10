@@ -47,19 +47,8 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Composable
 internal fun CommentsEntry(state: CommentsState, open: () -> Unit) {
-    Card(onClick = open, modifier = Modifier.fillMaxWidth().testTag("comments-entry"),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh)) {
-        Row(Modifier.padding(16.dp).heightIn(min = 40.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Icon(Icons.Default.ChatBubbleOutline, null, tint = MaterialTheme.colorScheme.primary)
-            Column(Modifier.weight(1f)) {
-                Text("Comments", style = MaterialTheme.typography.titleMedium)
-                state.feed.page.count?.let { Text(DisplayFormats.audience(it, "comment"), style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            }
-            Icon(Icons.Default.ExpandLess, "Open comments")
-        }
-    }
+    WatchDisclosureRow("Comments", Icons.Default.ChatBubbleOutline, Modifier.testTag("comments-entry"),
+        detail = state.feed.page.count?.let { DisplayFormats.audience(it, "comment") }, onClick = open)
 }
 
 @Composable
@@ -67,13 +56,14 @@ internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Mo
     channel: (String) -> Unit, link: (String) -> Unit) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     CommentsPanel(state, prefs.thinMode, modifier, vm::closeComments, { vm.backComments() }, vm::sortComments,
-        vm::loadComments, vm::openReplies, vm::commentPosition, channel, link)
+        vm::loadComments, vm::openReplies, vm::commentPosition, channel, link, watchStyle = true)
 }
 
 @Composable
 internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Modifier, close: () -> Unit,
     back: () -> Unit, changeSort: (CommentSort) -> Unit, load: (Boolean, String?) -> Unit,
-    replies: (Comment) -> Unit, savePosition: (String?, CommentPosition) -> Unit, channel: (String) -> Unit, link: (String) -> Unit) {
+    replies: (Comment) -> Unit, savePosition: (String?, CommentPosition) -> Unit, channel: (String) -> Unit, link: (String) -> Unit,
+    watchStyle: Boolean = false) {
     val latest by rememberUpdatedState(state)
     val mainList = remember(state.target, state.context, state.sort) {
         LazyListState(state.feed.position.index, state.feed.position.offset)
@@ -92,10 +82,11 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                     savePosition(key, position)
             }
     }
-    Surface(modifier.testTag("comments-drawer"), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+    val content: @Composable ColumnScope.() -> Unit = {
+            if (watchStyle) WatchPanelToolbar(if (thread != null) "Replies" else "Comments", "Close comments", close,
+                Icons.Default.ChatBubbleOutline, detail = if (thread == null) state.feed.page.count?.let { commentCount(it) } else null,
+                backLabel = "Back to comments", back = if (thread != null) back else null)
+            else Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (thread != null) IconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
                 else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() },
@@ -107,7 +98,7 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                 CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,
                     onClick = { changeSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
             }
-            HorizontalDivider()
+            if (!watchStyle) HorizontalDivider()
             LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag(if (thread == null) "comments-list" else "comment-replies-list"),
                 state = list, contentPadding = PaddingValues(bottom = 24.dp)) {
                 if (thread != null) item(key = "parent") {
@@ -142,8 +133,10 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                     }
                 }
             }
-        }
     }
+    if (watchStyle) WatchPanelSurface(modifier.testTag("comments-drawer"), content)
+    else Surface(modifier.testTag("comments-drawer"), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) { Column(Modifier.fillMaxSize(), content = content) }
 }
 
 @Composable

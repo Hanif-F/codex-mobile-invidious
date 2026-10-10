@@ -3162,3 +3162,59 @@ packaged separately from the release app under `artifacts/liquid-glass/`.
 
 The relocated DeArrow action was also checked for guest sign-in cancellation and
 authenticated contribution/review/import behavior using only the local fixture.
+
+## Expanded watch Liquid Glass — 10 October 2026
+
+The expanded watch page now owns a background-only Backdrop recording and a
+thumbnail wash. Its circular actions, Subscribe pill and disclosure rows use
+watch-specific refractive glass. Titles wrap at 20sp semibold, verification is
+inline, and description content remains inline on a quiet surface. Comments,
+chapters, chat replay and player settings have matching glass toolbars.
+
+The embedded and fullscreen player share measured controls: centered transport
+with 10-second seek buttons when space permits, a compact rail otherwise, top
+controls and a shallow seek rail. Loading, retry, seek feedback and SponsorBlock
+prompts use the same media material. Media3's existing service and decoding
+SurfaceView remain in place; controls never capture video frames.
+
+Device checks used the user's already-running Pixel 8 Pro emulator, Android 16
+/ API 36. Screenshots cover light/dark, reduced transparency, narrow layouts at
+200% text, wide layouts, RTL controls at large text, all four video aspect ratios,
+fullscreen, loading/error, live metadata and downloaded playback. RTL and shallow
+loading/error captures exercise isolated production controls; the other captures
+use actual service playback. The live fixture uses a finite stream with live
+metadata; a moving live window remains a separate physical/device-stream check.
+
+Older tests were updated for the removed watch heading, inline verification,
+top-row chapter control and combined time/seek rail. The generic channel-avatar
+test expected 64dp although the unchanged component uses 72dp. The comments Back
+test now invokes system Back instead of its navigation helper's Minimize action.
+PiP tests account for an absent activity Compose tree while pinned and exercise
+Android's expand control when returning.
+
+| Check | Result |
+| --- | --- |
+| `testDebugUnitTest` | 335 passed; zero failures, errors or skips |
+| Focused watch/player device selection | 52 distinct scenarios passed across focused runs and corrected reruns; zero outstanding failures or skips |
+| `assembleDebug` | Passed |
+| `assembleDebugAndroidTest` | Passed |
+| `lintDebug` | Passed; zero errors, 36 existing warnings |
+
+Device coverage includes auto-hide, keyboard focus, double-tap and explicit seek,
+scrubbing, settings navigation, description/timestamp links, comments/replies/
+sorting/pagination, chapter selection and preservation, More/sign-in return,
+chat docking, SponsorBlock, aspect ratios, reduced motion, fullscreen, PiP return
+and offline/background playback. Initial assertion and PiP automation failures
+are retained with the passing reruns under `.tools/watch-glass-review/`; a list
+of the final selected results is included in the review package. The complete
+historical device suite was not rerun.
+
+Review screenshots are under `artifacts/liquid-glass/watch/`, with a screenshot
+index in its `REVIEW.md`. The updated preview is
+`artifacts/liquid-glass/Mobivious-Liquid-Glass-Preview.apk`, using the separate
+debug package. SHA-256:
+`083a39c739b7e620b5fa7892eb97bfe58b37b644666484a628ccdb497a8ccd60`.
+Density, font, animation, appearance and IME overrides were restored by test
+cleanup. No server changes, public API or preference migrations, real account writes,
+release signing or deployment were needed. Physical/OEM rendering, software
+rendering on a device, and TalkBack traversal remain separate checks.

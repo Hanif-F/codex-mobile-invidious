@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -831,10 +832,14 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             }
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
-                    item(key = "watch:metadata") { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item(key = "watch:metadata") {
+                      WatchGlassScene(Modifier.fillMaxWidth(), artwork = if (prefs.thinMode || playback.downloadId != null) null else
+                          resolved(vm.store.server, details.video.thumbnail.ifBlank { "/vi/${details.video.id}/mqdefault.jpg" })) {
+                      Column(Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
-                        if (playback.downloadId != null) Text(details.video.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        else DeArrowTitle(vm, details.video, MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        val titleStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp)
+                        if (playback.downloadId != null) Text(details.video.title, style = titleStyle, fontWeight = FontWeight.SemiBold)
+                        else DeArrowTitle(vm, details.video, titleStyle, fontWeight = FontWeight.SemiBold)
                         VideoNotices(details)
                         VideoMetadataLine(details.video, likes = details.likes)
                         if (playback.downloadId != null) DownloadChannelIdentity(details.video)
@@ -848,18 +853,18 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         if (prefs.showYoutubeComments && playback.downloadId == null) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
                         ChatReplayEntry(chat) { chapterPanel.close(); vm.openChat() }
                         ChaptersEntry(chapters, playback.position, openChapters)
-                        ActionRow(if (description) "Hide description" else "Show description",
-                            modifier = Modifier.testTag("watch-description-toggle").semantics { stateDescription = if (description) "Expanded" else "Collapsed" },
-                            trailingIcon = Icons.Default.ExpandMore,
-                            trailingRotation = animateFloatAsState(if (description) 180f else 0f, tween(200), label = "description-chevron").value) { describe(!description) }
+                        WatchDisclosureRow("Description", Icons.AutoMirrored.Filled.Notes,
+                            modifier = Modifier.testTag("watch-description-toggle"), expanded = description,
+                            actionLabel = if (description) "Hide description" else "Show description") { describe(!description) }
                         VideoDescription(details, queue.currentKey.orEmpty(), vm.store.server, description, ::openWatchLink)
                         if (queue.current?.linkPlayback?.invalidEnd == true) Text("Invalid end boundary ignored.", style = MaterialTheme.typography.bodySmall)
-                    } }
+                    } } }
                 }
                 if (queue.hasExplicitQueue) item(key = "watch:queue") { PlaybackQueuePanel(vm, signIn, channel) }
                 playback.details?.let { details ->
                     if (prefs.relatedVideos) {
-                        item(key = "watch:up-next") { Text("Up next", Modifier.padding(16.dp).testTag("watch-up-next"), style = MaterialTheme.typography.titleLarge) }
+                        item(key = "watch:up-next") { Text("Up next", Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp)
+                            .testTag("watch-up-next"), style = MaterialTheme.typography.titleMedium) }
                         items(vm.visibleVideos(details.recommendations, ContentSurface.RECOMMENDATIONS, AiPageGroup.RECOMMENDATIONS, aiState), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn, aiGroup = AiPageGroup.RECOMMENDATIONS) }
                     }
                 }

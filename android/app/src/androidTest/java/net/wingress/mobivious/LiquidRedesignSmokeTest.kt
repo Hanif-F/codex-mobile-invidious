@@ -39,9 +39,7 @@ class LiquidRedesignSmokeTest {
     }
     private fun screenshot(name: String) {
         compose.waitForIdle()
-        InstrumentationRegistry.getInstrumentation().uiAutomation.waitForIdle(500, 5_000)
-        shell("mkdir -p /data/local/tmp/mobivious-liquid")
-        shell("screencap -p /data/local/tmp/mobivious-liquid/$name.png")
+        captureWatchScreenshot(name)
     }
     private fun back() {
         compose.waitForIdle()
@@ -223,4 +221,75 @@ class LiquidRedesignSmokeTest {
         assertTrue(vm.playback.value.playing)
     }
 
+    @Test fun watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances() {
+        command("chapters"); command("chat")
+        preferences(AccountPreferences(autoplay = false, continueAutoplay = false, darkMode = "light"))
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { !vm.playback.value.loading && vm.playback.value.duration > 0 && vm.playback.value.seekable }
+        compose.runOnUiThread { vm.controller.value!!.pause() }
+        for (name in listOf("Save", "Download", "Share", "More"))
+            compose.onNodeWithContentDescription(name).assertIsDisplayed().assertWidthIsEqualTo(androidx.compose.ui.unit.Dp(56f))
+        screenshot("watch-glass-light")
+        compose.onNodeWithTag("watch-more").performClick()
+        compose.onNodeWithText("Create clip").assertIsDisplayed()
+        screenshot("watch-glass-more")
+        shell("input keyevent KEYCODE_BACK")
+        compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("watch-description-text").assertExists()
+        screenshot("watch-glass-description")
+        compose.onNodeWithTag("comments-entry").performScrollTo().performClick()
+        until { vm.comments.value.feed.loaded }
+        screenshot("watch-glass-comments")
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        compose.onNodeWithTag("chapters-entry").performScrollTo().performClick()
+        screenshot("watch-glass-chapters")
+        compose.onNodeWithContentDescription("Close chapters").performClick()
+        compose.onNodeWithTag("chat-entry").performScrollTo().performClick()
+        until { vm.chatReplay.value.loaded }
+        screenshot("watch-glass-chat")
+        compose.onNodeWithContentDescription("Close chat replay").performClick()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("Playback speed").assertIsDisplayed()
+        screenshot("watch-glass-settings")
+        compose.onNodeWithContentDescription("Close player settings").performClick()
+        compose.onNodeWithContentDescription("Full screen").performClick()
+        until { currentActivity(); activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+        screenshot("watch-glass-fullscreen")
+        compose.onNodeWithContentDescription("Exit full screen").performClick()
+        until { currentActivity(); activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT }
+        preferences(AccountPreferences(autoplay = false, continueAutoplay = false, darkMode = "dark"))
+        compose.onNodeWithTag("watch-more").performScrollTo()
+        screenshot("watch-glass-dark")
+        compose.runOnUiThread { vm.store.reduceTransparency(true) }
+        screenshot("watch-glass-opaque")
+    }
+
+    @Test fun watchGlassNarrowLargeTextAndWideLayoutsKeepActionsReachable() {
+        preferences(AccountPreferences(autoplay = false, continueAutoplay = false))
+        compose.runOnUiThread { vm.openLink(VideoLink("landscape01")); activity.sharedVideo.value = true }
+        until { vm.playback.value.duration > 0 && !vm.playback.value.loading }
+        compose.runOnUiThread { vm.controller.value!!.pause() }
+        shell("wm density 640"); shell("settings put system font_scale 2.0")
+        until { currentActivity(); activity.resources.configuration.screenWidthDp <= 360 && activity.resources.configuration.fontScale >= 2f }
+        compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()
+        screenshot("watch-glass-narrow-large-text")
+        compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+        screenshot("watch-glass-narrow-description")
+        shell("settings put system font_scale 1.0"); shell("wm density 200")
+        until { currentActivity(); activity.resources.configuration.screenWidthDp >= 840 }
+        compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()
+        screenshot("watch-glass-wide")
+    }
+
+}
+
+/** Fixture-only visual evidence kept outside the package that UTP uninstalls. */
+internal fun captureWatchScreenshot(name: String) {
+    require(name.matches(Regex("[a-z0-9-]+")))
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+    automation.waitForIdle(500, 5_000)
+    for (command in listOf("mkdir -p /data/local/tmp/mobivious-liquid",
+        "screencap -p /data/local/tmp/mobivious-liquid/$name.png")) {
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+    }
 }

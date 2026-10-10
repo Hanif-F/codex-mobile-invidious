@@ -203,13 +203,15 @@ class AppSmokeTest {
         waitFor { compose.onAllNodesWithContentDescription("Close player settings").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithContentDescription("Exit full screen").assertExists()
         compose.runOnUiThread { activity.model.playback.value = activity.model.playback.value.copy(error = "Playback failed. Retry to refresh the stream.") }
+        screenshot("player-error-fullscreen")
         compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
         waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.error == null }
         compose.runOnUiThread { assertFalse(activity.model.controller.value!!.playWhenReady) }
         showControls()
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
-        waitFor { compose.onAllNodesWithText("Now playing").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText("Now playing").assertExists()
+        waitFor { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT &&
+            compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("watch-content").assertIsDisplayed()
         compose.onNodeWithContentDescription("Exit full screen").assertDoesNotExist()
         showControls()
         compose.onNodeWithContentDescription("Full screen").assertExists()

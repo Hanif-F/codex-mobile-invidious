@@ -40,7 +40,7 @@ class VideoInformationPresentationTest {
             }
         } }
         compose.onNodeWithText("Unlisted").assertExists()
-        compose.onNodeWithText("Verified channel").assertExists()
+        compose.onNodeWithContentDescription("Verified channel").assertExists()
         compose.onNodeWithText("12.3K subscribers").assertExists()
         compose.onNodeWithTag("video-information-toggle").assertDoesNotExist()
         compose.onNodeWithText("Video details").assertDoesNotExist()

@@ -136,6 +136,7 @@ class DownloadsSmokeTest {
             compose.runOnUiThread { activity.model.refreshBuffer() }
             until { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.position == 2000L }
             assertEquals(1.5f, activity.model.playback.value.speed)
+            captureWatchScreenshot("watch-glass-offline")
             compose.onNodeWithTag("player-surface").performClick()
             compose.onNodeWithContentDescription("Full screen").performClick()
             until { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }

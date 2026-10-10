@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -60,21 +59,22 @@ internal fun rememberChapterPanelState(): ChapterPanelState = rememberSaveable(s
 @Composable
 internal fun ChaptersEntry(chapters: List<VideoChapter>, positionMs: Long, open: () -> Unit) {
     if (chapters.isEmpty()) return
-    ActionRow("Chapters", detail = ChapterRules.current(chapters, positionMs)?.title ?: "${chapters.size} chapters",
-        icon = Icons.Default.FormatListNumbered, trailingIcon = Icons.Default.ExpandLess,
-        modifier = Modifier.testTag("chapters-entry"), actionLabel = "Open chapters", onClick = open)
+    WatchDisclosureRow("Chapters", Icons.Default.FormatListNumbered, Modifier.testTag("chapters-entry"),
+        detail = ChapterRules.current(chapters, positionMs)?.title ?: "${chapters.size} chapters", onClick = open)
 }
 
-/** The title takes only the space available beside the playback time. */
+/** The chapter action truncates inside the top control row without crowding its neighbors. */
 @Composable
 internal fun PlayerChapterTitle(chapters: List<VideoChapter>, positionMs: Long, modifier: Modifier = Modifier, open: () -> Unit) {
     if (chapters.isEmpty()) return
-    Box(modifier.heightIn(min = 48.dp)
+    Row(modifier.heightIn(min = 48.dp)
         .clickable(role = Role.Button, onClickLabel = "Open chapters", onClick = open)
-        .testTag("player-chapter-title").padding(horizontal = 4.dp, vertical = 4.dp), contentAlignment = Alignment.CenterStart) {
+        .testTag("player-chapter-title").padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(ChapterRules.current(chapters, positionMs)?.title ?: "Chapters",
-            Modifier.testTag("player-current-chapter"), color = Color.White, style = MaterialTheme.typography.labelLarge,
+            Modifier.weight(1f).testTag("player-current-chapter"), color = Color.White, style = MaterialTheme.typography.labelMedium,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Icon(Icons.Default.ChevronRight, null, Modifier.size(16.dp), tint = Color.White.copy(alpha = .8f))
     }
 }
 
@@ -88,16 +88,9 @@ internal fun ChaptersPanel(chapters: List<VideoChapter>, positionMs: Long, state
             state.revealed()
         }
     }
-    Surface(modifier.testTag("chapters-panel"), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.FormatListNumbered, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
-                Text("Chapters", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-                Text(chapters.size.toString(), style = MaterialTheme.typography.labelLarge)
-                IconButton(onClick = close) { Icon(Icons.Default.Close, "Close chapters") }
-            }
-            HorizontalDivider()
+    WatchPanelSurface(modifier.testTag("chapters-panel")) {
+            WatchPanelToolbar("Chapters", "Close chapters", close, Icons.Default.FormatListNumbered,
+                detail = "${chapters.size} chapters")
             LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("chapters-list"), state = state.list,
                 contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(chapters, key = VideoChapter::startMs) { chapter ->
@@ -115,7 +108,6 @@ internal fun ChaptersPanel(chapters: List<VideoChapter>, positionMs: Long, state
                     }
                 }
             }
-        }
     }
 }
 

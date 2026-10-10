@@ -108,9 +108,11 @@ class ChaptersSmokeTest {
             val chapter = compose.onNodeWithTag("player-chapter-title").getUnclippedBoundsInRoot()
             val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
             val expand = compose.onNodeWithContentDescription(if (fullscreen) "Exit full screen" else "Full screen").getUnclippedBoundsInRoot()
-            assertTrue(time.top >= timeline.bottom)
-            assertTrue(chapter.top >= timeline.bottom)
-            assertTrue(time.right <= chapter.left && chapter.right <= settings.left && settings.right <= expand.left)
+            val rail = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
+            assertTrue("Time $time must fit in rail $rail", time.top >= rail.top && time.bottom <= rail.bottom)
+            assertTrue("Seek target $timeline must fit in rail $rail", timeline.top >= rail.top && timeline.bottom <= rail.bottom)
+            assertTrue(chapter.bottom < timeline.top)
+            assertTrue(chapter.right <= settings.left && settings.right <= expand.left)
         }
         checkControls(false)
         compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()
@@ -187,22 +189,48 @@ class ChaptersSmokeTest {
         command("sponsorblock", """{"liveNow":true}""")
         incoming("/watch?v=testvideo01&autoplay=0"); ready()
         assertTrue(activity.model.playback.value.details!!.video.live)
+        captureWatchScreenshot("watch-glass-live")
         compose.onNodeWithTag("player-chapter-title").assertDoesNotExist()
         compose.onNodeWithTag("chapters-entry").assertDoesNotExist()
         assertEquals(0, fixture().getJSONArray("chapterAssetRequests").length())
     }
 
     @Test fun pipDismissesTheDrawerAndReturningDoesNotReopenIt() {
-        incoming("/watch?v=testvideo01&autoplay=0"); ready(); chapters()
+        incoming("/watch?v=testvideo01&autoplay=1"); ready(); chapters()
         Assume.assumeTrue(activity.supportsPip())
         ui { activity.enterPip() }
         until { activity.isInPictureInPictureMode }
-        until { compose.onAllNodesWithTag("chapters-panel").fetchSemanticsNodes().isEmpty() }
-        compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        // PiP can detach the entire Compose hierarchy; verify the drawer after returning.
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(
-            "am start --windowingMode 1 -n ${instrumentation.targetContext.packageName}/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task")).use { it.readBytes() }
+        val automation = instrumentation.uiAutomation
+        val info = automation.serviceInfo
+        val originalFlags = info.flags
+        info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+            android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
+        automation.serviceInfo = info
+        automation.waitForIdle(500, 5_000)
+        val bounds = android.graphics.Rect()
+        until { automation.windows.firstOrNull { it.root?.packageName?.toString() == instrumentation.targetContext.packageName }
+            ?.let { it.getBoundsInScreen(bounds); !bounds.isEmpty } == true }
+        captureWatchScreenshot("watch-glass-pip")
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(
+            "input tap ${bounds.centerX()} ${bounds.centerY()} ")).use { it.readBytes() }
+        captureWatchScreenshot("watch-glass-pip-menu")
+        until {
+            fun expand(node: android.view.accessibility.AccessibilityNodeInfo): Boolean {
+                val label = "${node.text?.toString().orEmpty()} ${node.contentDescription?.toString().orEmpty()}".lowercase()
+                if (label.contains("full screen") || label.contains("fullscreen") || label.contains("expand") ||
+                    node.viewIdResourceName?.endsWith("expand_button") == true)
+                    return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+                return (0 until node.childCount).any { index -> node.getChild(index)?.let(::expand) == true }
+            }
+            automation.windows.any { window -> window.root?.takeIf { it.packageName?.toString() == "com.android.systemui" }?.let(::expand) == true }
+        }
         reacquire(); until { !activity.isInPictureInPictureMode }
         compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
+        assertTrue(activity.model.playback.value.playWhenReady)
+        info.flags = originalFlags; automation.serviceInfo = info
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -82,19 +83,29 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
     val fontScale = LocalDensity.current.fontScale
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val author: @Composable (Modifier) -> Unit = { modifier ->
-            Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                ChannelAuthor(server, video.authorAvatar, video.author.ifBlank { "Unknown channel" },
-                    Avatars.show(thinMode, video.channelId), modifier = Modifier.fillMaxWidth(), size = 40.dp, tag = "watch-channel-avatar",
-                    onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
-                if (verified) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(Icons.Default.Verified, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text("Verified channel", style = MaterialTheme.typography.labelSmall)
+            Row(modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) {}
+                .clickable(enabled = ContentVisibility.validChannel(video.channelId), role = Role.Button,
+                    onClickLabel = "Open ${video.author}'s channel") { channel(video.channelId) },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (Avatars.show(thinMode, video.channelId)) ChannelAvatar(server, video.authorAvatar,
+                    video.author, 40.dp, "watch-channel-avatar")
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(video.author.ifBlank { "Unknown channel" }, Modifier.weight(1f, fill = false),
+                            style = MaterialTheme.typography.titleSmall)
+                        if (verified) Icon(Icons.Default.Verified, "Verified channel", Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary)
+                    }
+                    DisplayFormats.subscribers(subscribers).takeIf(String::isNotBlank)?.let { Text(it,
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
-                DisplayFormats.subscribers(subscribers).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             }
         }
         val button: @Composable () -> Unit = {
-            FilledTonalButton(onClick = subscribe) { Text(if (subscribed) "Subscribed" else "Subscribe") }
+            TextButton(onClick = subscribe, modifier = Modifier.heightIn(min = 48.dp).watchGlass(Liquid.pill, prominent = true),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
+                Text(if (subscribed) "Subscribed" else "Subscribe", style = MaterialTheme.typography.labelLarge)
+            }
         }
         if (maxWidth < 360.dp || fontScale > 1.4f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             author(Modifier.fillMaxWidth()); button()

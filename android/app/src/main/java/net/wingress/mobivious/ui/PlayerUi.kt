@@ -1,10 +1,6 @@
 package net.wingress.mobivious.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -16,9 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,7 +21,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -122,15 +115,12 @@ internal fun VideoPlayer(
     }
     LaunchedEffect(feedbackGeneration) { if (feedback != null) { delay(800); feedback = null } }
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
-    BoxWithConstraints(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
+    Box(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
         .onGloballyPositioned {
             inputOrigin = it.positionInRoot()
             val bounds = it.boundsInWindow()
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
-        val playbackOffset = if (maxHeight < 300.dp) (-56).dp else 0.dp
-        val compactPlay = maxHeight < 180.dp || !fullscreen && !settingsOpen && sponsor.active != null
-        val showTimeline = maxHeight >= 96.dp
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
         else playback.details?.video?.let { video ->
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
@@ -191,22 +181,26 @@ internal fun VideoPlayer(
             }
         })
         if (controls) {
-            AnimatedVisibility(visible && chromeVisible, enter = fadeIn(tween(200)), exit = fadeOut(tween(200)), modifier = Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxSize().testTag("player-controls").onFocusChanged { focused = it.hasFocus }.focusGroup()
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .75f))))) {
-                    onCollapse?.let { collapse ->
-                        IconButton(onClick = { vm.cancelAccumulatedSeek(); collapse() }, modifier = Modifier.align(Alignment.TopStart)
-                            .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier).padding(12.dp).mediaGlass(CircleShape)) {
-                            Icon(Icons.Default.KeyboardArrowDown, if (fullscreen) "Return to watch page" else "Minimize player", tint = Color.White)
-                        }
-                    }
-                    Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                        .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom)) else Modifier)
-                        .padding(horizontal = 12.dp, vertical = 10.dp).mediaGlass(Liquid.media).padding(horizontal = 12.dp, vertical = 4.dp)) {
-                        val timelinePosition = scrub?.toLong() ?: playback.position
-                        val sponsorLabels = sponsor.segments.filter { it.start <= timelinePosition && timelinePosition < it.end }
-                            .map { it.category.label }.distinct()
-                        if (showTimeline) Box(Modifier.fillMaxWidth()) {
+            val timelinePosition = scrub?.toLong() ?: playback.position
+            val sponsorLabels = sponsor.segments.filter { it.start <= timelinePosition && timelinePosition < it.end }
+                .map { it.category.label }.distinct()
+            val notice: (@Composable () -> Unit)? = if (!settingsOpen && playback.error == null && !playback.loading &&
+                (sponsor.active != null || sponsor.notice.isNotBlank())) ({
+                PlayerSponsorPrompt(sponsor, { id -> vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, id) },
+                    { id -> vm.sponsorCommand(PlaybackService.SPONSOR_DISMISS, id) })
+            }) else null
+            PlayerControlsLayout(playback, timelinePosition, fullscreen, controller != null,
+                onPlay = { vm.togglePlay(); interact() }, onSeek = ::seek,
+                onSettings = { vm.cancelAccumulatedSeek(); interact(); onSettings() },
+                onFullscreen = { interact(); onFullscreen() },
+                onChapters = { vm.cancelAccumulatedSeek(); interact(); onChapters() },
+                onCollapse = onCollapse?.let { collapse -> { vm.cancelAccumulatedSeek(); collapse() } },
+                onChat = onChat, chatOpen = replay.open, onRetry = { interact(); vm.retryPlayback() }, showControls = visible && chromeVisible,
+                notice = if (chromeVisible) notice else null,
+                modifier = Modifier.then(if (visible && chromeVisible) Modifier.testTag("player-controls") else Modifier)
+                    .onFocusChanged { focused = it.hasFocus }.focusGroup(),
+                timeline = { timelineModifier, trackOffset ->
+                    Box(timelineModifier) {
                             Slider(
                                 value = scrub ?: playback.position.coerceAtMost(playback.duration).toFloat(),
                                 onValueChange = { vm.cancelAccumulatedSeek(); scrub = it; interact() },
@@ -214,11 +208,11 @@ internal fun VideoPlayer(
                                 valueRange = 0f..playback.duration.coerceAtLeast(1).toFloat(),
                                 enabled = playback.seekable && playback.duration > 0 && !playback.loading && playback.error == null,
                                 thumb = {
-                                    Box(Modifier.size(12.dp).clip(CircleShape).background(
+                                    Box(Modifier.offset(y = trackOffset).size(12.dp).clip(CircleShape).background(
                                         if (playback.seekable && !playback.loading && playback.error == null) Color.White else Color.Transparent))
                                 },
                                 track = { slider ->
-                                    Canvas(Modifier.fillMaxWidth().height(3.dp)) {
+                                    Canvas(Modifier.fillMaxWidth().offset(y = trackOffset).height(3.dp)) {
                                         val end = playback.duration.coerceAtLeast(1).toFloat()
                                         fun line(fraction: Float, color: Color) {
                                             if (fraction > 0f) drawLine(color, Offset(0f, size.height / 2), Offset(size.width * fraction.coerceIn(0f, 1f), size.height / 2), size.height, StrokeCap.Round)
@@ -238,112 +232,54 @@ internal fun VideoPlayer(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth().height(48.dp).testTag("player-timeline").semantics {
+                                modifier = Modifier.fillMaxSize().testTag("player-timeline").semantics {
                                     contentDescription = "Playback position"
                                     stateDescription = (listOfNotNull(ChapterRules.current(chapters, timelinePosition)?.title) + sponsorLabels).joinToString(", ")
                                 },
                             )
                             if (scrub != null) PlayerSeekSponsorLabels(sponsorLabels,
                                 Modifier.align(Alignment.TopCenter).offset(y = (-24).dp))
-                        }
-                        PlayerControlFooterWithChat(playback, timelinePosition, fullscreen, controller != null,
-                            onSettings = { vm.cancelAccumulatedSeek(); interact(); onSettings() },
-                            onFullscreen = { interact(); onFullscreen() },
-                            onChapters = { vm.cancelAccumulatedSeek(); interact(); onChapters() }, onChat = onChat, chatOpen = replay.open)
                     }
-                    PlayerPlaybackButton(playback, compactPlay, playbackOffset) { vm.togglePlay(); interact() }
-                }
-            }
-            if (playback.loading || playback.buffering) CircularProgressIndicator(
-                Modifier.align(Alignment.Center).then(if (!playback.loading) Modifier.offset(y = (-52).dp) else Modifier).size(28.dp)
-                    .semantics { contentDescription = if (playback.loading) "Loading video" else "Buffering" }, color = Color.White, strokeWidth = 2.dp)
-            playback.error?.let { error ->
-                Column(Modifier.align(Alignment.Center).padding(start = 16.dp, end = 16.dp, bottom = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(error, color = Color.White, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    FilledTonalButton(onClick = { interact(); vm.retryPlayback() }) { Text("Retry") }
-                }
-            }
-            feedback?.let { Text(it, Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = .8f), CircleShape).padding(16.dp)
+                })
+            feedback?.let { Text(it, Modifier.align(Alignment.Center).mediaGlass().padding(16.dp)
                 .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White) }
             pendingSeek?.let { pending ->
                 Column(Modifier.align(if (pending.offset < 0) Alignment.CenterStart else Alignment.CenterEnd)
-                    .fillMaxWidth(1f / 3f).background(Color.Black.copy(alpha = .65f), CircleShape).padding(vertical = 20.dp)
+                    .fillMaxWidth(1f / 3f).mediaGlass(Liquid.card).padding(vertical = 20.dp)
                     .testTag("pending-seek").semantics { liveRegion = LiveRegionMode.Polite }, horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(if (pending.offset < 0) Icons.Default.FastRewind else Icons.Default.FastForward, null, tint = Color.White)
                     Text("${if (pending.offset < 0) "−" else "+"}${kotlin.math.abs(pending.offset) / 1000} seconds", color = Color.White,
                         style = MaterialTheme.typography.labelLarge)
                 }
             }
-            if (!settingsOpen && playback.error == null && !playback.loading) {
-                Column(Modifier.align(Alignment.TopStart)
-                    .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top)) else Modifier)
-                    .padding(8.dp).widthIn(max = 460.dp)) {
-                    sponsor.active?.let { active ->
-                        Row(Modifier.background(Color.Black.copy(alpha = .85f)).testTag("sponsorblock-prompt"), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                Text("${active.category.label} · ${sponsor.remaining}s", color = Color.White, style = MaterialTheme.typography.labelMedium)
-                                if (sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.testTag("sponsorblock-notice").semantics { liveRegion = LiveRegionMode.Polite },
-                                    color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            FilledTonalButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, active.id) }) { Text("Skip") }
-                            IconButton(onClick = { vm.sponsorCommand(PlaybackService.SPONSOR_DISMISS, active.id) }) { Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", tint = Color.White) }
-                        }
-                    }
-                    if (sponsor.active == null && sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.background(Color.Black.copy(alpha = .85f)).padding(8.dp).testTag("sponsorblock-notice")
-                        .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
+
         }
     }
 }
 
 @Composable
-internal fun BoxScope.PlayerPlaybackButton(playback: PlaybackState, compact: Boolean, verticalOffset: androidx.compose.ui.unit.Dp = 0.dp, play: () -> Unit) {
-    if (playback.loading || playback.error != null) return
-    IconButton(onClick = play, enabled = playback.canPlay,
-        modifier = Modifier.align(Alignment.Center).offset(y = verticalOffset).size(if (compact) 48.dp else 64.dp)
-            .testTag("player-play-pause").mediaGlass(CircleShape)) {
-        val ended = playback.playerState == Player.STATE_ENDED
-        Icon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
-            if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play",
-            Modifier.size(if (compact) 32.dp else 40.dp), tint = Color.White)
-    }
-}
-
-@Composable
-internal fun PlayerControlFooter(playback: PlaybackState, positionMs: Long, fullscreen: Boolean, settingsEnabled: Boolean,
-    onSettings: () -> Unit, onFullscreen: () -> Unit, onChapters: () -> Unit) {
-    PlayerControlFooterWithChat(playback, positionMs, fullscreen, settingsEnabled, onSettings, onFullscreen, onChapters)
-}
-
-@Composable
-internal fun PlayerControlFooterWithChat(playback: PlaybackState, positionMs: Long, fullscreen: Boolean, settingsEnabled: Boolean,
-    onSettings: () -> Unit, onFullscreen: () -> Unit, onChapters: () -> Unit, onChat: (() -> Unit)? = null, chatOpen: Boolean = false) {
-    val chapters = playback.chapters
-    Row(Modifier.fillMaxWidth().testTag("player-footer"), verticalAlignment = Alignment.CenterVertically) {
-        // Measure the fixed icon targets first; long timestamps must leave a clickable chapter target.
-        BoxWithConstraints(Modifier.weight(1f)) {
-            val timeWidth = if (chapters.isEmpty()) maxWidth else (maxWidth - 56.dp).coerceAtLeast(0.dp)
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("${playerTime(positionMs)} / ${if (playback.live) "LIVE" else if (playback.duration > 0) playerTime(playback.duration) else "—"}",
-                    Modifier.widthIn(max = timeWidth)
-                        .testTag("player-time"), color = Color.White, style = MaterialTheme.typography.labelLarge,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (chapters.isNotEmpty()) PlayerChapterTitle(chapters, positionMs, Modifier.weight(1f).padding(start = 8.dp), onChapters)
-            }
+internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -> Unit, dismiss: (String) -> Unit) {
+    val active = sponsor.active
+    Row(Modifier.fillMaxWidth().mediaGlass(Liquid.card).testTag("sponsorblock-prompt"),
+        verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(start = 14.dp, top = 8.dp, bottom = 8.dp)) {
+            if (active != null) Text("${active.category.label} · ${sponsor.remaining}s", color = Color.White,
+                style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.testTag("sponsorblock-notice")
+                .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White,
+                style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (onChat != null && playback.clip == null && playback.details?.chatAvailable == true && !playback.live) IconButton(onClick = onChat,
-            modifier = Modifier.testTag("player-chat").semantics { selected = chatOpen }) { Icon(Icons.AutoMirrored.Filled.Chat, if (chatOpen) "Hide chat replay" else "Show chat replay", tint = Color.White) }
-        IconButton(onClick = onSettings, enabled = settingsEnabled) { Icon(Icons.Default.Settings, "Player settings", tint = Color.White) }
-        IconButton(onClick = onFullscreen) { Icon(if (fullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
-            if (fullscreen) "Exit full screen" else "Full screen", tint = Color.White) }
+        if (active != null) {
+            TextButton(onClick = { skip(active.id) }) { Text("Skip", color = Color.White) }
+            IconButton(onClick = { dismiss(active.id) }) { Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", tint = Color.White) }
+        }
     }
 }
 
 @Composable
 internal fun PlayerSeekSponsorLabels(labels: List<String>, modifier: Modifier = Modifier) {
     if (labels.isEmpty()) return
-    Text(labels.joinToString(", "), modifier.background(Color.Black.copy(alpha = .85f)).padding(4.dp).testTag("player-seek-sponsor-labels"),
+    Text(labels.joinToString(", "), modifier.mediaGlass().padding(horizontal = 10.dp, vertical = 4.dp).testTag("player-seek-sponsor-labels"),
         color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
@@ -380,13 +316,10 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     fun back() { if (page == "Player settings") dismiss() else page = "Player settings" }
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheetState, sheetMaxWidth = 640.dp) {
         BackHandler { back() }
-        Column(Modifier.fillMaxWidth().heightIn(max = sheetHeight)) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (page != "Player settings") IconButton(onClick = { page = "Player settings" }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to player settings") }
-                Text(page, Modifier.weight(1f).padding(horizontal = 12.dp), style = MaterialTheme.typography.titleLarge)
-                IconButton(onClick = dismiss) { Icon(Icons.Default.Close, "Close player settings") }
-            }
-            HorizontalDivider()
+        WatchGlassScene(Modifier.fillMaxWidth()) {
+          Column(Modifier.fillMaxWidth().heightIn(max = sheetHeight)) {
+            WatchPanelToolbar(page, "Close player settings", dismiss, Icons.Default.Settings,
+                backLabel = "Back to player settings", back = if (page != "Player settings") ({ page = "Player settings" }) else null)
             LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).testTag("player-settings-list"), contentPadding = PaddingValues(bottom = 16.dp)) {
                 if (page == "Player settings") {
                     item { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
@@ -427,7 +360,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     }
                 }
             }
-        }
+        } }
     }
 }
 

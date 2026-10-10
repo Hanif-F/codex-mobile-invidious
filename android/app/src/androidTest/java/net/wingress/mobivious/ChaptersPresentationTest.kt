@@ -83,10 +83,10 @@ class ChaptersPresentationTest {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalLayoutDirection provides LayoutDirection.Rtl) {
                 val state = rememberChapterPanelState()
                 Column(Modifier.width(320.dp).height(600.dp)) {
-                    PlayerControlFooter(PlaybackState(details = VideoDetails(Video("abcdefghijk", "Video", "Studio", duration = 20),
+                    PlayerControlHeader(PlaybackState(details = VideoDetails(Video("abcdefghijk", "Video", "Studio", duration = 20),
                         entries.joinToString("\n") { "${playerTime(it.startMs)} ${it.title}" }, "", "", "", emptyList(), emptyList()),
                         mediaId = "abcdefghijk", duration = 20000),
-                        5000, false, true, {}, {}) { state.show(entries, 5000) }
+                        5000, false, true, {}, {}, { state.show(entries, 5000) })
                     PlayerSeekSponsorLabels(listOf("Sponsor", "Intro"))
                     ChaptersPanel(entries, 5000, state, true, state::close, { selected = it }, Modifier.weight(1f))
                 }

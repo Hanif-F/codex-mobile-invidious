@@ -70,7 +70,7 @@ class ContentLinksSmokeTest {
         incoming("/watch?v=testvideo01&extend_desc=1&autoplay=0")
         ready()
         compose.onNodeWithTag("watch-description-text").assertTextContains("Rich description", substring = true)
-        compose.onNodeWithText("Verified channel").assertExists()
+        compose.onNodeWithContentDescription("Verified channel").assertExists()
         val key = activity.model.queue.value.currentKey
         ui { activity.model.openContent(ContentLinks.resolve("/watch?v=testvideo01&t=30", activity.model.store.server, "testvideo01")!!) }
         until { activity.model.playback.value.position == 30000L }

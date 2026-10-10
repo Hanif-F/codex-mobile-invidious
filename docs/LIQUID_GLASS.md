@@ -7,6 +7,8 @@ appearance of this design; there is no theme collection or legacy-design switch.
 ## Apple references
 
 - [Liquid Glass technology overview](https://developer.apple.com/documentation/TechnologyOverviews/liquid-glass)
+- [Build a SwiftUI app with the new design, WWDC 2025](https://developer.apple.com/videos/play/wwdc2025/219/):
+  material hierarchy, legibility over media, and avoiding stacked glass.
 - [Meet Liquid Glass, WWDC 2025](https://developer.apple.com/videos/play/wwdc2025/284/):
   the Music mini-player accessory at 2:49 and Maps custom controls at 19:15.
 - [Apple's iOS 26 app examples](https://www.apple.com/newsroom/2025/06/apple-elevates-the-iphone-experience-with-ios-26/):
@@ -36,6 +38,32 @@ Download, Share and More form the primary action row. More contains Create clip
 and DeArrow title contributions. On wide displays, metadata and comments sit
 beside the video. Native portrait, square, landscape and ultrawide geometry is
 preserved. The mini-player floats above navigation while browsing.
+
+## Expanded watch
+
+The watch page records its own background independently of its controls. A subtle
+blurred thumbnail wash fades into the page; thin mode, unavailable artwork and
+offline playback use a neutral wash. `WatchGlassUi.kt` owns the background,
+refractive materials, disclosure rows and panel toolbars. It never records the
+glass into the backdrop that glass samples.
+
+Save, Download, Share and More use evenly spaced 56dp circles, reducing to 48dp
+on narrow layouts. Accessible names, disabled states and long-press tooltips
+remain available. The title wraps at 20sp semibold, verification sits beside the
+channel name, and Subscribe uses a glass pill. Comments, Description, Chapters
+and Chat replay share disclosure styling. Description expands inline; comments
+remain below the picture. Reading areas and lists stay on quiet surfaces.
+
+`PlayerControlsUi.kt` measures the top controls, notices and shallow timeline
+rail. Play/Pause/Replay sits at the picture's center between 10-second seek
+buttons when their touch targets fit separately. Short pictures move Play/Pause
+into the rail and retain double-tap seeking. Minimize, chapter title, chat,
+settings and fullscreen live above the picture; exceptionally short layouts
+consolidate controls into the rail. Loading and retry also fit inside the rail.
+The seek track retains buffering, chapter separators, SponsorBlock ranges and
+scrubbing labels. Comments, chapters, chat replay and player settings use glass
+toolbars without turning their reading surfaces into glass cards. Shared
+community comments retain their existing styling through an explicit watch flag.
 
 ## Shared components
 

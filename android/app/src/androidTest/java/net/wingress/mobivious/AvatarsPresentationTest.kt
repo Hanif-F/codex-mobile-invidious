@@ -38,7 +38,7 @@ class AvatarsPresentationTest {
                 }
             }
         }
-        compose.onNodeWithTag("channel-header-avatar", useUnmergedTree = true).assertWidthIsEqualTo(64.dp)
+        compose.onNodeWithTag("channel-header-avatar", useUnmergedTree = true).assertWidthIsEqualTo(72.dp)
         compose.onNodeWithTag("author", useUnmergedTree = true).assertWidthIsEqualTo(32.dp)
         compose.onAllNodesWithText(channel.name).filter(hasClickAction()).assertCountEquals(1)
         compose.onAllNodesWithText(channel.name).filter(hasClickAction())[0].performClick()
