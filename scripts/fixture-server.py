@@ -171,7 +171,7 @@ def community_posts():
 def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
                  subscriptionRequests=[], subscriptionDelayNext=0, failSubscriptionRead=False,
-                 subscriptionStatsMode='full', subscriptionStats={},
+                 subscriptionStatsMode='full', subscriptionStats={}, subscriptionWriteDelayNext=0, failSubscriptionWrite=False,
                  discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False, discoveryCategories=False)
 reset_home_subscriptions()
 
@@ -805,7 +805,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':
-            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'discoveryDelayNext', 'discoveryDistinct'):
+            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'subscriptionWriteDelayNext', 'failSubscriptionWrite', 'discoveryDelayNext', 'discoveryDistinct'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/discovery-search':
@@ -871,6 +871,10 @@ class Handler(BaseHTTPRequestHandler):
         if p.startswith('/api/v1/auth/subscriptions/'):
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
             id = p.rsplit('/', 1)[-1]
+            state['events'].append(dict(action='channel-subscribe' if self.command == 'POST' else 'channel-unsubscribe', channel=id))
+            delay = state['subscriptionWriteDelayNext']; state['subscriptionWriteDelayNext'] = 0
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            if state['failSubscriptionWrite']: return self.respond(dict(error='Fixture subscription update failed; retry'), 503)
             if self.command == 'POST' and all(c['authorId'] != id for c in state['subscriptionChannels']):
                 state['subscriptionChannels'].append(dict(authorId=id, author=video['author'], authorThumbnails=video['authorThumbnails']))
             elif self.command == 'DELETE':

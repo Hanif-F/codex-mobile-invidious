@@ -188,27 +188,27 @@ internal fun PlayerPresentationHost(
                 fullscreen = state.fullscreen, controls = !pip && state.watch, settingsOpen = modal,
                 presentation = state.mode, drag = drag,
                 gesturesEnabled = !pip && !modal && !chatSettings && !chatOverlayEditor.editing.value && (!state.active || state.dragging) && lifecycleState.isAtLeast(Lifecycle.State.RESUMED),
-                chromeVisible = !state.active, gestureKey = windowSize to occurrence,
+                chromeVisible = !state.active && !chatOverlayEditor.editing.value, gestureKey = windowSize to occurrence,
                 onCollapse = collapse, onRestore = restore, onDismiss = close,
                 onFullscreen = fullscreen, onSettings = settings, onChapters = chapters, onChat = chat,
-                surfaceAlpha = if (dismissing) 1f - state.fraction else 1f)
-            if (chatVisible && replay.open && !state.active) {
-                if (appearance.overlay) {
+                surfaceAlpha = if (dismissing) 1f - state.fraction else 1f,
+                pictureOverlay = {
+                  if (chatVisible && replay.open && !state.active && appearance.overlay) {
                     // Anchor normalized geometry to the fitted picture, excluding letterbox bars.
                     val ratio = playback.geometry.ratio ?: 16f / 9f
                     val fittedWidth = minOf(rect.width, rect.height * ratio)
                     val fittedHeight = minOf(rect.height, rect.width / ratio)
-                    ChatOverlay(vm, Modifier.offset { IntOffset((rect.left + (rect.width - fittedWidth) / 2).roundToInt(),
-                        (rect.top + (rect.height - fittedHeight) / 2).roundToInt()) }
+                    ChatOverlay(vm, Modifier.offset { IntOffset(((rect.width - fittedWidth) / 2).roundToInt(),
+                        ((rect.height - fittedHeight) / 2).roundToInt()) }
                         .size(with(density) { fittedWidth.toDp() }, with(density) { fittedHeight.toDp() }),
                         settings = { chatSettings = true }, editor = chatOverlayEditor)
-                }
-                else if (state.fullscreen) {
+                  }
+                })
+            if (chatVisible && replay.open && !state.active && !appearance.overlay && state.fullscreen) {
                     val side = full.width > full.height
                     ChatReplayPanel(vm, Modifier.offset { IntOffset(if (side) rect.right.roundToInt() else 0, if (side) 0 else rect.bottom.roundToInt()) }
                         .size(with(density) { (if (side) full.width - rect.width else full.width).toDp() },
                             with(density) { (if (side) full.height else full.height - rect.height).toDp() }), { chatSettings = true })
-                }
             }
             if (chatSettings && chatVisible && replay.open) ChatSettings(vm) { chatSettings = false }
         }

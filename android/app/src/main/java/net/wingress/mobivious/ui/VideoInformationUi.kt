@@ -102,12 +102,12 @@ internal fun VideoInformation(details: VideoDetails, occurrence: String, server:
 @Composable
 internal fun LinkResolutionDialog(state: LinkResolutionState, retry: () -> Unit, external: (String) -> Unit, dismiss: () -> Unit) {
     if (state.link == null) return
-    AlertDialog(onDismissRequest = dismiss, title = { Text("Open channel") }, text = {
+    AlertDialog(onDismissRequest = dismiss, containerColor = MaterialTheme.colorScheme.surfaceContainer, title = { Text("Open channel") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.loading) { CircularProgressIndicator(); Text("Resolving channel…") }
             else Text(state.error ?: "This channel could not be resolved.")
         }
-    }, confirmButton = { if (!state.loading) TextButton(onClick = retry) { Text("Retry") } }, dismissButton = {
+    }, confirmButton = { if (!state.loading) LibraryControlScene { LibraryActionButton("Retry", prominent = true, onClick = retry) } }, dismissButton = {
         Row { if (!state.loading) TextButton(onClick = { external(state.link.resolveUrl); dismiss() }) { Text("Open externally") }
             TextButton(onClick = dismiss) { Text("Cancel") } }
     })

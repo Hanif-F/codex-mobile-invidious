@@ -7,9 +7,9 @@ appearance of this design; there is no theme collection or legacy-design switch.
 ## Apple references
 
 - [Liquid Glass technology overview](https://developer.apple.com/documentation/TechnologyOverviews/liquid-glass)
-- [Build a SwiftUI app with the new design, WWDC 2025](https://developer.apple.com/videos/play/wwdc2025/219/):
+- [Build a SwiftUI app with the new design, WWDC 2025](https://developer.apple.com/videos/play/wwdc2025/323/):
   material hierarchy, legibility over media, and avoiding stacked glass.
-- [Meet Liquid Glass, WWDC 2025](https://developer.apple.com/videos/play/wwdc2025/284/):
+- [Meet Liquid Glass, WWDC 2025](https://developer.apple.com/videos/play/wwdc2025/219/):
   the Music mini-player accessory at 2:49 and Maps custom controls at 19:15.
 - [Apple's iOS 26 app examples](https://www.apple.com/newsroom/2025/06/apple-elevates-the-iphone-experience-with-ios-26/):
   floating navigation and content-first layouts in Music, Safari and Photos.
@@ -47,7 +47,7 @@ and scoped search. Channels uses a continuous directory with quiet separators,
 40dp avatars, viewing statistics and a matching-channel count. Local search,
 saved sorting and the statistics fallback remain independent of presentation.
 
-`BrowseGlassUi.kt` records scrolling content separately from sibling floating
+`BrowseGlassUi.kt` measures its toolbar before composing content in the same layout pass, avoiding a first-frame content jump. It records scrolling content separately from sibling floating
 search, tab and sort controls. Measured toolbar height sets the initial list
 padding, while scrolling artwork and rows can pass behind the glass. The shell
 continues to own the dock, sidebar and mini-player. No glass control samples the
@@ -66,6 +66,67 @@ Channel descriptions, RSS/OPML and SponsorBlock panels use floating glass
 toolbars over quiet scrolling bodies. Private-feed warnings, file operations,
 rich links and settings semantics remain intact. Presentation and journey tests
 save screenshots under `/data/local/tmp/mobivious-subscriptions-glass/`.
+
+## You and library
+
+You is a dashboard with an open identity and four glass launchers: Playlists,
+My Clips, History and Downloads. Guests see every destination, with contextual
+sign-in on account pages and immediate access to local downloads. Launchers use
+one column on phones and two at content widths of 600dp or more with ordinary
+text sizes. Settings remains in You’s toolbar; account management remains in
+Settings.
+
+Playlists has My playlists/Subscribed segments and a New playlist control.
+Segments retain independent positions; browse snapshots restore the segment and
+position after details and global search. Account/instance changes clear this
+state. Library lists remain continuous and centered at a maximum of 800dp.
+Playlist details put artwork, the full title and metadata above glass playback
+and subscription actions. History retains its date groups and older-server
+fallback, with scoped search and clearing actions in its floating toolbar.
+
+Downloads show local artwork, status, progress and actionable failures. Play,
+Retry and Cancel stay accessible; Details expands track information, and the
+per-entry menu owns Save to files and Delete. The Android file picker and export
+conversion consent retain their existing behavior. Clip details and editing use
+the same material language while preserving preview ownership and trimming.
+
+`LibraryGlassUi.kt` provides library toolbars, action buttons, confirmations and
+scrolling phone/centered wide panels. Dashboard controls sample a separate
+background-only radial wash. Floating page/panel toolbars sample separately
+recorded scrolling bodies, using measured header padding. Glass never samples
+its own recording or a video decoding surface. Forms and reading surfaces stay
+quiet. Large text stacks controls and clip timestamp fields; reduced transparency
+uses the shared opaque fallback. Presentation/journey captures are written to
+`/data/local/tmp/mobivious-library-glass/`.
+
+## Discovery, settings and account flows
+
+Discover and global search now own pinned glass toolbars, with moving selection
+feedback and quiet feed content below them. Country selection and search filters
+use the shared adaptive panel. Settings keeps forms and reading surfaces quiet,
+centers content up to 800dp, and floats its toolbar above scrolling preferences.
+Save remains accessible above system navigation and the keyboard. Authentication,
+account sessions, token creation, DeArrow contributions and chat settings reuse
+the same controls and panels. Password fields have accessible Show/Hide actions;
+secrets remain transient. Community posts and image viewers have floating
+navigation, and post comments share the watch comments presentation. RSS export,
+playlist privacy, clip completion, queue recovery and SponsorBlock saves also
+use the shared glass actions and segments.
+
+Shared popup menus own a separate background recording within their own window.
+Explicit content colors keep standalone controls readable in both appearances.
+Glass selection feedback uses interruptible springs and observes the system
+animation duration scale. Content choices such as switches, checkboxes and form
+fields retain quiet, legible surfaces; glass is reserved for navigation and actions.
+
+Channel and playlist controls show Subscribe or a checked Subscribed pill.
+Subscribed opens an explicit Unsubscribe menu. Pending operations show
+Subscribing/Unsubscribing and disable repeated writes; failures retain confirmed
+membership and expose an inline error. A missing initial directory shows Checking
+or Check subscription instead of guessing. Confirmed writes invalidate older
+reads, and account/instance changes fence off pending work. Guest channel
+subscription intent completes after sign-in only if needed; canceling sign-in
+clears that intent. Playlist subscriptions keep their existing sign-in continuation.
 
 ## Expanded watch
 
@@ -105,8 +166,7 @@ Watch comments have a floating glass toolbar and a segmented Top/Newest control.
 The reading surface is recorded separately from its sibling glass controls;
 scrolling comments pass behind them without a recursive backdrop. Measured header
 padding keeps the first comment readable. Avatars sit beside comment bodies,
-separators are quiet and replies use lightweight text controls. Community comments
-retain their existing presentation through the explicit watch flag. Chapters,
+separators are quiet and replies use lightweight text controls. Community comments use the same floating toolbar and quiet reading presentation. Chapters,
 chat replay and settings keep their existing glass toolbars and quiet lists.
 
 ## Shared components
@@ -132,7 +192,9 @@ itself: recorded content receives a null backdrop. This prevents render cycles.
 
 Media3 retains its decoding SurfaceView and service ownership. Video overlays
 use dark translucent plates and do not read back the decoding surface. This
-preserves fullscreen, PiP, background playback and aspect ratios.
+preserves fullscreen, PiP, background playback and aspect ratios. Chat overlays
+sit below playback chrome so they cannot intercept fullscreen and seek controls.
+Overlay adjustment temporarily hides playback chrome so drag handles stay usable.
 
 Appearance → Reduce transparency is a local, device-wide accessibility setting.
 It replaces sampled materials with opaque plates. Software rendering also falls

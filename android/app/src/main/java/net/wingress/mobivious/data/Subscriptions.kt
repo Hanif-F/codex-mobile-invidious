@@ -62,7 +62,8 @@ data class SubscriptionDirectory(val channels: List<Channel>, val stats: Map<Str
 data class SubscriptionChannelsState(val context: ApiContext? = null, val channels: List<Channel> = emptyList(),
     val loaded: Boolean = false, val loading: Boolean = false, val error: String? = null, val query: String = "",
     val stats: Map<String, SubscriptionStats> = emptyMap(), val sort: SubscriptionSort = SubscriptionSort.RELEVANCE,
-    val unavailableReason: String? = null) {
+    val unavailableReason: String? = null, val busy: Set<String> = emptySet(),
+    val actionErrors: Map<String, String> = emptyMap()) {
     val effectiveSort: SubscriptionSort get() = if (unavailableReason == null) sort else SubscriptionSort.ALPHABETICAL
     val matches: List<Channel>
         get() {
@@ -81,16 +82,18 @@ data class SubscriptionChannelsState(val context: ApiContext? = null, val channe
 class SubscriptionsController(private val scope: CoroutineScope, private val context: () -> ApiContext,
     private val fetch: suspend (ApiContext) -> SubscriptionDirectory, private val errorMessage: (Exception) -> String,
     private val readSort: (ApiContext) -> SubscriptionSort = { SubscriptionSort.RELEVANCE },
-    private val saveSort: (ApiContext, SubscriptionSort) -> Unit = { _, _ -> }) {
+    private val saveSort: (ApiContext, SubscriptionSort) -> Unit = { _, _ -> },
+    private val write: suspend (String, Boolean, ApiContext) -> Unit = { _, _, _ -> }) {
     private val mutableState = MutableStateFlow(SubscriptionChannelsState())
     val state = mutableState.asStateFlow()
     private var job: Job? = null
     private var revision = 0L
+    private val writes = mutableMapOf<String, Job>()
 
     fun reset() {
         val current = context()
         if (mutableState.value.context == current) return
-        job?.cancel(); revision++
+        job?.cancel(); writes.values.forEach { it.cancel() }; writes.clear(); revision++
         mutableState.value = SubscriptionChannelsState(context = current, loaded = current.account == null, sort = readSort(current))
     }
 
@@ -123,6 +126,35 @@ class SubscriptionsController(private val scope: CoroutineScope, private val con
             catch (e: Exception) {
                 if (current == context() && ticket == revision) mutableState.value = mutableState.value.copy(
                     loading = false, error = errorMessage(e))
+            }
+        }
+    }
+
+    /** Membership changes only after confirmation; repeated taps cannot send a second write. */
+    fun toggle(channel: Channel) {
+        reset()
+        val current = context()
+        val state = mutableState.value
+        if (current.account == null || channel.id in state.busy) return
+        if (!state.loaded) { refresh(); return }
+        val subscribe = state.channels.none { it.id == channel.id }
+        mutableState.value = state.copy(busy = state.busy + channel.id, actionErrors = state.actionErrors - channel.id)
+        writes[channel.id] = scope.launch {
+            try {
+                write(channel.id, subscribe, current)
+                if (current != context()) return@launch
+                // A read started before this write must never replace its confirmed result.
+                job?.cancel(); revision++
+                val latest = mutableState.value
+                mutableState.value = latest.copy(channels = if (subscribe) latest.channels.filterNot { it.id == channel.id } + channel
+                    else latest.channels.filterNot { it.id == channel.id }, loading = false)
+                refresh()
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (current == context()) mutableState.value = mutableState.value.copy(
+                    actionErrors = mutableState.value.actionErrors + (channel.id to errorMessage(e)))
+            } finally {
+                if (current == context()) mutableState.value = mutableState.value.copy(busy = mutableState.value.busy - channel.id)
             }
         }
     }

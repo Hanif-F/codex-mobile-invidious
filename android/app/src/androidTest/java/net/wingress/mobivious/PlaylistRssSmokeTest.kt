@@ -44,7 +44,10 @@ class PlaylistRssSmokeTest {
             vm.playlists.value.any { it.id == source.id && it.saved } }
         compose.runOnUiThread { vm.navigate("You") }
         until { !vm.browse.value.loading }
+        compose.onNodeWithTag("you-playlists").performClick()
+        until { vm.route == "playlists" && !vm.browse.value.loading }
         compose.onNodeWithText("My playlists (1)").assertExists()
+        compose.onNodeWithTag("playlist-section-subscribed").performClick()
         compose.onNodeWithText("Subscribed playlists (1)").assertExists()
     }
 
@@ -55,9 +58,12 @@ class PlaylistRssSmokeTest {
         until { vm.playlists.value.any { it.id == source.id && it.saved } }
         compose.runOnUiThread { vm.navigate("You") }
         until { !vm.browse.value.loading }
+        compose.onNodeWithTag("you-playlists").performClick()
+        until { vm.route == "playlists" && !vm.browse.value.loading }
         compose.onNodeWithText("My playlists (1)").assertExists()
+        compose.onNodeWithTag("playlist-section-subscribed").performClick()
         compose.onNodeWithText("Subscribed playlists (1)").assertExists()
-        compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("playlist-card-IVother"))
+        compose.onNodeWithTag("playlist-library-list").performScrollToNode(hasTestTag("playlist-card-IVother"))
         compose.onNodeWithTag("playlist-card-IVother").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
         until { vm.playlist.value?.id == source.id && !vm.browse.value.loading }
         compose.onNodeWithTag("playlist-actions-IVother").performScrollTo().performClick()
@@ -86,12 +92,16 @@ class PlaylistRssSmokeTest {
         until { vm.playlists.value.any { it.id == source.id && it.saved } }
         compose.runOnUiThread { vm.navigate("You") }
         until { !vm.browse.value.loading }
-        compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("playlist-subscribe-IVother"))
+        compose.onNodeWithTag("you-playlists").performClick()
+        until { vm.route == "playlists" && !vm.browse.value.loading }
+        compose.onNodeWithTag("playlist-section-subscribed").performClick()
+        compose.onNodeWithTag("playlist-library-list").performScrollToNode(hasTestTag("playlist-subscribe-IVother"))
         compose.onNodeWithTag("playlist-subscribe-IVother").performClick()
+        compose.onNodeWithTag("subscription-unsubscribe").performClick()
         until { vm.playlists.value.none { it.id == source.id } }
         assertNull(vm.playlist.value)
         assertEquals("You", vm.tab)
-        assertEquals("", vm.route)
+        assertEquals("playlists", vm.route)
     }
 
     @Test fun ownedPlaylistDeletionStillRequiresConfirmation() {

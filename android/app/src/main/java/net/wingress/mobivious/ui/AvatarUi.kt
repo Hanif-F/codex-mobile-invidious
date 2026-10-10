@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,8 +80,10 @@ internal fun ChannelAuthor(server: String, image: String, name: String,
 
 @Composable
 internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolean, subscribed: Boolean,
-    subscribe: () -> Unit, channel: (String) -> Unit, verified: Boolean = false, subscribers: String = "") {
+    subscribe: () -> Unit, channel: (String) -> Unit, verified: Boolean = false, subscribers: String = "",
+    subscriptionBusy: Boolean = false, subscriptionKnown: Boolean = true, subscriptionChecking: Boolean = false, subscriptionError: String? = null) {
     val fontScale = LocalDensity.current.fontScale
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val author: @Composable (Modifier) -> Unit = { modifier ->
             Row(modifier.heightIn(min = 48.dp).semantics(mergeDescendants = true) {}
@@ -102,10 +105,8 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
             }
         }
         val button: @Composable () -> Unit = {
-            TextButton(onClick = subscribe, modifier = Modifier.heightIn(min = 48.dp).watchGlass(Liquid.pill, prominent = true),
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp)) {
-                Text(if (subscribed) "Subscribed" else "Subscribe", style = MaterialTheme.typography.labelLarge)
-            }
+            SubscriptionControl(subscribed, subscribe, busy = subscriptionBusy, known = subscriptionKnown,
+                checking = subscriptionChecking, watch = true, resetKey = listOf(server, video.channelId))
         }
         if (maxWidth < 360.dp || fontScale > 1.4f) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             author(Modifier.fillMaxWidth()); button()
@@ -113,11 +114,16 @@ internal fun WatchChannelIdentity(video: Video, server: String, thinMode: Boolea
             author(Modifier.weight(1f)); button()
         }
     }
+    subscriptionError?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall,
+        modifier = Modifier.semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) }
+    }
 }
 
 @Composable
 internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, subscribed: Boolean,
-    actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {}, subscribe: () -> Unit) {
+    actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {},
+    subscriptionBusy: Boolean = false, subscriptionKnown: Boolean = true, subscriptionChecking: Boolean = false,
+    subscriptionError: String? = null, subscribe: () -> Unit) {
     var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
     BrowseArtworkSurface(if (thinMode || bannerFailed) null else ChannelImages.url(server, channel.banner)) {
         Column(Modifier.fillMaxWidth().padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -152,8 +158,8 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
                 Text(channel.description, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
                 TextButton(onClick = readDescription, modifier = Modifier.testTag("channel-description-open")) { Text("Read full description") }
             }
-            TextButton(onClick = subscribe, modifier = Modifier.heightIn(min = 48.dp).browseGlass(prominent = true),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)) { Text(if (subscribed) "Subscribed" else "Subscribe") }
+            SubscriptionControl(subscribed, subscribe, busy = subscriptionBusy, known = subscriptionKnown,
+                checking = subscriptionChecking, error = subscriptionError, resetKey = listOf(server, channel.id))
         }
     }
 }

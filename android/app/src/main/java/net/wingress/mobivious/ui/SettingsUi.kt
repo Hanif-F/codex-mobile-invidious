@@ -19,6 +19,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -26,7 +32,11 @@ import net.wingress.mobivious.BuildConfig
 import net.wingress.mobivious.data.*
 import org.json.JSONObject
 
-@OptIn(ExperimentalMaterial3Api::class)
+internal val LocalSettingsTopInset = staticCompositionLocalOf { 0.dp }
+
+@Composable
+internal fun settingsPadding(horizontal: Dp = Liquid.inset) = PaddingValues(start = horizontal, end = horizontal, top = LocalSettingsTopInset.current + 16.dp, bottom = 32.dp)
+
 @Composable
 internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -> Unit, back: () -> Unit, signIn: () -> Unit, openChannel: (String) -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
@@ -44,37 +54,41 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
         return
     }
     BackHandler { if (!saving && !accountBusy) back() }
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = {
-        LiquidTopBar(page, large = page == "Settings", navigation = {
-            GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back from $page", enabled = !saving && !accountBusy, onClick = back)
-        })
-    }) { padding ->
-        key(page, context) {
-            when (page) {
-                "Settings" -> LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings-root"), contentPadding = PaddingValues(horizontal = Liquid.inset, vertical = 12.dp)) {
-                    item { Text(account?.let { "Signed in as ${it.username}" } ?: "Preferences for this device and instance", Modifier.padding(horizontal = 20.dp, vertical = 12.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                    item { SectionHeading("Your account") }
-                    item { SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate) }
-                    item { SectionHeading("Preferences") }
-                    item { SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate) }
-                    item { SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate) }
-                    item { SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate) }
-                    item { SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate) }
-                    item { SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate) }
-                    item { SectionHeading("Community tools") }
-                    item { SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate) }
-                    item { SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate) }
-                    item { SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate) }
-                    item { SectionHeading("Connection & app") }
-                    item { SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate) }
-                    item { SettingsLink("About", "Version and community data", Icons.Default.Info, navigate) }
+    BrowseGlassSurface(Modifier.fillMaxSize().imePadding(), softEdge = true, toolbar = {
+        LibraryToolbar(page, large = page == "Settings", back = back,
+            backLabel = "Back from $page", backEnabled = !saving && !accountBusy)
+    }) { body, top ->
+        Box(body, contentAlignment = Alignment.TopCenter) {
+          CompositionLocalProvider(LocalSettingsTopInset provides top) {
+            val content = Modifier.widthIn(max = 800.dp).fillMaxSize()
+            key(page, context) {
+                when (page) {
+                    "Settings" -> LazyColumn(content.testTag("settings-root"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        item { Text(account?.let { "Signed in as ${it.username}" } ?: "Preferences for this device and instance", Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                        item { SectionHeading("Your account") }
+                        item { SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate) }
+                        item { SectionHeading("Preferences") }
+                        item { SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate) }
+                        item { SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate) }
+                        item { SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate) }
+                        item { SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate) }
+                        item { SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate) }
+                        item { SectionHeading("Community tools") }
+                        item { SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate) }
+                        item { SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate) }
+                        item { SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate) }
+                        item { SectionHeading("Connection & app") }
+                        item { SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate) }
+                        item { SettingsLink("About", "Version and community data", Icons.Default.Info, navigate) }
+                    }
+                    "Server" -> ServerSettingsScreen(vm, content, back)
+                    "About" -> AboutSettingsScreen(content)
+                    "Blocked channels" -> BlockedChannelsScreen(vm, content, signIn, openChannel)
+                    in accountSettingsPages -> AccountSettingsContent(vm, page, content, navigate, signIn)
+                    else -> PreferenceSettingsScreen(vm, page, prefs, content, back, signIn, navigate) { saving = it }
                 }
-                "Server" -> ServerSettingsScreen(vm, Modifier.padding(padding), back)
-                "About" -> AboutSettingsScreen(Modifier.padding(padding))
-                "Blocked channels" -> BlockedChannelsScreen(vm, Modifier.padding(padding), signIn, openChannel)
-                in accountSettingsPages -> AccountSettingsContent(vm, page, Modifier.padding(padding), navigate, signIn)
-                else -> PreferenceSettingsScreen(vm, page, prefs, Modifier.padding(padding), back, signIn, navigate) { saving = it }
             }
+          }
         }
     }
 }
@@ -104,8 +118,11 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     fun update(next: AccountPreferences) { draft = next.json().toString(); error = null }
     val accountOnly = page == "Subscriptions"
     val valid = (!accountOnly || account != null) && (page != "Browsing" || Regex("[A-Z]{2}").matches(value.region)) && (page != "Subscriptions" || value.maxResults in 1..1500)
-    Column(modifier.fillMaxSize().imePadding().testTag("settings-category")) {
-        LazyColumn(Modifier.weight(1f).fillMaxWidth().testTag("settings-list"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val density = LocalDensity.current
+    var footerHeight by remember { mutableStateOf(100.dp) }
+    Box(modifier.fillMaxSize().testTag("settings-category")) {
+        LazyColumn(Modifier.fillMaxSize().testTag("settings-list"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset,
+            top = LocalSettingsTopInset.current + 16.dp, bottom = footerHeight + 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             item { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             when (page) {
                 "AI channel filter" -> {
@@ -195,7 +212,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     }
                 }
                 "Subscriptions" -> {
-                    if (account == null) item { Text("Sign in to change your subscription feed."); Button(onClick = signIn) { Text("Sign in") } }
+                    if (account == null) item { LibraryEmptyState("Your subscription feed", "Sign in to change your subscription feed.", Icons.Default.Subscriptions, "Sign in", signIn) }
                     else item {
                         SettingsChoice("Videos per page", (listOf(10, 20, 30, 40, 60, 100, 200, 500, 1000, 1500) + value.maxResults).distinct().sorted().map { it.toString() to it.toString() }, value.maxResults.toString(), !busy) { update(value.copy(maxResults = it.toInt())) }
                         SettingsChoice("Feed sorting", PreferenceRules.feedSorts.zip(listOf("Newest first", "Oldest first", "Title A–Z", "Title Z–A", "Channel A–Z", "Channel Z–A")), value.feedSort, !busy) { update(value.copy(feedSort = it)) }
@@ -224,19 +241,25 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                 }
             }
         }
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("settings-save-error")) }
-        HorizontalDivider()
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = back, enabled = !busy) { Text("Cancel") }
-            Button(onClick = {
-                busy = true; onBusy(true); error = null
-                scope.launch {
-                    try { vm.savePreferences(value, AccountPreferences.parse(JSONObject(baseline)), context); back() }
-                    catch (e: CancellationException) { throw e }
-                    catch (e: Exception) { error = e.message ?: "Could not save settings. Your changes are still here." }
-                    finally { busy = false; onBusy(false) }
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            .onSizeChanged { footerHeight = with(density) { it.height.toDp() } }
+            .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.surface)))
+            .navigationBarsPadding().padding(horizontal = Liquid.inset, vertical = 12.dp)) {
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("settings-save-error")) }
+            LibraryControlScene {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = back, enabled = !busy) { Text("Cancel") }
+                    LibraryActionButton(if (busy) "Saving…" else "Save", Modifier.testTag("settings-save"), enabled = !busy && valid, prominent = true, onClick = {
+                        busy = true; onBusy(true); error = null
+                        scope.launch {
+                            try { vm.savePreferences(value, AccountPreferences.parse(JSONObject(baseline)), context); back() }
+                            catch (e: CancellationException) { throw e }
+                            catch (e: Exception) { error = e.message ?: "Could not save settings. Your changes are still here." }
+                            finally { busy = false; onBusy(false) }
+                        }
+                    })
                 }
-            }, enabled = !busy && valid, modifier = Modifier.testTag("settings-save")) { Text(if (busy) "Saving…" else "Save") }
+            }
         }
     }
 }
@@ -283,17 +306,17 @@ private fun SettingsChoice(label: String, choices: List<Pair<String, String>>, s
 private fun ServerSettingsScreen(vm: AppViewModel, modifier: Modifier, back: () -> Unit) {
     var address by rememberSaveable { mutableStateOf(vm.store.server) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
-    LazyColumn(modifier.fillMaxSize().imePadding(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(modifier.fillMaxSize().imePadding(), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Your app and website share the same server and account. Changing servers signs you out.") }
         item { OutlinedTextField(address, { address = it; error = null }, label = { Text("HTTPS address") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth(), isError = error != null) }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { Button(onClick = { try { vm.switchServer(InvidiousApi.normalizeServer(address, BuildConfig.DEBUG)); back() } catch (e: Exception) { error = e.message } }) { Text("Connect") } }
+        item { LibraryControlScene { LibraryActionButton("Connect", prominent = true) { try { vm.switchServer(InvidiousApi.normalizeServer(address, BuildConfig.DEBUG)); back() } catch (e: Exception) { error = e.message } } } }
     }
 }
 
 @Composable
 private fun AboutSettingsScreen(modifier: Modifier) {
-    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { Text("Mobivious ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall); Text("Powered by Invidious & Companion", Modifier.padding(top = 8.dp)) }
         item { CommunityDataLinks() }
         item {

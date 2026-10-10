@@ -42,14 +42,14 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val enabled = !state.busy && !state.loading
-    ModalBottomSheet(onDismissRequest = vm::dismissSave, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        LazyColumn(Modifier.fillMaxWidth().testTag("save-playlist-sheet"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            item { Text("Save to playlist", style = MaterialTheme.typography.titleLarge); Text(state.video?.title.orEmpty()) }
-            if (account == null) item { Text("Sign in to save this video."); Button(onClick = signIn) { Text("Sign in") } }
+    LibraryPanel("Save to playlist", vm::dismissSave, enabled = !state.busy) { modifier, top ->
+        LazyColumn(modifier.testTag("save-playlist-sheet"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            item { Text(state.video?.title.orEmpty(), style = MaterialTheme.typography.titleMedium) }
+            if (account == null) item { Text("Sign in to save this video."); LibraryActionButton("Sign in", prominent = true, onClick = signIn) }
             else {
                 if (state.loading || state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("save-playlist-error")) } }
-                if (state.created != null) item { Button(onClick = { vm.saveVideo(state.created) }, enabled = enabled) { Text("Retry saving to ${state.created!!.title}") } }
+                if (state.created != null) item { LibraryActionButton("Retry saving to ${state.created!!.title}", enabled = enabled, onClick = { vm.saveVideo(state.created) }) }
                 if (state.lists.isEmpty() && !state.loading) item { Text("No personal playlists yet. Create one below.") }
                 items(state.lists, key = { it.id }) { list ->
                     ActionRow(list.title, modifier = Modifier.testTag("save-playlist-${list.id}"),
@@ -57,17 +57,18 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
                         icon = Icons.Default.VideoLibrary, trailingIcon = Icons.AutoMirrored.Filled.PlaylistAdd,
                         enabled = enabled, actionLabel = "Save to ${list.title}") { vm.saveVideo(list) }
                 }
-                item { OutlinedButton(onClick = vm::loadSaveLists, enabled = enabled) { Text("Reload playlists") }; HorizontalDivider() }
+                item { LibraryActionButton("Reload playlists", enabled = enabled, onClick = vm::loadSaveLists); HorizontalDivider() }
                 item {
                     Text("Create and save", style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(state.title, { vm.editSave(it, state.privacy) }, label = { Text("Playlist title") }, singleLine = true, enabled = enabled && state.created == null,
                         modifier = Modifier.fillMaxWidth().testTag("save-playlist-title"))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("private", "unlisted", "public").forEach { privacy -> FilterChip(selected = state.privacy == privacy, onClick = { vm.editSave(state.title, privacy) },
-                            enabled = enabled && state.created == null, label = { Text(privacy.replaceFirstChar { it.uppercase() }) }) }
+                    LibraryControlScene(Modifier.padding(vertical = 8.dp)) {
+                        BrowseTabs(listOf("private", "unlisted", "public"), state.privacy,
+                            { it.replaceFirstChar { c -> c.uppercase() } }, { "save-privacy-$it" },
+                            enabled = enabled && state.created == null, select = { vm.editSave(state.title, it) })
                     }
-                    Button(onClick = { vm.saveVideo() }, enabled = enabled && state.title.isNotBlank() && state.created == null,
-                        modifier = Modifier.testTag("create-and-save")) { Text("Create and save") }
+                    BrowseArtworkSurface(null) { LibraryActionButton("Create and save", Modifier.testTag("create-and-save"), enabled = enabled && state.title.isNotBlank() && state.created == null,
+                        prominent = true) { vm.saveVideo() } }
                 }
             }
             item { TextButton(onClick = vm::dismissSave, enabled = !state.busy) { Text("Cancel") } }

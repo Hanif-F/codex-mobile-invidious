@@ -132,7 +132,11 @@ class NavigationHubSmokeTest {
         compose.onNodeWithTag("you-clips").performClick()
         until { vm.route == "clips" && !vm.browse.value.loading }
         back()
-        compose.onNodeWithTag("you-library-list").performScrollToNode(hasText("Subscribed playlists (0)"))
+        compose.onNodeWithTag("you-playlists").performClick()
+        until { vm.route == "playlists" && !vm.browse.value.loading }
+        compose.onNodeWithTag("playlist-section-subscribed").performClick()
+        compose.onNodeWithText("Subscribed playlists (0)").assertIsDisplayed()
+        back()
         compose.waitForIdle()
         val position = vm.browse.value.position
         tab("Popular"); tab("You")
@@ -144,6 +148,25 @@ class NavigationHubSmokeTest {
         screenshot("account-settings")
         back(); screenshot("settings-root"); back()
         assertEquals(position, vm.browse.value.position)
+    }
+
+    @Test fun guestLibraryDestinationsReturnFromAuthenticationAndKeepDownloadsPublic() {
+        tab("You")
+        for (route in listOf("playlists", "history", "clips")) {
+            compose.onNodeWithTag("you-$route").performScrollTo().performClick()
+            until { vm.route == route && !vm.browse.value.loading }
+            compose.onNodeWithText("Sign in", substring = false).performClick()
+            compose.onNodeWithTag("sign-in-screen").assertExists()
+            back()
+            assertEquals(route, vm.route)
+            back()
+            compose.onNodeWithTag("you-guest").assertExists()
+        }
+        compose.onNodeWithTag("you-downloads").performScrollTo().performClick()
+        compose.onNodeWithTag("downloads-page").assertExists()
+        assertNull(vm.account.value)
+        back()
+        compose.onNodeWithTag("global-settings").assertIsDisplayed()
     }
 
     @Test fun guestAuthenticationBackReturnsToYouOrTheSettingsAccountPage() {
@@ -220,38 +243,37 @@ class NavigationHubSmokeTest {
         }
     }
 
-    @Test fun savingFeedSettingsFromTheLibraryKeepsItsScrollPosition() {
+    @Test fun playlistSegmentsKeepTheirOwnPositionsAcrossDetailsAndGlobalSearch() {
         login()
         compose.runOnUiThread { vm.action {
-            repeat(8) { vm.api.createPlaylist("Saved playlist ${it + 1}", "private") }
+            repeat(12) { vm.api.createPlaylist("Saved playlist ${it + 1}", "private") }
             vm.refreshAccount()
         } }
-        until { vm.playlists.value.count { it.owned } == 8 }
-        compose.onNodeWithTag("you-library-list").performScrollToIndex(7)
+        until { vm.playlists.value.count { it.owned } == 12 }
+        compose.onNodeWithTag("you-playlists").performClick()
+        until { vm.route == "playlists" && !vm.browse.value.loading }
+        // An interior row keeps this check independent of metadata changing the maximum scroll range.
+        compose.onNodeWithTag("playlist-library-list").performScrollToIndex(2)
+        until { vm.browse.value.position.index > 0 }
         compose.waitForIdle()
         val position = vm.browse.value.position
-        assertTrue(position.index > 0)
-        compose.openAppSettings()
-        compose.onNodeWithText("Browsing", substring = false).performScrollTo().performClick()
-        compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("settings-region"))
-        compose.onNodeWithTag("settings-region").performClick()
-        compose.onNodeWithTag("region-search").performTextReplacement("ID")
-        compose.onNodeWithTag("region-ID").performClick()
-        compose.onNodeWithTag("settings-save").performClick()
-        until { vm.preferences.value.region == "ID" }
-        compose.onNodeWithTag("settings-root").assertExists()
+        compose.onNodeWithTag("playlist-section-subscribed").performClick()
+        compose.onNodeWithText("Subscribed playlists (0)").assertIsDisplayed()
+        compose.onNodeWithTag("playlist-section-owned").performClick()
+        compose.waitForIdle()
+        assertEquals("Playlist segment restores its settled position", position, vm.browse.value.position)
+        compose.openGlobalSearch()
+        compose.onNodeWithContentDescription("Close search").performClick()
+        until { vm.route == "playlists" && vm.browse.value.position == position }
+        assertEquals("owned", vm.playlistLibrarySection.value)
+        val playlist = vm.playlists.value.first { it.owned }
+        compose.runOnUiThread { vm.openPlaylist(playlist) }
+        until { vm.playlist.value?.id == playlist.id && !vm.browse.value.loading }
         back()
-        assertEquals("You", vm.tab)
-        assertEquals(position, vm.browse.value.position)
-        tab("Trending")
-        compose.onNodeWithText("Trending in ID").assertExists()
-        compose.runOnUiThread {
-            val before = vm.preferences.value
-            vm.action { vm.savePreferences(before.copy(region = "JP"), before, vm.api.context()) }
-        }
-        until { vm.preferences.value.region == "JP" && !vm.browse.value.loading }
-        tab("You")
-        assertEquals(position, vm.browse.value.position)
+        until { vm.route == "playlists" && !vm.browse.value.loading }
+        compose.waitForIdle()
+        assertEquals("Playlist detail restores the library position", position, vm.browse.value.position)
+        screenshot("playlists-scrolled-restored")
     }
 
     @Test fun libraryAndFeedPresentationAdaptToThemesLargeTextNarrowAndLandscapeScreens() {

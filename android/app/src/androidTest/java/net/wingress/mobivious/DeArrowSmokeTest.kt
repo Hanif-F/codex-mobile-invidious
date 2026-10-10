@@ -106,7 +106,8 @@ class DeArrowSmokeTest {
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("video-card-testvideo01"))).performClick()
         until { activity.model.channel.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
-        compose.onNodeWithText("You").performClick()
+        compose.onNodeWithTag("navigation-You").performClick()
+        compose.onNodeWithTag("you-playlists").performClick()
         until { compose.onAllNodesWithText("DeArrow fixture playlist").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("DeArrow fixture playlist").performClick()
         until { activity.model.playlist.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
@@ -127,7 +128,7 @@ class DeArrowSmokeTest {
         compose.onNodeWithText("Another calm scene").assertExists()
         compose.navigateBack()
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 } // playlist card and mini-player
-        compose.onNodeWithText("You").performClick(); compose.onNodeWithText("Watch history").performClick()
+        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("you-history").performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 }
         val watchedAfter = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }

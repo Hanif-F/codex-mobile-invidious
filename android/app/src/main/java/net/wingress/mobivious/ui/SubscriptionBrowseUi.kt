@@ -70,7 +70,7 @@ internal fun ChannelBrowseToolbar(channel: Channel?, tab: ChannelTab?, videoSort
             val compactRow = maxWidth >= 360.dp && LocalDensity.current.fontScale <= 1.3f
             val tabs: @Composable (Modifier) -> Unit = { modifier ->
                 BrowseTabs(channel.contentTabs, tab.takeIf { submitted.isBlank() }, { it.label }, { "channel-tab-${it.path}" },
-                    modifier.testTag("channel-tabs"), selectTab)
+                    modifier.testTag("channel-tabs"), select = selectTab)
             }
             val sorting: @Composable () -> Unit = {
                 if (submitted.isBlank()) {

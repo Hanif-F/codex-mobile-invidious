@@ -172,13 +172,13 @@ internal fun WatchPanelToolbar(title: String, closeLabel: String, close: () -> U
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).watchGlass()
         .heightIn(min = 56.dp).padding(start = if (back == null) 16.dp else 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (back != null) IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) }
+        if (back != null) IconButton(onClick = back, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) }
         else Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
             Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
             detail?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         actions()
-        IconButton(onClick = close) { Icon(Icons.Default.Close, closeLabel) }
+        IconButton(onClick = close, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, closeLabel) }
     }
 }

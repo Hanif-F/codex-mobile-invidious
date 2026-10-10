@@ -69,7 +69,7 @@ internal fun VideoPlayer(
     gesturesEnabled: Boolean = true, chromeVisible: Boolean = true, gestureKey: Any? = null,
     onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
-    onChat: (() -> Unit)? = null,
+    onChat: (() -> Unit)? = null, pictureOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val current by rememberUpdatedState(playback)
@@ -180,6 +180,9 @@ internal fun VideoPlayer(
                     CustomAccessibilityAction("Dismiss player") { onDismiss?.invoke(); true })
             }
         })
+        // Picture overlays stay above the decoder and gestures, below playback controls.
+        // An overlay covering the footer must not intercept fullscreen or seeking taps.
+        pictureOverlay()
         if (controls) {
             val timelinePosition = scrub?.toLong() ?: playback.position
             val sponsorLabels = sponsor.segments.filter { it.start <= timelinePosition && timelinePosition < it.end }

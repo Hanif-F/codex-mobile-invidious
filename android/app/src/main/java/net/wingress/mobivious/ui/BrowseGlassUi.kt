@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
@@ -35,6 +36,8 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.unit.constrainHeight
 import coil.compose.AsyncImage
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -45,21 +48,32 @@ import com.kyant.backdrop.effects.vibrancy
 
 /** The content recording and the chrome that samples it are siblings, never ancestors. */
 @Composable
-internal fun BrowseGlassSurface(modifier: Modifier = Modifier, enabled: Boolean = true,
+internal fun BrowseGlassSurface(modifier: Modifier = Modifier, enabled: Boolean = true, softEdge: Boolean = false,
     toolbar: @Composable () -> Unit, content: @Composable (Modifier, Dp) -> Unit) {
     if (!enabled) { content(modifier, 0.dp); return }
     val backdrop = rememberLayerBackdrop()
-    val density = LocalDensity.current
-    var toolbarHeight by remember { mutableStateOf(0.dp) }
     val surface = MaterialTheme.colorScheme.surface
-    Box(modifier.background(surface)) {
-        CompositionLocalProvider(LocalGlassBackdrop provides null) {
-            content(Modifier.fillMaxSize().layerBackdrop(backdrop), toolbarHeight + 8.dp)
-        }
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
-            Column(Modifier.fillMaxWidth().onSizeChanged { toolbarHeight = with(density) { it.height.toDp() } }
-                .background(Brush.verticalGradient(0f to surface, .75f to surface.copy(alpha = .98f), 1f to Color.Transparent))
-                .padding(bottom = 12.dp).testTag("browse-glass-toolbar"), horizontalAlignment = Alignment.CenterHorizontally) { toolbar() }
+    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        // Measure chrome before composing the list so its first frame already has the right inset.
+        SubcomposeLayout(modifier.background(surface)) { constraints ->
+            val chrome = subcompose("toolbar") {
+                CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
+                    Column(Modifier.fillMaxWidth()
+                        .background(Brush.verticalGradient(0f to surface.copy(alpha = if (softEdge) .98f else 1f),
+                            .75f to surface.copy(alpha = if (softEdge) .94f else .98f), 1f to Color.Transparent))
+                        .padding(bottom = 12.dp).testTag("browse-glass-toolbar"), horizontalAlignment = Alignment.CenterHorizontally) { toolbar() }
+                }
+            }.single().measure(constraints.copy(minHeight = 0))
+            val body = subcompose("content") {
+                CompositionLocalProvider(LocalGlassBackdrop provides null) {
+                    content(Modifier.fillMaxSize().layerBackdrop(backdrop), chrome.height.toDp() + 8.dp)
+                }
+            }.map { it.measure(constraints) }
+            layout(constraints.constrainWidth(maxOf(chrome.width, body.maxOfOrNull { it.width } ?: 0)),
+                constraints.constrainHeight(body.maxOfOrNull { it.height } ?: chrome.height)) {
+                body.forEach { it.placeRelative(0, 0) }
+                chrome.placeRelative(0, 0)
+            }
         }
     }
 }
@@ -139,15 +153,16 @@ internal fun BrowsePanelToolbar(title: String, closeLabel: String, close: () -> 
 
 @Composable
 internal fun <T> BrowseTabs(options: List<T>, selected: T?, label: (T) -> String,
-    tag: (T) -> String, modifier: Modifier = Modifier, select: (T) -> Unit) {
+    tag: (T) -> String, modifier: Modifier = Modifier, enabled: Boolean = true, available: (T) -> Boolean = { true }, select: (T) -> Unit) {
     Row(modifier.browseGlass().horizontalScroll(rememberScrollState()).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option ->
             val active = option == selected
             Box(Modifier.clip(Liquid.pill).background(if (active) MaterialTheme.colorScheme.primary.copy(alpha = .12f) else Color.Transparent)
-                .heightIn(min = 48.dp).selectable(active, role = Role.Tab, onClick = { select(option) }).testTag(tag(option))
+                .heightIn(min = 48.dp).selectable(active, enabled = enabled && available(option), role = Role.Tab, onClick = { select(option) }).testTag(tag(option))
                 .padding(horizontal = 16.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
                 Text(label(option), style = MaterialTheme.typography.labelLarge,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    color = if (!enabled || !available(option)) MaterialTheme.colorScheme.onSurface.copy(alpha = .38f)
+                        else if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -163,7 +178,7 @@ internal fun <T> BrowseSortMenu(options: List<T>, selected: T, label: (T) -> Str
             Text("Sort: ${label(selected)}", Modifier.weight(1f, fill = false))
             Icon(Icons.Default.ExpandMore, null, Modifier.padding(start = 8.dp))
         }
-        DropdownMenu(expanded, { expanded = false }) {
+        GlassDropdownMenu(expanded, { expanded = false }) {
             options.forEach { option -> DropdownMenuItem(text = { Text(label(option)) }, enabled = available(option),
                 leadingIcon = { if (option == selected) Icon(Icons.Default.Check, null) },
                 modifier = Modifier.testTag(optionTag(option)).semantics { this.selected = option == selected },

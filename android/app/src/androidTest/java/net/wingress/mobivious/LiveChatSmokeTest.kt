@@ -282,6 +282,9 @@ class LiveChatSmokeTest {
         screenshot("overlay")
         compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()
         until { compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot().let { it.right - it.left > it.bottom - it.top } }
+        // The overlay must not intercept the ordinary fullscreen button's physical tap.
+        until { compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isNotEmpty() }
+        screenshot("overlay-entered-fullscreen")
         val surface = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
         val overlay = compose.onNodeWithTag("chat-overlay").getUnclippedBoundsInRoot()
         assertTrue(overlay.left >= surface.left && overlay.right <= surface.right && overlay.top >= surface.top && overlay.bottom <= surface.bottom)
@@ -291,6 +294,8 @@ class LiveChatSmokeTest {
         compose.onNodeWithTag("chat-overlay-save").performClick()
         assertTrue(activity.model.chatAppearance.value.x < saved.x)
         assertEquals(10_000L, activity.model.playback.value.position); assertFalse(activity.model.playback.value.playWhenReady)
+        until { compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isNotEmpty() }
+        screenshot("overlay-after-fullscreen-adjustment")
         compose.onNodeWithContentDescription("Exit full screen").assertExists()
     }
     @Test fun filtersAndTimingSaveForGuestsAndSurviveRecreation() {

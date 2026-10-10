@@ -63,8 +63,10 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Channel subscriptions, a subscription feed and a searchable channel directory
   sorted by Relevance, Latest upload, Most watched or A–Z, with upload and viewing
   details. The choice is saved on this device for each instance.
-- A **You** hub for your identity, owned/subscribed playlists, clips, and searchable
-  watch history, with account management in **Settings → Account**.
+- A **You** dashboard for your identity and dedicated Playlists, My Clips, History
+  and Downloads pages, with floating Liquid Glass controls. Playlists separates
+  owned and subscribed collections; watch history supports scoped search. Account
+  management lives in **Settings → Account**.
 - Watched indicators and saved playback positions.
 - RSS links, subscription OPML exports and private playlist Atom exports.
 - **Clips:** use the watch page’s **More → Create clip** action to create public 5–120 second moments with a title, precise timestamps,
@@ -73,7 +75,7 @@ An `OK` result confirms the APK matches the supplied checksum.
   clip-relative timeline, loop, share or copy the permalink, continue the full
   video at the same scene, and delete your own clips.
 - **Downloads:** choose a separate video track, audio track, or both, with optional
-  captions. Each saved copy appears in **You → Downloaded**, available to guests
+  captions. Each saved copy appears in **You → Downloads**, available to guests
   and signed-in users. Repeated downloads create separate entries; Retry repairs
   the existing entry. Saved artwork and media play offline through the usual
   player. Downloads may use mobile data and remain available after sign-out or

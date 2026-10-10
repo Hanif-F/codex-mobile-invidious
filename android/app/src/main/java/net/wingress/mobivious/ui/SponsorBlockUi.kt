@@ -113,7 +113,7 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                                 }
                                 OutlinedTextField(color, { global = global.copy(colors = global.colors + (category to it)); edited = true }, label = { Text("${category.label} color (#RRGGBB)") },
                                     singleLine = true, enabled = !busy, isError = !SponsorBlockRules.validColor(color), modifier = Modifier.fillMaxWidth())
-                                OutlinedButton(onClick = { global = global.copy(colors = global.colors + (category to category.color)); edited = true }, enabled = !busy) { Text("Restore default color") }
+                                TextButton(onClick = { global = global.copy(colors = global.colors + (category to category.color)); edited = true }, enabled = !busy) { Text("Restore default color") }
                             }
                         }
                         item {
@@ -126,7 +126,7 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                             item {
                                 Text("Channel settings override global settings. Use global follows future global changes. Colors remain global.")
                                 OutlinedTextField(input, { input = it }, label = { Text("Channel ID or /channel/UC… URL") }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
-                                Button(enabled = !busy, onClick = { val id = SponsorBlockRules.channelId(input); if (id == null) error = "Enter a valid channel ID or /channel/UC… URL." else navigate("Channel SponsorBlock settings", id) }) { Text("Edit channel settings") }
+                                LibraryActionButton("Edit channel settings", enabled = !busy, onClick = { val id = SponsorBlockRules.channelId(input); if (id == null) error = "Enter a valid channel ID or /channel/UC… URL." else navigate("Channel SponsorBlock settings", id) })
                                 if (prefs.sponsorBlock.channels.isEmpty()) Text("No channel overrides yet.")
                             }
                             items(prefs.sponsorBlock.channels.toList().sortedBy { it.second.name.lowercase() }, key = { it.first }) { (id, saved) -> ActionRow(saved.name, modifier = Modifier.testTag("sponsor-configured-channel-$id"), detail = "Channel SponsorBlock settings", enabled = !busy) { navigate("Channel SponsorBlock settings", id) } }
@@ -154,10 +154,12 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
             }
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("sponsorblock-save-error")) }
             if (page != "Configured channels") {
-                HorizontalDivider()
-                FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (page == "Channel SponsorBlock settings") OutlinedButton(onClick = { save(true) }, enabled = !busy && !loading) { Text("Reset to global") }
-                    Button(onClick = { save() }, enabled = !busy && !loading && (page != "Global SponsorBlock settings" || global.colors.values.all(SponsorBlockRules::validColor))) { Text(if (busy) "Saving…" else "Save") }
+                LibraryControlScene(Modifier.fillMaxWidth()) {
+                    FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (page == "Channel SponsorBlock settings") LibraryActionButton("Reset to global", enabled = !busy && !loading) { save(true) }
+                        LibraryActionButton(if (busy) "Saving…" else "Save", prominent = true,
+                            enabled = !busy && !loading && (page != "Global SponsorBlock settings" || global.colors.values.all(SponsorBlockRules::validColor))) { save() }
+                    }
                 }
             }
         }

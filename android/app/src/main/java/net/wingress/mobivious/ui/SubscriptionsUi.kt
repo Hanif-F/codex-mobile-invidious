@@ -55,7 +55,7 @@ internal fun SubscriptionChannelsScreen(state: SubscriptionChannelsState, server
                 state.error?.let { error -> item {
                     Card(Modifier.fillMaxWidth().padding(16.dp).testTag("subscription-channels-error"),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
-                        Column(Modifier.padding(16.dp)) { Text(error); OutlinedButton(onClick = refresh) { Text("Retry") } }
+                        Column(Modifier.padding(16.dp)) { Text(error); LibraryActionButton("Retry", onClick = refresh) }
                     }
                 } }
                 items(matches, key = { it.id }) { channel ->

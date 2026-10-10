@@ -14,6 +14,16 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+
+/** Popups own a quiet recording source instead of sampling another window. */
+@Composable
+internal fun GlassDropdownMenu(expanded: Boolean, dismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    DropdownMenu(expanded, dismiss, shape = Liquid.card, containerColor = Color.Transparent,
+        tonalElevation = 0.dp, shadowElevation = 0.dp) {
+        LibraryControlScene { Column(Modifier.browseGlass(Liquid.card).padding(vertical = 4.dp), content = content) }
+    }
+}
 
 /** Reset open menus when their entity/account changes; callers close before dispatching actions. */
 @Composable
@@ -24,7 +34,7 @@ internal fun OverflowMenu(description: String, resetKey: Any?, modifier: Modifie
         IconButton(onClick = { expanded = true }, modifier = modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) {
             Icon(Icons.Default.MoreVert, description)
         }
-        DropdownMenu(expanded, { expanded = false }) { content { expanded = false } }
+        GlassDropdownMenu(expanded, { expanded = false }) { content { expanded = false } }
     }
 }
 
@@ -51,7 +61,7 @@ internal fun DropdownChoiceRow(label: String, choices: List<Pair<String, String>
     Box {
         ActionRow(label, modifier = modifier, detail = choices.firstOrNull { it.first == selected }?.second ?: selected,
             trailingIcon = Icons.Default.ArrowDropDown, enabled = enabled, actionLabel = "Choose $label") { expanded = true }
-        DropdownMenu(expanded && enabled, { expanded = false }) {
+        GlassDropdownMenu(expanded && enabled, { expanded = false }) {
             choices.forEach { (value, name) ->
                 DropdownMenuItem(text = { Text(name) }, modifier = Modifier.semantics { this.selected = value == selected },
                     leadingIcon = { if (value == selected) Icon(Icons.Default.Check, null) },

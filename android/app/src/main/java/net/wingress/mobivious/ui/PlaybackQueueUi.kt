@@ -87,7 +87,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
         if (expanded) visible.indexOfFirst { it.key == state.currentKey }.takeIf { it >= 0 }?.let { list.scrollToItem(it) }
     }
     Surface(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("playback-queue"),
-        shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceContainer) {
+        shape = Liquid.card, color = MaterialTheme.colorScheme.surfaceContainer) {
         Column {
             ActionRow(state.source?.title?.ifBlank { "Playback queue" } ?: "Playback queue",
                 detail = currentTitle?.let { "Now playing · $it" }, icon = Icons.AutoMirrored.Filled.PlaylistPlay,
@@ -112,12 +112,9 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
                         }
                         Text("Repeat", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
                     }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        QueueRepeat.entries.forEach { value ->
-                            FilterChip(selected = state.repeat == value, onClick = { repeat(value) },
-                                enabled = value != QueueRepeat.ALL || state.source?.mix != true,
-                                label = { Text(value.label) }, modifier = Modifier.testTag("queue-repeat-${value.name}"))
-                        }
+                    LibraryControlScene {
+                        BrowseTabs(QueueRepeat.entries, state.repeat, { it.label }, { "queue-repeat-${it.name}" },
+                            available = { it != QueueRepeat.ALL || state.source?.mix != true }, select = repeat)
                     }
                 }
               }
@@ -125,8 +122,8 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
             // Status and recovery remain accessible even if the user collapsed the list.
             if (state.loading || state.sourceLoading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("queue-loading"))
             if (state.error != null || state.sourceError != null) Column(Modifier.padding(12.dp)) {
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(retry) { Text("Retry playback") } }
-                state.sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(more) { Text("Retry queue") } }
+                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryActionButton("Retry playback", onClick = retry) }
+                state.sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryActionButton("Retry queue", onClick = more) }
             }
             AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
                 exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
@@ -135,8 +132,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
                 if (visible.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().heightIn(max = 288.dp).testTag("playback-queue-items"), state = list) {
                     items(visible, key = { it.key }) { entry -> row(entry) }
                 }
-                if (!state.sourceComplete && !state.sourceLoading) OutlinedButton(more, enabled = !state.loading,
-                    modifier = Modifier.fillMaxWidth().padding(12.dp)) { Text("Load more queue items") }
+                if (!state.sourceComplete && !state.sourceLoading) LibraryActionButton("Load more queue items", Modifier.fillMaxWidth().padding(12.dp), enabled = !state.loading, onClick = more)
               }
             }
         }

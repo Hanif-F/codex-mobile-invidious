@@ -109,7 +109,7 @@ internal fun postShareIntent(server: String, post: CommunityPost): Intent = Inte
 
 @Composable
 internal fun PostExpansionButton(key: String, expanded: Boolean, toggle: () -> Unit) {
-    OutlinedButton(onClick = toggle, modifier = Modifier.heightIn(min = 48.dp).testTag("post-expand-$key")) {
+    TextButton(onClick = toggle, modifier = Modifier.heightIn(min = 48.dp).testTag("post-expand-$key")) {
         Text(if (expanded) "Show less" else "Read more")
     }
 }
@@ -130,19 +130,17 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
                 Icon(Icons.Default.Share, "Share post")
             }
         }
-        FilledTonalButton(onClick = comments, enabled = validId && ContentVisibility.validChannel(post.channelId),
-            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("post-comments-${post.key}")) {
-            Icon(Icons.Default.ChatBubbleOutline, null, Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(post.commentCount?.let { "Comments (${DisplayFormats.compact(it)})" } ?: "Comments")
-        }
+        LibraryControlScene { LibraryActionButton(post.commentCount?.let { "Comments (${DisplayFormats.compact(it)})" } ?: "Comments",
+            Modifier.fillMaxWidth().testTag("post-comments-${post.key}"), icon = Icons.Default.ChatBubbleOutline,
+            enabled = validId && ContentVisibility.validChannel(post.channelId), onClick = comments) }
     }
 }
 
 @Composable
 internal fun PostDetailScreen(vm: AppViewModel, state: PostDetailState, list: LazyListState, channel: (String) -> Unit,
-    link: (String) -> Unit, play: (Video) -> Unit, playlist: (Playlist) -> Unit, signIn: () -> Unit) {
-    LazyColumn(Modifier.fillMaxSize().testTag("post-detail"), state = list, contentPadding = PaddingValues(bottom = LocalContentBottomInset.current)) {
+    link: (String) -> Unit, play: (Video) -> Unit, playlist: (Playlist) -> Unit, signIn: () -> Unit, back: () -> Unit = {}) {
+    BrowseGlassSurface(Modifier.fillMaxSize(), softEdge = true, toolbar = { LibraryToolbar("Post", back = back) }) { body, top ->
+    LazyColumn(body.testTag("post-detail"), state = list, contentPadding = PaddingValues(top = top, bottom = LocalContentBottomInset.current)) {
         state.post?.let { post ->
             item {
                 CommunityPostCard(vm, post, comments = { vm.openPostComments() }, detail = true,
@@ -154,9 +152,10 @@ internal fun PostDetailScreen(vm: AppViewModel, state: PostDetailState, list: La
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Post unavailable", style = MaterialTheme.typography.titleMedium)
                 Text(error, color = MaterialTheme.colorScheme.error)
-                OutlinedButton(onClick = vm::retryBrowse, modifier = Modifier.testTag("post-retry")) { Text("Retry") }
+                LibraryActionButton("Retry", Modifier.testTag("post-retry"), onClick = vm::retryBrowse)
             }
         } }
+    }
     }
 }
 
@@ -199,12 +198,14 @@ internal fun PostGallery(images: List<PostImage>, server: String, tag: String) {
         val largePager = rememberPagerState(initialPage = pager.currentPage) { images.size }
         Surface(Modifier.fillMaxSize().testTag("post-image-viewer")) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Image ${largePager.currentPage + 1} of ${images.size}", Modifier.weight(1f).padding(16.dp))
-                    IconButton(onClick = { viewer = false }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close image") }
-                }
-                HorizontalPager(largePager, Modifier.weight(1f)) { index ->
-                    PostMediaImage(images[index], server, "Image ${index + 1} of ${images.size}", Modifier.fillMaxSize())
+                BrowseGlassSurface(Modifier.fillMaxSize(), softEdge = true, toolbar = {
+                    LibraryToolbar("Image ${largePager.currentPage + 1} of ${images.size}", statusInset = false, actions = {
+                        IconButton({ viewer = false }, Modifier.size(48.dp).browseGlass(androidx.compose.foundation.shape.CircleShape)) { Icon(Icons.Default.Close, "Close image") }
+                    })
+                }) { body, top ->
+                    HorizontalPager(largePager, body.padding(top = top)) { index ->
+                        PostMediaImage(images[index], server, "Image ${index + 1} of ${images.size}", Modifier.fillMaxSize())
+                    }
                 }
             }
         }

@@ -100,6 +100,7 @@ class LiquidRedesignSmokeTest {
         compose.onNodeWithTag("navigation-Discover").assertDoesNotExist()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
         until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
         screenshot("search-ime")
         compose.onNodeWithTag("main-search").performImeAction()
         until { vm.searchInput.value.submitted == "fixture" && !vm.browse.value.loading }
@@ -145,6 +146,7 @@ class LiquidRedesignSmokeTest {
         compose.onNodeWithTag("global-search").performClick()
         compose.onNodeWithTag("main-search").performClick()
         until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
         compose.onNodeWithTag("player-surface").assertDoesNotExist()
         screenshot("mini-search-ime")
@@ -182,7 +184,8 @@ class LiquidRedesignSmokeTest {
         screenshot("discover-narrow-large-text")
         compose.onNodeWithTag("navigation-You").performClick()
         compose.onNodeWithTag("global-settings").performClick()
-        compose.onNodeWithText("Appearance").performScrollTo().performClick()
+        compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Appearance"))
+        compose.onNodeWithText("Appearance").performClick()
         screenshot("appearance-narrow-large-text")
     }
     @Test fun systemReducedMotionKeepsNavigationAndMinimizationUsable() {

@@ -120,7 +120,7 @@ class DiscoverySearchSmokeTest {
         compose.onNodeWithTag("trending-region").performClick()
         compose.onNodeWithTag("region-search").performTextReplacement("Indonesia")
         compose.onNodeWithTag("region-ID").assertExists(); screenshot("country-picker")
-        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithContentDescription("Cancel").performClick()
     }
 
     @Test fun failedAccountRegionSaveRetainsPreviousSelectionAndCanRetry() {
@@ -173,7 +173,7 @@ class DiscoverySearchSmokeTest {
         assertTrue(channels.isNull("date")); assertTrue(channels.isNull("duration"))
         compose.onNodeWithContentDescription("Search filters").performClick()
         compose.onNodeWithText("Uploaded").assertDoesNotExist(); compose.onNodeWithText("Duration").assertDoesNotExist()
-        compose.onNodeWithText("Cancel").performClick(); screenshot("channel-search")
+        compose.onNodeWithContentDescription("Cancel").performClick(); screenshot("channel-search")
         compose.onNodeWithTag("search-type-video").performClick(); until { !vm.browse.value.loading && vm.searchType.value == SearchType.VIDEOS }
         val videos = requests().last(); assertEquals("week", videos.getJSONArray("date").getString(0)); assertEquals("short", videos.getJSONArray("duration").getString(0))
         assertEquals("views", videos.getString("sort"))

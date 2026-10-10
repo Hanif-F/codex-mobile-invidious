@@ -225,7 +225,8 @@ class DownloadsSmokeTest {
             val filter = android.content.IntentFilter(Intent.ACTION_CREATE_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); addDataType("*/*") }
             val monitor = instrumentation.addMonitor(filter, android.app.Instrumentation.ActivityResult(android.app.Activity.RESULT_OK, Intent().setData(output).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)), true)
             try {
-                compose.onNodeWithTag("downloads-page").performScrollToNode(hasTestTag("download-save-$id"))
+                compose.onNodeWithTag("downloads-page").performScrollToNode(hasTestTag("download-actions-$id"))
+                compose.onNodeWithTag("download-actions-$id").performClick()
                 compose.onNodeWithTag("download-save-$id").performClick()
                 compose.onNodeWithText(label).performClick()
                 until { monitor.hits > 0 && DownloadExportService.state.value.destination == output.toString() && DownloadExportService.state.value.phase in listOf("Saved", "Failed") }

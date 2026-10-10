@@ -156,6 +156,7 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithTag("subscription-channel-$channelId").performClick()
         until { activity.model.channel.value != null && !activity.model.browse.value.loading }
         compose.onNodeWithText("Subscribed", substring = false).performClick()
+        compose.onNodeWithTag("subscription-unsubscribe").performClick()
         until { activity.model.subscriptionChannels.value.channels.isEmpty() && !activity.model.subscriptionChannels.value.loading }
         back(); compose.onNodeWithText("No subscribed channels").assertIsDisplayed()
     }

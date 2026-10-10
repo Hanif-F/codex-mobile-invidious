@@ -7,6 +7,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -125,7 +130,8 @@ internal fun GlassIconButton(icon: ImageVector, description: String, modifier: M
     val scale by animateFloatAsState(if (pressed) .94f else 1f, spring(dampingRatio = .8f), label = "glass-press")
     IconButton(onClick, modifier.graphicsLayer { scaleX = scale; scaleY = scale }.size(48.dp)
         .liquidGlass(CircleShape, prominent), enabled = enabled, interactionSource = interaction) {
-        Icon(icon, description, tint = if (prominent) MaterialTheme.colorScheme.primary else LocalContentColor.current)
+        Icon(icon, description, tint = if (!enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = .38f)
+            else if (prominent) MaterialTheme.colorScheme.primary else LocalContentColor.current)
     }
 }
 
@@ -157,12 +163,19 @@ internal fun SectionHeading(title: String, modifier: Modifier = Modifier, detail
 @Composable
 internal fun <T> LiquidSegments(options: List<T>, selected: T, label: (T) -> String,
     modifier: Modifier = Modifier, tag: (T) -> String = { "" }, select: (T) -> Unit) {
-    Row(modifier.clip(Liquid.pill).background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(4.dp),
+    if (options.isEmpty()) return
+    val position by animateFloatAsState(options.indexOf(selected).coerceAtLeast(0).toFloat(),
+        spring(dampingRatio = .86f, stiffness = 420f), label = "segment-selection")
+    val selection = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
+    Row(modifier.browseGlass().padding(4.dp).selectableGroup().drawBehind {
+        val gap = 4.dp.toPx()
+        val cell = (size.width - gap * (options.size - 1)) / options.size
+        drawRoundRect(selection, Offset(position * (cell + gap), 0f), Size(cell, size.height), CornerRadius(size.height / 2))
+    },
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option ->
             val active = option == selected
-            Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(Liquid.pill)
-                .background(if (active) MaterialTheme.colorScheme.surfaceContainer else Color.Transparent)
+            Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(Liquid.pill)
                 .selectable(active, role = Role.Tab, onClick = { select(option) }).testTag(tag(option))
                 .padding(horizontal = 10.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
                 Text(label(option), style = MaterialTheme.typography.labelLarge,

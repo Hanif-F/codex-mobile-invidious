@@ -302,7 +302,9 @@ class AppSmokeTest {
         compose.navigateBack()
         compose.onNodeWithContentDescription("Pause").assertExists()
         compose.onNodeWithTag("navigation-You").performClick()
-        compose.onNodeWithText("New playlist").performClick()
+        compose.onNodeWithTag("you-playlists").performClick()
+        waitFor { activity.model.route == "playlists" && !activity.model.browse.value.loading }
+        compose.onNodeWithTag("playlist-create").performClick()
         compose.onNodeWithText("Title").performTextInput("Emulator playlist")
         compose.onNodeWithText("Save", useUnmergedTree = true).performClick()
         waitFor { activity.model.playlists.value.any { it.title == "Emulator playlist" } }
@@ -317,7 +319,8 @@ class AppSmokeTest {
         compose.runOnUiThread { activity.model.controller.value!!.pause() }
         assertTrue(fixture().getLong("position") >= 29)
         compose.runOnUiThread { activity.model.controller.value!!.play() }
-        compose.onNodeWithText("A quiet moment · playback fixture").performClick()
+        waitFor { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("mini-player-preview").performClick()
         showControls()
         compose.onNodeWithContentDescription("Player settings").performClick()
         compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Picture in picture"))

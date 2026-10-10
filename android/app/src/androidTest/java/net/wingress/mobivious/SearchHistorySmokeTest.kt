@@ -154,7 +154,7 @@ class SearchHistorySmokeTest {
         assertEquals(1, vm.browse.value.history!!.total)
         submit("history-search", "missing")
         compose.onNodeWithText("No matches").assertExists()
-        compose.onNodeWithText("Clear search").performClick()
+        compose.onNodeWithContentDescription("Clear search").performClick()
         until { !vm.browse.value.loading && vm.browse.value.videos.size == 2 }
         repeat(2) {
             compose.revealInBrowse(hasText("Load more"))
@@ -171,8 +171,9 @@ class SearchHistorySmokeTest {
 
     @Test fun historyRemovalPreservesProgressAndClearRequiresConfirmation() {
         seedHistory(); command("watched", """{"positions":{"testvideo01":40}}"""); openHistory()
-        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasContentDescription("Remove Saved today"))
-        compose.onNodeWithContentDescription("Remove Saved today").performClick()
+        compose.revealInBrowse(hasTestTag("video-actions-testvideo01"))
+        compose.onNodeWithTag("video-actions-testvideo01").performClick()
+        compose.onNodeWithText("Remove from history").performClick()
         until { !vm.browse.value.loading && vm.browse.value.history?.total == 5 }
         assertEquals(40, fixture().getJSONObject("positions").getInt("testvideo01"))
         compose.onNodeWithTag("history-actions").performClick()

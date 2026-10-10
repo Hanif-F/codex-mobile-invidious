@@ -86,26 +86,26 @@ internal fun RssSheet(vm: AppViewModel) {
         Column(contentModifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.privateLink) Text("Anyone with this link can read your subscription feed. Share it only when you want to grant that access.")
             if (state.playlist?.let { it.owned && it.privacy == "private" } == true) Text("This exports a snapshot of your private playlist. The file does not update automatically.")
-            if (state.opml) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = state.format == "rss", onClick = { vm.openOpml("rss") }, label = { Text("Invidious feeds") }, modifier = Modifier.heightIn(min = 48.dp))
-                FilterChip(selected = state.format == "newpipe", onClick = { vm.openOpml("newpipe") }, label = { Text("YouTube feeds") }, modifier = Modifier.heightIn(min = 48.dp))
+            if (state.opml) LibraryControlScene {
+                BrowseTabs(listOf("rss", "newpipe"), state.format,
+                    { if (it == "rss") "Invidious feeds" else "YouTube feeds" }, { "feed-format-$it" }, select = vm::openOpml)
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); OutlinedButton(onClick = vm::retryRss) { Text("Retry") } }
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryControlScene { LibraryActionButton("Retry", onClick = vm::retryRss) } }
             if (!state.loading && state.error == null && state.url != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { external(Intent(Intent.ACTION_VIEW, Uri.parse(state.url))) }) { Text("Open") }
-                OutlinedButton(onClick = {
+                LibraryActionButton("Open", prominent = true, onClick = { external(Intent(Intent.ACTION_VIEW, Uri.parse(state.url))) })
+                LibraryActionButton("Copy", onClick = {
                     if (state.context == vm.api.context()) {
                         (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("RSS feed", state.url))
                         vm.message.value = "Feed link copied"
                     }
-                }) { Text("Copy") }
-                OutlinedButton(onClick = { external(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, state.url), true) }) { Text("Share") }
+                })
+                LibraryActionButton("Share", onClick = { external(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, state.url), true) })
             }
             if (!state.loading && state.error == null && state.xml != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = { fileIntent(false) }) { Text("Open") }
-                OutlinedButton(onClick = { if (state.context == vm.api.context()) { pendingSave = state; save.launch(state.filename) } }) { Text("Save file") }
-                OutlinedButton(onClick = { fileIntent(true) }) { Text("Share") }
+                LibraryActionButton("Open", prominent = true, onClick = { fileIntent(false) })
+                LibraryActionButton("Save file", onClick = { if (state.context == vm.api.context()) { pendingSave = state; save.launch(state.filename) } })
+                LibraryActionButton("Share", onClick = { fileIntent(true) })
             }
         }
     }

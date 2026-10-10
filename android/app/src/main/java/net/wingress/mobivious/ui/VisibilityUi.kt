@@ -41,24 +41,24 @@ internal fun BlockedChannelsScreen(vm: AppViewModel, modifier: Modifier, signIn:
     val account by vm.account.collectAsStateWithLifecycle()
     val context = state.context ?: vm.api.context()
     LaunchedEffect(vm.api.context()) { vm.refreshBlockedChannels() }
-    LazyColumn(modifier.fillMaxSize().testTag("blocked-channel-manager"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(modifier.fillMaxSize().testTag("blocked-channel-manager"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Blocked channels are hidden from discovery, search and recommendations. Subscriptions, history, playlists and direct links remain accessible.") }
         if (account == null) item { Text("Blocked channels are saved for guests on this device and instance.") }
         run {
-            item { OutlinedButton(onClick = vm::refreshBlockedChannels, enabled = !state.loading) { Text("Refresh blocked channels") } }
+            item { LibraryControlScene { LibraryActionButton("Refresh blocked channels", enabled = !state.loading, onClick = vm::refreshBlockedChannels) } }
             if (state.loading) item { CircularProgressIndicator() }
             state.error?.let { error -> item {
                 Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("blocked-refresh-error"))
                 if (!state.loaded) Text("Your blocked channels could not be loaded. Some blocked content may be visible.")
-                OutlinedButton(onClick = vm::refreshBlockedChannels) { Text("Retry") }
+                LibraryControlScene { LibraryActionButton("Retry", onClick = vm::refreshBlockedChannels) }
             } }
             if (state.loaded && state.channels.isEmpty() && !state.loading) item { Text("No blocked channels") }
             items(state.channels, key = { it.id }) { channel ->
                 Column(Modifier.fillMaxWidth()) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { openChannel(channel.id) }) { Text(channel.name) }
-                        OutlinedButton(onClick = { vm.toggleBlocked(channel.id, channel.name, context) }, enabled = channel.id !in state.busy,
-                            modifier = Modifier.testTag("unblock-${channel.id}")) { Text(if (channel.id in state.busy) "Saving…" else "Unblock") }
+                        LibraryControlScene { LibraryActionButton(if (channel.id in state.busy) "Unblocking…" else "Unblock",
+                            Modifier.testTag("unblock-${channel.id}"), enabled = channel.id !in state.busy) { vm.toggleBlocked(channel.id, channel.name, context) } }
                     }
                     state.actionErrors[channel.id]?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("blocked-action-error-${channel.id}")) }
                 }

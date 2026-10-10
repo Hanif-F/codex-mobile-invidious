@@ -3345,3 +3345,183 @@ returned to its normal default instance as a guest on Subscriptions.
 The emulator remained connected throughout; no AVD recovery or data wipe was
 needed. No real account writes, server changes, signing or publishing were
 required.
+
+
+## 2026-10-10 — You and library Liquid Glass
+
+You now has an open identity and four glass destinations: Playlists, My Clips,
+History and Downloads. Playlists has separate My playlists/Subscribed segments
+with independent positions, restored after details and global search. The library
+pages have floating controls over quiet continuous lists capped at 800dp.
+Playlist details, create/edit/save panels, clip details/editor, download selection
+and export, and destructive confirmations use the shared library presentation.
+Downloads expose status/progress/failures, retry/cancel, expandable track details
+and an overflow menu for saving/deleting local files. Existing APIs, account
+semantics, offline media ownership and persisted formats remain intact.
+
+`LibraryGlassUi.kt` owns reusable toolbars, action buttons, panels and
+confirmations. Dashboard glass samples a background-only radial wash. Each page
+or dialog records its scrolling body separately from sibling floating controls;
+no glass samples itself or a decoding surface. Large text stacks controls and
+clip timestamps. Reduced transparency retains the shared opaque fallback.
+Visual review prompted a smoother dashboard wash and stronger floating-title
+contrast.
+
+| Check | Result |
+| --- | --- |
+| Unit tests | 335 passed; zero failures, errors or skips |
+| Distinct selected device scenarios | 78 passed, one existing skipped conversion case |
+| Final navigation/presentation rerun | 23/23 passed |
+| Additional Save to playlist authentication/create/retry journey | Passed |
+| Debug app and instrumentation APK builds | Passed |
+| Lint | Zero errors, 36 warnings |
+| `git diff --check` | Passed |
+
+Device checks ran on the connected Pixel_8_Pro emulator, API 36. The 78-case
+selection covers the new presentation/journey tests, navigation, playlist/RSS,
+history/search, clips, downloads/export, avatars, app playback and account flows.
+Its two failures were superseded by the passing 23-case rerun; the additional
+Save to playlist journey brings the latest distinct passing count to 78.
+Early iterations exposed outdated inline-control selectors, a global-search
+back/IME expectation, and a bottom-of-list position assertion affected by changed
+playlist metadata. Final position checks use an interior row and verify segment,
+global-search and detail restoration. An intermediate Compose lint finding was
+corrected and the affected selection rerun. Logs are preserved in
+`.tools/library-glass/` and the review bundle.
+
+Screenshots cover populated light/dark pages, playlist and clip editors,
+download progress/failure/details, compact/thin mode, opaque materials, 320dp
+with 200% text, physical narrow configurations, landscape and wide layouts.
+Existing clip tests also verify keyboard accessibility and draft retention
+through layout changes. The accepted video conversion test remains ignored
+because the emulator's gfxstream host crashes during conversion; conversion
+consent/cancellation and ordinary exports passed. Physical/OEM rendering,
+software rendering on-device and TalkBack traversal remain separate checks.
+The complete historical device suite was not rerun.
+
+The review bundle is `artifacts/library-glass/REVIEW.md`, with screenshots,
+selected results, logs and `Mobivious-Library-Glass-Preview.apk`.
+SHA-256: `4e8d8b580a83b3acc90dd896be43d58ec7a3e6962f9bf240fe6cb247435f48e5`.
+The preview is installed and open as a guest on You at the normal default
+instance, `https://invidious.wingress.net`. Density/font settings are restored
+to 480dpi/100%, and test ADB forwarding is removed. The emulator remained
+connected; no AVD recovery or data wipe was needed. No server changes,
+real-account writes, signing or publishing were required.
+
+
+## 2026-10-10 — Remaining app Liquid Glass audit and subscription clarity
+
+Discovery and global search now have pinned glass toolbars. Settings, sign-in,
+account management, DeArrow contributions, chat settings, country selection and
+search filters use the shared adaptive panels and controls. Community posts,
+image viewers and post comments share the floating navigation/reading hierarchy.
+RSS export, playlist privacy, clip completion, queue recovery and SponsorBlock
+saves also use the shared controls. Forms and content retain quiet surfaces.
+Toolbars are measured before their content is composed, avoiding the first-frame
+inset correction. Standalone controls have explicit light/dark content colors.
+Glass segments use interruptible selection springs and system animation scaling.
+
+Channel controls distinguish Subscribe, checked Subscribed, Checking, pending
+writes and failure. Subscribed opens an explicit Unsubscribe menu. The controller
+rejects duplicate writes, changes membership only after confirmation, invalidates
+older reads and fences account/instance changes. Failed reads retain confirmed
+membership. Guest channel subscription intent resumes after sign-in and clears
+when canceled. Playlist subscriptions share the explicit control and retain their
+existing continuation behavior. Signup uses Creating account while pending.
+
+The audit found and fixed a 40dp comments close target and a chat overlay that
+intercepted the physical fullscreen button. Playback chrome now sits above the
+picture overlay; editing temporarily hides it so drag handles remain usable.
+The narrow overlay menu sits away from trailing player controls. The regression
+journey now verifies actual fullscreen entry before adjusting the overlay.
+Decoder surfaces and service ownership remain intact.
+
+| Check | Latest result |
+| --- | --- |
+| Unit tests | 338 passed; zero failures, errors or skips |
+| Distinct selected emulator scenarios | 177 passed; one existing ignored conversion test |
+| Final complete chat rerun | 18/18 passed |
+| Playback controls, gestures and shell follow-up | All latest outcomes passed |
+| Debug app and instrumentation APK builds | Passed |
+| Lint | Zero errors, 36 warnings |
+| Warm settings scrolling | 342 frames; 2 missed deadlines (0.58%); p50/p90 16ms, p95 19ms |
+| `git diff --check` | Passed |
+
+The distinct device count merges the latest outcome per scenario across the
+86-case audit, 104-case library/playback selection, focused signup checks,
+37-case control/gesture selection and final 18-case chat rerun. Intermediate
+failures identified old selectors, an IME transition assertion and the real
+control-overlap issue; later passing outcomes supersede them. Exact scenario
+names and their source logs are in `artifacts/glass-audit/selected-results.txt`.
+
+Checks used the connected Pixel_8_Pro API 36 emulator and a disposable local
+fixture with dummy accounts. Visual evidence includes light/dark, reduced
+transparency, large text, narrow/wide layouts, keyboard forms, failures, menus,
+native aspect ratios and fullscreen overlays. The warm rendering sample used
+four up/down settings scroll pairs after warm-up, with builds/tests idle. It is a
+limited debug-emulator measurement, not proof of zero jank throughout every
+screen or on physical devices. An earlier aggregate captured during automated
+launches, rotations, screenshots and concurrent builds reported 24.16% missed
+frames; both raw samples are retained. Physical/OEM rendering and manual
+TalkBack traversal remain separate checks. The existing accepted-conversion
+case stays ignored because its codec path previously crashed host gfxstream.
+
+The final preview is installed and left open as a guest on You at the normal
+instance, `https://invidious.wingress.net`. Density/font settings are 480dpi/100%;
+test ADB reverse forwarding is removed and the owned fixture stopped. The
+emulator stayed connected throughout. No server code, production account writes,
+release signing, publishing or Git commits were required.
+
+Review bundle: `artifacts/glass-audit/REVIEW.md`.
+Preview: `artifacts/glass-audit/Mobivious-Liquid-Glass-Preview.apk`.
+SHA-256: `15c9286a84d58f45a52eb59c999994771b4d175b785d0b5c194e09951b614db0`.
+
+## Mobivious 0.10.0 release — 10 October 2026
+
+The minor release includes the complete Liquid Glass redesign since v0.9.1,
+the You/library pages, explicit subscription controls and the remaining
+presentation and player/chat overlap fixes recorded above. Version name is
+**0.10.0**, version code **18**, and application ID remains
+`net.wingress.mobivious`.
+
+| Check | Result |
+| --- | --- |
+| `scripts/build-release.sh` | Passed; signed release APK built in 3m20s |
+| Unit/API tests | 338 passed; zero failures, errors or skips |
+| Release lint | Passed; zero errors, 36 warnings |
+| Android compatibility | Minimum API 33 (Android 13); target/compile API 37; arm64-v8a, armeabi-v7a, x86 and x86_64 |
+| Signing continuity | Same certificate as the published v0.9.1 APK |
+| APK SHA-256 | `fea0a2dfddc14a4bd84241b309b21b2bc2d1fbb8e3d92411a984c6b1fc543dd8` |
+| APK bytes | 58,939,306 |
+| Signed emulator update | v0.9.1/17 to v0.10.0/18 with `adb install -r`; original installation timestamp retained |
+| Preference preservation | Saved Dark appearance retained across the signed update |
+| Signed cold launch | Discover/Popular feed rendered; app process running; no new crash-buffer entries |
+| Signed navigation | You dashboard and appearance settings opened successfully |
+| `git diff --cached --check` | Passed |
+
+No release package was installed on the connected emulator at the start of
+release acceptance. The published v0.9.1 APK was therefore installed as a
+baseline, a local appearance preference was saved, and v0.10.0 was installed
+over it without clearing data or uninstalling. The original installation
+timestamp is `2026-10-10 19:07:56`. The previous APK's SHA-256 matches GitHub's
+published digest, `526a453e265f6ff2d343580455355d0539a449f7dfd7dcd55e001e68d82f584a`.
+Both APKs use signing certificate SHA-256
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+
+This release raises the minimum supported version from Android 8.0/API 26 to
+Android 13/API 33, as introduced by the redesign. The preceding audit records
+177 passing selected debug-emulator scenarios and one existing ignored
+codec-conversion case. Release acceptance adds the signed build, lint,
+certificate/checksum validation and update/navigation smoke checks; the entire
+device suite was not repeated for the version-only bump. Physical/OEM rendering,
+manual TalkBack traversal and the skipped conversion remain unverified.
+
+The redesign introduces no new server migration or sign-in renewal requirement.
+Existing feature-specific instance prerequisites still apply. No server deployment
+or production account writes are part of this release.
+
+Assets are `artifacts/Mobivious-0.10.0.apk` and its `.apk.sha256` file, with notes
+in `artifacts/release-notes-0.10.0.md`. Build/lint, metadata, signing, update,
+startup, UI and screenshot evidence is retained in the ignored
+`artifacts/release-0.10.0/` directory. Release target:
+[GitHub Releases v0.10.0](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.10.0).

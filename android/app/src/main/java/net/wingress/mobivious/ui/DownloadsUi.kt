@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import net.wingress.mobivious.data.*
@@ -44,9 +46,11 @@ private fun choiceLabel(choice: DownloadChoice): String {
 internal fun DownloadDialog(vm: AppViewModel) {
     val state by vm.downloadDialog.collectAsStateWithLifecycle()
     val catalog = state.catalog
-    AlertDialog(onDismissRequest = vm::dismissDownload, title = { Text("Download") },
-        text = {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 440.dp).testTag("download-dialog"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LibraryPanel("Download", vm::dismissDownload, enabled = !state.busy, actions = {
+        LibraryActionButton("Download", Modifier.testTag("download-confirm"), enabled = catalog?.allowed == true && state.selection.hasMedia && !state.busy,
+            prominent = true, onClick = vm::confirmDownload)
+    }) { modifier, top ->
+            LazyColumn(modifier.testTag("download-dialog"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Text(state.video?.title.orEmpty()); Text("Choose at least one video or audio track. Captions are optional.", style = MaterialTheme.typography.bodySmall) }
                 if (state.loading || state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error); TextButton(onClick = { state.video?.let(vm::openDownload) }) { Text("Retry") } } }
@@ -75,9 +79,9 @@ internal fun DownloadDialog(vm: AppViewModel) {
                         }
                     }
                 }
+                item { TextButton(onClick = vm::dismissDownload, enabled = !state.busy) { Text("Cancel") } }
             }
-        }, confirmButton = { TextButton(onClick = vm::confirmDownload, enabled = catalog?.allowed == true && state.selection.hasMedia && !state.busy, modifier = Modifier.testTag("download-confirm")) { Text("Download") } },
-        dismissButton = { TextButton(onClick = vm::dismissDownload, enabled = !state.busy) { Text("Cancel") } })
+        }
 }
 
 @Composable
@@ -92,8 +96,9 @@ internal fun DownloadChannelIdentity(video: Video) {
 }
 
 @Composable
-internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (String) -> Unit) {
+internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8.dp, play: (String) -> Unit) {
     val records by vm.downloads.records.collectAsStateWithLifecycle()
+    val prefs by vm.preferences.collectAsStateWithLifecycle()
     val error by vm.downloads.error.collectAsStateWithLifecycle()
     val export by DownloadExportService.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -118,7 +123,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
             .putExtra(Intent.EXTRA_TITLE, "$name-${record.id.take(8)}${asset?.choice?.language?.takeIf(String::isNotBlank)?.let { "-$it" }.orEmpty()}.$extension"))
     }
     LaunchedEffect(Unit) { vm.downloads.refresh() }
-    LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = 8.dp, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Saved on this device · ${DisplayFormats.inventory(records.size.toLong(), "download")}", style = MaterialTheme.typography.bodySmall) }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = vm.downloads::refresh) { Text("Retry") } } }
         if (export.phase.isNotBlank()) item {
@@ -126,47 +131,61 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
                 if (export.busy) { LinearProgressIndicator(progress = { export.progress / 100f }, modifier = Modifier.fillMaxWidth()); TextButton(onClick = { DownloadExportService.cancel(context) }) { Text("Cancel export") } }
             }
         }
-        if (records.isEmpty()) item { Text("Your downloads will appear here. Open a video's Download action to save media and optional captions.") }
+        if (records.isEmpty()) item { LibraryEmptyState("Your offline library", "Open a video’s Download action to save video, audio, and optional captions on this device.", Icons.Default.DownloadDone) }
         items(records, key = { it.id }) { record ->
             val video = vm.downloads.localDetails(record).video
-            Card(Modifier.fillMaxWidth().testTag("download-entry-${record.id}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Box(Modifier.width(112.dp).height(64.dp).clip(Liquid.media), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.OndemandVideo, null)
-                            if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        }
-                        Column(Modifier.weight(1f)) { Text(video.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                            DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) } }
-                    }
-                    DownloadChannelIdentity(video)
-                    record.assets.filterNot { it.artwork }.forEach { asset -> Text(choiceLabel(asset.choice), style = MaterialTheme.typography.bodySmall) }
-                    val incomplete = record.assets.filterNot { it.artwork }.filter { it.status != DownloadStatus.COMPLETE }
-                    val status = if (record.playable && incomplete.isEmpty()) "Downloaded" else if (incomplete.any { it.status == DownloadStatus.FAILED }) "Some files failed" else if (record.active) "Downloading" else "Cancelled"
-                    Text("$status · ${DisplayFormats.bytes(record.bytes)}${if (record.total > 0) " / ${DisplayFormats.bytes(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall)
-                    if (record.active) { if (record.total > 0) LinearProgressIndicator(progress = { (record.bytes.toFloat() / record.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                    incomplete.firstOrNull { it.error.isNotBlank() }?.let { Text(it.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        FilledTonalButton(onClick = { play(record.id) }, enabled = record.playable, modifier = Modifier.testTag("download-play-${record.id}")) { Text("Play") }
-                        if (record.active) TextButton(onClick = { vm.cancelDownload(record.id) }) { Text("Cancel") }
-                        if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L }) TextButton(onClick = { vm.retryDownload(record.id) }) { Text("Retry") }
-                        TextButton(onClick = { exporting = record.id }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}")) { Text("Save to files") }
-                        TextButton(onClick = { deleting = record.id }) { Text("Delete") }
+            var details by rememberSaveable(record.id) { mutableStateOf(false) }
+            Column(Modifier.fillMaxWidth().testTag("download-entry-${record.id}").padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val heading: @Composable () -> Unit = {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(video.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        Text(video.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
                 }
+                if (!prefs.thinMode) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Box(Modifier.width(if (prefs.uiDensity == "compact") 80.dp else 112.dp).aspectRatio(16f / 9f).clip(Liquid.media), contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.OndemandVideo, null)
+                        if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
+                    Box(Modifier.weight(1f)) { heading() }
+                } else heading()
+                val incomplete = record.assets.filterNot { it.artwork }.filter { it.status != DownloadStatus.COMPLETE }
+                val status = if (record.playable && incomplete.isEmpty()) "Downloaded" else if (incomplete.any { it.status == DownloadStatus.FAILED }) "Some files failed" else if (record.active) "Downloading" else "Cancelled"
+                Text("$status · ${DisplayFormats.bytes(record.bytes)}${if (record.total > 0) " / ${DisplayFormats.bytes(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (record.active) { if (record.total > 0) LinearProgressIndicator(progress = { (record.bytes.toFloat() / record.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                incomplete.firstOrNull { it.error.isNotBlank() }?.let { Text(it.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                BrowseArtworkSurface(null) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
+                        LibraryActionButton("Play", Modifier.testTag("download-play-${record.id}"), Icons.Default.PlayArrow, enabled = record.playable, prominent = true) { play(record.id) }
+                        if (record.active) TextButton(onClick = { vm.cancelDownload(record.id) }) { Text("Cancel") }
+                        if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L }) TextButton(onClick = { vm.retryDownload(record.id) }) { Text("Retry") }
+                        TextButton(onClick = { details = !details }, modifier = Modifier.testTag("download-details-${record.id}")) { Text(if (details) "Hide details" else "Details") }
+                        OverflowMenu("Actions for download ${video.title}", record.id, Modifier.size(48.dp).browseGlass(CircleShape).testTag("download-actions-${record.id}")) { close ->
+                            DropdownMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
+                            DropdownMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
+                        }
+                    }
+                }
+                if (details) record.assets.filterNot { it.artwork }.forEach { asset -> Text(choiceLabel(asset.choice), style = MaterialTheme.typography.bodySmall) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
             }
         }
     }
     records.firstOrNull { it.id == deleting }?.let { record ->
-        AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Delete download?") }, text = { Text("Remove ${record.details.video.title} and its saved files from this device?") },
-            confirmButton = { TextButton(onClick = { vm.deleteDownload(record.id); deleting = null }) { Text("Delete") } }, dismissButton = { TextButton(onClick = { deleting = null }) { Text("Cancel") } })
+        LibraryConfirmation("Delete download?", { deleting = null }, { vm.deleteDownload(record.id); deleting = null }) {
+            Text("Remove ${record.details.video.title} and its saved files from this device?")
+        }
     }
     records.firstOrNull { it.id == exporting }?.let { record ->
-        AlertDialog(onDismissRequest = { exporting = null }, title = { Text("Save to files") }, text = {
-            Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) { TextButton(onClick = { save(record, null) }) { Text(if (record.assets.count { it.media } == 2) "Combined video and audio" else "Media file") }
+        LibraryPanel("Save to files", { exporting = null }) { modifier, top ->
+            Column(modifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(record.details.video.title, style = MaterialTheme.typography.titleMedium)
+                TextButton(onClick = { save(record, null) }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (record.assets.count { it.media } == 2) "Combined video and audio" else "Media file") }
                 record.assets.filter { it.choice.kind == DownloadKind.CAPTION && it.status == DownloadStatus.COMPLETE }.forEach { asset -> TextButton(onClick = { save(record, asset) }) { Text("Caption: ${asset.choice.label}") } }
+                TextButton(onClick = { exporting = null }) { Text("Cancel") }
             }
-        }, confirmButton = { TextButton(onClick = { exporting = null }) { Text("Cancel") } })
+        }
     }
 }
 
@@ -174,9 +193,9 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, play: (Stri
 internal fun DownloadExportConsent() {
     val state by DownloadExportService.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    if (state.phase == "Needs conversion") AlertDialog(onDismissRequest = { DownloadExportService.cancel(context) },
-        title = { Text("Convert before export?") },
-        text = { Text("These tracks could not be merged unchanged into MP4. Necessary tracks will be converted to H.264 video or AAC audio. This may reduce quality and take longer. The original downloaded files stay intact. Resolution and frame rate will be preserved, or the export will report an error.") },
-        confirmButton = { TextButton(onClick = { DownloadExportService.start(context, state.id, state.asset, Uri.parse(state.destination), true) }, modifier = Modifier.testTag("download-convert-confirm")) { Text("Convert and export") } },
-        dismissButton = { TextButton(onClick = { DownloadExportService.cancel(context) }, modifier = Modifier.testTag("download-convert-cancel")) { Text("Cancel") } })
+    if (state.phase == "Needs conversion") LibraryConfirmation("Convert before export?", { DownloadExportService.cancel(context) },
+        { DownloadExportService.start(context, state.id, state.asset, Uri.parse(state.destination), true) },
+        confirmLabel = "Convert and export", confirmTag = "download-convert-confirm", destructive = false, dismissTag = "download-convert-cancel") {
+        Text("These tracks could not be merged unchanged into MP4. Necessary tracks will be converted to H.264 video or AAC audio. This may reduce quality and take longer. The original downloaded files stay intact. Resolution and frame rate will be preserved, or the export will report an error.")
+    }
 }

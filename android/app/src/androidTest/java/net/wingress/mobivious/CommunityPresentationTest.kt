@@ -141,7 +141,7 @@ class CommunityPresentationTest {
             }
         } }
         compose.onNodeWithText("they/them").assertIsDisplayed()
-        compose.onNodeWithText("Verified channel").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Verified channel").assertIsDisplayed()
         compose.onNodeWithTag("channel-header-avatar", true).assertDoesNotExist()
         compose.onNodeWithTag("channel-description-open").performClick()
         val layouts = mutableListOf<TextLayoutResult>()

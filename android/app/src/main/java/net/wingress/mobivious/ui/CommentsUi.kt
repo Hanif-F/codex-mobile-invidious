@@ -66,7 +66,7 @@ internal fun CommentsDrawer(vm: AppViewModel, state: CommentsState, modifier: Mo
 internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Modifier, close: () -> Unit,
     back: () -> Unit, changeSort: (CommentSort) -> Unit, load: (Boolean, String?) -> Unit,
     replies: (Comment) -> Unit, savePosition: (String?, CommentPosition) -> Unit, channel: (String) -> Unit, link: (String) -> Unit,
-    watchStyle: Boolean = false) {
+    watchStyle: Boolean = true) {
     val latest by rememberUpdatedState(state)
     val mainList = remember(state.target, state.context, state.sort) {
         LazyListState(state.feed.position.index, state.feed.position.offset)
@@ -108,14 +108,14 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                     Column(Modifier.fillMaxWidth().padding(16.dp)) {
                         Text(if (thread == null) "Comments unavailable" else "Replies unavailable", style = MaterialTheme.typography.titleSmall)
                         Text(feed.error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
-                        OutlinedButton(onClick = { load(feed.loaded, key) }, modifier = Modifier.testTag("comments-retry")) { Text("Retry") }
+                        TextButton(onClick = { load(feed.loaded, key) }, modifier = Modifier.testTag("comments-retry")) { Text("Retry") }
                     }
                 }
                 if (feed.loadingMore) item { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(Modifier.size(28.dp).semantics { contentDescription = "Loading more ${if (thread == null) "comments" else "replies"}" })
                 } }
                 else if (feed.loaded && feed.page.continuation.isNotEmpty() && feed.error == null) item {
-                    OutlinedButton(onClick = { load(true, key) }, modifier = Modifier.fillMaxWidth().testTag("comments-load-more")) {
+                    TextButton(onClick = { load(true, key) }, modifier = Modifier.fillMaxWidth().testTag("comments-load-more")) {
                         Text(if (thread == null) "More comments" else "More replies")
                     }
                 }
@@ -167,7 +167,7 @@ private fun WatchCommentSort(selected: CommentSort, changeSort: (CommentSort) ->
 @Composable
 internal fun CommentRow(comment: Comment, server: String, videoId: String, channel: (String) -> Unit,
     link: (String) -> Unit, replies: (() -> Unit)? = null, parent: Boolean = false, thinMode: Boolean = false,
-    watchStyle: Boolean = false) {
+    watchStyle: Boolean = true) {
     val validAuthor = ContentVisibility.validChannel(comment.authorId)
     val canOpenAuthor = validAuthor || CommentLinks.resolve(comment.authorUrl, server, videoId) != null && comment.authorUrl.isNotBlank()
     val authorClick = { if (validAuthor) channel(comment.authorId) else if (comment.authorUrl.isNotBlank()) link(comment.authorUrl) }

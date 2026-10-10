@@ -124,7 +124,10 @@ class AvatarsSmokeTest {
         until { activity.model.playlists.value.any { it.id == "PLlive" && it.saved } }
         compose.runOnUiThread { activity.model.navigate("You") }
         until { !activity.model.browse.value.loading }
-        compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("playlist-card-PLlive"))
+        compose.onNodeWithTag("you-playlists").performClick()
+        until { activity.model.route == "playlists" && !activity.model.browse.value.loading }
+        compose.onNodeWithTag("playlist-section-subscribed").performClick()
+        compose.onNodeWithTag("playlist-library-list").performScrollToNode(hasTestTag("playlist-card-PLlive"))
         compose.onNodeWithTag("playlist-avatar-PLlive", true).assertExists()
         screenshot("playlist-card")
         // Invoke the card action directly; its center can fall on the nested channel link.

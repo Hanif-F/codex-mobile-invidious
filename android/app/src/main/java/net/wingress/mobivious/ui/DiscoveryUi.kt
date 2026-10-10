@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -22,9 +24,8 @@ import net.wingress.mobivious.data.*
 internal fun RegionChoice(selected: String, enabled: Boolean = true, tag: String, change: (String) -> Unit) {
     val locale = LocalConfiguration.current.locales[0]
     var open by rememberSaveable { mutableStateOf(false) }
-    OutlinedButton(onClick = { open = true }, enabled = enabled, modifier = Modifier.fillMaxWidth().testTag(tag)) {
-        Text("Trending region: ${ContentRegions.label(selected, locale)}")
-    }
+    ActionRow("Trending region", detail = ContentRegions.label(selected, locale), enabled = enabled,
+        modifier = Modifier.testTag(tag), trailingIcon = Icons.Default.ExpandMore) { open = true }
     if (open && enabled) RegionPicker(selected, dismiss = { open = false }) { code -> open = false; change(code) }
 }
 
@@ -33,21 +34,23 @@ private fun RegionPicker(selected: String, dismiss: () -> Unit, change: (String)
     val locale = LocalConfiguration.current.locales[0]
     var query by rememberSaveable { mutableStateOf("") }
     val codes = remember(query, locale) { ContentRegions.choices(query, locale) }
-    AlertDialog(onDismissRequest = dismiss, modifier = Modifier.testTag("region-picker"), title = { Text("Trending region") }, text = {
-        Column(Modifier.fillMaxWidth()) {
-            OutlinedTextField(query, { query = it }, label = { Text("Search countries or codes") }, singleLine = true,
-                modifier = Modifier.fillMaxWidth().testTag("region-search"))
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 360.dp).testTag("region-list")) {
-                items(codes, key = { it }) { code ->
-                    TextButton(onClick = { change(code) }, modifier = Modifier.fillMaxWidth().testTag("region-$code")) {
-                        Text(ContentRegions.label(code, locale), Modifier.weight(1f))
-                        if (code == selected) Text("Selected", style = MaterialTheme.typography.labelSmall)
-                    }
+    LibraryPanel("Trending region", dismiss, closeLabel = "Cancel") { body, top ->
+        LazyColumn(body.testTag("region-picker"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset,
+            top = top + 16.dp, bottom = 24.dp)) {
+            item { OutlinedTextField(query, { query = it }, label = { Text("Search countries or codes") }, singleLine = true,
+                modifier = Modifier.fillMaxWidth().testTag("region-search")) }
+            items(codes, key = { it }) { code ->
+                androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                    .selectable(code == selected, role = androidx.compose.ui.semantics.Role.RadioButton, onClick = { change(code) })
+                    .testTag("region-$code").padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(ContentRegions.label(code, locale), Modifier.weight(1f))
+                    if (code == selected) Icon(Icons.Default.Check, "Selected", tint = MaterialTheme.colorScheme.primary)
                 }
-                if (codes.isEmpty()) item { Text("No matching countries", Modifier.padding(16.dp)) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
             }
+            if (codes.isEmpty()) item { Text("No matching countries", Modifier.padding(vertical = 16.dp)) }
         }
-    }, confirmButton = { TextButton(onClick = dismiss) { Text("Cancel") } })
+    }
 }
 
 @Composable
@@ -57,14 +60,9 @@ internal fun TrendingControls(vm: AppViewModel, region: String) {
     val error by vm.trendingRegionError.collectAsStateWithLifecycle()
     val locale = LocalConfiguration.current.locales[0]
     var regionOpen by rememberSaveable { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset)) {
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TrendingCategory.entries.forEach { option ->
-                FilterChip(selected = category == option, onClick = { vm.selectTrendingCategory(option) },
-                    label = { Text(option.label) }, modifier = Modifier.testTag("trending-${option.apiValue}"))
-            }
-        }
-        TextButton(onClick = { regionOpen = true }, enabled = !busy, modifier = Modifier.testTag("trending-region")) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        BrowseTabs(TrendingCategory.entries, category, { it.label }, { "trending-${it.apiValue}" }, select = vm::selectTrendingCategory)
+        TextButton(onClick = { regionOpen = true }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp).browseGlass().testTag("trending-region")) {
             Text(ContentRegions.label(region, locale)); Spacer(Modifier.width(4.dp)); Icon(Icons.Default.ExpandMore, null, Modifier.size(18.dp))
         }
         if (regionOpen) RegionPicker(region, { regionOpen = false }) { regionOpen = false; vm.selectTrendingRegion(it) }

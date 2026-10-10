@@ -98,6 +98,67 @@ class SubscriptionsTest {
         } finally { scope.cancel() }
     }
 
+    @Test fun duplicateTapsAreBlockedAndConfirmedChangeSurvivesRefreshFailure() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val gate = CompletableDeferred<Unit>()
+        try {
+            var failRead = false; var writes = 0
+            val channel = Channel("a", "Studio")
+            val controller = SubscriptionsController(scope, { context }, {
+                if (failRead) error("Read unavailable")
+                SubscriptionDirectory(listOf(channel))
+            }, { it.message.orEmpty() }, write = { id, subscribe, captured ->
+                assertEquals(context, captured); assertEquals("a", id); assertFalse(subscribe)
+                writes++; gate.await()
+            })
+            controller.refresh(); controller.toggle(channel); controller.toggle(channel)
+            assertEquals(1, writes); assertEquals(setOf("a"), controller.state.value.busy)
+            assertEquals(listOf(channel), controller.state.value.channels)
+            failRead = true; gate.complete(Unit); yield()
+            assertTrue(controller.state.value.channels.isEmpty())
+            assertTrue(controller.state.value.busy.isEmpty())
+            assertEquals("Read unavailable", controller.state.value.error)
+        } finally { gate.complete(Unit); scope.cancel() }
+    }
+
+    @Test fun failedWriteRetainsMembershipAndAllowsRetryWithoutGuessingUnknownState() {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        try {
+            val channel = Channel("a", "Studio")
+            var failRead = true; var failWrite = true; var writes = 0; var subscribed = false
+            val controller = SubscriptionsController(scope, { context }, {
+                if (failRead) error("Offline")
+                SubscriptionDirectory(if (subscribed) listOf(channel) else emptyList())
+            }, { it.message.orEmpty() }, write = { _, next, _ ->
+                writes++; if (failWrite) error("Write unavailable"); subscribed = next
+            })
+            controller.toggle(channel); assertEquals(0, writes)
+            assertFalse(controller.state.value.loaded)
+            failRead = false; controller.refresh(); controller.toggle(channel)
+            assertTrue(controller.state.value.channels.isEmpty())
+            assertEquals("Write unavailable", controller.state.value.actionErrors["a"])
+            assertTrue(controller.state.value.busy.isEmpty())
+            failWrite = false; controller.toggle(channel)
+            assertEquals(2, writes); assertEquals(listOf(channel), controller.state.value.channels)
+            assertTrue(controller.state.value.actionErrors.isEmpty())
+        } finally { scope.cancel() }
+    }
+
+    @Test fun oldAccountWriteCannotRepopulateChannelsOrErrorsAfterReset() = runBlocking {
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        val gate = CompletableDeferred<Unit>()
+        try {
+            var active = context
+            val controller = SubscriptionsController(scope, { active }, { SubscriptionDirectory(emptyList()) },
+                { it.message.orEmpty() }, write = { _, _, _ -> withContext(NonCancellable) { gate.await() }; error("Former account") })
+            controller.refresh(); controller.toggle(Channel("a", "Studio"))
+            active = context.copy(generation = 1); controller.reset(); gate.complete(Unit); yield()
+            assertEquals(active, controller.state.value.context)
+            assertTrue(controller.state.value.busy.isEmpty()); assertTrue(controller.state.value.channels.isEmpty())
+            assertTrue(controller.state.value.actionErrors.isEmpty())
+        } finally { gate.complete(Unit); scope.cancel() }
+    }
+
     @Test fun allSortsUseTheirOwnMetricAndBreakTiesByNameAndId() {
         val channels = listOf(Channel("b", "same"), Channel("a", "Same"), Channel("c", "Zulu"), Channel("d", "Dormant"))
         val state = SubscriptionChannelsState(channels = channels, stats = mapOf(

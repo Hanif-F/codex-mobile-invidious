@@ -128,14 +128,16 @@ import kotlin.math.roundToInt
         else Modifier.background(MaterialTheme.colorScheme.surfaceContainer))) {
         val compact = maxWidth < 200.dp
         Row(Modifier.fillMaxWidth().heightIn(min = if (watchStyle) 56.dp else 48.dp).padding(start = if (compact) 0.dp else 12.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (compact) Arrangement.End else Arrangement.Start) {
+            verticalAlignment = Alignment.CenterVertically,
+            // Keep a narrow overlay's menu away from the player's trailing controls.
+            horizontalArrangement = if (compact && adjustOverlay == null) Arrangement.End else Arrangement.Start) {
             if (!compact) Text("Chat replay", Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Box {
                 IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
                     Icon(Icons.Default.MoreVert, "Chat menu")
                 }
-                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                GlassDropdownMenu(expanded = menu, dismiss = { menu = false }) {
                     DropdownMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
                         onClick = { menu = false; settings() }, modifier = Modifier.testTag("chat-settings"))
                     if (adjustOverlay != null) DropdownMenuItem(text = { Text("Adjust overlay") },
@@ -265,7 +267,6 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
         if (timing == (beforeTiming / 1000.0).toString()) timing = (state.timingOffsetMs / 1000.0).toString()
         beforeTiming = state.timingOffsetMs
     }
-    val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     val busy = saving || state.timingSaving
     fun save() {
         val offset = timing.toDoubleOrNull()?.takeIf { it.isFinite() && it in -3600.0..3600.0 }?.let { (it * 1000).roundToInt() }
@@ -282,22 +283,16 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
             finally { saving = false }
         }
     }
-    ModalBottomSheet(onDismissRequest = { if (!busy) dismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
-        Column(Modifier.fillMaxWidth().heightIn(max = height).testTag("chat-settings-sheet")) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Chat settings", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
-                IconButton(onClick = dismiss, enabled = !busy, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, "Close chat settings") }
-            }
-            LazyColumn(Modifier.weight(1f, fill = false).testTag("chat-settings-list"), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+    LibraryPanel("Chat settings", dismiss, enabled = !busy, closeLabel = "Close chat settings") { body, top ->
+        Column(body.testTag("chat-settings-sheet")) {
+            LazyColumn(Modifier.weight(1f).testTag("chat-settings-list"),
+                contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top + 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item {
                     Text("Chat layout", style = MaterialTheme.typography.labelLarge)
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        listOf("Docked", "Overlay").forEachIndexed { index, label ->
-                            SegmentedButton(selected = appearance.overlay == (index == 1), onClick = { vm.setChatAppearance(appearance.copy(overlay = index == 1), ctx) },
-                                shape = SegmentedButtonDefaults.itemShape(index, 2), modifier = Modifier.heightIn(min = 48.dp).testTag("chat-layout-${label.lowercase()}")) { Text(label) }
-                        }
-                    }
+                    LibraryControlScene { LiquidSegments(listOf(false, true), appearance.overlay,
+                        { if (it) "Overlay" else "Docked" }, Modifier.fillMaxWidth(),
+                        tag = { "chat-layout-${if (it) "overlay" else "docked"}" }) { vm.setChatAppearance(appearance.copy(overlay = it), ctx) } }
                     Text("Appearance saves automatically.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (appearance.overlay) {
@@ -333,9 +328,8 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                 }
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("chat-settings-error")) }
                 Text("Save timestamps, blocked users and words, and chat delay.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Button(onClick = ::save, enabled = !busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("chat-settings-save")) {
-                    Text(if (busy) "Saving…" else "Save")
-                }
+                LibraryControlScene { LibraryActionButton(if (busy) "Saving…" else "Save", Modifier.fillMaxWidth().testTag("chat-settings-save"),
+                    enabled = !busy, prominent = true, onClick = ::save) }
             }
         }
     }
