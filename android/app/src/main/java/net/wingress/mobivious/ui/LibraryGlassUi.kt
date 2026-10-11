@@ -5,7 +5,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -16,10 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -33,21 +28,13 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowInsetsControllerCompat
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 
-/** Navigation launchers sample only this quiet wash, never themselves. */
+/** Quiet controls paint their own shaped material without a rectangular backing or recursive sampling. */
 @Composable
 internal fun LibraryControlScene(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    val backdrop = rememberLayerBackdrop()
-    val colors = MaterialTheme.colorScheme
     Box(modifier) {
-        Box(Modifier.matchParentSize().clipToBounds().layerBackdrop(backdrop).background(colors.surface).drawBehind {
-            val radius = size.minDimension * .6f
-            if (radius > 0) drawRect(Brush.radialGradient(listOf(colors.primaryContainer.copy(alpha = if (colors.background.red < .3f) .42f else .65f), colors.surface),
-                center = Offset(size.width / 2, size.height / 2), radius = radius))
-        })
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalContentColor provides colors.onSurface) { content() }
+        CompositionLocalProvider(LocalGlassBackdrop provides null,
+            LocalContentColor provides MaterialTheme.colorScheme.onSurface) { content() }
     }
 }
 

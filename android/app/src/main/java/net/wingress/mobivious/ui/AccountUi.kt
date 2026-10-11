@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -48,10 +49,11 @@ internal fun SignInScreen(vm: AppViewModel, modifier: Modifier = Modifier, back:
     BrowseGlassSurface(modifier.fillMaxSize().imePadding(), softEdge = true, toolbar = {
         LibraryToolbar("Sign in", back = back)
     }) { body, top ->
-      Box(body, contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+      // Focus scrolling uses the visible form viewport, excluding the pinned toolbar.
+      Box(body.padding(top = top).clipToBounds().testTag("sign-in-viewport"), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
     key(vm.api.context()) {
         Column(Modifier.widthIn(max = 600.dp).fillMaxSize().verticalScroll(rememberScrollState())
-            .padding(start = Liquid.inset, end = Liquid.inset, top = top + 16.dp, bottom = LocalContentBottomInset.current)
+            .padding(start = Liquid.inset, end = Liquid.inset, top = 16.dp, bottom = LocalContentBottomInset.current)
             .testTag("sign-in-screen"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Welcome to your library", style = MaterialTheme.typography.headlineSmall)
             Text("Sign in to your Invidious account on ${vm.store.server}.", color = MaterialTheme.colorScheme.onSurfaceVariant)

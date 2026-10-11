@@ -2,6 +2,8 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -74,6 +76,23 @@ class AiFilterSmokeTest {
             android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(it)).use { stream -> stream.readBytes() }
         }
     }
+    private fun assertWarningFits() {
+        val container = compose.onNodeWithTag("ai-thumbnail-blocklist", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        for (text in listOf("Likely AI-generated", "AiSList Blocklist")) {
+            val node = compose.onNodeWithText(text, useUnmergedTree = true)
+            val layouts = mutableListOf<TextLayoutResult>()
+            node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            val layout = layouts.single()
+            val bounds = node.fetchSemanticsNode().boundsInRoot
+            // A centered paragraph can retain wider layout constraints than its measured glyph bounds.
+            for (line in 0 until layout.lineCount) assertTrue("Warning line is clipped: $text",
+                layout.getLineRight(line) - layout.getLineLeft(line) <= bounds.width + 1f)
+            assertFalse("Warning text is clipped vertically: $text", layout.didOverflowHeight)
+            assertTrue(bounds.top >= container.top && bounds.bottom <= container.bottom)
+            val duration = compose.onNode(hasText("2:00") and hasAnyAncestor(hasTestTag("video-card-testvideo01")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            assertTrue("Duration covers warning text", bounds.bottom <= duration.top)
+        }
+    }
     @Test fun guestCanEditWhilePausedSaveEnableAndPauseWithoutLosingChoices() {
         assertEquals(0, fixture().getJSONArray("aiRequests").length())
         settings(); choose(AiPageGroup.FEEDS, AiListKind.BLOCKLIST, "Hide videos")
@@ -83,11 +102,15 @@ class AiFilterSmokeTest {
         assertEquals(0, fixture().getJSONArray("aiRequests").length())
         compose.onNodeWithContentDescription("Back from Settings").performClick()
         settings()
+        compose.onNodeWithTag("settings-list").performScrollToIndex(0)
         compose.onNodeWithText("Enable AI Channel Filter").performClick()
         screenshot("settings-enabled")
         compose.onNodeWithTag("settings-save").performClick()
-        until { vm.preferences.value.aiFilter.enabled && vm.aiFilter.state.value.matches[first]?.contains(AiListKind.BLOCKLIST) == true }
+        until { vm.preferences.value.aiFilter.enabled }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
+        // Settings is opened from You; feed-only actions request classifications when a feed is shown.
+        navigate("Popular")
+        until { vm.aiFilter.state.value.matches[first]?.contains(AiListKind.BLOCKLIST) == true }
         compose.onNodeWithTag("video-card-testvideo01").assertDoesNotExist()
         save(vm.preferences.value.copy(aiFilter = vm.preferences.value.aiFilter.copy(enabled = false)))
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
@@ -111,9 +134,9 @@ class AiFilterSmokeTest {
         until { vm.aiFilter.state.value.matches.size == 2 }
         command("ai", """{"aiImages":"warnings","clearRequests":true}""")
         ui { vm.refresh() }; until { !vm.browse.value.loading && vm.browse.value.videos.first().thumbnail.contains("warnings") }
-        compose.onNodeWithTag("ai-thumbnail-blocklist", useUnmergedTree = true).assertExists(); screenshot("warnings-light")
-        save(vm.preferences.value.copy(darkMode = "dark", uiDensity = "compact")); screenshot("warnings-dark-compact")
-        save(vm.preferences.value.copy(thinMode = true)); screenshot("warnings-text-only")
+        compose.onNodeWithTag("ai-thumbnail-blocklist", useUnmergedTree = true).assertExists(); screenshot("warnings-light"); assertWarningFits()
+        save(vm.preferences.value.copy(darkMode = "dark", uiDensity = "compact")); screenshot("warnings-dark-compact"); assertWarningFits()
+        save(vm.preferences.value.copy(thinMode = true)); screenshot("warnings-text-only"); assertWarningFits()
         compose.onNodeWithTag("ai-thumbnail-warnlist", useUnmergedTree = true).assertExists()
         val paths = fixture().getJSONArray("allRequests").objects().map { it.getString("path") }
         assertFalse(paths.any { it.contains("ai=warnings-testvideo01") || it.contains("ai=warnings-membervid01") })

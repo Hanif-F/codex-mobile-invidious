@@ -323,7 +323,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         channelDescriptionOpen = false; vm.closePostComments()
     } }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
-    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
+    BackHandler(settingsPage.isEmpty() && (fullscreen || watch || presentation.target == PlayerPresentation.WATCH || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch || presentation.target == PlayerPresentation.WATCH -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
     BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
     BackHandler(accountBusy) { }
     val keyboardVisible = WindowInsets.isImeVisible
@@ -399,7 +399,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                   // Content controls must not sample the layer that records them.
                   // Only the sibling floating chrome uses the shell's live backdrop.
                   CompositionLocalProvider(LocalGlassBackdrop provides null) {
-                if (route == "sign-in") SignInScreen(vm, Modifier.hiddenPlayerContent(watch || presentation.active || pip)) { vm.backBrowse() }
+                if (route == "sign-in") CompositionLocalProvider(LocalContentBottomInset provides 20.dp) {
+                    // The form viewport ends above the dock and IME, so focus scrolling cannot put an input behind chrome.
+                    val bottom = PaddingValues(bottom = padding.calculateBottomPadding())
+                    SignInScreen(vm, Modifier.padding(bottom).consumeWindowInsets(bottom)
+                        .hiddenPlayerContent(watch || presentation.active || pip)) { vm.backBrowse() }
+                }
                 else BrowseGlassSurface(Modifier.fillMaxSize().hiddenPlayerContent(watch || presentation.active || pip),
                     enabled = subscriptionFeed || channelPage || libraryPage || discoveryPage || searchPage, softEdge = true, toolbar = {
                         if (libraryPage) LibraryToolbar(libraryTitle,
@@ -590,23 +595,21 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     }
                 }
                 }
-                if (presentation.showsWatch && !pip) {
-                    val miniPadding = with(LocalDensity.current) { if (presentation.allocatesMini) presentation.miniHeight.toDp() else 0.dp }
-                    val layoutDirection = LocalLayoutDirection.current
-                    val watchPadding = PaddingValues(start = padding.calculateStartPadding(layoutDirection),
-                        top = padding.calculateTopPadding(), end = padding.calculateEndPadding(layoutDirection),
-                        bottom = (padding.calculateBottomPadding() - miniPadding).coerceAtLeast(0.dp))
-                    WatchScreen(vm, playback, Modifier.padding(watchPadding).graphicsLayer { alpha = presentation.watchAlpha }
-                        .hiddenPlayerContent(!watch || presentation.active),
-                        presentation, watchList, watchResize, chapterPanel, watchDescription, { watchDescription = it }, ::closePlayer, vm::openSave,
-                        { id -> navigate("Popular", "channel:$id") }, { play(it) }, { signIn() }, openChatSettings)
-                }
                 }
                 }
               }
             }
               if (wideLayout && !watch && !fullscreen && !pip) FloatingSidebar(destination, !accountBusy,
                   Modifier.align(Alignment.TopStart).statusBarsPadding().padding(top = 14.dp), ::selectDestination)
+              if (presentation.showsWatch && !pip) {
+                  // Watch owns the whole window, independently of changing browse/mini chrome allocations.
+                  Box(Modifier.fillMaxSize().graphicsLayer { alpha = presentation.watchAlpha }
+                      .background(MaterialTheme.colorScheme.surface).hiddenPlayerContent(!watch || presentation.active)) {
+                      WatchScreen(vm, playback, Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.systemBars),
+                          presentation, watchList, watchResize, chapterPanel, watchDescription, { watchDescription = it }, ::closePlayer, vm::openSave,
+                          { id -> navigate("Popular", "channel:$id") }, { play(it) }, { signIn() }, openChatSettings)
+                  }
+              }
             }
           }
             if (fullscreen && !pip && chapterPanel.open && chapters.isNotEmpty()) ChaptersSheet(chapters, playback, chapterPanel, vm::seekTo)
@@ -657,9 +660,18 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
     val compact = prefs.uiDensity == "compact" || libraryRow
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val warning = vm.aiDecision(video, aiGroup, aiState).warning
+    val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
+    val warningCompact = compact || prefs.thinMode
+    val fontScale = LocalDensity.current.fontScale
+    val badgeInset = with(LocalDensity.current) { 12.sp.toDp() } + 22.dp
     val thumbnail: @Composable (Modifier) -> Unit = { thumbnailModifier ->
-        if (!prefs.thinMode || warning != null) Box(thumbnailModifier.then(if (prefs.thinMode) Modifier.height(64.dp) else Modifier.aspectRatio(16f/9f)).clip(Liquid.media).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
-            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = prefs.thinMode)
+        if (!prefs.thinMode || warning != null) BoxWithConstraints(thumbnailModifier) {
+          val naturalHeight = if (prefs.thinMode) 64.dp else maxWidth * 9f / 16f
+          val imageHeight = if (warning == null) naturalHeight else maxOf(naturalHeight,
+              (if (warningCompact) 96.dp else 144.dp) * fontScale + if (indicator.watched) badgeInset else 0.dp)
+          Box(Modifier.fillMaxWidth().height(imageHeight).clip(Liquid.media).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
+            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = warningCompact,
+                topInset = if (indicator.watched) badgeInset else 0.dp, bottomInset = if (duration.isNotBlank()) badgeInset else 4.dp)
             else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), video.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             if (indicator.watched) {
                 Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .18f)))
@@ -667,7 +679,6 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                     .background(Color.Black.copy(alpha = .8f)).padding(horizontal = 8.dp, vertical = 4.dp)
                     .testTag("video-watched-${video.id}"), color = Color.White, style = MaterialTheme.typography.labelMedium)
             }
-            val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
             if (duration.isNotBlank()) Text(duration, Modifier.align(Alignment.BottomEnd).padding(8.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .8f)).padding(horizontal = 6.dp, vertical = 3.dp), color = Color.White, fontSize = 12.sp)
             indicator.bar?.let { fraction ->
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp)
@@ -675,6 +686,7 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                         progressBarRangeInfo = ProgressBarRangeInfo(indicator.percent?.div(100f) ?: 1f, 0f..1f)
                     }, color = MaterialTheme.colorScheme.primary, trackColor = Color.Black.copy(alpha = .3f), gapSize = 0.dp, drawStopIndicator = {})
             }
+          }
         }
     }
     val metadata: @Composable (Modifier) -> Unit = { metadataModifier ->
@@ -748,7 +760,6 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 .onGloballyPositioned { coordinates ->
                     origin = coordinates.positionInRoot()
                     width = coordinates.size.width.toFloat()
-                    presentation.miniHeight = coordinates.size.height.toFloat()
                 }
                 .pointerInput(playback.mediaId, occurrence.currentKey, presentation.mode, enabled, layoutDirection, windowSize) {
                     if (!enabled || presentation.mode != PlayerPresentation.MINI) return@pointerInput

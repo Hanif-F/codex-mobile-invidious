@@ -181,7 +181,7 @@ def reset_search_history():
 reset_search_history()
 
 def reset_accounts():
-    state.update(accountUsername='Fixture', accountProfileId=None, registrationEnabled=True, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[],
+    state.update(accountUsername='Fixture', accountProfileId=None, registrationEnabled=True, registrationCaptcha=None, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[],
                  accountSessions=[dict(id='current', type='api', issuedAt=1700000000, expiresAt=9999999999, current=True),
                                   dict(id='browser', type='browser', issuedAt=1700000001, expiresAt=9999999999, current=False)])
 reset_accounts()
@@ -379,7 +379,7 @@ class Handler(BaseHTTPRequestHandler):
             items = [c for c in state['clips'] if not auth or c['creator'] == 'fixture-user']
             return self.respond(items[(page - 1) * 30:page * 30])
         if p == '/api/v1/mobile/registration':
-            return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=None))
+            return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=state['registrationCaptcha']))
         if p == '/api/v1/auth/account/sessions':
             if state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token':
                 return self.respond(dict(error='Request must be authenticated'), 403)
@@ -766,6 +766,7 @@ class Handler(BaseHTTPRequestHandler):
         if p == '/test/accounts':
             if 'accountProfileId' in data: state['accountProfileId'] = data['accountProfileId']
             if 'registrationEnabled' in data: state['registrationEnabled'] = bool(data['registrationEnabled'])
+            if 'captcha' in data: state['registrationCaptcha'] = data['captcha']
             return self.respond({})
         if p == '/test/comments':
             for key in ('commentFailNext', 'commentDelayNext', 'commentEmpty'):

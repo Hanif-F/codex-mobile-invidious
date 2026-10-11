@@ -1,0 +1,123 @@
+[
+  {
+    "elapsed_s": 1.023,
+    "label": "Restore mini over mixed, paginated Search",
+    "input": [
+      "input",
+      "tap",
+      "170",
+      "2570"
+    ]
+  },
+  {
+    "elapsed_s": 3.021,
+    "label": "Settled expanded watch bottom edge",
+    "input": [
+      "screencap",
+      "-p",
+      "/data/local/tmp/watch-fixed-bottom.png"
+    ]
+  },
+  {
+    "elapsed_s": 4.016,
+    "label": "Back collapse",
+    "input": [
+      "input",
+      "keyevent",
+      "4"
+    ]
+  },
+  {
+    "elapsed_s": 6.021,
+    "label": "Restore",
+    "input": [
+      "input",
+      "tap",
+      "170",
+      "2570"
+    ]
+  },
+  {
+    "elapsed_s": 8.026,
+    "label": "Short drag; cancellation restores watch",
+    "input": [
+      "input",
+      "swipe",
+      "670",
+      "360",
+      "670",
+      "440",
+      "500"
+    ]
+  },
+  {
+    "elapsed_s": 11.014,
+    "label": "Completed drag collapse",
+    "input": [
+      "input",
+      "swipe",
+      "670",
+      "360",
+      "670",
+      "1900",
+      "600"
+    ]
+  },
+  {
+    "elapsed_s": 14.015,
+    "label": "Restore then immediately reverse",
+    "input": [
+      "input",
+      "tap",
+      "170",
+      "2570"
+    ]
+  },
+  {
+    "elapsed_s": 14.124,
+    "label": "Back during restoration",
+    "input": [
+      "input",
+      "keyevent",
+      "4"
+    ]
+  },
+  {
+    "elapsed_s": 17.019,
+    "label": "Restore again",
+    "input": [
+      "input",
+      "tap",
+      "170",
+      "2570"
+    ]
+  },
+  {
+    "elapsed_s": 20.021,
+    "label": "Repeated Back collapse",
+    "input": [
+      "input",
+      "keyevent",
+      "4"
+    ]
+  },
+  {
+    "elapsed_s": 23.026,
+    "label": "Final restore",
+    "input": [
+      "input",
+      "tap",
+      "170",
+      "2570"
+    ]
+  },
+  {
+    "elapsed_s": 26.026,
+    "label": "Final settled watch",
+    "input": [
+      "screencap",
+      "-p",
+      "/data/local/tmp/watch-fixed-restored.png"
+    ]
+  }
+]

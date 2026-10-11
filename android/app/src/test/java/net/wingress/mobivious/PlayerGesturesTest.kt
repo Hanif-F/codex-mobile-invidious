@@ -127,4 +127,21 @@ class PlayerGesturesTest {
         drag.start(PlayerDragAxis.VERTICAL); drag.move(Offset(0f, 100f)); state.cancelMotion()
         assertEquals(PlayerPresentation.WATCH, state.mode); assertFalse(state.active)
     }
+
+    @Test fun reversingRestoreOrCollapseKeepsTheDisplayedFractionAndPresentation() = runBlocking(Frames()) {
+        for (initial in listOf(PlayerPresentation.WATCH, PlayerPresentation.MINI)) {
+            val state = PlayerPresentationState(initial, this)
+            val destination = if (initial == PlayerPresentation.WATCH) PlayerPresentation.MINI else PlayerPresentation.WATCH
+            val drag = state.dragHandler(1f, 400f, 390f, {}, { fail("Vertical motion must not close playback") })
+            drag.start(PlayerDragAxis.VERTICAL)
+            drag.move(Offset(0f, if (initial == PlayerPresentation.WATCH) 160f else -160f))
+            val fraction = state.fraction
+            state.present(initial)
+            assertEquals(fraction, state.fraction, 0f)
+            assertEquals(destination, state.target)
+            coroutineContext[Job]!!.children.toList().forEach { it.join() }
+            assertEquals(initial, state.mode)
+            assertFalse(state.active)
+        }
+    }
 }

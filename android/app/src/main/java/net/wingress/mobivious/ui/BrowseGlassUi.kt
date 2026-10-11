@@ -58,10 +58,13 @@ internal fun BrowseGlassSurface(modifier: Modifier = Modifier, enabled: Boolean 
         SubcomposeLayout(modifier.background(surface)) { constraints ->
             val chrome = subcompose("toolbar") {
                 CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
-                    Column(Modifier.fillMaxWidth()
-                        .background(Brush.verticalGradient(0f to surface.copy(alpha = if (softEdge) .98f else 1f),
-                            .75f to surface.copy(alpha = if (softEdge) .94f else .98f), 1f to Color.Transparent))
-                        .padding(bottom = 12.dp).testTag("browse-glass-toolbar"), horizontalAlignment = Alignment.CenterHorizontally) { toolbar() }
+                    Column(Modifier.fillMaxWidth().testTag("browse-glass-toolbar"), horizontalAlignment = Alignment.CenterHorizontally) {
+                        // Fade below the measured title/controls, including wrapped large text.
+                        Column(Modifier.fillMaxWidth().background(surface)) { toolbar() }
+                        Spacer(Modifier.fillMaxWidth().height(12.dp).then(if (softEdge)
+                            Modifier.background(Brush.verticalGradient(listOf(surface, Color.Transparent)))
+                            else Modifier.background(surface)))
+                    }
                 }
             }.single().measure(constraints.copy(minHeight = 0))
             val body = subcompose("content") {

@@ -1,0 +1,82 @@
+INSTRUMENTATION_STATUS: class=net.wingress.mobivious.VisualAuditCaptureTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=
+net.wingress.mobivious.VisualAuditCaptureTest:
+INSTRUMENTATION_STATUS: test=conditionalRegistrationStates
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=net.wingress.mobivious.VisualAuditCaptureTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stack=java.lang.IllegalStateException: No compose hierarchies found in the app. Possible reasons include: (1) the Activity that calls setContent did not launch; (2) setContent was not called; (3) setContent was called before the ComposeTestRule ran. If setContent is called by the Activity, make sure the Activity is launched after the ComposeTestRule runs
+	at androidx.compose.ui.test.TestOwnerKt.getAllSemanticsNodes(TestOwner.kt:106)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNodes$ui_test(SemanticsNodeInteraction.kt:64)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:157)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performScrollTo(Actions.kt:81)
+	at net.wingress.mobivious.VisualAuditCaptureTest.conditionalRegistrationStates(VisualAuditCaptureTest.kt:230)
+
+INSTRUMENTATION_STATUS: stream=
+Error in conditionalRegistrationStates(net.wingress.mobivious.VisualAuditCaptureTest):
+java.lang.IllegalStateException: No compose hierarchies found in the app. Possible reasons include: (1) the Activity that calls setContent did not launch; (2) setContent was not called; (3) setContent was called before the ComposeTestRule ran. If setContent is called by the Activity, make sure the Activity is launched after the ComposeTestRule runs
+	at androidx.compose.ui.test.TestOwnerKt.getAllSemanticsNodes(TestOwner.kt:106)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNodes$ui_test(SemanticsNodeInteraction.kt:64)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:157)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performScrollTo(Actions.kt:81)
+	at net.wingress.mobivious.VisualAuditCaptureTest.conditionalRegistrationStates(VisualAuditCaptureTest.kt:230)
+
+INSTRUMENTATION_STATUS: test=conditionalRegistrationStates
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=net.wingress.mobivious.DarkGlassPresentationTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=
+net.wingress.mobivious.DarkGlassPresentationTest:
+INSTRUMENTATION_STATUS: test=neutralPalettePreservesTextActionAndStatusContrast
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=net.wingress.mobivious.DarkGlassPresentationTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=neutralPalettePreservesTextActionAndStatusContrast
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=net.wingress.mobivious.DarkGlassPresentationTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=materialsRemainVisibleInBothAppearancesAndOpaqueMode
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=net.wingress.mobivious.DarkGlassPresentationTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=3
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=materialsRemainVisibleInBothAppearancesAndOpaqueMode
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 20.334
+There was 1 failure:
+1) conditionalRegistrationStates(net.wingress.mobivious.VisualAuditCaptureTest)
+java.lang.IllegalStateException: No compose hierarchies found in the app. Possible reasons include: (1) the Activity that calls setContent did not launch; (2) setContent was not called; (3) setContent was called before the ComposeTestRule ran. If setContent is called by the Activity, make sure the Activity is launched after the ComposeTestRule runs
+	at androidx.compose.ui.test.TestOwnerKt.getAllSemanticsNodes(TestOwner.kt:106)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNodes$ui_test(SemanticsNodeInteraction.kt:64)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:157)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performScrollTo(Actions.kt:81)
+	at net.wingress.mobivious.VisualAuditCaptureTest.conditionalRegistrationStates(VisualAuditCaptureTest.kt:230)
+
+FAILURES!!!
+Tests run: 3,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

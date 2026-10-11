@@ -78,7 +78,7 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, comments: 
                 is PostAttachment.Images -> PostGallery(attachment.images, vm.store.server, "post-media-${post.key}")
                 is PostAttachment.VideoItem -> VideoCard(vm, attachment.video, vm.store.server,
                     { play(attachment.video) }, channel, signIn)
-                is PostAttachment.PlaylistItem -> PlaylistCard(vm, attachment.playlist, { playlist(attachment.playlist) }, signIn)
+                is PostAttachment.PlaylistItem -> PlaylistCard(vm, attachment.playlist, { playlist(attachment.playlist) }, signIn, embedded = true)
                 is PostAttachment.Poll -> {
                     Text(if (attachment.quiz) "Quiz" else "Poll", style = MaterialTheme.typography.titleSmall)
                     attachment.choices.forEachIndexed { index, choice ->

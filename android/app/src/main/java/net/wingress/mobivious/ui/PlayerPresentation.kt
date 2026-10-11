@@ -56,7 +56,6 @@ internal class PlayerPresentationState(initial: PlayerPresentation, private val 
     var watchBounds by mutableStateOf(Rect.Zero)
     var miniBounds by mutableStateOf(Rect.Zero)
     var navigationBounds by mutableStateOf(Rect.Zero)
-    var miniHeight by mutableFloatStateOf(0f)
     private fun blend(value: (PlayerPresentation) -> Float): Float = value(mode) + ((target?.let(value) ?: value(mode)) - value(mode)) * fraction
 
     fun cancelMotion() {
@@ -65,6 +64,12 @@ internal class PlayerPresentationState(initial: PlayerPresentation, private val 
 
     fun present(next: PlayerPresentation, animate: Boolean = true, closed: () -> Unit = {}) {
         if (next == mode && !active) return
+        if (animate && active && (next == mode || next == target)) {
+            // Reverse from the currently displayed fraction rather than snapping back to the source slot.
+            dragging = false
+            settle(next == target, closed)
+            return
+        }
         cancelMotion()
         if (!animate || next == PlayerPresentation.FULLSCREEN || mode == PlayerPresentation.FULLSCREEN || mode == PlayerPresentation.CLOSED) {
             mode = next
@@ -115,6 +120,7 @@ internal class PlayerPresentationState(initial: PlayerPresentation, private val 
 
     private fun settle(complete: Boolean, closed: () -> Unit) {
         val start = fraction
+        job?.cancel()
         job = scope.launch {
             motion.snapTo(start); dragFraction = null
             motion.animateTo(if (complete) 1f else 0f, spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow))

@@ -1,0 +1,33 @@
+{
+  "unit": {
+    "tests": 339,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 20
+  },
+  "device": {
+    "model": "Pixel 8 Pro",
+    "android": 16,
+    "resolution": "1344x2992",
+    "density": 480,
+    "extraProfiles": "320dp/font scale 2.0; light/dark; compact/thin"
+  },
+  "largeCaptcha": {
+    "tests": 1,
+    "failures": 0,
+    "density": 672,
+    "fontScale": 2.0
+  },
+  "visualRegression": {
+    "tests": 17,
+    "failures": 0
+  },
+  "finalForms": {
+    "tests": 7,
+    "failures": 0
+  }
+}

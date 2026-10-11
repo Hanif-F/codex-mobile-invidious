@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
@@ -82,15 +83,19 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
         .padding(horizontal = Liquid.inset, vertical = 9.dp).testTag("clip-card-${clip.id}"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (!prefs.thinMode || warning != null) Box(Modifier.width(if (prefs.uiDensity == "compact" || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 80.dp else 112.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(12.dp))
+        if (!prefs.thinMode || warning != null) BoxWithConstraints(Modifier.width(if (prefs.uiDensity == "compact" || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 80.dp else 112.dp)) {
+          val imageHeight = if (warning == null) maxWidth * 9f / 16f else maxOf(maxWidth * 9f / 16f, 96.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale)
+          Box(Modifier.fillMaxWidth().height(imageHeight).clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)) {
-            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true)
+            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true,
+                bottomInset = with(androidx.compose.ui.platform.LocalDensity.current) { 12.sp.toDp() } + 16.dp)
             else AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Row(Modifier.align(Alignment.BottomEnd).padding(5.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .82f))
                 .padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.ContentCut, null, Modifier.size(13.dp), Color.White)
                 Text(playerTime(clip.durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
             }
+          }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(clip.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)

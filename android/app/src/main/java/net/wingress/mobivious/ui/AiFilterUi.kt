@@ -13,15 +13,18 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import net.wingress.mobivious.data.AiListKind
 
 @Composable
-internal fun AiThumbnail(kind: AiListKind, modifier: Modifier = Modifier, compact: Boolean = false) {
+internal fun AiThumbnail(kind: AiListKind, modifier: Modifier = Modifier, compact: Boolean = false,
+    topInset: Dp = 0.dp, bottomInset: Dp = 0.dp) {
     val warning = if (kind == AiListKind.BLOCKLIST) "Likely AI-generated" else "Possibly AI-generated"
     val source = if (kind == AiListKind.BLOCKLIST) "AiSList Blocklist" else "AiSList Warnlist"
     Column(modifier.background(Color(0xFF25282C)).testTag("ai-thumbnail-${kind.wire}")
-        .semantics { contentDescription = "$warning. $source" }.padding(if (compact) 3.dp else 12.dp),
+        .semantics { contentDescription = "$warning. $source" }.padding(top = topInset, bottom = bottomInset)
+        .padding(if (compact) 3.dp else 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
         Text(warning, color = Color(0xFFADB0B5), fontWeight = FontWeight.Normal, fontSize = if (compact) 10.sp else 16.sp,
             lineHeight = if (compact) 11.sp else 20.sp, textAlign = TextAlign.Center)

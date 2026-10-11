@@ -1,0 +1,11 @@
+--- scripts/fixture-server.py
++++ captcha-server.py
+@@ -379,7 +379,7 @@
+             items = [c for c in state['clips'] if not auth or c['creator'] == 'fixture-user']
+             return self.respond(items[(page - 1) * 30:page * 30])
+         if p == '/api/v1/mobile/registration':
+-            return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=None))
++            return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=dict(image=f'http://127.0.0.1:{args.port}/media/captcha.png', token='audit-clock') if state['registrationEnabled'] else None))
+         if p == '/api/v1/auth/account/sessions':
+             if state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token':
+                 return self.respond(dict(error='Request must be authenticated'), 403)

@@ -43,13 +43,14 @@ internal fun PlaylistSubscriptionButton(vm: AppViewModel, list: Playlist, signIn
 }
 
 @Composable
-internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, signIn: () -> Unit) {
+internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, signIn: () -> Unit, embedded: Boolean = false) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val library by vm.playlists.collectAsStateWithLifecycle()
     val owned = list.owned || library.any { it.id == list.id && it.owned }
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
-    BrowseArtworkSurface(null) {
-        Column(Modifier.fillMaxWidth().clickable(onClick = open).testTag("playlist-card-${list.id}").padding(horizontal = Liquid.inset, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val content: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth().clickable(onClick = open).testTag("playlist-card-${list.id}")
+            .padding(horizontal = if (embedded) 0.dp else Liquid.inset, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
                     Modifier.size(if (prefs.uiDensity == "compact") 80.dp else 112.dp, if (prefs.uiDensity == "compact") 45.dp else 63.dp).clip(Liquid.media), contentScale = ContentScale.Crop)
@@ -62,9 +63,11 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
                 }
             }
             PlaylistSubscriptionButton(vm, list, signIn)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
+            if (!embedded) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
         }
     }
+    if (embedded) CompositionLocalProvider(LocalGlassBackdrop provides null, content = content)
+    else BrowseArtworkSurface(null, content)
 }
 
 @Composable
