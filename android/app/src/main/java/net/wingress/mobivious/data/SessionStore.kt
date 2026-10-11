@@ -47,6 +47,11 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     @Synchronized fun reduceTransparency(value: Boolean) {
         if (persistence.edit(mapOf("accessibility.reduceTransparency" to value), emptySet())) reduceTransparency.value = value
     }
+    /** A visual device preference, shared by player settings and Appearance. */
+    val ambientMode = MutableStateFlow(prefs.getBoolean("appearance.ambientMode", true))
+    @Synchronized fun ambientMode(value: Boolean) {
+        if (persistence.edit(mapOf("appearance.ambientMode" to value), emptySet())) ambientMode.value = value
+    }
     val storageError = MutableStateFlow<String?>(null)
     private val persistence = SharedProfilePersistence(prefs) { storageError.value = it }
     private val profiles = DeviceProfiles(persistence)

@@ -827,7 +827,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     val commentsOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
     val chatDocked = chat.open && chat.available && !chatAppearance.overlay
     val drawerOpen = commentsOpen || chapterPanel.open || chatDocked
-    BoxWithConstraints(modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).testTag("watch-content")
+    WatchAmbientScene(modifier.fillMaxSize(), ambientPictureBounds(presentation.watchBounds, playback.geometry.ratio)) {
+    BoxWithConstraints(Modifier.fillMaxSize().testTag("watch-content")
         .pointerInput(Unit) {
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
             awaitEachGesture { awaitFirstDown().consume(); waitForUpOrCancellation()?.consume() }
@@ -850,7 +851,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
                     item(key = "watch:metadata") {
-                      WatchGlassScene(Modifier.fillMaxWidth(), artwork = if (prefs.thinMode || playback.downloadId != null) null else
+                      WatchGlassScene(Modifier.fillMaxWidth(), inheritAmbient = true, artwork = if (prefs.thinMode || playback.downloadId != null) null else
                           resolved(vm.store.server, details.video.thumbnail.ifBlank { "/vi/${details.video.id}/mqdefault.jpg" })) {
                       Column(Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
@@ -897,6 +898,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                 .playerAnchor { presentation.watchBounds = it })
             detailsContent()
         }
+    }
     }
 }
 

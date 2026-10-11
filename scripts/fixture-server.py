@@ -497,6 +497,10 @@ class Handler(BaseHTTPRequestHandler):
                 items = {1: [visibility_member], 2: [video]}.get(int(parse_qs(url.query).get('page', ['1'])[0]), [])
             self.respond(items)
         elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
+        elif p == '/api/v1/videos/ambient0001':
+            return self.respond(dict(video, videoId='ambient0001', title='Ambient color phases', lengthSeconds=24,
+                                     formatStreams=[dict(url='/media/ambient.mp4', type='video/mp4', quality='medium')],
+                                     description='Deterministic red, green, blue, white, black and cyan phases.', recommendedVideos=[recommended]))
         elif p.rsplit('/', 1)[-1] in ('portrait001', 'square00001', 'landscape01', 'ultrawide01') and p.startswith('/api/v1/videos/'):
             name = {'portrait001':'portrait', 'square00001':'square', 'landscape01':'landscape', 'ultrawide01':'ultrawide'}[p.rsplit('/', 1)[-1]]
             return self.respond(dict(video, videoId=p.rsplit('/', 1)[-1], title=name + ' geometry fixture',

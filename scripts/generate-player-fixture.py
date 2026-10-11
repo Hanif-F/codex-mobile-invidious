@@ -8,6 +8,22 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser()
 parser.add_argument('media_dir', type=Path)
 args = parser.parse_args()
+
+def generate_ambient():
+    target = args.media_dir / 'ambient.mp4'
+    if target.exists():
+        return
+    command = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
+    for color in ('red', 'lime', 'blue', 'white', 'black', 'cyan'):
+        command += ['-f', 'lavfi', '-i', f'color=c={color}:s=640x360:r=24:d=4']
+    command += ['-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo', '-filter_complex',
+                '[0:v][1:v][2:v][3:v][4:v][5:v]concat=n=6:v=1:a=0[v]', '-map', '[v]', '-map', '6:a',
+                '-t', '24', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2', '-g', '24',
+                '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-movflags', '+faststart', str(target)]
+    subprocess.run(command, check=True)
+
+generate_ambient()
+
 def generate_rich():
     directory = args.media_dir / 'rich'
     manifest = directory / 'dash.mpd'

@@ -3,6 +3,8 @@ package net.wingress.mobivious.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
+import android.view.SurfaceView
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -24,7 +26,9 @@ internal fun PlaybackState.keepVideoScreenOn(visible: Boolean): Boolean =
 /** Every visible player uses the service's controller; changing layouts only changes its surface. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaController?, modifier: Modifier) {
+internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaController?, modifier: Modifier,
+    onVideoSurfaceChanged: (SurfaceView?) -> Unit = {}) {
+    val surfaceChanged by rememberUpdatedState(onVideoSurfaceChanged)
     // PiP stays STARTED even though the activity is no longer RESUMED.
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val keepAwake = controller != null && playback.keepVideoScreenOn(lifecycleState.isAtLeast(Lifecycle.State.STARTED))
@@ -40,8 +44,10 @@ internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaCont
         update = {
             it.player = controller
             it.keepScreenOn = keepAwake
+            surfaceChanged(it.videoSurfaceView as? SurfaceView)
         },
         onRelease = {
+            surfaceChanged(null)
             it.keepScreenOn = false
             // PlayerView clears only its own surface, preserving a newly attached player view.
             it.player = null

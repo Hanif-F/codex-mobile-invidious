@@ -12,12 +12,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
@@ -69,7 +71,8 @@ internal fun VideoPlayer(
     gesturesEnabled: Boolean = true, chromeVisible: Boolean = true, gestureKey: Any? = null,
     onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
-    onChat: (() -> Unit)? = null, pictureOverlay: @Composable BoxScope.() -> Unit = {},
+    onChat: (() -> Unit)? = null, onVideoSurfaceChanged: (android.view.SurfaceView?) -> Unit = {},
+    pictureOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val current by rememberUpdatedState(playback)
@@ -82,7 +85,7 @@ internal fun VideoPlayer(
     var visible by remember(playback.mediaId, controls) { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
     var scrub by remember(playback.mediaId, gestureKey, controls) { mutableStateOf<Float?>(null) }
-    var feedback by remember(playback.mediaId, controls) { mutableStateOf<String?>(null) }
+    var feedback by remember(playback.mediaId, controls) { mutableStateOf<Long?>(null) }
     var feedbackGeneration by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
     var inputOrigin by remember { mutableStateOf(Offset.Zero) }
@@ -95,7 +98,7 @@ internal fun VideoPlayer(
     fun seek(offset: Long) {
         if (current.seekable && !current.loading && current.error == null) {
             vm.seekBy(offset)
-            feedback = if (offset < 0) "−10 seconds" else "+10 seconds"
+            feedback = offset
             feedbackGeneration++
             interact()
         }
@@ -121,7 +124,7 @@ internal fun VideoPlayer(
             val bounds = it.boundsInWindow()
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
-        if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize())
+        if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize(), onVideoSurfaceChanged)
         else playback.details?.video?.let { video ->
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
@@ -244,16 +247,10 @@ internal fun VideoPlayer(
                                 Modifier.align(Alignment.TopCenter).offset(y = (-24).dp))
                     }
                 })
-            feedback?.let { Text(it, Modifier.align(Alignment.Center).mediaGlass().padding(16.dp)
-                .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White) }
-            pendingSeek?.let { pending ->
-                Column(Modifier.align(if (pending.offset < 0) Alignment.CenterStart else Alignment.CenterEnd)
-                    .fillMaxWidth(1f / 3f).mediaGlass(Liquid.card).padding(vertical = 20.dp)
-                    .testTag("pending-seek").semantics { liveRegion = LiveRegionMode.Polite }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(if (pending.offset < 0) Icons.Default.FastRewind else Icons.Default.FastForward, null, tint = Color.White)
-                    Text("${if (pending.offset < 0) "−" else "+"}${kotlin.math.abs(pending.offset) / 1000} seconds", color = Color.White,
-                        style = MaterialTheme.typography.labelLarge)
-                }
+            (pendingSeek?.offset ?: feedback)?.let { offset ->
+                PlayerSeekFeedback(offset, Modifier.align(if (offset < 0) AbsoluteAlignment.CenterLeft else AbsoluteAlignment.CenterRight)
+                    .fillMaxWidth(1f / 3f).padding(horizontal = 4.dp)
+                    .then(if (pendingSeek != null) Modifier.testTag("pending-seek") else Modifier))
             }
 
         }
@@ -263,18 +260,32 @@ internal fun VideoPlayer(
 @Composable
 internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -> Unit, dismiss: (String) -> Unit) {
     val active = sponsor.active
-    Row(Modifier.fillMaxWidth().mediaGlass(Liquid.card).testTag("sponsorblock-prompt"),
-        verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(start = 14.dp, top = 8.dp, bottom = 8.dp)) {
-            if (active != null) Text("${active.category.label} · ${sponsor.remaining}s", color = Color.White,
-                style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (sponsor.notice.isNotBlank()) Text(sponsor.notice, Modifier.testTag("sponsorblock-notice")
-                .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White,
-                style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (active != null) {
-            TextButton(onClick = { skip(active.id) }) { Text("Skip", color = Color.White) }
-            IconButton(onClick = { dismiss(active.id) }) { Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", tint = Color.White) }
+    if (active == null && sponsor.notice.isBlank()) return
+    val plate = if (LocalReduceTransparency.current) Color(0xFF181A1D) else Color.Black.copy(alpha = .6f)
+    BoxWithConstraints {
+        val noticeStyle = MaterialTheme.typography.labelSmall
+        val noticeHeight = with(LocalDensity.current) { noticeStyle.lineHeight.toDp() } + 12.dp
+        val showNotice = sponsor.notice.isNotBlank() && (active == null || maxHeight >= 48.dp + 4.dp + noticeHeight)
+        Column(Modifier.testTag("sponsorblock-prompt"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            // Preserve the actions if a very short picture cannot fit the passive confirmation too.
+            if (showNotice) {
+                Text(sponsor.notice, Modifier.widthIn(max = 280.dp).clip(CircleShape).background(plate)
+                    .padding(horizontal = 12.dp, vertical = 6.dp).testTag("sponsorblock-notice")
+                    .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White,
+                    style = noticeStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (active != null) {
+                Row(Modifier.clip(CircleShape).background(plate).testTag("sponsorblock-actions"),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { skip(active.id) }, modifier = Modifier.heightIn(min = 48.dp)
+                        .testTag("sponsorblock-skip").semantics { contentDescription = "Skip ${active.category.label}" }) {
+                        Text("Skip", color = Color.White, maxLines = 1)
+                    }
+                    IconButton(onClick = { dismiss(active.id) }, modifier = Modifier.size(48.dp)) {
+                        Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", Modifier.size(20.dp), tint = Color.White)
+                    }
+                }
+            }
         }
     }
 }
@@ -302,6 +313,8 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 @Composable
 internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
+    val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
+    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
     val formats = playback.details?.formats.orEmpty()
     val video = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_VIDEO, formats)
     val audio = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, formats)
@@ -329,6 +342,19 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
                     item { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
                     item { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
+                    item {
+                        Row(Modifier.fillMaxWidth().testTag("player-ambient-mode")
+                            .toggleable(ambientMode, role = Role.Switch, onValueChange = vm.store::ambientMode)
+                            .semantics { contentDescription = "Ambient mode" }.padding(horizontal = 24.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text("Ambient mode")
+                                Text(if (reduceTransparency) "Paused while Reduce transparency is on" else "Video colors illuminate the watch view",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(checked = ambientMode, onCheckedChange = null)
+                        }
+                    }
                     item {
                         Row(Modifier.fillMaxWidth().clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Audio only", Modifier.weight(1f), color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))

@@ -91,6 +91,8 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 - Liquid Glass navigation with light, dark or system appearance; Reduce transparency
   for solid controls, compact lists and optional hidden thumbnails.
+- Ambient mode casts live video colors behind the expanded watch view and its glass
+  controls. Enabled by default; toggle it in player settings or Appearance.
 - Choose your launch homepage; retain your place in Popular and Trending within
   Discover, Subscriptions, and You.
 - Playback defaults, browsing and feed preferences, and channel blocking.

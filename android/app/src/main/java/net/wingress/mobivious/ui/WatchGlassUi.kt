@@ -20,11 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -47,11 +50,17 @@ import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.effects.colorControls
+import com.kyant.backdrop.effects.exposureAdjustment
 
 /** A background-only recording, never an ancestor recording the glass that samples it. */
 @Composable
-internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = null,
+internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = null, inheritAmbient: Boolean = false,
     content: @Composable BoxScope.() -> Unit) {
+    if (inheritAmbient && LocalWatchAmbientMaterial.current != null) {
+        Box(modifier, content = content)
+        return
+    }
     val backdrop = rememberLayerBackdrop()
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
@@ -70,30 +79,46 @@ internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = n
                     colors.surface.copy(alpha = .25f), colors.surface))))
             }
         }
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop) { content() }
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalWatchAmbientMaterial provides null) { content() }
     }
 }
 
-/** Watch controls share the dark optical material; light retains its stronger definition. */
+/** Watch chrome catches the ambient colors while retaining its reading contrast plate. */
 @Composable
 internal fun Modifier.watchGlass(shape: Shape = Liquid.card, prominent: Boolean = false): Modifier {
     val source = LocalGlassBackdrop.current
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
-    if (dark) return darkLiquidGlass(shape, prominent)
     val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    val plate = if (prominent) colors.primaryContainer else Color.White
+    val ambient = LocalWatchAmbientMaterial.current.takeUnless { opaque }
+    if (dark && ambient == null) return darkLiquidGlass(shape, prominent)
+    val plate = if (prominent) colors.primaryContainer else if (dark) DarkGlass.plate else Color.White
     val material = if (opaque || source == null) Modifier.background(plate, shape) else Modifier.drawBackdrop(
         backdrop = source, shape = { shape },
-        effects = { vibrancy(); blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx()) },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .64f else .46f)) },
+        effects = {
+            blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx())
+            if (dark) { colorControls(saturation = 1.1f); exposureAdjustment(-.7f) } else vibrancy()
+        },
+        onDrawSurface = { drawRect(plate.copy(alpha = if (dark) { if (prominent) .60f else .52f }
+            else if (prominent) .64f else .46f)) },
     )
     return shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .12f))
         .then(material)
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .30f),
+        .background(if (dark) DarkGlass.reflection else Brush.verticalGradient(listOf(Color.White.copy(alpha = .30f),
             Color.White.copy(alpha = .02f), Color.Black.copy(alpha = .025f))), shape)
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .95f),
-            Color.White.copy(alpha = .08f), Color.White.copy(alpha = .65f))), shape).clip(shape)
+        .border(1.dp, if (dark) DarkGlass.rim else Brush.linearGradient(listOf(Color.White.copy(alpha = .95f),
+            Color.White.copy(alpha = .08f), Color.White.copy(alpha = .65f))), shape)
+        .then(if (ambient == null) Modifier else Modifier.drawWithContent {
+            val left = ambient.colors[0].value
+            val right = ambient.colors[2].value
+            val bottom = ambient.colors[8].value
+            drawRect(Brush.linearGradient(listOf(left.copy(alpha = left.alpha * .055f),
+                right.copy(alpha = right.alpha * .035f), bottom.copy(alpha = bottom.alpha * .025f))))
+            drawContent()
+            drawOutline(shape.createOutline(size, layoutDirection, this),
+                Brush.linearGradient(listOf(left.copy(alpha = left.alpha * .65f),
+                    right.copy(alpha = right.alpha * .28f), bottom.copy(alpha = bottom.alpha * .55f))), style = Stroke(1.dp.toPx()))
+        }).clip(shape)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -156,10 +181,12 @@ internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () ->
     var toolbarHeight by remember { mutableStateOf(136.dp) }
     val surface = MaterialTheme.colorScheme.surface
     Box(modifier.clip(Liquid.card).background(surface)) {
-        CompositionLocalProvider(LocalGlassBackdrop provides null, LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        CompositionLocalProvider(LocalGlassBackdrop provides null, LocalWatchAmbientMaterial provides null,
+            LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
             content(Modifier.fillMaxSize().layerBackdrop(backdrop).background(surface), toolbarHeight + 8.dp)
         }
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalWatchAmbientMaterial provides null,
+            LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
             Column(Modifier.fillMaxWidth().testTag("comments-toolbar").onSizeChanged { toolbarHeight = with(density) { it.height.toDp() } }
                 .padding(bottom = 8.dp)) { toolbar() }
         }

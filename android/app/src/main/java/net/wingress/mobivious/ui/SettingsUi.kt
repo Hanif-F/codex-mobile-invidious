@@ -184,9 +184,13 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                 }
                 "Appearance" -> item {
                     SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode, !busy) { update(value.copy(darkMode = it)) }
+                    val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
+                    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
+                    SettingsToggle("Ambient mode", if (reduceTransparency) "Paused while Reduce transparency is on. Your choice is saved on this device."
+                        else "Let video colors illuminate the expanded watch view. Saves on this device immediately.",
+                        ambientMode, true) { vm.store.ambientMode(it) }
                     SettingsChoice("Video list density", listOf("balanced" to "Comfortable", "compact" to "Compact"), value.uiDensity, !busy) { update(value.copy(uiDensity = it)) }
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode, !busy) { update(value.copy(thinMode = it)) }
-                    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
                     SettingsHeading("Accessibility")
                     SettingsToggle("Reduce transparency", "Use solid controls for stronger contrast. Saves on this device immediately.", reduceTransparency, !busy) { vm.store.reduceTransparency(it) }
                 }

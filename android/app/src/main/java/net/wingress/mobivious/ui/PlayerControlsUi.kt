@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
@@ -29,6 +30,7 @@ import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
@@ -44,14 +46,16 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(48.dp) }
     var footerHeight by remember { mutableStateOf(96.dp) }
-    var noticeHeight by remember { mutableStateOf(0.dp) }
+    var noticeHeight by remember { mutableStateOf(48.dp) }
     BoxWithConstraints(modifier.fillMaxSize()) {
         // Two 48dp rows keep chapter/fullscreen targets separate from full-width seeking.
-        // Very shallow pictures share the upper row with the header controls.
-        val sharedHeader = maxHeight < 144.dp
-        val occupiedTop = headerHeight + if (notice == null) 0.dp else noticeHeight
-        fun centerFits(size: Dp) = !sharedHeader && maxHeight / 2 - size / 2 >= occupiedTop + 1.dp &&
-            maxHeight / 2 + size / 2 <= maxHeight - footerHeight - 1.dp
+        // A bottom notice also needs room clear of the header in short pictures.
+        val noticeSpace = if (notice == null) 0.dp else noticeHeight + 16.dp
+        val sharedHeader = maxHeight < maxOf(144.dp, headerHeight + footerHeight + noticeSpace)
+        val safeBottom = if (fullscreen) WindowInsets.safeDrawing.asPaddingValues().calculateBottomPadding() else 0.dp
+        val occupiedBottom = footerHeight + noticeSpace
+        fun centerFits(size: Dp) = !sharedHeader && maxHeight / 2 - size / 2 >= headerHeight + 1.dp &&
+            maxHeight / 2 + size / 2 <= maxHeight - occupiedBottom - 1.dp
         val centerSize = if (centerFits(64.dp)) 64.dp else 48.dp
         val centered = centerFits(centerSize)
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
@@ -64,9 +68,6 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
                         .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal)) else Modifier)
                         .padding(horizontal = 4.dp))
             }
-            if (notice != null) Box(Modifier.fillMaxWidth()
-                .onSizeChanged { noticeHeight = with(density) { it.height.toDp() } }
-                .padding(horizontal = 8.dp, vertical = 4.dp)) { notice() }
         }
         AnimatedVisibility(showControls, enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
@@ -82,6 +83,15 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
             enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.Center)) {
             Box(Modifier.testTag("player-transport")) { PlayerPlayControl(playback, Modifier.size(centerSize), play = onPlay) }
+        }
+        if (notice != null) {
+            val bottom = if (showControls) footerHeight else safeBottom
+            Box(Modifier.align(AbsoluteAlignment.BottomLeft)
+                .padding(bottom = bottom)
+                .then(if (fullscreen) Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal)) else Modifier)
+                .padding(8.dp)) {
+                Box(Modifier.onSizeChanged { noticeHeight = with(density) { it.height.toDp() } }) { notice() }
+            }
         }
     }
 }
@@ -200,10 +210,21 @@ private fun PlayerIconButton(icon: ImageVector, description: String, modifier: M
 }
 
 @Composable
-private fun PlayerIcon(icon: ImageVector, description: String, size: Dp = 24.dp, enabled: Boolean = true) {
+internal fun PlayerIcon(icon: ImageVector, description: String?, size: Dp = 24.dp, enabled: Boolean = true) {
     Box(Modifier.size(size)) {
         Icon(icon, null, Modifier.fillMaxSize().offset(y = 1.dp).blur(2.dp), tint = Color.Black.copy(alpha = .65f))
         Icon(icon, description, Modifier.fillMaxSize(), tint = Color.White.copy(alpha = if (enabled) 1f else .38f))
+    }
+}
+
+@Composable
+internal fun PlayerSeekFeedback(offsetMs: Long, modifier: Modifier = Modifier) {
+    Column(modifier.testTag("player-seek-feedback").semantics(mergeDescendants = true) {
+        liveRegion = LiveRegionMode.Polite
+    }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        PlayerIcon(if (offsetMs < 0) Icons.Default.FastRewind else Icons.Default.FastForward, null)
+        Text("${if (offsetMs < 0) "−" else "+"}${kotlin.math.abs(offsetMs) / 1000} seconds", color = Color.White,
+            style = MaterialTheme.typography.labelLarge.copy(shadow = PlayerTextShadow), textAlign = TextAlign.Center)
     }
 }
 
