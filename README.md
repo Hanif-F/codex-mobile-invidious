@@ -175,6 +175,10 @@ acceptance and reproduction instructions.
 
 ## Development and documentation
 
+The [complete documentation index](docs/README.md) covers the current architecture,
+features, settings, APIs, playback, accounts/library, storage/security, UI, testing,
+troubleshooting and a file-by-file source map.
+
 Built with Kotlin, Jetpack Compose and Media3. Start with the developer guide
 whether you are contributing directly or working with an AI coding agent.
 

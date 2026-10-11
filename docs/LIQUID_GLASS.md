@@ -1,5 +1,8 @@
 # Liquid Glass design language
 
+See the [documentation index](README.md) and [UI implementation reference](UI.md)
+for the current system, including ambient frame sampling and its lifecycle gates.
+
 Mobivious has one visual design, inspired by Apple's Liquid Glass. Android 13
 (API 33) is the minimum supported version. Light, Dark and System change the
 appearance of this design; there is no theme collection or legacy-design switch.
@@ -204,8 +207,12 @@ its original rendering. Video overlays use a separate neutral contrast plate and
 never sample the decoding surface.
 
 Media3 retains its decoding SurfaceView and service ownership. Video overlays
-use dark translucent plates and do not read back the decoding surface. This
-preserves fullscreen, PiP, background playback and aspect ratios. Chat overlays
+use neutral contrast plates and do not sample the decoder as a glass backdrop.
+Ambient mode separately uses bounded PixelCopy requests to reduce ready video
+frames to nine spatial colors; only generated lighting is recorded for ambient
+glass. Sampling is restricted to the resumed expanded watch view and respects
+power, motion and transparency settings. See [ambient mode](UI.md#ambient-mode).
+This preserves fullscreen, PiP, background playback and aspect ratios. Chat overlays
 sit below playback chrome so they cannot intercept fullscreen and seek controls.
 Overlay adjustment temporarily hides playback chrome so drag handles stay usable.
 

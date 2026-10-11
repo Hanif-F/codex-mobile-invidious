@@ -1,5 +1,8 @@
 # Deploy on the Ubuntu server
 
+For the Android-side request contracts, compatibility and user behavior, see the
+[app documentation index](../docs/README.md) and [API reference](../docs/API.md).
+
 The root Compose file keeps the original project name `invidious-codex-v3`, services,
 Postgres 14, and `postgresdata` / `companioncache` volumes. Both hostnames serve
 the same backend and database. It builds the sibling fork in `../invidious` by

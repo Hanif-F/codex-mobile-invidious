@@ -2,6 +2,10 @@
 
 [Back to the README](../README.md)
 
+For current behavior and implementation references, start with the
+[complete documentation index](README.md). It includes architecture, all feature
+workflows, settings and API contracts, subsystem guides, and source/test catalogs.
+
 This guide covers building, testing and maintaining Mobivious for human and AI
 contributors. Commands run from this repository's root unless shown otherwise.
 
@@ -61,6 +65,38 @@ For production setup, migrations, secrets and rollback, use the
 Open `android/` in Android Studio. Use the checked-in Gradle wrapper; Gradle and
 library versions are pinned. SDK settings, signing material and build output are
 ignored by Git.
+
+### Current toolchain and direct dependencies
+
+These are the repository's configured versions for 0.10.2, rather than a request
+to install the newest upstream release. The Gradle files are authoritative after
+a dependency update.
+
+| Component | Configured version / purpose |
+| --- | --- |
+| Gradle wrapper | 9.4.1, with distribution SHA-256 verification. |
+| Android Gradle plugin | 9.2.1; single `com.android.application` module. |
+| Compose compiler plugin | 2.3.10. |
+| Android SDK | Minimum 33; compile/target 37. |
+| Java source/bytecode target | 17. |
+| Compose BOM | 2026.03.00; aligns Material3, icons, UI tooling and Compose tests. |
+| Activity Compose | 1.12.3; activity/UI integration. |
+| Lifecycle Compose | 2.10.0; view-model and lifecycle-aware collection. |
+| Media3 | 1.9.3; ExoPlayer, DASH/HLS, sessions, PlayerView and Transformer. |
+| OkHttp / MockWebServer | 4.12.0; application HTTP / JVM contract fixtures. |
+| Coil Compose | 2.7.0; images and caching. |
+| Coroutines Android | 1.10.2; asynchronous work and state flows. |
+| Backdrop | 1.0.6; glass rendering. |
+| RE2/J | 1.8; bounded-complexity chat regex matching. |
+| JUnit / JVM JSON | 4.13.2 / 20251224. |
+| Android test JUnit / runner / Espresso | 1.3.0 / 1.7.0 / 3.7.0. |
+
+Release uses `net.wingress.mobivious`, version code 20 and version name 0.10.2.
+Debug adds `.debug` and `-debug`, allowing separate installation as Mobivious
+Preview. BuildConfig and Compose are enabled; release minification is disabled.
+Personal signing configuration is loaded only when local `signing.properties`
+exists. JVM tests return Android default stub values where required; device-only
+behavior still needs instrumentation.
 
 ### Local checks
 
