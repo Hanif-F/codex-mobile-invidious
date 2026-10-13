@@ -62,6 +62,7 @@ class CommunityPresentationTest {
             share.performClick()
             compose.onNodeWithText("Copy link").assertDoesNotExist()
             compose.onNodeWithText("Share").assertDoesNotExist()
+            captureWatchScreenshot("unbacked-community-actions-${if (isDark) "dark-large" else "light"}")
         }
         assertEquals(2, opened); assertEquals(2, shared)
     }
@@ -101,6 +102,7 @@ class CommunityPresentationTest {
         val index = expanded.layoutInput.text.text.indexOf("Another post")
         compose.onNodeWithTag("post-body-Ugpost1").performTouchInput { click(expanded.getBoundingBox(index).center) }
         assertEquals("/post/Ugpost2", opened)
+        captureWatchScreenshot("unbacked-community-rich-post")
         compose.onNodeWithText("Show less").performScrollTo().performClick()
         assertEquals(6, layout().lineCount)
     }
@@ -168,6 +170,7 @@ class CommunityPresentationTest {
             compose.onNodeWithText("2 / 2").assertIsDisplayed()
             compose.onNodeWithTag("gallery").performTouchInput { click(center) }
             compose.onNodeWithTag("post-image-viewer").assertIsDisplayed()
+            captureWatchScreenshot("unbacked-community-image-${if (isDark) "dark" else "light"}")
             compose.onNodeWithContentDescription("Close image").assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).performClick()
             compose.onNodeWithTag("post-image-viewer").assertDoesNotExist()
         }
@@ -193,6 +196,7 @@ class CommunityPresentationTest {
             compose.onNodeWithText("Post comment text").assertIsDisplayed()
             compose.onNodeWithContentDescription("12 likes").assert(hasClickAction().not())
             if (thin) compose.onNodeWithTag("comment-avatar-post-comment", true).assertDoesNotExist()
+            captureWatchScreenshot("unbacked-community-comments-${if (isDark) "dark-large" else "light"}")
         }
     }
 }

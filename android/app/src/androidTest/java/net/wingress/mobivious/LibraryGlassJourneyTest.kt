@@ -40,6 +40,8 @@ class LibraryGlassJourneyTest {
     }
     @Before fun launch() {
         command("reset"); command("playlist-rss"); command("clips", """{"count":3}""")
+        // Named light download captures must not inherit a dark System appearance.
+        command("preferences", """{"dark_mode":"light"}""")
         command("downloads", """{"downloadDuration":12,"downloadSlow":false,"downloadFailKey":""}""")
         command("search-history", """{"historyEntries":[
             {"video_id":"testvideo01","title":"Saved today","channel_name":"Mobivious Studio","latest_watched":"2026-10-04","length_seconds":120},

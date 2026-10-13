@@ -50,6 +50,7 @@ class VideoInformationPresentationTest {
         compose.onNodeWithText("Artist · Album").assertExists()
         compose.onNodeWithTag("video-regions-toggle").performScrollTo().performClick()
         compose.onNodeWithTag("video-regions").assertTextContains("(ID)", substring = true)
+        captureWatchScreenshot("unbacked-video-information-dark-large")
     }
 
     @Test fun descriptionOwnsMetadataVisibilityAndGenreLinksStillWork() {

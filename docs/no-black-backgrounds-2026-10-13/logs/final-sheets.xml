@@ -1,0 +1,73 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="14" failures="0" errors="0" skipped="0" time="78.816" timestamp="2026-10-13T05:47:00" hostname="localhost">
+  <testsuite name="net.wingress.mobivious.ChannelDescriptionPresentationTest" tests="4" failures="0" errors="0" skipped="0" time="11.058" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="blankDescriptionsHaveNoReadButton" classname="net.wingress.mobivious.ChannelDescriptionPresentationTest" time="1.815" />
+    <testcase name="narrowDarkLargeFontSheetKeepsItsCloseButtonAndAllTextAccessible" classname="net.wingress.mobivious.ChannelDescriptionPresentationTest" time="3.145" />
+    <testcase name="shortDescriptionsAlsoOpenAndTheSheetCanBeSwipedAway" classname="net.wingress.mobivious.ChannelDescriptionPresentationTest" time="3.241" />
+    <testcase name="completeTextScrollsToTheFinalLineAndCloseAndBackKeepTheChannelPage" classname="net.wingress.mobivious.ChannelDescriptionPresentationTest" time="2.857" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.LiquidRedesignSmokeTest" tests="1" failures="0" errors="0" skipped="0" time="15.858" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances" classname="net.wingress.mobivious.LiquidRedesignSmokeTest" time="15.858" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.SubscriptionGlassJourneyTest" tests="1" failures="0" errors="0" skipped="0" time="16.626" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="feedDirectoryAndCreatorSheetsRetainPlaybackAndTheirOrigin" classname="net.wingress.mobivious.SubscriptionGlassJourneyTest" time="16.626" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.PlaylistRssSmokeTest" tests="1" failures="0" errors="0" skipped="0" time="3.067" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange" classname="net.wingress.mobivious.PlaylistRssSmokeTest" time="3.067" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.StreamControlsSmokeTest" tests="1" failures="0" errors="0" skipped="0" time="6.176" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="exactTracksMenusRefreshRetryAndReconnection" classname="net.wingress.mobivious.StreamControlsSmokeTest" time="6.176" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.CommunitySmokeTest" tests="1" failures="0" errors="0" skipped="0" time="3.364" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="postCommentsSheetSortsRepliesRetriesAndIgnoresVideoCommentVisibility" classname="net.wingress.mobivious.CommunitySmokeTest" time="3.364" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.CommunityPresentationTest" tests="4" failures="0" errors="0" skipped="0" time="13.512" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="galleryRemainsBrowsableWhenImagesFailAndViewerHasAnAccessibleCloseButton" classname="net.wingress.mobivious.CommunityPresentationTest" time="4.748" />
+    <testcase name="postExpansionRestoresAndKeepsRichLinksInsideTheCard" classname="net.wingress.mobivious.CommunityPresentationTest" time="2.963" />
+    <testcase name="postCommentPanelKeepsCloseSortingAndReadOnlyMetadataAccessible" classname="net.wingress.mobivious.CommunityPresentationTest" time="2.461" />
+    <testcase name="postActionsSeparateLikesAndShareAboveAFullWidthCommentsButton" classname="net.wingress.mobivious.CommunityPresentationTest" time="3.34" />
+  </testsuite>
+  <testsuite name="net.wingress.mobivious.VideoInformationPresentationTest" tests="1" failures="0" errors="0" skipped="0" time="2.986" timestamp="2026-10-13T05:47:00" hostname="localhost">
+    <properties>
+      <property name="device" value="Pixel_8_Pro(AVD) - 16" />
+      <property name="flavor" value="" />
+      <property name="project" value=":app" />
+    </properties>
+    <testcase name="metadataAndCreditsFitNarrowDarkLargeFontLayouts" classname="net.wingress.mobivious.VideoInformationPresentationTest" time="2.986" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,240 @@
+[
+  {
+    "file": "screenshots/neutral-discover-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/neutral-discover-dark.png",
+    "raw_sha256": "1be7be5cc05f312f75bdd2b1bb0c1c66db0d6455b13fcb65acc49885fa8f061f",
+    "preview_sha256": "a037cadd55647e042708ae65161dcc7a45d1cd283cccc209fe3f433f57945ca6",
+    "device_source": "/data/local/tmp/mobivious-liquid/neutral-discover-dark.png"
+  },
+  {
+    "file": "screenshots/neutral-discover-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/neutral-discover-light.png",
+    "raw_sha256": "0040212f07159476df6871d5094c4cf002230118649fa88f3a9fd631c33d3ef7",
+    "preview_sha256": "8f34663f757b2576a9c23d4e64963891ea14c81c42e4919d3c82e7d7262559f2",
+    "device_source": "/data/local/tmp/mobivious-liquid/neutral-discover-light.png"
+  },
+  {
+    "file": "screenshots/watch-glass-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/watch-glass-dark.png",
+    "raw_sha256": "631b04c4f2fd8ac335773aa12dbd6118211841da0306bd921b7cd66aa6a16b9f",
+    "preview_sha256": "2bf4d774ebef3b4b17f6026139bf7fddb395140ed4df2f41ba9ea84d147ca041",
+    "device_source": "/data/local/tmp/mobivious-liquid/watch-glass-dark.png"
+  },
+  {
+    "file": "screenshots/watch-glass-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/watch-glass-light.png",
+    "raw_sha256": "87a66b972c9d674f4ca90adbbc72f404806867c0e71ecc27e1c4603e7b8f9671",
+    "preview_sha256": "e5aab524a87329988627ff3283f7000cc00bc42553abafca0c8ac1ead45a717b",
+    "device_source": "/data/local/tmp/mobivious-liquid/watch-glass-light.png"
+  },
+  {
+    "file": "screenshots/watch-glass-comments.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/watch-glass-comments.png",
+    "raw_sha256": "35d337db58c379232d6a1a8c74f6d546568c0b65c47f5a920eadadc3bd707309",
+    "preview_sha256": "81e1bce054c9262f17620cc3ba539150f897e89c710d930fe2980d6243078cfb",
+    "device_source": "/data/local/tmp/mobivious-liquid/watch-glass-comments.png"
+  },
+  {
+    "file": "screenshots/watch-glass-description.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/watch-glass-description.png",
+    "raw_sha256": "1126c1c3c1a073578b288293e4e55f5ad227cc4838192a87d0cdd89ea176be31",
+    "preview_sha256": "1d8dcdbf3a1778704fa8e5e7257d5477d5386bcdcbc73a138327dd293129fee5",
+    "device_source": "/data/local/tmp/mobivious-liquid/watch-glass-description.png"
+  },
+  {
+    "file": "screenshots/watch-glass-settings.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/watch-glass-settings.png",
+    "raw_sha256": "abf77d0d79eb8562bc88c4bb03f3032f6d69ba94466b8212a16bea2d112a95dc",
+    "preview_sha256": "94981407099ab1f6f9a869824d97d6cb9fea42743420b28aad98cbf0f6269b35",
+    "device_source": "/data/local/tmp/mobivious-liquid/watch-glass-settings.png"
+  },
+  {
+    "file": "screenshots/no-black-background-native-caption.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/no-black-background-native-caption.png",
+    "raw_sha256": "7ab988d19bc55cbde7dceedb4e11e09b1f3b520676404c26c2274dcf477f19b8",
+    "preview_sha256": "16702e9bf33e2213899d86d7be9c1c7516e94dafb9d9b4e8021dc4712f4abf27",
+    "device_source": "/data/local/tmp/mobivious-liquid/no-black-background-native-caption.png"
+  },
+  {
+    "file": "screenshots/clip-editor-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-library-glass/clip-editor-dark.png",
+    "raw_sha256": "1e380adf86a016eb7529cd8868d0ed2724657e4f4d558fd10794db3f160cb22f",
+    "preview_sha256": "ac2306c0a599abc2d53e5bbd11664a5c648b76099d062a9625b412ae2ce86ead",
+    "device_source": "/data/local/tmp/mobivious-library-glass/clip-editor-dark.png"
+  },
+  {
+    "file": "screenshots/downloads-details-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-library-glass/downloads-details-light.png",
+    "raw_sha256": "745ec0b90c8fbd2ed5e368eca1b5017c7c13d616a4f373b4c0bffd2235217751",
+    "preview_sha256": "8ddee9fe2afd4a9a8575674078b5a72e23cef39d718fe0075c3c435c50bfa510",
+    "device_source": "/data/local/tmp/mobivious-library-glass/downloads-details-light.png"
+  },
+  {
+    "file": "screenshots/playlist-editor-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-library-glass/playlist-editor-light.png",
+    "raw_sha256": "b7f51aac39b5f6ddb08a143f3ae5e8bd68284633f0a9f3f46e1b2160c3d6ea06",
+    "preview_sha256": "a12eb64c5d51e10f11bfe27c28136d397650cf2bddafa85bae5f2457a01ab68f",
+    "device_source": "/data/local/tmp/mobivious-library-glass/playlist-editor-light.png"
+  },
+  {
+    "file": "screenshots/you-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-library-glass/you-dark.png",
+    "raw_sha256": "a44e2a33a0f5a59abcbbac9944718e2f7ff22bddb190b53c9993874894102cd1",
+    "preview_sha256": "37978c3e5143dccf271310d96fffff70f935a1acfbee462fbb72563d604ed298",
+    "device_source": "/data/local/tmp/mobivious-library-glass/you-dark.png"
+  },
+  {
+    "file": "screenshots/you-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-library-glass/you-light.png",
+    "raw_sha256": "c6635ec1f10c6e93f66798db17e2eb1dec9e371f6c9ad3539a3e136cb1cc2e35",
+    "preview_sha256": "d9b20cad36bf42848bc64c3807578f1430a59a76093136c8efe16672d3cd6d7b",
+    "device_source": "/data/local/tmp/mobivious-library-glass/you-light.png"
+  },
+  {
+    "file": "screenshots/subscriptions-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-subscriptions-glass/subscriptions-dark.png",
+    "raw_sha256": "97bbed913f742bd64b4d5ade7ee3fc5ab4638cd08eec3be62e166d171319337c",
+    "preview_sha256": "91732764539c627c84cf5f286fa720520727719a7cc643b3b9e9fb7f5157c41b",
+    "device_source": "/data/local/tmp/mobivious-subscriptions-glass/subscriptions-dark.png"
+  },
+  {
+    "file": "screenshots/channels-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-subscriptions-glass/channels-light.png",
+    "raw_sha256": "a9a6f5858a8d81d389f5832bf3314100ea192c49e24c4e75275ed6f288b0a74e",
+    "preview_sha256": "bd1f719cf1b243a594ed3c3c02f0d7ca506e161685a3ab4057d17b1476ac8fc1",
+    "device_source": "/data/local/tmp/mobivious-subscriptions-glass/channels-light.png"
+  },
+  {
+    "file": "screenshots/overhaul-category-playback-top.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-glass-audit/overhaul-category-playback-top.png",
+    "raw_sha256": "7096a66bcbf2bb658e4146582f17d806c490d867c665cc43de2480dce8744d70",
+    "preview_sha256": "43851964e2af470d879bf926f238a5a2496b973b905b3daf6691138d36004bb4",
+    "device_source": "/data/local/tmp/mobivious-glass-audit/overhaul-category-playback-top.png"
+  },
+  {
+    "file": "screenshots/account.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-glass-audit/account.png",
+    "raw_sha256": "4a970d42108b845a3c36013b9110267a3f7c8a53a63db8787e35bf378e02bca6",
+    "preview_sha256": "450c229681f94cd511c4c5c6878cbca3f59f7e9deaef902e454f9caa44346b34",
+    "device_source": "/data/local/tmp/mobivious-glass-audit/account.png"
+  },
+  {
+    "file": "screenshots/settings-codec-menu.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-glass-audit/settings-codec-menu.png",
+    "raw_sha256": "06160979f04617823fdb5dd117c8e6ce979d8d9428a1ac1d00773ab7bfbf2f1c",
+    "preview_sha256": "e84062e938240844f7316d29ad134b563e0454f32c73970f423ceb0e75214eb8",
+    "device_source": "/data/local/tmp/mobivious-glass-audit/settings-codec-menu.png"
+  },
+  {
+    "file": "screenshots/warnings-dark-compact.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-ai-screenshots/warnings-dark-compact.png",
+    "raw_sha256": "b73d85a94f00cf5e6fc546090a5bf6d0f77b32a03202ef673204826a57bffa38",
+    "preview_sha256": "8c68fc504fbe1d5c172e85433430c579ef3328217a55d295afb8f8b06236b57a",
+    "device_source": "/data/local/tmp/mobivious-ai-screenshots/warnings-dark-compact.png"
+  },
+  {
+    "file": "screenshots/warnings-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-ai-screenshots/warnings-light.png",
+    "raw_sha256": "20d5ec94c0950cf5628ec7d9a34d8f4227e1e1232b93b2426fdee2a13a5ce8ed",
+    "preview_sha256": "44d73a4aa2f336218bb0cc852c0b016c7bcaae716bdf795e291bf7faa366a754",
+    "device_source": "/data/local/tmp/mobivious-ai-screenshots/warnings-light.png"
+  },
+  {
+    "file": "screenshots/blocked-manager-failure.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-visibility-screenshots/blocked-manager-failure.png",
+    "raw_sha256": "8e73e80d62ac5da9cc1459a45bd06a5030d142fd0e1c5db0be25cbf8a06393bf",
+    "preview_sha256": "7b563d8a715d9d49ef9e9172efa90764a78e918ef5f8dea3db1db09a3d70b5c3",
+    "device_source": "/data/local/tmp/mobivious-visibility-screenshots/blocked-manager-failure.png"
+  },
+  {
+    "file": "screenshots/draft-keyboard.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-dearrow-screenshots/draft-keyboard.png",
+    "raw_sha256": "f78947fd1942e35a3d39db4a734ee99277ecb2057131fc8363770d98bc5b7b36",
+    "preview_sha256": "9c57319ec9d1b7b479ec1065e71ed3197f3ebd427ade7abb886ea1f299ae2d9e",
+    "device_source": "/data/local/tmp/mobivious-dearrow-screenshots/draft-keyboard.png"
+  },
+  {
+    "file": "screenshots/layout-picker.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-discovery-search/layout-picker.png",
+    "raw_sha256": "1afe4e0a49402622495dec2cccdfee341d8160e145a393742026f3f917108f44",
+    "preview_sha256": "26036314c9a4a8bfd12ecde3e2b35ea0a5ef5afb74f616ced899db78edb3c51e",
+    "device_source": "/data/local/tmp/mobivious-discovery-search/layout-picker.png"
+  },
+  {
+    "file": "screenshots/settings-docked.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-chat-screenshots/settings-docked.png",
+    "raw_sha256": "f5aedab129c40ae9856c7cc67c1a79f432c61302b3b402662fe2f62421a1cf80",
+    "preview_sha256": "df255b72cc3e736c7ba9c87ff42a5159cff2d44a1addf46774eef06707f52dd1",
+    "device_source": "/data/local/tmp/mobivious-chat-screenshots/settings-docked.png"
+  },
+  {
+    "file": "screenshots/overlay-large-font-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-chat-screenshots/overlay-large-font-dark.png",
+    "raw_sha256": "f474778c6c89971664f737ab2fc6e767e2ee0ba2d02c9c3b400abe8d3129a15c",
+    "preview_sha256": "a65b9c4fcb0a4270f6df5f38a9ff82b417e4019ce3d9fe8c16130c717c4f92f2",
+    "device_source": "/data/local/tmp/mobivious-chat-screenshots/overlay-large-font-dark.png"
+  },
+  {
+    "file": "screenshots/presentation-320-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-queue-screenshots/presentation-320-dark.png",
+    "raw_sha256": "5194d140fde0efb97051827ff4a185e583763de748b425406efa0845aa598511",
+    "preview_sha256": "52eb484c681f0911eede9026db6ec1e53272274ca65ef0c33aeabce0b95a7af5",
+    "device_source": "/data/local/tmp/mobivious-queue-screenshots/presentation-320-dark.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-actions-dark-large.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-actions-dark-large.png",
+    "raw_sha256": "4653cfa45b1978095f8c8694e53f7dfff101e862a237e1da7f0933b96e3a9eb1",
+    "preview_sha256": "6ce0269c22b5b93ea96f94ad6a5455452ea5fcdaf9810feec65ec4d88cc4db8c",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-actions-dark-large.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-actions-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-actions-light.png",
+    "raw_sha256": "7d331e9c531dbfceda01e00476b331f36571d8b54a57d6c65a7297b3fa564377",
+    "preview_sha256": "710290f6e7b34471c4b491f8b82d55b6f66744545a9c2e21d1dde284d3eda4e6",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-actions-light.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-comments-dark-large.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-comments-dark-large.png",
+    "raw_sha256": "4f02f25d8edca07b18d7f10381718a0ed37ea4c82219ceb17b326fb72ff5727d",
+    "preview_sha256": "edf2fce292905d2fb9fb3dccff4b1d6ac613b4526db394603493a565d08bf885",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-comments-dark-large.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-comments-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-comments-light.png",
+    "raw_sha256": "269fc3e20f046b44cea62874839cf336a20f115024465a1910da4bf01a6fdc90",
+    "preview_sha256": "1949e395ac0668ee06ae1d38ccce22dac2592f8e0ecc5ec414334c55ab330dfb",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-comments-light.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-image-dark.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-image-dark.png",
+    "raw_sha256": "cae4721cec4e5ac280a9721c0c62479a41c142e6e9f5250179be1f06aeebb4db",
+    "preview_sha256": "c84444649acefa794eaf104373eb7eb52fc077bab7f3ad6d8673f519dc20308e",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-image-dark.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-image-light.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-image-light.png",
+    "raw_sha256": "7b0a999751532b68eb38c3edbb0b7e7a1caeacbc2f5527c3ad1c04aa2017c8be",
+    "preview_sha256": "49dcffd1066f646efbcbe5fe57108d2ac321aa55a579a604941af53c9623205f",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-image-light.png"
+  },
+  {
+    "file": "screenshots/unbacked-community-rich-post.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-community-rich-post.png",
+    "raw_sha256": "9f9eb365f40d167377cb6d6f73348219508c085cb30614799c4c5186074f0724",
+    "preview_sha256": "a95826a27aba7b8f117871e552df02a829af78c1dddb78a38b1d34cd042ccea0",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-community-rich-post.png"
+  },
+  {
+    "file": "screenshots/unbacked-video-information-dark-large.jpg",
+    "raw_file": ".tools/no-black-backgrounds-evidence/screenshots/mobivious-liquid/unbacked-video-information-dark-large.png",
+    "raw_sha256": "ca8738f066878e9b1b12a0c1b27e3e390584c88c2f6fe9497b5be5c49286bd0d",
+    "preview_sha256": "66d2dc21c764dcae840e96f919500ce003f3a6ebd08e532fb511defaff05b382",
+    "device_source": "/data/local/tmp/mobivious-liquid/unbacked-video-information-dark-large.png"
+  }
+]

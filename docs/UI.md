@@ -27,25 +27,79 @@ actions do not remain attached to a new account or row.
 
 ## Materials and reusable components
 
-`LiquidDesign` defines light/dark colors, typography, spacing, shapes and material
-rendering. Main insets are 20dp; content uses quiet surfaces and actions use pills/
-circles. `DarkGlass` shares dark control tokens. Backdrop 1.0.6 supplies sampled
-blur/vibrancy/refraction; a fine rim/tint gives definition. Opaque plates are used
-for Reduce transparency and software rendering.
+`LiquidDesign` defines light/dark palettes, typography, shapes and 20dp main
+insets. `GlassMaterial` owns the renderer and optical tokens. Control, section
+and media-overlay roles share directional highlights, restrained reflection and
+concentric clipping; prominence changes emphasis. Shell/browse/watch modifier
+facades delegate to this renderer. Backdrop remains pinned to 1.0.6, on API 33+.
 
-The recorded backdrop must be a sibling of its consuming glass. Content inside
-that recording receives no consuming backdrop, preventing recursive rendering.
-Shell, browse, watch, library artwork and popup windows use separate scenes where
-needed. `ActionControlsUi` supplies overflow menus/settings rows; `LibraryGlassUi`
-supplies toolbars/buttons/confirmation/panels; `WatchGlassUi` supplies watch
-disclosures/actions/panel chrome. Reading text, forms and content rows remain quiet.
+Ordinary/prominent control tint is .14/.20 in dark appearance and .20/.26 in light;
+section tint is .20/.28. Refractive controls use 12dp depth/18dp displacement;
+sections use 18dp/20dp, with depth clamped to half the smaller dimension. The
+background alone is magnified by 1.035 before depth-enabled refraction, with no
+backdrop blur or chromatic aberration. Glyphs and icons remain sharp. Broad blue, teal and violet pools
+illuminate non-media destinations. Artwork and the existing bounded ambient
+palette supply media environments. Stationary screens have no ornamental loops.
 
-The watch background has a thumbnail/neutral wash independent of controls.
-Player controls use white foregrounds, localized edge contrast and measured rails;
-they never use the full decoder surface as a glass recording. Save/Download/Share/
-More have labeled circles with accessible names and long-press tooltips. Disabled
-actions retain legible disabled state. Narrow layouts compact timestamp/chapter
-labels but preserve full semantic descriptions and separate ≥48dp touch areas.
+Settings root categories and related preference groups, account forms, playlist/
+clip/RSS editors, player/chat settings, download choices and community tools share
+section surfaces. Interior rows have quiet state fills, dividers and editing
+boundaries; they do not stack independent glass. Content lists remain continuous.
+`ActionControlsUi`, `LibraryGlassUi` and `WatchGlassUi` share these primitives.
+
+`GlassScene` separates background-only section sources from page-content sources
+for sibling floating chrome. Recorded children inherit the independent background
+scene, never the page recording containing themselves. Header reading environments
+mask scrolled glyphs across their complete measured height, including wrapped
+2× titles; the trailing edge fades that same environment. Toolbar controls remain
+clear and transmit the page. `GlassWindowBackdrop` gives menus, alert dialogs and
+tooltips native-resolution crops from their originating Window using PixelCopy.
+Each overlay records those pixels locally; graphics layers never cross windows.
+Screen-coordinate alignment includes source-window offsets and clips crops to its
+DecorView. Captures follow parent redraw/geometry changes, capped at four per
+second while resumed, with two reusable crops, one request in flight and stale
+callback rejection. Settled overlays do not poll. Capture failure, software drawing
+and Reduce transparency use the readable solid fallback. Full-page panels continue
+to record their own content. Video controls, player settings and the mini-player
+use the internal deferred-player profile, retaining their prior optics and
+palette-based popup backgrounds; surrounding watch-page glass uses refraction.
+
+`GlassContentColors` supplies actual primary/secondary/icon colors through
+`GlassForeground`. Polarity switches atomically with hysteresis. Labels, icons
+and menu slots paint only their content, with no rectangular
+backing, circular backing or inherited text halo. Readability comes from the
+continuous surrounding glass material: its tint increases only when the
+foreground needs more contrast over detailed artwork. Secondary/help text uses the
+same foreground contract. Errors retain semantic hues; selection retains markers
+and state descriptions, and disabled/busy controls remain distinguishable.
+
+Changing Compose scenes share a GPU-downsampled 24×48 color grid. Sampling is
+conflated, limited to one update per 250ms, resumed-lifecycle/hardware gated, and
+stops without redraws. The first sample waits for the source recording to finish.
+The small graphics layer and scratch buffer are reused; no full-window bitmap or
+per-control readback is allocated. Active Watch reuses generated ambient palette
+statistics instead of adding another pixel readback. Hidden shell chrome does not
+sample. Unavailable statistics retain stable colors with a conservative shared
+material tint.
+
+Arbitrary artwork receives a conservative shared material tint: a coarse grid
+cannot rule out a narrow bright band between samples. Generated environments
+instead use analytic channel bounds from the light pools' actual peak opacity
+and painting order. These bounds remain valid where pools overlap and avoid
+unnecessary tint on the designed Settings and library backgrounds.
+
+Press/focus illumination observes the existing semantic interaction source and
+press position. Small controls deform by at most 2%, broad surfaces by 1%, with
+at most 2dp lift through Backdrop's `layerBlock`; thin inset controls share feedback
+without another material. Dock, tabs and segments spring toward measured selection
+positions. Reduced motion suppresses deformation; system animation scale governs
+transitions. Reduce transparency and software rendering use readable solid plates
+and skip contrast readback. These are accessibility fallbacks, not the dark default.
+
+Player chrome uses the shared slate media-overlay styling, white foregrounds and
+glyph shadows, preserving measured rails and separate ≥48dp targets. It never records
+the decoder. Save/Download/Share/More retain labels and long-press tooltips; narrow
+layouts compact time/chapter labels while preserving full semantic descriptions.
 
 ## Video and motion
 
@@ -114,3 +168,13 @@ launch theme/system-bar colors, adaptive/monochrome launcher icons, backup rules
 RSS sharing paths and the separate TextureView clip preview. UI copy is currently
 primarily literal English Kotlin text; locale-aware country/date/number formatting
 does not imply a fully translated string-resource system.
+
+The native `PlayerView` uses transparent caption/window backgrounds, including
+cues with embedded background spans. Caption font/typeface preferences are
+retained, with a glyph shadow when no edge is requested. Native clip-preview
+controls use a transparent scrim and slate footer/settings popup through
+`media_colors.xml`; loading shutters also use slate. Thumbnail durations, watched
+labels and clip badges have transparent backgrounds.
+
+Modal bottom sheets use transparent container fills, so their drag-handle region
+does not introduce a separate dark band above the shared glass content.

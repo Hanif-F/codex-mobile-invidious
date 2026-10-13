@@ -1,0 +1,377 @@
+{
+  "origin": "Selector membership from declared source, reconciled with executed counts and failures in the retained run log.",
+  "tests": 74,
+  "failures": 0,
+  "cases": [
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "labelsIconsAndMenuSlotsNeverPaintTheirOwnBackgrounds",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "generatedEnvironmentsKeepReadableLabelsWithoutAdditionalBacking",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "navigationLabelsRemainReadableOverNarrowArtworkBands",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "sceneDownsamplesChangesAndStopsWhenSettled",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "nestedPageRecordingPreservesForegroundsAndCornerTransparency",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "softwareAndReducedTransparencyUseReadablePlatesWithoutReadback",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "pressCancellationAndRapidRepetitionKeepOneSemanticAction",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ActionControlsPresentationTest",
+      "name": "nestedOverflowClosesBeforeActionAndBackDoesNotActivateParent",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ActionControlsPresentationTest",
+      "name": "openMenuResetsAcrossEntityAndAccountChanges",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ActionControlsPresentationTest",
+      "name": "selectorKeepsLabelAndValueAndCannotOpenWhileDisabled",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ActionControlsPresentationTest",
+      "name": "darkNarrowLayoutKeepsControlsAccessibleAtDoubleFontSize",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ActionControlsPresentationTest",
+      "name": "lightWideLayoutKeepsControlsAccessibleAtDoubleFontSize",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AmbientModePresentationTest",
+      "name": "videoColorsReachTheBackgroundAndGlassWithoutLosingTextContrast",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AvatarsPresentationTest",
+      "name": "darkLargeFontHeaderAndAuthorKeepOneNavigationAction",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AvatarsPresentationTest",
+      "name": "lightThinModeSuppressesHeaderSubscriptionCommentAndHeartImages",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AvatarsPresentationTest",
+      "name": "subscriptionCommentsAndCompactAuthorUseTheirIntendedSizes",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AvatarsPresentationTest",
+      "name": "narrowWatchIdentityAtLargeFontKeepsSubscribeBelowTheAuthor",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChannelDescriptionPresentationTest",
+      "name": "completeTextScrollsToTheFinalLineAndCloseAndBackKeepTheChannelPage",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChannelDescriptionPresentationTest",
+      "name": "narrowDarkLargeFontSheetKeepsItsCloseButtonAndAllTextAccessible",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChannelDescriptionPresentationTest",
+      "name": "blankDescriptionsHaveNoReadButton",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChannelDescriptionPresentationTest",
+      "name": "shortDescriptionsAlsoOpenAndTheSheetCanBeSwipedAway",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChaptersPresentationTest",
+      "name": "openingRevealsCurrentChapterAndSeekingKeepsThePanelOpen",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChaptersPresentationTest",
+      "name": "restorationKeepsOpenStateAndScrollButNewOccurrencesResetIt",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChaptersPresentationTest",
+      "name": "inlineChapterAndScrubFeedbackKeepAccessibleLongRtlTitles",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ChaptersPresentationTest",
+      "name": "unavailableChaptersHideTheEntryAndLoadingDisablesSeekActions",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommentsPresentationTest",
+      "name": "lightThemeRichContentAndMetadataAreDistinct",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommentsPresentationTest",
+      "name": "darkThemeLargeFontsAndNarrowLayoutKeepMetadataReadable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommentsPresentationTest",
+      "name": "wideLayoutRetainsRichTextAndReadOnlyLikeSemantics",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "postActionsSeparateLikesAndShareAboveAFullWidthCommentsButton",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "invalidPostIdentifiersDisableOnlyTheUnavailableActions",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "postExpansionRestoresAndKeepsRichLinksInsideTheCard",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "shortAndStandalonePostBodiesHaveNoExpansionControl",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "postShareChooserContainsThePostUrlAndChannelOwner",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "channelIdentityAndRichDescriptionLinksWorkAtNarrowLargeFontSizes",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "galleryRemainsBrowsableWhenImagesFailAndViewerHasAnAccessibleCloseButton",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.CommunityPresentationTest",
+      "name": "postCommentPanelKeepsCloseSortingAndReadOnlyMetadataAccessible",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LibraryGlassPresentationTest",
+      "name": "narrowLargeTextDashboardKeepsEveryDestinationReachableInBothAppearances",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LibraryGlassPresentationTest",
+      "name": "wideDashboardUsesTwoColumnsAndGuestDownloadsRemainAvailable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LibraryGlassPresentationTest",
+      "name": "floatingToolbarLeavesFirstAndLastRowsAccessibleAtLargeText",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LibraryGlassPresentationTest",
+      "name": "playlistFormKeepsSaveAvailableAndPreservesPrivacyAndTrimmedTitle",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.MetadataPresentationTest",
+      "name": "compactChannelAndVerifiedWatchDetailsRemainReadableAtLargeFont",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.MetadataPresentationTest",
+      "name": "roundedAndLegacyCountsNeverGainExactTotalsAndEpochDatesStayHidden",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "name": "implicitPlaybackNeverShowsAQueueRegardlessOfItemCount",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "name": "followingDuplicateOccurrencesOnlyScrollsTheBoundedInnerList",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "name": "collapsedQueueStaysCollapsedOnAdvanceAndReopensAtCurrentOccurrence",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "name": "loadingAndRecoveryRemainVisibleWithoutDetailsAndWhileCollapsed",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "name": "narrowDarkLargeFontLayoutKeepsActionsAccessible",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "name": "light390dpLayoutKeepsActionsAccessible",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "measuredChromeKeepsTransportCenteredOrInHeaderAboveFullWidthSeeking",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "noSeekButtonsAndChatStaysToTheLeftOfSettings",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "multiHourTimestampCompactsAtLargeFontsWithoutLosingChapterOrSeeking",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "loadingAndRetryRemainInsideTheRailInShallowVideo",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "chapterTracksScrubbingAndSupportsClickAndKeyboardWithoutDisplacingSettings",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "playbackKeepsPlayPauseReplayDisabledAndLoadingStates",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "name": "videosWithoutChaptersKeepTimeAndIconsAndLiveDurationLabel",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionGlassPresentationTest",
+      "name": "narrowLargeTextFeedReflowsAndKeepsItsContentBelowChrome",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionGlassPresentationTest",
+      "name": "directoryLastRowAndCountStayAccessibleWithLargeTextAndOpaqueGlass",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionGlassPresentationTest",
+      "name": "channelTabsScrollAndSortMenusKeepTheirSelectedSemantics",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionsPresentationTest",
+      "name": "sortingAndDetailsFitNarrowScreensWithLargeTextAndProduceScreenshots",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionsPresentationTest",
+      "name": "narrowLightAndDarkDirectoriesKeepSearchPinnedAndRowsAccessible",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionsPresentationTest",
+      "name": "liveNameSearchAndClearWorkInThinModeAndEmptyStatesStayDistinct",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VideoInformationPresentationTest",
+      "name": "metadataAndCreditsFitNarrowDarkLargeFontLayouts",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VideoInformationPresentationTest",
+      "name": "descriptionOwnsMetadataVisibilityAndGenreLinksStillWork",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VideoInformationPresentationTest",
+      "name": "emptyDescriptionsStillShowMetadataAndMissingMetadataAddsNoSection",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VideoInformationPresentationTest",
+      "name": "richDescriptionPreservesFormattingAndNativeLinkTargets",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VideoInformationPresentationTest",
+      "name": "plainFallbackLinksTimestampsAndHashtagsWithoutExecutingHtml",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.WatchCommentsPresentationTest",
+      "name": "floatingGlassLeavesFirstCommentReadableAndKeepsSortAndRepliesWorking",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ClipsSmokeTest",
+      "name": "createPreviewFailedPublishDraftAndDeletionCompleteTheFlow",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.ClipsSmokeTest",
+      "name": "trimAccessibilityKeyboardRotationAndWideEditorKeepTheDraftUsable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiveChatSmokeTest",
+      "name": "overlayAndDockSupportLargeFontsBothThemesAndAccessibleCloseTargets",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiveChatSmokeTest",
+      "name": "settingsKeepDraftsAndFixedSaveWhileLayoutAndAppearanceSaveImmediately",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiveChatSmokeTest",
+      "name": "overlayDragAndResizeSaveCancelWithoutSeekingOrMinimizing",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.StreamControlsSmokeTest",
+      "name": "exactTracksMenusRefreshRetryAndReconnection",
+      "failed": false
+    }
+  ]
+}

@@ -1,0 +1,237 @@
+{
+  "origin": "Selector membership from declared source, reconciled with executed counts and failures in the retained run log.",
+  "tests": 46,
+  "failures": 1,
+  "cases": [
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans",
+      "failed": true
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "labelsIconsAndMenuSlotsNeverPaintTheirOwnBackgrounds",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "generatedEnvironmentsKeepReadableLabelsWithoutAdditionalBacking",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "navigationLabelsRemainReadableOverNarrowArtworkBands",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "sceneDownsamplesChangesAndStopsWhenSettled",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "nestedPageRecordingPreservesForegroundsAndCornerTransparency",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "softwareAndReducedTransparencyUseReadablePlatesWithoutReadback",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassFoundationTest",
+      "name": "pressCancellationAndRapidRepetitionKeepOneSemanticAction",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.DarkGlassPresentationTest",
+      "name": "materialsRemainVisibleInBothAppearancesAndOpaqueMode",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.DarkGlassPresentationTest",
+      "name": "neutralPalettePreservesTextActionAndStatusContrast",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassControlPresentationTest",
+      "name": "subscriptionStateAndExplicitActionRemainClearWithLargeText",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.GlassControlPresentationTest",
+      "name": "settingsToolbarAndSegmentedControlsFitNarrowLargeTextAndKeepRowsReachable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.WatchGlassPresentationTest",
+      "name": "arrivingAmbientPalettePreservesAnOpenMenu",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.WatchGlassPresentationTest",
+      "name": "actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.WatchGlassPresentationTest",
+      "name": "narrowLargeTextKeepsActionLabelsWhole",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.WatchGlassPresentationTest",
+      "name": "disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.WatchGlassPresentationTest",
+      "name": "longPressShowsTheActionTooltipWithoutActivatingTheButton",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerFeedbackPresentationTest",
+      "name": "compactActionsStayAtBottomLeftAndClearTheTimelineAndOtherControls",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerFeedbackPresentationTest",
+      "name": "skipAndCloseRemainAccessibleAndConfirmationIsCompact",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlayerFeedbackPresentationTest",
+      "name": "seekHasNoBackdropAndSponsorHonorsReduceTransparency",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "discoverFeedsAndBottomSearchPreserveTheirOrigin",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "youOwnsGuestSettingsAndOpaqueAccessibilityMode",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "transparentGlassKeepsActionsReachableAcrossLightAndDarkPages",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "systemAppearanceUsesDarkGlassAndHonorsAnExplicitLightChoice",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "watchPreservesFourAspectRatiosAndPlaybackThroughMiniSearchAndSettings",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "wideSidebarAndLargeTextRemainReachable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "systemReducedMotionKeepsNavigationAndMinimizationUsable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "guestTitleContributionReturnsToWatchAfterSignInCancellation",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "name": "watchGlassNarrowLargeTextAndWideLayoutsKeepActionsReachable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "name": "settingsFormsMenusAndAuthenticationStayReachable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "name": "everySettingsCategorySharesGlassAndKeepsItsFooterReachable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "name": "accountManagementUsesQuietFormsAndExplicitConfirmations",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "name": "subscriptionMenuPendingFailureAndRetryNeverMisrepresentMembership",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "name": "guestSubscribeCompletesAfterSignInAndReturnsToTheCreator",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "name": "canceledSubscribeSignInDoesNotChangeALaterAccount",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionGlassJourneyTest",
+      "name": "feedDirectoryAndCreatorSheetsRetainPlaybackAndTheirOrigin",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionGlassJourneyTest",
+      "name": "darkOpaqueFeedAndExportsRetainAccessibleControls",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.SubscriptionGlassJourneyTest",
+      "name": "wideFeedsUseTwoColumnsAndReducedMotionPreservesNavigation",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LibraryGlassJourneyTest",
+      "name": "libraryPagesAndEditorsKeepPlaybackAndTheirGlassControls",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.LibraryGlassJourneyTest",
+      "name": "downloadProgressFailuresDetailsAndOfflinePlaybackRemainActionable",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisualSurfaceRegressionTest",
+      "name": "artworkAvailabilityPreservesAnOpenControlMenu",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisualSurfaceRegressionTest",
+      "name": "roundedActionsLeaveTheContrastingContainerVisibleAtTheirCorners",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisualSurfaceRegressionTest",
+      "name": "wrappedToolbarTitleMasksScrollingGlyphsAndReservesMeasuredInsets",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisualSurfaceRegressionTest",
+      "name": "launcherSymbolsStayInsideTheSafeRegionForEveryMask",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisualSurfaceRegressionTest",
+      "name": "multipartToolbarPlacesControlsBelowTheSafeTitle",
+      "failed": false
+    }
+  ]
+}

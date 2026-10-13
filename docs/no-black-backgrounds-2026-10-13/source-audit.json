@@ -1,0 +1,238 @@
+[
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/AccountUi.kt",
+    "sha256": "c5f35afd29c141f96832aa2538eecbf2d9b291626dd01bf89468df6325fbfa15"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/ActionControlsUi.kt",
+    "sha256": "7b1f209e568a73ae3d332e85c1107ad7540815bdf5a1571c95a0aac1c5a98d48"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/AiFilterUi.kt",
+    "sha256": "ff674f1c022d9c86e350aa1c3165297f1cb2be3c3201f26f8ac86c3c675589ad"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/AmbientPalette.kt",
+    "sha256": "4dbbfa4f87e0f01487f6541d12b2e213ff1427b1c18177f8a42ce223091557cb"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/AppViewModel.kt",
+    "sha256": "f44f2f6a4d3373aa43fbea41e6ca6f359d722b4d3a159730dee887d8a6f6c777"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/AvatarUi.kt",
+    "sha256": "76ffd24f6102c1a9280ae7d806b59b2f24fe8272a674b5d7da660d9b28967741"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/BrowseGlassUi.kt",
+    "sha256": "267f48e1cedfda0fb5caee6bbc5c01fe7bf29132289dc50eeeee338f7da0a878"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/ChannelDescriptionUi.kt",
+    "sha256": "9e3992f5d3fdd54e45113be56456c5095825a241162fe7ab49a0fae9db366e54"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/ChaptersUi.kt",
+    "sha256": "3a596faec37cd34798c8edae41cfb66ed0912317b0b665794b81d9e3089f92ee"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/ClipsState.kt",
+    "sha256": "1cfe151f6581b2f1cdc303780fef9497443d47455680e21ce8f9fc10ebae8d26"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/ClipsUi.kt",
+    "sha256": "f2498fc9aca56bf2db66d656b2f2b7c5c5bddc9f8c25e28b24fd33ea74b2e55c"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/CommentsUi.kt",
+    "sha256": "3084c21837c2babc6007b2e057339c86892be525628e5fe19e586f0ec88c4a4d"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/CommunityUi.kt",
+    "sha256": "c71f0f19265619d0ea3389255ed73ea7d3d3950ba70f6005be9354a617c09fd8"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/DeArrowUi.kt",
+    "sha256": "f8d95e2dce07847a3cddce6c5cda81b77ca6e95fe0d9ee76ef573a175c45ad38"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/DiscoveryUi.kt",
+    "sha256": "940e0907aaa8c3f10a4f36c182b591fffa44a99edb7c25487ea58b202712da9a"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/DownloadsUi.kt",
+    "sha256": "349f5c287645080a893e71854f73200069c0067e0f708a1230b3ddcf898ae4fa"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/GlassContent.kt",
+    "sha256": "9be14de92ca0f17768bd4da473bac9d47b5cbe5448564b7d6531bf026cfa0ffe"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/GlassDialog.kt",
+    "sha256": "9c7e98f9a84afa864c874f95105de495d303b2c02dd44451884a40dd9df82a60"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/GlassMaterial.kt",
+    "sha256": "56c7af97f9e8be4fe61b6d01a71dcbf24db83a302ed102d27a5519254ef719bf"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/GlassScene.kt",
+    "sha256": "825f964535a82a67d24335e484d6e6be96a41736fc190add0fd0b2d868ff4cd8"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/LibraryActionsUi.kt",
+    "sha256": "4d8d9155905e7bffcc3c0442a94199b8ba706def93cc012f4265b77cbc193d61"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/LibraryGlassUi.kt",
+    "sha256": "24fd540716465b8cce2c34e3eafb6ce2ddedbcf6bf39c361a20bdacde731d5e4"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/LiquidDesign.kt",
+    "sha256": "31448bdc9b18e60bb0cf74a8e786386d0175d0220c3effaa7bc3089e1ce1de5e"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/LiquidNavigation.kt",
+    "sha256": "c7ba62a27b028a3ca45391399247c551d4eb12a44cb1b1cac666f064e27c37c5"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/LiveChatUi.kt",
+    "sha256": "b806f9c1ea3b44f6fc7d422f9f219243a9fcd0868f480f690ec49a1462011bc7"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/MetadataUi.kt",
+    "sha256": "8ec3f5b8ee201c000c2270d3c846a4c15c2630eea5ddc1df73a6affa80d3c3f2"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/MobiviousApp.kt",
+    "sha256": "315fb579767bb55fd19ff75628010baca6d7474b3ce091e1e572ecfb28bce450"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlaybackQueueUi.kt",
+    "sha256": "859bc3ceea577ae0fd44d7606a3472e3b15fc6e835163b00df777145d8b30f2f"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlaybackVideoSurface.kt",
+    "sha256": "729376d8767c92a21af7123dc2199709fbf059538290272f32da4d63db3906ea"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlayerControlsUi.kt",
+    "sha256": "71e1c6c2f31b05227c15a5f499bd1e3d306b9e8479e16904e957ddf720be4490"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlayerGestures.kt",
+    "sha256": "7f234ad77774c1c2ba898bac85506d1cae073b4bc4a23d8e174994b1faa895c2"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlayerPresentation.kt",
+    "sha256": "ea802b2d322ae24e97464dc7ae6a928c30eb9484d3f927ee954915383493ac81"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlayerUi.kt",
+    "sha256": "3daadd6237d460287c1b31853d9a963b16ccba96c935bff5fce4375574317caa"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/PlaylistUi.kt",
+    "sha256": "a6d0a9c7fa65f7fd76d9e8eb8dc0958341b48613bfe63f0d437c133081743b91"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/RssUi.kt",
+    "sha256": "0623b76e23c76ab186ef0571a178ba30cb6e61b8ef7add33b6915a9b843e76c8"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt",
+    "sha256": "e326dee221ab1a59f0da0dac5eeadba2fe1d5f8d7d702a1b4e31f089e036a9e1"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt",
+    "sha256": "d8f7994b094076760d82bd7a49a466f5b6e3dbaf95e7d0ce4dbfdcf4b3732b5a"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt",
+    "sha256": "8fffea492e6e839ae34575e5bade75215914c34e11aa153373c23f930e2b73b9"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionBrowseUi.kt",
+    "sha256": "3ac6d8130dcc21a71227fd1d6ad1fa37757d7359aebf72bd54ef7c9ded704eef"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionControl.kt",
+    "sha256": "a361f1ed9d6fa68797c4099ef1d596efa98586d0d803ee1c293145ee069f0984"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionsUi.kt",
+    "sha256": "4ebf0d81cc0ff6bdeab88de3781724a3595437c11972df6a8e915ca475aef332"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/VideoInformationUi.kt",
+    "sha256": "70420f7d19349f5099474ff253f30af464f05566f98cd8e415fae3244cc547c0"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/VisibilityUi.kt",
+    "sha256": "c50fb5f2042be1c17154e0c3eced7a696825d226332a1bcbde3e965bd9f94467"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/WatchActionsUi.kt",
+    "sha256": "9314280615740ea10571d0e5b7328149845d75fffc7bec6e96879787dae0e0dc"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/WatchAmbient.kt",
+    "sha256": "a709bc92e7ec63dcb677ec802eac8284cd69a6d4eb57bc10511a6702c8488f8e"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/WatchGlassUi.kt",
+    "sha256": "b1041a11bd959896a5e70a14693bb5b5793ef5b1f2012d139382ff3f137b5d3c"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/WatchPlayerResize.kt",
+    "sha256": "40941060d86e9ed5675867ea339f6280204e4f923592a43914ccbc61fff861c7"
+  },
+  {
+    "file": "android/app/src/main/java/net/wingress/mobivious/ui/YouUi.kt",
+    "sha256": "0f182b05775d252f4e63b5ff4e5ca523484941ad3b192c755fefdaea7db6b685"
+  },
+  {
+    "file": "android/app/src/main/res/drawable/ic_launcher.xml",
+    "sha256": "49b4a0785cab1a60a7363baa356b98cf9864b2c7c23d9df4c021b50138046927"
+  },
+  {
+    "file": "android/app/src/main/res/drawable/ic_launcher_background.xml",
+    "sha256": "d35e49cc4ca797fc279643a3b40a4350910d09a7c100eb8ce03d7e19338a759b"
+  },
+  {
+    "file": "android/app/src/main/res/drawable/ic_launcher_monochrome.xml",
+    "sha256": "705489acaab4a570ae36b62083d85d1a8a789bbf1331f450092ef53634f9ec94"
+  },
+  {
+    "file": "android/app/src/main/res/layout/clip_preview.xml",
+    "sha256": "33af649e32b22363ad1dc233478a9f29121541e58406eaa485967cdf116f1eae"
+  },
+  {
+    "file": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+    "sha256": "9093d53778beb412b8f3375eff26b768e201960ca687023b870e816b95e8725f"
+  },
+  {
+    "file": "android/app/src/main/res/values/colors.xml",
+    "sha256": "573fcebc71e5b1a2d1dd3353d7e26e9725be1b6af2464cd62ee384c192f07f52"
+  },
+  {
+    "file": "android/app/src/main/res/values/media_colors.xml",
+    "sha256": "0bc189f6a2d56fed77d26856d31201bff2c13a08f1b3542ffa84010b938c4b9c"
+  },
+  {
+    "file": "android/app/src/main/res/values/styles.xml",
+    "sha256": "948ba60db0134688981fe5832f3c0dceac164f7a9798bdbd4c4c8a5862c0b802"
+  },
+  {
+    "file": "android/app/src/main/res/values-night/colors.xml",
+    "sha256": "44b8450f732f270597e16562c874fa1751800fb0f479b40670900b8d080dd74d"
+  },
+  {
+    "file": "android/app/src/main/res/xml/data_extraction_rules.xml",
+    "sha256": "cb029b35db0e976c087100424e16e14a6256b46962398887520e51508c3b5842"
+  },
+  {
+    "file": "android/app/src/main/res/xml/rss_paths.xml",
+    "sha256": "6c923335831e2326c41fed473535b778b3b6b537e68a168387d14926420555ba"
+  }
+]

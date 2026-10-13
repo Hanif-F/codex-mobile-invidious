@@ -30,9 +30,7 @@ internal fun SubscriptionChannelsScreen(state: SubscriptionChannelsState, server
         Column(Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SearchField(state.query, search, "Search channels", "subscription-channel-search", Modifier.weight(1f), glass = true) {}
-                IconButton(onClick = refresh, enabled = !state.loading, modifier = Modifier.size(48.dp).browseGlass(androidx.compose.foundation.shape.CircleShape)) {
-                    Icon(Icons.Default.Refresh, "Refresh channels")
-                }
+                GlassIconButton(Icons.Default.Refresh, "Refresh channels", enabled = !state.loading, onClick = refresh)
             }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
                 itemVerticalAlignment = Alignment.CenterVertically) {

@@ -62,9 +62,7 @@ internal fun TrendingControls(vm: AppViewModel, region: String) {
     var regionOpen by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BrowseTabs(TrendingCategory.entries, category, { it.label }, { "trending-${it.apiValue}" }, select = vm::selectTrendingCategory)
-        TextButton(onClick = { regionOpen = true }, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp).browseGlass().testTag("trending-region")) {
-            Text(ContentRegions.label(region, locale)); Spacer(Modifier.width(4.dp)); Icon(Icons.Default.ExpandMore, null, Modifier.size(18.dp))
-        }
+        LibraryActionButton(ContentRegions.label(region, locale), Modifier.testTag("trending-region"), enabled = !busy, icon = Icons.Default.ExpandMore) { regionOpen = true }
         if (regionOpen) RegionPicker(region, { regionOpen = false }) { regionOpen = false; vm.selectTrendingRegion(it) }
         if (busy) Text("Saving region…", style = MaterialTheme.typography.bodySmall)
         error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("trending-region-error")) }

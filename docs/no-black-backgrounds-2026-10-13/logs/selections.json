@@ -1,0 +1,95 @@
+[
+  {
+    "run": "final-core-journeys",
+    "selectors": [
+      "net.wingress.mobivious.GlassFoundationTest",
+      "net.wingress.mobivious.DarkGlassPresentationTest",
+      "net.wingress.mobivious.GlassControlPresentationTest",
+      "net.wingress.mobivious.WatchGlassPresentationTest",
+      "net.wingress.mobivious.PlayerFeedbackPresentationTest",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest",
+      "net.wingress.mobivious.RemainingGlassJourneyTest",
+      "net.wingress.mobivious.SubscriptionGlassJourneyTest",
+      "net.wingress.mobivious.LibraryGlassJourneyTest",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest"
+    ],
+    "tests": 46,
+    "failures": 1
+  },
+  {
+    "run": "secondary",
+    "selectors": [
+      "net.wingress.mobivious.GlassFoundationTest",
+      "net.wingress.mobivious.ActionControlsPresentationTest",
+      "net.wingress.mobivious.AmbientModePresentationTest",
+      "net.wingress.mobivious.AvatarsPresentationTest",
+      "net.wingress.mobivious.ChannelDescriptionPresentationTest",
+      "net.wingress.mobivious.ChaptersPresentationTest",
+      "net.wingress.mobivious.CommentsPresentationTest",
+      "net.wingress.mobivious.CommunityPresentationTest",
+      "net.wingress.mobivious.LibraryGlassPresentationTest",
+      "net.wingress.mobivious.MetadataPresentationTest",
+      "net.wingress.mobivious.PlaybackQueuePresentationTest",
+      "net.wingress.mobivious.PlayerControlsPresentationTest",
+      "net.wingress.mobivious.SubscriptionGlassPresentationTest",
+      "net.wingress.mobivious.SubscriptionsPresentationTest",
+      "net.wingress.mobivious.VideoInformationPresentationTest",
+      "net.wingress.mobivious.WatchCommentsPresentationTest",
+      "net.wingress.mobivious.ClipsSmokeTest#createPreviewFailedPublishDraftAndDeletionCompleteTheFlow",
+      "net.wingress.mobivious.ClipsSmokeTest#trimAccessibilityKeyboardRotationAndWideEditorKeepTheDraftUsable",
+      "net.wingress.mobivious.LiveChatSmokeTest#overlayAndDockSupportLargeFontsBothThemesAndAccessibleCloseTargets",
+      "net.wingress.mobivious.LiveChatSmokeTest#settingsKeepDraftsAndFixedSaveWhileLayoutAndAppearanceSaveImmediately",
+      "net.wingress.mobivious.LiveChatSmokeTest#overlayDragAndResizeSaveCancelWithoutSeekingOrMinimizing",
+      "net.wingress.mobivious.StreamControlsSmokeTest#exactTracksMenusRefreshRetryAndReconnection"
+    ],
+    "tests": 74,
+    "failures": 0
+  },
+  {
+    "run": "features",
+    "selectors": [
+      "net.wingress.mobivious.VisibilitySmokeTest#guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts",
+      "net.wingress.mobivious.VisibilitySmokeTest#managerRetainsFailedChangesAndRefreshesWebsiteState",
+      "net.wingress.mobivious.VisibilitySmokeTest#cardBlockSearchOverrideAndChannelHeaderPreserveLibraryAccess",
+      "net.wingress.mobivious.DeArrowSmokeTest#contributionsGuidelinesFailuresAndPrivateIdentity",
+      "net.wingress.mobivious.AiFilterSmokeTest#warningsRenderAcrossThemesAndTextOnlyWithoutFetchingOriginalImages",
+      "net.wingress.mobivious.AiFilterSmokeTest#failedAccountSaveRetainsDraftAndListStatusExplainsStaleData",
+      "net.wingress.mobivious.PlaylistRssSmokeTest#rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange",
+      "net.wingress.mobivious.DiscoverySearchSmokeTest#searchTypesUseCorrectFiltersAndKeepVideoChoices",
+      "net.wingress.mobivious.DiscoverySearchSmokeTest#mixedSearchPreservesOrderChannelBackScrollRecreationAndRetry",
+      "net.wingress.mobivious.DiscoverySearchSmokeTest#controlsAndMixedCardsRemainReachableOnCompactDisplays"
+    ],
+    "tests": 10,
+    "failures": 0
+  },
+  {
+    "run": "captures",
+    "selectors": [
+      "net.wingress.mobivious.CommunityPresentationTest#postActionsSeparateLikesAndShareAboveAFullWidthCommentsButton",
+      "net.wingress.mobivious.CommunityPresentationTest#postExpansionRestoresAndKeepsRichLinksInsideTheCard",
+      "net.wingress.mobivious.CommunityPresentationTest#galleryRemainsBrowsableWhenImagesFailAndViewerHasAnAccessibleCloseButton",
+      "net.wingress.mobivious.CommunityPresentationTest#postCommentPanelKeepsCloseSortingAndReadOnlyMetadataAccessible",
+      "net.wingress.mobivious.VideoInformationPresentationTest#metadataAndCreditsFitNarrowDarkLargeFontLayouts"
+    ],
+    "tests": 5,
+    "failures": 0
+  },
+  {
+    "run": "final-sheets",
+    "selectors": [
+      "net.wingress.mobivious.ChannelDescriptionPresentationTest",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances",
+      "net.wingress.mobivious.SubscriptionGlassJourneyTest#feedDirectoryAndCreatorSheetsRetainPlaybackAndTheirOrigin",
+      "net.wingress.mobivious.PlaylistRssSmokeTest#rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange",
+      "net.wingress.mobivious.StreamControlsSmokeTest#exactTracksMenusRefreshRetryAndReconnection",
+      "net.wingress.mobivious.CommunitySmokeTest#postCommentsSheetSortsRepliesRetriesAndIgnoresVideoCommentVisibility",
+      "net.wingress.mobivious.CommunityPresentationTest#postActionsSeparateLikesAndShareAboveAFullWidthCommentsButton",
+      "net.wingress.mobivious.CommunityPresentationTest#postExpansionRestoresAndKeepsRichLinksInsideTheCard",
+      "net.wingress.mobivious.CommunityPresentationTest#galleryRemainsBrowsableWhenImagesFailAndViewerHasAnAccessibleCloseButton",
+      "net.wingress.mobivious.CommunityPresentationTest#postCommentPanelKeepsCloseSortingAndReadOnlyMetadataAccessible",
+      "net.wingress.mobivious.VideoInformationPresentationTest#metadataAndCreditsFitNarrowDarkLargeFontLayouts"
+    ],
+    "tests": 14,
+    "failures": 0
+  }
+]

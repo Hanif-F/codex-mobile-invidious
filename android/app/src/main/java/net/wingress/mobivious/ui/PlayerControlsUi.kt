@@ -98,8 +98,8 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
 
 @Composable
 private fun Modifier.playerEdgeContrast(top: Boolean): Modifier {
-    if (LocalReduceTransparency.current) return background(if (MaterialTheme.colorScheme.background.red < .3f) Color(0xFF181A1D) else Color(0xFF171B24))
-    val edge = Color.Black.copy(alpha = .18f)
+    if (LocalReduceTransparency.current) return background(GlassOptics.mediaPlate)
+    val edge = GlassOptics.mediaPlate.copy(alpha = .18f)
     return background(Brush.verticalGradient(if (top) listOf(edge, Color.Transparent) else listOf(Color.Transparent, edge)))
 }
 
@@ -204,7 +204,7 @@ internal fun PlayerControlHeader(playback: PlaybackState, fullscreen: Boolean, s
 @Composable
 private fun PlayerIconButton(icon: ImageVector, description: String, modifier: Modifier = Modifier,
     enabled: Boolean = true, contentOffset: Dp = 0.dp, onClick: () -> Unit) {
-    IconButton(onClick, modifier.size(48.dp), enabled = enabled) {
+    GlassInsetIconButton(onClick, modifier.size(48.dp).mediaGlass(CircleShape), enabled = enabled) {
         Box(Modifier.offset(y = contentOffset)) { PlayerIcon(icon, description, enabled = enabled) }
     }
 }
@@ -234,9 +234,8 @@ internal fun PlayerPlayControl(playback: PlaybackState, modifier: Modifier = Mod
     val ended = playback.playerState == Player.STATE_ENDED
     val icon = if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow
     val description = if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play"
-    IconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.testTag("player-play-pause")
-        .then(if (LocalReduceTransparency.current) Modifier.background(
-            if (MaterialTheme.colorScheme.background.red < .3f) Color(0xFF181A1D) else Color(0xFF171B24), CircleShape) else Modifier)) {
+    GlassInsetIconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.testTag("player-play-pause")
+        .mediaGlass(CircleShape)) {
         PlayerIcon(icon, description, size = 36.dp, enabled = playback.canPlay)
         if (playback.buffering) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Buffering" },
             color = Color.White, strokeWidth = 2.dp)

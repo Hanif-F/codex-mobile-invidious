@@ -95,14 +95,14 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
             LazyColumn(Modifier.weight(1f, fill = fullScreen).fillMaxWidth().testTag("sponsorblock-settings-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topInset, bottom = 16.dp)) {
                 when (page) {
                     "Global SponsorBlock settings" -> {
-                        item {
+                        item { GlassSection {
                             Text(if (account != null) "These settings are shared with the website." else "Global settings are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall)
                             Row(verticalAlignment = Alignment.CenterVertically) { Text("Enable SponsorBlock", Modifier.weight(1f)); Switch(global.enabled, { global = global.copy(enabled = it); edited = true }, enabled = !busy) }
                             Text("Choose how to handle community-submitted segments. Auto and manual modes also show timeline markers. Disabled categories are hidden.", style = MaterialTheme.typography.bodySmall)
                             ActionRow("Channel SponsorBlock settings", enabled = !busy) { navigate("Configured channels") }
-                        }
+                        } }
                         items(SponsorBlockCategory.entries) { category ->
-                            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                            GlassSection(Modifier.padding(vertical = 8.dp)) {
                                 val color = global.colors[category] ?: category.color
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(Modifier.size(20.dp).clip(CircleShape).background(sponsorColor(color.takeIf(SponsorBlockRules::validColor) ?: category.color)))
@@ -123,31 +123,31 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
                     }
                     "Configured channels" -> {
                         run {
-                            item {
+                            item { GlassSection {
                                 Text("Channel settings override global settings. Use global follows future global changes. Colors remain global.")
                                 OutlinedTextField(input, { input = it }, label = { Text("Channel ID or /channel/UC… URL") }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth())
                                 LibraryActionButton("Edit channel settings", enabled = !busy, onClick = { val id = SponsorBlockRules.channelId(input); if (id == null) error = "Enter a valid channel ID or /channel/UC… URL." else navigate("Channel SponsorBlock settings", id) })
                                 if (prefs.sponsorBlock.channels.isEmpty()) Text("No channel overrides yet.")
-                            }
+                            } }
                             items(prefs.sponsorBlock.channels.toList().sortedBy { it.second.name.lowercase() }, key = { it.first }) { (id, saved) -> ActionRow(saved.name, modifier = Modifier.testTag("sponsor-configured-channel-$id"), detail = "Channel SponsorBlock settings", enabled = !busy) { navigate("Channel SponsorBlock settings", id) } }
                         }
                     }
                     "Channel SponsorBlock settings" -> {
                         run {
-                            item {
+                            item { GlassSection {
                                 Text(channel.name, style = MaterialTheme.typography.titleMedium)
                                 if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                                 DropdownChoiceRow("SponsorBlock", listOf("inherit" to "Use global (${if (prefs.sponsorBlock.enabled) "Enabled" else "Disabled"})", "true" to "Enabled", "false" to "Disabled"),
                                     channel.enabled?.toString() ?: "inherit", enabled = !busy && !loading, modifier = Modifier.testTag("sponsor-channel-enabled")) { channel = channel.copy(enabled = it.toBooleanStrictOrNull()); edited = true }
                                 Text("Category colors remain global.", style = MaterialTheme.typography.bodySmall)
-                            }
-                            items(SponsorBlockCategory.entries) { category ->
+                            } }
+                            items(SponsorBlockCategory.entries) { category -> GlassSection {
                                 Text(category.label, style = MaterialTheme.typography.titleMedium)
                                 DropdownChoiceRow("Skip option", listOf("inherit" to "Use global (${prefs.sponsorBlock.modes[category]?.label})") + SponsorBlockMode.entries.map { it.wire to it.label },
                                     channel.modes[category]?.wire ?: "inherit", enabled = !busy && !loading) {
                                     channel = channel.copy(modes = channel.modes.toMutableMap().apply { SponsorBlockMode.parse(it)?.let { mode -> put(category, mode) } ?: remove(category) }); edited = true
                                 }
-                            }
+                            } }
                         }
                     }
                 }
@@ -166,5 +166,6 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, signIn:
         }
     }
     if (fullScreen) Surface { content() }
-    else ModalBottomSheet(onDismissRequest = { if (!busy) dismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) { content() }
+    else ModalBottomSheet(onDismissRequest = { if (!busy) dismiss() }, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        sheetMaxWidth = 640.dp, containerColor = androidx.compose.ui.graphics.Color.Transparent) { content() }
 }

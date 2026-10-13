@@ -21,7 +21,8 @@ import net.wingress.mobivious.data.Comment
 internal fun ChannelDescriptionSheet(channel: Channel, server: String = "", link: (String) -> Unit = {}, dismiss: () -> Unit) {
     val maxHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     ModalBottomSheet(onDismissRequest = dismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) {
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent) {
         BrowseGlassSurface(Modifier.fillMaxWidth().height(maxHeight).testTag("channel-description-sheet"), toolbar = {
             BrowsePanelToolbar("Channel description", "Close channel description", dismiss, channel.name)
         }) { contentModifier, topInset ->

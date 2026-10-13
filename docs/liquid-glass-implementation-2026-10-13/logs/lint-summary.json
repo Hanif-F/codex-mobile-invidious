@@ -1,0 +1,14 @@
+{
+  "severity": {
+    "Warning": 36
+  },
+  "warningsById": {
+    "InflateParams": 1,
+    "AndroidGradlePluginVersion": 1,
+    "GradleDependency": 11,
+    "NewerVersionAvailable": 5,
+    "ExportedService": 1,
+    "ObsoleteSdkInt": 5,
+    "UseKtx": 12
+  }
+}

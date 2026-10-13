@@ -102,7 +102,7 @@ internal fun VideoInformation(details: VideoDetails, occurrence: String, server:
 @Composable
 internal fun LinkResolutionDialog(state: LinkResolutionState, retry: () -> Unit, external: (String) -> Unit, dismiss: () -> Unit) {
     if (state.link == null) return
-    AlertDialog(onDismissRequest = dismiss, containerColor = MaterialTheme.colorScheme.surfaceContainer, title = { Text("Open channel") }, text = {
+    GlassAlertDialog(onDismissRequest = dismiss,  title = { Text("Open channel") }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (state.loading) { CircularProgressIndicator(); Text("Resolving channel…") }
             else Text(state.error ?: "This channel could not be resolved.")

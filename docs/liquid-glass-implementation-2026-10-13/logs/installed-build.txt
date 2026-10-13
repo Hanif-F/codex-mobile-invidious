@@ -1,0 +1,8 @@
+Installed final debug APK SHA256 matches local APK: 77ccdf51b30b99934feec3bce643403c7a5ea33277ecdd8e390457fb53f56906
+density: Physical density: 480
+fontScale: 1.0
+animatorScale: 1.0
+navigationMode: 2
+accessibilityEnabled: 0
+accessibilityServices: null
+reverseMappings: 

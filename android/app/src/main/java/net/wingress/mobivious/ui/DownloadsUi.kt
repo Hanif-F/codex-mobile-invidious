@@ -57,27 +57,29 @@ internal fun DownloadDialog(vm: AppViewModel) {
                 if (catalog != null && !catalog.allowed) item { Text(catalog.reason) }
                 if (catalog?.allowed == true) {
                     listOf(DownloadKind.VIDEO, DownloadKind.AUDIO).forEach { kind ->
-                        item { Text(if (kind == DownloadKind.VIDEO) "Video" else "Audio", style = MaterialTheme.typography.titleMedium) }
+                        item { GlassSection { Text(if (kind == DownloadKind.VIDEO) "Video" else "Audio", style = MaterialTheme.typography.titleMedium)
                         val selected = if (kind == DownloadKind.VIDEO) state.selection.video else state.selection.audio
                         fun pick(key: String?) { vm.selectDownload(if (kind == DownloadKind.VIDEO) state.selection.copy(video = key) else state.selection.copy(audio = key)) }
-                        item {
+                        run {
                             Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { pick(null) }, verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected == null, { pick(null) }, enabled = !state.busy, modifier = Modifier.testTag("download-${kind.name.lowercase()}-none")); Text("None")
                             }
                         }
-                        items(catalog.choices.filter { it.kind == kind }, key = { it.key }) { choice ->
+                        catalog.choices.filter { it.kind == kind }.forEach { choice ->
                             Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { pick(choice.key) }.testTag("download-choice-${choice.key}"), verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected == choice.key, { pick(choice.key) }, enabled = !state.busy); Text(choiceLabel(choice), style = MaterialTheme.typography.bodyMedium)
                             }
                         }
+                        } }
                     }
-                    if (catalog.choices.any { it.kind == DownloadKind.CAPTION }) item { Text("Captions", style = MaterialTheme.typography.titleMedium) }
-                    items(catalog.choices.filter { it.kind == DownloadKind.CAPTION }, key = { it.key }) { choice ->
+                    if (catalog.choices.any { it.kind == DownloadKind.CAPTION }) item { GlassSection { Text("Captions", style = MaterialTheme.typography.titleMedium)
+                    catalog.choices.filter { it.kind == DownloadKind.CAPTION }.forEach { choice ->
                         fun toggle() = vm.selectDownload(state.selection.copy(captions = if (choice.key in state.selection.captions) state.selection.captions - choice.key else state.selection.captions + choice.key))
                         Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { toggle() }.testTag("download-choice-${choice.key}"), verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(choice.key in state.selection.captions, { toggle() }, enabled = !state.busy); Text(choiceLabel(choice))
                         }
                     }
+                    } }
                 }
                 item { TextButton(onClick = vm::dismissDownload, enabled = !state.busy) { Text("Cancel") } }
             }
@@ -161,9 +163,9 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                         if (record.active) TextButton(onClick = { vm.cancelDownload(record.id) }) { Text("Cancel") }
                         if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L }) TextButton(onClick = { vm.retryDownload(record.id) }) { Text("Retry") }
                         TextButton(onClick = { details = !details }, modifier = Modifier.testTag("download-details-${record.id}")) { Text(if (details) "Hide details" else "Details") }
-                        OverflowMenu("Actions for download ${video.title}", record.id, Modifier.size(48.dp).browseGlass(CircleShape).testTag("download-actions-${record.id}")) { close ->
-                            DropdownMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
-                            DropdownMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
+                        OverflowMenu("Actions for download ${video.title}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->
+                            GlassMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
+                            GlassMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
                         }
                     }
                 }
@@ -180,10 +182,12 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
     records.firstOrNull { it.id == exporting }?.let { record ->
         LibraryPanel("Save to files", { exporting = null }) { modifier, top ->
             Column(modifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                GlassSection {
                 Text(record.details.video.title, style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = { save(record, null) }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (record.assets.count { it.media } == 2) "Combined video and audio" else "Media file") }
                 record.assets.filter { it.choice.kind == DownloadKind.CAPTION && it.status == DownloadStatus.COMPLETE }.forEach { asset -> TextButton(onClick = { save(record, asset) }) { Text("Caption: ${asset.choice.label}") } }
                 TextButton(onClick = { exporting = null }) { Text("Cancel") }
+                }
             }
         }
     }

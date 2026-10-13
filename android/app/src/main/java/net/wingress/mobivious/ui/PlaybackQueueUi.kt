@@ -86,8 +86,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
     LaunchedEffect(state.token, state.currentKey, expanded) {
         if (expanded) visible.indexOfFirst { it.key == state.currentKey }.takeIf { it >= 0 }?.let { list.scrollToItem(it) }
     }
-    Surface(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("playback-queue"),
-        shape = Liquid.card, color = MaterialTheme.colorScheme.surfaceContainer) {
+    GlassSection(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("playback-queue")) {
         Column {
             ActionRow(state.source?.title?.ifBlank { "Playback queue" } ?: "Playback queue",
                 detail = currentTitle?.let { "Now playing · $it" }, icon = Icons.AutoMirrored.Filled.PlaylistPlay,
@@ -102,11 +101,11 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
                 HorizontalDivider()
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(previous, enabled = !state.loading && (state.currentIndex > 0 ||
+                        GlassInsetIconButton(previous, enabled = !state.loading && (state.currentIndex > 0 ||
                             (state.current?.sourceIndex ?: 0) > 0 || state.repeat == QueueRepeat.ALL)) {
                             Icon(Icons.Default.SkipPrevious, "Previous video")
                         }
-                        IconButton(next, enabled = !state.loading && (QueueRules.successor(state, 1, showMembers) != null ||
+                        GlassInsetIconButton(next, enabled = !state.loading && (QueueRules.successor(state, 1, showMembers) != null ||
                             !state.sourceComplete || state.repeat == QueueRepeat.ALL)) {
                             Icon(Icons.Default.SkipNext, "Next video")
                         }

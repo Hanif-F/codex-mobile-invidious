@@ -2,6 +2,7 @@ package net.wingress.mobivious.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -14,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -31,12 +35,12 @@ internal fun YouIdentity(account: Account?, server: String) {
     Row(Modifier.fillMaxWidth().testTag("you-identity").padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Box(Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            if (account == null) Icon(Icons.Default.PersonOutline, null, Modifier.size(32.dp), MaterialTheme.colorScheme.primary)
-            else Text(account.username.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            if (account == null) GlassIcon(Icons.Default.PersonOutline, null, Modifier.size(32.dp), MaterialTheme.colorScheme.primary)
+            else GlassLabel(account.username.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(account?.username ?: "Your personal space", style = MaterialTheme.typography.headlineSmall)
-            Text(server.toHttpUrlOrNull()?.host ?: server, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            GlassLabel(account?.username ?: "Your personal space", style = MaterialTheme.typography.headlineSmall)
+            GlassLabel(server.toHttpUrlOrNull()?.host ?: server, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -67,14 +71,22 @@ internal fun LibraryDestinations(navigate: (String) -> Unit) {
 
 @Composable
 private fun LibraryDestination(title: String, detail: String, icon: ImageVector, modifier: Modifier, action: () -> Unit) {
-    Row(modifier.browseGlass().clickable(role = Role.Button, onClick = action).heightIn(min = 80.dp).padding(horizontal = 20.dp, vertical = 16.dp),
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = rememberGlassContentColors(bounds)
+    val interaction = remember { MutableInteractionSource() }
+    val feedback = rememberGlassInteraction(interaction)
+    GlassForeground(foreground) {
+
+    Row(modifier.onGloballyPositioned { bounds = it.boundsInRoot() }.glassMaterial(Liquid.card, interaction = feedback).clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = action).heightIn(min = 80.dp).padding(horizontal = 20.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Icon(icon, null, Modifier.size(28.dp), MaterialTheme.colorScheme.primary)
+        GlassIcon(icon, null, Modifier.size(28.dp), MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            GlassLabel(title, style = MaterialTheme.typography.titleMedium)
+            GlassLabel(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Icon(Icons.Default.ChevronRight, null, Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+        GlassIcon(Icons.Default.ChevronRight, null, Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+
     }
 }
 
@@ -85,15 +97,15 @@ internal fun YouDashboard(account: Account?, server: String, state: LazyListStat
         contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = LocalContentBottomInset.current),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item { YouIdentity(account, server) }
-        item { Text("Your library", style = MaterialTheme.typography.titleLarge) }
+        item { GlassLabel("Your library", style = MaterialTheme.typography.titleLarge) }
         item { LibraryDestinations(navigate) }
         if (account == null) item {
             LibraryControlScene(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Your videos, together", style = MaterialTheme.typography.headlineSmall)
-                    Text("Sign in to keep your playlists, history, and clips together. Downloads stay on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    GlassLabel("Your videos, together", style = MaterialTheme.typography.headlineSmall)
+                    GlassLabel("Sign in to keep your playlists, history, and clips together. Downloads stay on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LibraryActionButton("Sign in", Modifier.testTag("you-sign-in"), Icons.AutoMirrored.Filled.Login, prominent = true, onClick = signIn)
-                    Text("No Google account needed. Create an account when your instance allows it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    GlassLabel("No Google account needed. Create an account when your instance allows it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

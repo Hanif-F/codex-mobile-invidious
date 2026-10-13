@@ -13,6 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,9 +35,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 /** Quiet controls paint their own shaped material without a rectangular backing or recursive sampling. */
 @Composable
 internal fun LibraryControlScene(modifier: Modifier = Modifier, content: @Composable BoxScope.() -> Unit) {
-    Box(modifier) {
-        CompositionLocalProvider(LocalGlassBackdrop provides null,
-            LocalContentColor provides MaterialTheme.colorScheme.onSurface) { content() }
+    if (LocalGlassBackdrop.current != null) Box(modifier, content = content)
+    else {
+        // Record a generated environment only. The actual container remains visible at corners.
+        val scene = rememberGlassScene(environmentOnly = true)
+        Box(modifier.recordGlassScene(scene)) {
+            CompositionLocalProvider(LocalGlassScene provides scene, LocalGlassBackdrop provides scene.backdrop) { content() }
+        }
     }
 }
 
@@ -42,14 +49,18 @@ internal fun LibraryControlScene(modifier: Modifier = Modifier, content: @Compos
 internal fun LibraryActionButton(label: String, modifier: Modifier = Modifier, icon: ImageVector? = null,
     enabled: Boolean = true, prominent: Boolean = false, destructive: Boolean = false, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .96f else 1f, spring(dampingRatio = .8f), label = "library-press")
-    TextButton(onClick, modifier.graphicsLayer { scaleX = scale; scaleY = scale }
-        .heightIn(min = 48.dp).browseGlass(prominent = prominent), enabled = enabled,
+    val feedback = rememberGlassInteraction(interaction)
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = rememberGlassContentColors(bounds, prominent = prominent)
+    TextButton(onClick, modifier.onGloballyPositioned { bounds = it.boundsInRoot() }.heightIn(min = 48.dp).glassMaterial(prominent = prominent, interaction = feedback), enabled = enabled,
         interactionSource = interaction, contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
-        colors = ButtonDefaults.textButtonColors(contentColor = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary)) {
-        icon?.let { Icon(it, null, Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)) }
-        Text(label)
+        colors = ButtonDefaults.textButtonColors(contentColor = if (destructive) MaterialTheme.colorScheme.error else foreground.primary)) {
+        GlassForeground(foreground) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                icon?.let { GlassIcon(it, null, Modifier.size(20.dp), tint = LocalContentColor.current.copy(alpha = if (enabled) 1f else .38f)); Spacer(Modifier.width(8.dp)) }
+                GlassLabel(label, color = (if (destructive) MaterialTheme.colorScheme.error else LocalContentColor.current).copy(alpha = if (enabled) 1f else .38f))
+            }
+        }
     }
 }
 
@@ -57,8 +68,8 @@ internal fun LibraryActionButton(label: String, modifier: Modifier = Modifier, i
 internal fun LibraryConfirmation(title: String, dismiss: () -> Unit, confirm: () -> Unit,
     enabled: Boolean = true, confirmLabel: String = "Delete", confirmTag: String = "", destructive: Boolean = true, dismissTag: String = "",
     text: @Composable () -> Unit) {
-    AlertDialog(onDismissRequest = { if (enabled) dismiss() }, title = { Text(title) }, text = text,
-        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+    GlassAlertDialog(onDismissRequest = { if (enabled) dismiss() }, title = { Text(title) }, text = text,
+
         confirmButton = { LibraryControlScene {
             LibraryActionButton(confirmLabel, Modifier.testTag(confirmTag), enabled = enabled, prominent = !destructive, destructive = destructive, onClick = confirm)
         } }, dismissButton = { TextButton(dismiss, Modifier.testTag(dismissTag), enabled = enabled) { Text("Cancel") } })
@@ -76,13 +87,13 @@ internal fun LibraryToolbar(title: String, large: Boolean = false, back: (() -> 
         if (largeText) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                back?.let { IconButton(it, Modifier.size(48.dp).browseGlass(CircleShape), enabled = backEnabled) { Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) } }
+                back?.let { GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, backLabel, Modifier.testTag("library-toolbar-back"), enabled = backEnabled, onClick = it) }
                 Spacer(Modifier.weight(1f)); actions()
             }
             Text(title, Modifier.semantics { heading() }, style = if (large) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
         } else Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            back?.let { IconButton(it, Modifier.size(48.dp).browseGlass(CircleShape), enabled = backEnabled) { Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) } }
+            back?.let { GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, backLabel, Modifier.testTag("library-toolbar-back"), enabled = backEnabled, onClick = it) }
             Text(title, Modifier.weight(1f).semantics { heading() }, style = if (large) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.titleLarge)
             actions()
         }
@@ -95,6 +106,7 @@ internal fun LibraryToolbar(title: String, large: Boolean = false, back: (() -> 
 internal fun LibraryPanel(title: String, close: () -> Unit, enabled: Boolean = true,
     closeLabel: String = "Close", actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (Modifier, Dp) -> Unit) {
+    val palette = originatingGlassPalette()
     Dialog(onDismissRequest = { if (enabled) close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val view = LocalView.current
         val light = MaterialTheme.colorScheme.surface.luminance() > .5f
@@ -105,14 +117,14 @@ internal fun LibraryPanel(title: String, close: () -> Unit, enabled: Boolean = t
             val phone = LocalConfiguration.current.smallestScreenWidthDp < 600
             Surface(Modifier.then(if (phone) Modifier.fillMaxSize() else Modifier.widthIn(max = 720.dp).fillMaxHeight(.95f)),
                 shape = if (phone) androidx.compose.foundation.shape.RoundedCornerShape(0.dp) else Liquid.card) {
+                CompositionLocalProvider(LocalGlassEnvironmentPalette provides palette) {
                 BrowseGlassSurface(Modifier.fillMaxSize(), softEdge = true, toolbar = {
                     LibraryToolbar(title, statusInset = false, actions = {
                         actions()
-                        IconButton({ if (enabled) close() }, Modifier.size(48.dp).browseGlass(CircleShape), enabled = enabled) {
-                            Icon(Icons.Default.Close, closeLabel)
-                        }
+                        GlassIconButton(Icons.Default.Close, closeLabel, enabled = enabled) { close() }
                     })
                 }, content = content)
+                }
             }
         }
     }

@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@color/exo_black_opacity_60,@color/exo_bottom_bar_background,@color/exo_black_opacity_70">
+    <!-- Media3's clip-preview controller otherwise supplies its own black scrim,
+         footer and settings popup. Match GlassOptics.mediaPlate for native chrome. -->
+    <color name="exo_black_opacity_60" tools:override="true">@android:color/transparent</color>
+    <color name="exo_bottom_bar_background" tools:override="true">#CC34445B</color>
+    <color name="exo_black_opacity_70" tools:override="true">#F234445B</color>
+</resources>

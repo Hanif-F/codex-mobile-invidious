@@ -1,6 +1,7 @@
 package net.wingress.mobivious.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
@@ -22,9 +23,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.background
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -63,23 +61,31 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
             val content = Modifier.widthIn(max = 800.dp).fillMaxSize()
             key(page, context) {
                 when (page) {
-                    "Settings" -> LazyColumn(content.testTag("settings-root"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    "Settings" -> LazyColumn(content.testTag("settings-root"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         item { Text(account?.let { "Signed in as ${it.username}" } ?: "Preferences for this device and instance", Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        item { SectionHeading("Your account") }
-                        item { SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate) }
-                        item { SectionHeading("Preferences") }
-                        item { SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate) }
-                        item { SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate) }
-                        item { SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate) }
-                        item { SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate) }
-                        item { SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate) }
-                        item { SectionHeading("Community tools") }
-                        item { SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate) }
-                        item { SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate) }
-                        item { SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate) }
-                        item { SectionHeading("Connection & app") }
-                        item { SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate) }
-                        item { SettingsLink("About", "Version and community data", Icons.Default.Info, navigate) }
+                        item { GlassSection {
+                            SectionHeading("Your account")
+                            SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate)
+                        } }
+                        item { GlassSection {
+                            SectionHeading("Preferences")
+                            SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate)
+                            SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate)
+                            SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate)
+                            SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate)
+                            SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate)
+                        } }
+                        item { GlassSection {
+                            SectionHeading("Community tools")
+                            SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate)
+                            SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate)
+                            SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate)
+                        } }
+                        item { GlassSection {
+                            SectionHeading("Connection & app")
+                            SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate)
+                            SettingsLink("About", "Version and community data", Icons.Default.Info, navigate)
+                        } }
                     }
                     "Server" -> ServerSettingsScreen(vm, content, back)
                     "About" -> AboutSettingsScreen(content)
@@ -121,20 +127,20 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     val density = LocalDensity.current
     var footerHeight by remember { mutableStateOf(100.dp) }
     Box(modifier.fillMaxSize().testTag("settings-category")) {
-        LazyColumn(Modifier.fillMaxSize().testTag("settings-list"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset,
-            top = LocalSettingsTopInset.current + 16.dp, bottom = footerHeight + 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        LazyColumn(Modifier.fillMaxSize().padding(bottom = footerHeight).testTag("settings-list"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset,
+            top = LocalSettingsTopInset.current + 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item { GlassSection { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             when (page) {
                 "AI channel filter" -> {
-                    item {
+                    item { GlassSection {
                         Column(Modifier.testTag("ai-filter-master")) {
                             SettingsToggle("Enable AI Channel Filter", "Pause filtering and warnings without clearing your choices", value.aiFilter.enabled, !busy) { update(value.copy(aiFilter = value.aiFilter.copy(enabled = it))) }
                         }
                         if (!value.aiFilter.enabled) Text("Filtering is paused. Edit the actions, then enable the filter and Save to apply them.", style = MaterialTheme.typography.bodySmall)
                         Text("AiSList is a community classification of channels. Blocklist means high confidence; Warnlist means moderate confidence. Classifications may be incorrect. Invidious does not perform automatic AI detection.", style = MaterialTheme.typography.bodySmall)
                         aiState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("ai-status-error")) }
-                    }
-                    AiPageGroup.entries.forEach { group -> item {
+                    } }
+                    AiPageGroup.entries.forEach { group -> item { GlassSection {
                         SettingsHeading(group.label)
                         Text(when (group) {
                             AiPageGroup.FEEDS -> "Videos in Popular and Trending."
@@ -148,11 +154,11 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                                     value.aiFilter.saved(kind, group).wire, !busy) { update(value.copy(aiFilter = value.aiFilter.withAction(kind, group, AiAction.parse(it, group)))) }
                             }
                         }
-                    } }
-                    item { AiListDetails(aiState) { scope.launch { vm.aiFilter.refreshStatus() } } }
+                    } } }
+                    item { GlassSection { AiListDetails(aiState) { scope.launch { vm.aiFilter.refreshStatus() } } } }
                 }
                 "Playback" -> {
-                    item {
+                    item { GlassSection {
                         SettingsHeading("Playback defaults")
                         SettingsToggle("Autoplay opened videos", "Start playing when you open a video", value.autoplay, !busy) { update(value.copy(autoplay = it)) }
                         SettingsToggle("Next recommendation", "Select the next eligible recommendation when a standalone video ends", value.continueNext, !busy) { update(value.copy(continueNext = it)) }
@@ -164,14 +170,14 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec, !busy) { update(value.copy(videoCodec = it)) }
                         SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash, !busy) { update(value.copy(qualityDash = it)) }
                         Text("Playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
-                    }
-                    item {
+                    } }
+                    item { GlassSection {
                         SettingsHeading("On this device")
                         SettingsToggle("Background playback", "Keep playing when the app is in the background", background, !busy) { if (vm.setBackground(it, context)) background = it }
                         SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip, !busy) { if (vm.setPip(it, context)) pip = it }
                         Text("These two options save immediately for this account or guest on this device.", style = MaterialTheme.typography.bodySmall)
-                    }
-                    item {
+                    } }
+                    item { GlassSection {
                         SettingsHeading("Caption language priority")
                         Text("Use the first available language. Set all priorities to None to start with captions off.", style = MaterialTheme.typography.bodySmall)
                         repeat(3) { index ->
@@ -180,9 +186,9 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                                 update(value.copy(captions = languages))
                             }
                         }
-                    }
+                    } }
                 }
-                "Appearance" -> item {
+                "Appearance" -> item { GlassSection {
                     SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode, !busy) { update(value.copy(darkMode = it)) }
                     val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
                     val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
@@ -193,19 +199,19 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode, !busy) { update(value.copy(thinMode = it)) }
                     SettingsHeading("Accessibility")
                     SettingsToggle("Reduce transparency", "Use solid controls for stronger contrast. Saves on this device immediately.", reduceTransparency, !busy) { vm.store.reduceTransparency(it) }
-                }
+                } }
                 "Browsing" -> {
-                    item {
+                    item { GlassSection {
                         SettingsToggle("Show members-only videos", "Include members-only content in video lists. This does not grant membership access.", value.showMemberVideos, !busy) { update(value.copy(showMemberVideos = it)) }
                         SettingsLink("Blocked channels", "Manage channels hidden from discovery and recommendations", Icons.Default.Block, navigate)
-                    }
-                    item {
+                    } }
+                    item { GlassSection {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
                         SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
                         Text("Choose where the app opens. Popular and Trending live in Discover; Subscriptions and You remain in navigation. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
                         RegionChoice(value.region, !busy, "settings-region") { update(value.copy(region = it)) }
-                    }
-                    item {
+                    } }
+                    item { GlassSection {
                         SettingsHeading("Video pages")
                         SettingsToggle("Show related videos", "Display recommendations below the video", value.relatedVideos, !busy) { update(value.copy(relatedVideos = it)) }
                         SettingsToggle("Expand descriptions by default", "Show the full description when opening a video", value.extendDescription, !busy) { update(value.copy(extendDescription = it)) }
@@ -213,20 +219,20 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                             val others = value.comments.filter { it != "youtube" && it.isNotBlank() }
                             update(value.copy(comments = ((if (enabled) listOf("youtube") else emptyList()) + others).take(2).let { it + List((2 - it.size).coerceAtLeast(0)) { "" } }))
                         }
-                    }
+                    } }
                 }
                 "Subscriptions" -> {
-                    if (account == null) item { LibraryEmptyState("Your subscription feed", "Sign in to change your subscription feed.", Icons.Default.Subscriptions, "Sign in", signIn) }
-                    else item {
+                    if (account == null) item { GlassSection { LibraryEmptyState("Your subscription feed", "Sign in to change your subscription feed.", Icons.Default.Subscriptions, "Sign in", signIn) } }
+                    else item { GlassSection {
                         SettingsChoice("Videos per page", (listOf(10, 20, 30, 40, 60, 100, 200, 500, 1000, 1500) + value.maxResults).distinct().sorted().map { it.toString() to it.toString() }, value.maxResults.toString(), !busy) { update(value.copy(maxResults = it.toInt())) }
                         SettingsChoice("Feed sorting", PreferenceRules.feedSorts.zip(listOf("Newest first", "Oldest first", "Title A–Z", "Title Z–A", "Channel A–Z", "Channel Z–A")), value.feedSort, !busy) { update(value.copy(feedSort = it)) }
                         SettingsToggle("Latest video from each channel", "Show one video per subscribed channel", value.latestOnly, !busy) { update(value.copy(latestOnly = it)) }
                         SettingsToggle("Unwatched videos only", "Hide videos already in your watch history", value.unseenOnly, !busy) { update(value.copy(unseenOnly = it)) }
                         SettingsToggle("Pending notifications only", "Show pending account uploads in this feed", value.notificationsOnly, !busy) { update(value.copy(notificationsOnly = it)) }
                         Text("This filters the feed; it does not enable Android alerts. Page size also applies to watch history.", style = MaterialTheme.typography.bodySmall)
-                    }
+                    } }
                 }
-                "History & library" -> item {
+                "History & library" -> item { GlassSection {
                     if (account != null) SettingsToggle("Watch history", "Record played videos in your shared account history", value.watchHistory, !busy) { update(value.copy(watchHistory = it)) }
                     else Text("Sign in to keep a shared watch history.", style = MaterialTheme.typography.bodyMedium)
                     SettingsToggle("Remember playback position", if (account != null) "Resume across Android and the website" else "Resume videos on this device", value.savePosition, !busy) { update(value.copy(savePosition = it)) }
@@ -234,20 +240,19 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsChoice("Default playlist", listOf("" to "None") + playlists.filter { it.owned }.map { it.id to it.title }, value.defaultPlaylist, !busy) { update(value.copy(defaultPlaylist = it)) }
                         Text("The default playlist appears first when saving a video.", style = MaterialTheme.typography.bodySmall)
                     }
-                }
+                } }
                 "DeArrow" -> {
-                    item {
+                    item { GlassSection {
                         SettingsToggle("Replace video titles with DeArrow", "Use community titles throughout browsing and playback", value.dearrowEnabled, !busy) { update(value.copy(dearrowEnabled = it)) }
                         SettingsToggle("Show original titles using the DeArrow icon", "Keep original titles available on each video", value.dearrowShowOriginal, !busy) { update(value.copy(dearrowShowOriginal = it)) }
-                    }
-                    if (account != null) item { DeArrowIdentitySettings(vm) }
-                    item { CommunityDataLinks() }
+                    } }
+                    if (account != null) item { GlassSection { DeArrowIdentitySettings(vm) } }
+                    item { GlassSection { CommunityDataLinks() } }
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().testTag("settings-footer")
             .onSizeChanged { footerHeight = with(density) { it.height.toDp() } }
-            .background(Brush.verticalGradient(listOf(Color.Transparent, MaterialTheme.colorScheme.surface)))
             .navigationBarsPadding().padding(horizontal = Liquid.inset, vertical = 12.dp)) {
             error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("settings-save-error")) }
             LibraryControlScene {
@@ -295,10 +300,13 @@ private fun AiListDetails(state: AiFilterState, refresh: () -> Unit) {
 
 @Composable
 private fun SettingsToggle(label: String, detail: String, value: Boolean, enabled: Boolean, update: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().toggleable(value, enabled = enabled, role = Role.Switch, onValueChange = update).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    val interaction = remember { MutableInteractionSource() }
+    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).glassItemFeedback(interaction)
+        .toggleable(value, interactionSource = interaction, indication = null, enabled = enabled, role = Role.Switch, onValueChange = update).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) { Text(label, style = MaterialTheme.typography.bodyLarge); Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Switch(value, null, enabled = enabled)
     }
+    HorizontalDivider(color = LocalContentColor.current.copy(alpha = .10f))
 }
 
 @Composable
@@ -311,24 +319,26 @@ private fun ServerSettingsScreen(vm: AppViewModel, modifier: Modifier, back: () 
     var address by rememberSaveable { mutableStateOf(vm.store.server) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     LazyColumn(modifier.fillMaxSize().imePadding(), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Your app and website share the same server and account. Changing servers signs you out.") }
-        item { OutlinedTextField(address, { address = it; error = null }, label = { Text("HTTPS address") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth(), isError = error != null) }
-        error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
-        item { LibraryControlScene { LibraryActionButton("Connect", prominent = true) { try { vm.switchServer(InvidiousApi.normalizeServer(address, BuildConfig.DEBUG)); back() } catch (e: Exception) { error = e.message } } } }
+        item { GlassSection {
+            Text("Your app and website share the same server and account. Changing servers signs you out.")
+            OutlinedTextField(address, { address = it; error = null }, label = { Text("HTTPS address") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth(), isError = error != null)
+            error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            LibraryActionButton("Connect", prominent = true) { try { vm.switchServer(InvidiousApi.normalizeServer(address, BuildConfig.DEBUG)); back() } catch (e: Exception) { error = e.message } }
+        } }
     }
 }
 
 @Composable
 private fun AboutSettingsScreen(modifier: Modifier) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { Text("Mobivious ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall); Text("Powered by Invidious & Companion", Modifier.padding(top = 8.dp)) }
-        item { CommunityDataLinks() }
-        item {
+        item { GlassSection { Text("Mobivious ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall); Text("Powered by Invidious & Companion", Modifier.padding(top = 8.dp)) } }
+        item { GlassSection { CommunityDataLinks() } }
+        item { GlassSection {
             val uri = LocalUriHandler.current
             Text("Open source", style = MaterialTheme.typography.titleMedium)
             Text("Glass rendering uses Backdrop 1.0.6 by Kyant, licensed under Apache 2.0.", style = MaterialTheme.typography.bodyMedium)
             TextButton(onClick = { uri.openUri("https://github.com/Kyant0/AndroidLiquidGlass") }) { Text("Backdrop source & license") }
-        }
+        } }
     }
 }
 

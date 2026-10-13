@@ -30,6 +30,8 @@ class AmbientModePresentationTest {
         var dark by mutableStateOf(true)
         var opaque by mutableStateOf(false)
         lateinit var state: WatchAmbientState
+        var actual = GlassContentColors.light
+        var scene: GlassScene? = null
         compose.setContent {
             state = remember { WatchAmbientState().apply { enabled = true; show(AmbientPalette(List(9) { 0xFFFF0000.toInt() })) } }
             DisposableEffect(state) { onDispose { state.close() } }
@@ -39,10 +41,12 @@ class AmbientModePresentationTest {
                 CompositionLocalProvider(LocalWatchAmbient provides state, LocalReduceTransparency provides opaque) {
                     WatchAmbientScene(Modifier.width(320.dp).height(640.dp).testTag("ambient-scene"),
                         Rect(8 * density, 0f, 312 * density, 180 * density)) {
+                        scene = LocalGlassScene.current
                         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
                             Spacer(Modifier.height(200.dp))
-                            Box(Modifier.fillMaxWidth().height(72.dp).watchGlass().testTag("ambient-glass"), contentAlignment = Alignment.Center) {
-                                Text("Glass", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            GlassSurface(Modifier.fillMaxWidth().height(72.dp).testTag("ambient-glass")) {
+                                actual = LocalGlassContentColors.current
+                                GlassLabel("Glass", Modifier.align(Alignment.Center).testTag("ambient-label"), color = actual.secondary)
                             }
                         }
                     }
@@ -70,13 +74,15 @@ class AmbientModePresentationTest {
             for (source in listOf(0xFFFFFFFF.toInt(), 0xFF000000.toInt(), 0xFF00FF00.toInt())) {
                 compose.runOnIdle { state.show(AmbientPalette(List(9) { source })) }
                 compose.mainClock.advanceTimeBy(800)
-                val foreground = (if (isDark) Liquid.dark else Liquid.light).onSurfaceVariant
-                val background = sample("ambient-glass")
+                val foreground = actual.secondary
+                val label = compose.onNodeWithTag("ambient-label").captureToImage().toPixelMap()
+                val background = label[label.width / 2, 1]
                 val contrast = (maxOf(foreground.luminance(), background.luminance()) + .05f) /
                     (minOf(foreground.luminance(), background.luminance()) + .05f)
                 assertTrue("Glass contrast $contrast dark=$isDark source=$source", contrast >= 4.5f)
             }
         }
+        assertEquals("Generated ambient palettes must not add Compose readback", 0, scene!!.captures)
         compose.runOnIdle { opaque = true }
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         compose.runOnIdle { opaque = false; state.enabled = false }

@@ -114,7 +114,8 @@ internal fun ChaptersPanel(chapters: List<VideoChapter>, positionMs: Long, state
 internal fun ChaptersSheet(chapters: List<VideoChapter>, playback: PlaybackState, state: ChapterPanelState, seek: (Long) -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
-    ModalBottomSheet(onDismissRequest = state::close, sheetState = sheetState, sheetMaxWidth = 640.dp) {
+    ModalBottomSheet(onDismissRequest = state::close, sheetState = sheetState, sheetMaxWidth = 640.dp,
+        containerColor = androidx.compose.ui.graphics.Color.Transparent) {
         BackHandler { state.close() }
         ChaptersPanel(chapters, playback.position, state, playback.seekable && !playback.loading && playback.error == null,
             state::close, seek, Modifier.fillMaxWidth().height(height))

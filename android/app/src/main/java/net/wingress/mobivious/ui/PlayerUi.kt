@@ -1,5 +1,8 @@
 package net.wingress.mobivious.ui
 
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -73,7 +76,7 @@ internal fun VideoPlayer(
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
     onChat: (() -> Unit)? = null, onVideoSurfaceChanged: (android.view.SurfaceView?) -> Unit = {},
     pictureOverlay: @Composable BoxScope.() -> Unit = {},
-) {
+) = DeferredPlayerGlass {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
@@ -118,7 +121,7 @@ internal fun VideoPlayer(
     }
     LaunchedEffect(feedbackGeneration) { if (feedback != null) { delay(800); feedback = null } }
     // A new pointer-input key cancels any pending single/double tap on media changes or PiP entry.
-    Box(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
+    Box(modifier.graphicsLayer { alpha = surfaceAlpha }.background(GlassOptics.mediaPlate).testTag("player-surface")
         .onGloballyPositioned {
             inputOrigin = it.positionInRoot()
             val bounds = it.boundsInWindow()
@@ -261,7 +264,6 @@ internal fun VideoPlayer(
 internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -> Unit, dismiss: (String) -> Unit) {
     val active = sponsor.active
     if (active == null && sponsor.notice.isBlank()) return
-    val plate = if (LocalReduceTransparency.current) Color(0xFF181A1D) else Color.Black.copy(alpha = .6f)
     BoxWithConstraints {
         val noticeStyle = MaterialTheme.typography.labelSmall
         val noticeHeight = with(LocalDensity.current) { noticeStyle.lineHeight.toDp() } + 12.dp
@@ -269,19 +271,19 @@ internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -
         Column(Modifier.testTag("sponsorblock-prompt"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Preserve the actions if a very short picture cannot fit the passive confirmation too.
             if (showNotice) {
-                Text(sponsor.notice, Modifier.widthIn(max = 280.dp).clip(CircleShape).background(plate)
+                Text(sponsor.notice, Modifier.widthIn(max = 280.dp).mediaGlass(CircleShape)
                     .padding(horizontal = 12.dp, vertical = 6.dp).testTag("sponsorblock-notice")
                     .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White,
                     style = noticeStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (active != null) {
-                Row(Modifier.clip(CircleShape).background(plate).testTag("sponsorblock-actions"),
+                Row(Modifier.mediaGlass(CircleShape).testTag("sponsorblock-actions"),
                     verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { skip(active.id) }, modifier = Modifier.heightIn(min = 48.dp)
                         .testTag("sponsorblock-skip").semantics { contentDescription = "Skip ${active.category.label}" }) {
                         Text("Skip", color = Color.White, maxLines = 1)
                     }
-                    IconButton(onClick = { dismiss(active.id) }, modifier = Modifier.size(48.dp)) {
+                    GlassInsetIconButton(onClick = { dismiss(active.id) }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", Modifier.size(20.dp), tint = Color.White)
                     }
                 }
@@ -311,7 +313,7 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
+internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) = DeferredPlayerGlass {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
     val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
     val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
@@ -330,19 +332,22 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     val sheetHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     // Handle system Back in the sheet's dialog before the watch screen's handler.
     fun back() { if (page == "Player settings") dismiss() else page = "Player settings" }
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheetState, sheetMaxWidth = 640.dp) {
+    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheetState, sheetMaxWidth = 640.dp,
+        containerColor = Color.Transparent) {
         BackHandler { back() }
         WatchGlassScene(Modifier.fillMaxWidth()) {
           Column(Modifier.fillMaxWidth().heightIn(max = sheetHeight)) {
             WatchPanelToolbar(page, "Close player settings", dismiss, Icons.Default.Settings,
                 backLabel = "Back to player settings", back = if (page != "Player settings") ({ page = "Player settings" }) else null)
-            LazyColumn(Modifier.fillMaxWidth().weight(1f, fill = false).testTag("player-settings-list"), contentPadding = PaddingValues(bottom = 16.dp)) {
+            Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
+                .testTag("player-settings-list").padding(horizontal = 12.dp, vertical = 12.dp)) {
+              GlassSection {
                 if (page == "Player settings") {
-                    item { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
-                    item { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
-                    item { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
-                    item { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
-                    item {
+                    run { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
+                    run { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
+                    run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
+                    run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
+                    run {
                         Row(Modifier.fillMaxWidth().testTag("player-ambient-mode")
                             .toggleable(ambientMode, role = Role.Switch, onValueChange = vm.store::ambientMode)
                             .semantics { contentDescription = "Ambient mode" }.padding(horizontal = 24.dp, vertical = 4.dp),
@@ -355,39 +360,40 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                             Switch(checked = ambientMode, onCheckedChange = null)
                         }
                     }
-                    item {
+                    run {
                         Row(Modifier.fillMaxWidth().clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Audio only", Modifier.weight(1f), color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))
                             Switch(checked = audioOnly, onCheckedChange = vm::audioOnly, enabled = available)
                         }
                     }
-                    item { SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device", supportsPip && playback.details != null && playback.error == null && !playback.loading) { dismiss(); pip() } }
-                    item { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
+                    run { SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device", supportsPip && playback.details != null && playback.error == null && !playback.loading) { dismiss(); pip() } }
+                    run { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
                 } else when (page) {
                     "Quality" -> {
-                        item { SettingChoice("Auto", qualityAuto, available && !audioOnly) { vm.autoQuality(); page = "Player settings" } }
-                        items(StreamCatalog.qualityMenu(video)) { track -> SettingChoice(track.primary, !qualityAuto && track == selectedVideo, available && !audioOnly, track.secondary) {
+                        run { SettingChoice("Auto", qualityAuto, available && !audioOnly) { vm.autoQuality(); page = "Player settings" } }
+                        StreamCatalog.qualityMenu(video).forEach { track -> SettingChoice(track.primary, !qualityAuto && track == selectedVideo, available && !audioOnly, track.secondary) {
                             vm.selectTrack(track.group, track.index); page = "Player settings"
                         } }
                     }
-                    "Playback speed" -> items(PreferenceRules.speeds) { speed ->
+                    "Playback speed" -> PreferenceRules.speeds.forEach { speed ->
                         SettingChoice(speedLabel(speed), playback.speed == speed, playback.canSetSpeed) { vm.speed(speed); page = "Player settings" }
                     }
                     "Audio" -> {
-                        item { SettingChoice("Auto", audioAuto, available) { vm.autoAudio(); page = "Player settings" } }
+                        run { SettingChoice("Auto", audioAuto, available) { vm.autoAudio(); page = "Player settings" } }
                         AudioSection.entries.forEach { section ->
                             val choices = audio.filter { it.section == section }
                             if (choices.isNotEmpty()) {
-                                item { Text(section.title, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.titleSmall) }
-                                items(choices) { track -> SettingChoice(track.primary, !audioAuto && track.explicitlySelected(selection), available, track.secondary) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
+                                run { Text(section.title, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.titleSmall) }
+                                choices.forEach { track -> SettingChoice(track.primary, !audioAuto && track.explicitlySelected(selection), available, track.secondary) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
                             }
                         }
                     }
                     "Captions" -> {
-                        item { SettingChoice("Off", selectedCaption == null, available) { vm.captions(null); page = "Player settings" } }
-                        items(captions) { track -> SettingChoice(track.label, track == selectedCaption, available) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
+                        run { SettingChoice("Off", selectedCaption == null, available) { vm.captions(null); page = "Player settings" } }
+                        captions.forEach { track -> SettingChoice(track.label, track == selectedCaption, available) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
                     }
                 }
+            }
             }
         } }
     }

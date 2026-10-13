@@ -32,11 +32,34 @@ import java.io.File
 class VisualSurfaceRegressionTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun artworkAvailabilityPreservesAnOpenControlMenu() {
+        var artwork by mutableStateOf<String?>(null)
+        compose.setContent {
+            MaterialTheme(colorScheme = Liquid.light) {
+                GlassBackgroundScene(Modifier.fillMaxSize()) {
+                    BrowseArtworkSurface(artwork) {
+                        OverflowMenu("Artwork actions", "stable-artwork") { close ->
+                            GlassMenuItem(text = { Text("Retained choice") }, onClick = close)
+                        }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("Artwork actions").performClick()
+        for (source in listOf("file:///missing-glass-regression.png", null)) {
+            compose.runOnIdle { artwork = source }
+            compose.waitForIdle()
+            compose.onNodeWithText("Retained choice").assertIsDisplayed()
+        }
+    }
+
     @Test fun roundedActionsLeaveTheContrastingContainerVisibleAtTheirCorners() {
         var dark by mutableStateOf(false)
         compose.setContent { MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light) {
             Box(Modifier.size(240.dp, 120.dp).background(Color.Magenta).testTag("container"), contentAlignment = Alignment.Center) {
-                LibraryControlScene { LibraryActionButton("Retry", Modifier.width(160.dp).testTag("retry"), onClick = {}) }
+                BrowseArtworkSurface(null) {
+                    LibraryControlScene { LibraryActionButton("Retry", Modifier.width(160.dp).testTag("retry"), onClick = {}) }
+                }
             }
         } }
         for (appearance in listOf(false, true)) {
@@ -53,28 +76,49 @@ class VisualSurfaceRegressionTest {
         }
     }
 
-    @Test fun wrappedToolbarTitleHasAnOpaqueBackdropAcrossItsEntireHeight() {
+    @Test fun wrappedToolbarTitleMasksScrollingGlyphsAndReservesMeasuredInsets() {
         var dark by mutableStateOf(false)
+        var underlay by mutableStateOf(Color.Magenta)
         compose.setContent { MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light, typography = Liquid.typography) {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 BrowseGlassSurface(Modifier.width(320.dp).height(700.dp), softEdge = true,
-                    toolbar = { LibraryToolbar("History & library", back = {}, statusInset = false) }) { body, _ ->
-                    Box(body.background(Color.Magenta)) { Text("Content under the pinned title") }
+                    toolbar = { LibraryToolbar("History & library", back = {}, statusInset = false) }) { body, top ->
+                    Box(body.background(underlay)) {
+                        Text("MMMM Background letters WWWW", Modifier.padding(top = 70.dp), style = MaterialTheme.typography.displayLarge)
+                        Text("First reachable row", Modifier.padding(top = top).testTag("first-row"))
+                    }
                 }
             }
         } }
         for (appearance in listOf(false, true)) {
-            compose.runOnIdle { dark = appearance }
+            compose.runOnIdle { dark = appearance; underlay = Color.Magenta }
+            compose.waitForIdle()
+            Thread.sleep(600)
             val header = compose.onNodeWithTag("browse-glass-toolbar")
             val bounds = header.fetchSemanticsNode().boundsInRoot
-            val title = compose.onNodeWithText("History & library").fetchSemanticsNode().boundsInRoot
+            val title = compose.onNodeWithText("History & library")
+            val titleBounds = title.fetchSemanticsNode().boundsInRoot
+            val before = title.captureToImage().toPixelMap()
+            assertTrue("Wrapped title must fit the measured toolbar", titleBounds.bottom <= bounds.bottom)
+            assertTrue("Body must reserve the complete measured toolbar", compose.onNodeWithTag("first-row").fetchSemanticsNode().boundsInRoot.top >= bounds.bottom)
             val pixels = header.captureToImage().toPixelMap()
-            val actual = pixels[pixels.width - 3, (title.center.y - bounds.top).toInt()]
-            val expected = if (appearance) Liquid.dark.surface else Liquid.light.surface
-            assertEquals(1f, actual.alpha, .01f)
-            assertEquals(expected.red, actual.red, .01f)
-            assertEquals(expected.green, actual.green, .01f)
-            assertEquals(expected.blue, actual.blue, .01f)
+            val background = pixels[pixels.width - 3, (titleBounds.center.y - bounds.top).toInt()]
+            val foreground = (if (appearance) Liquid.dark else Liquid.light).onSurface
+            assertTrue("Title contrast must remain >= 4.5", glassContrast(foreground, background) >= 4.5f)
+            val buttonBefore = compose.onNodeWithTag("library-toolbar-back").captureToImage().toPixelMap()
+            compose.runOnIdle { underlay = Color.Cyan }
+            Thread.sleep(700)
+            val after = title.captureToImage().toPixelMap()
+            for (y in 0 until before.height step 3) for (x in 0 until before.width step 3) {
+                assertEquals("Scrolled glyphs/color leak behind the title", before[x, y], after[x, y])
+            }
+            val buttonAfter = compose.onNodeWithTag("library-toolbar-back").captureToImage().toPixelMap()
+            val sampleX = buttonBefore.width / 2
+            val sampleY = (buttonBefore.height * .2f).toInt()
+            val a = buttonBefore[sampleX, sampleY]; val b = buttonAfter[sampleX, sampleY]
+            captureWatchScreenshot("overhaul-title-diagnostic-${if (appearance) "dark" else "light"}")
+            assertTrue("Chrome must still transmit the page recording: dark=$appearance before=$a after=$b", kotlin.math.abs(a.red - b.red) + kotlin.math.abs(a.green - b.green) > .2f)
+            captureWatchScreenshot("overhaul-wrapped-toolbar-${if (appearance) "dark" else "light"}")
         }
     }
 

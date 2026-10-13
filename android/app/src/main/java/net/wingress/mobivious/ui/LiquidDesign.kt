@@ -3,9 +3,7 @@ package net.wingress.mobivious.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.draw.drawBehind
@@ -19,30 +17,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.platform.testTag
 import com.kyant.backdrop.Backdrop
-import com.kyant.backdrop.drawBackdrop
-import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.colorControls
-import com.kyant.backdrop.effects.exposureAdjustment
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
 
 internal object Liquid {
     val inset = 20.dp
@@ -69,8 +59,8 @@ internal object Liquid {
         secondaryContainer = Color(0xFF2B2D31), onSecondaryContainer = Color(0xFFE5E7EB),
         tertiary = Color(0xFFD0D2D6), onTertiary = Color(0xFF282A2E),
         tertiaryContainer = Color(0xFF303236), onTertiaryContainer = Color(0xFFE8EAED),
-        background = Color(0xFF111214), onBackground = Color(0xFFEEF0F3),
-        surface = Color(0xFF111214), onSurface = Color(0xFFEEF0F3),
+        background = Color(0xFF0C1322), onBackground = Color(0xFFEEF0F3),
+        surface = Color(0xFF0C1322), onSurface = Color(0xFFEEF0F3),
         surfaceDim = Color(0xFF111214), surfaceBright = Color(0xFF383A3E),
         surfaceContainerLowest = Color(0xFF0D0E10), surfaceContainerLow = Color(0xFF17191C),
         surfaceContainer = Color(0xFF1C1E21), surfaceContainerHigh = Color(0xFF282A2E),
@@ -107,39 +97,10 @@ internal val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 internal val LocalReduceTransparency = staticCompositionLocalOf { false }
 internal val LocalContentBottomInset = staticCompositionLocalOf { 20.dp }
 
-/** One optical treatment for dark navigation, browse and watch chrome. */
-internal object DarkGlass {
-    val plate = Color(0xFF292B2E)
-    const val tintAlpha = .58f
-    const val prominentTintAlpha = .62f
-    const val saturation = .78f
-    // Android color filters operate in the renderer's working color space; validate the composed result on-device.
-    const val exposure = -2.8f
-    val reflection = Brush.verticalGradient(listOf(Color.White.copy(alpha = .035f),
-        Color.White.copy(alpha = .008f), Color.Transparent))
-    val rim = Brush.linearGradient(listOf(Color.White.copy(alpha = .20f),
-        Color.White.copy(alpha = .035f), Color.White.copy(alpha = .10f)))
-}
-
+/** Compatibility facade; all roles now use the shared transparent renderer. */
 @Composable
-internal fun Modifier.darkLiquidGlass(shape: Shape, prominent: Boolean): Modifier {
-    val source = LocalGlassBackdrop.current
-    val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    val plate = if (prominent) MaterialTheme.colorScheme.primaryContainer else DarkGlass.plate
-    val material = if (opaque || source == null) Modifier.background(plate, shape) else Modifier.drawBackdrop(
-        backdrop = source, shape = { shape },
-        effects = {
-            blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx())
-            // Bound bright artwork inside the material, without dimming the actual content or its labels.
-            colorControls(saturation = DarkGlass.saturation); exposureAdjustment(DarkGlass.exposure)
-        },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) DarkGlass.prominentTintAlpha else DarkGlass.tintAlpha)) },
-    )
-    return shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = .12f), spotColor = Color.Black.copy(alpha = .20f))
-        .then(material)
-        .then(if (opaque) Modifier else Modifier.background(DarkGlass.reflection, shape))
-        .border(.75.dp, DarkGlass.rim, shape).clip(shape)
-}
+internal fun Modifier.darkLiquidGlass(shape: Shape, prominent: Boolean): Modifier =
+    glassMaterial(shape, prominent)
 
 /** The small marker makes neutral selection recognizable independently of the fill's brightness. */
 internal fun DrawScope.drawLiquidSelection(fill: Color, indicator: Color?, topLeft: Offset = Offset.Zero,
@@ -162,53 +123,27 @@ internal fun Modifier.liquidSelection(active: Boolean): Modifier {
     return drawBehind { drawLiquidSelection(fill, indicator) }
 }
 
-/** Only content is recorded by the shell. Glass must never record itself into its own source. */
 @Composable
-internal fun Modifier.liquidGlass(shape: Shape = Liquid.pill, prominent: Boolean = false): Modifier {
-    val source = LocalGlassBackdrop.current
-    val colors = MaterialTheme.colorScheme
-    val dark = colors.background.red < .3f
-    if (dark) return darkLiquidGlass(shape, prominent)
-    val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    val plate = if (prominent) colors.primaryContainer else Color.White
-    val rim = Color.White.copy(alpha = .85f)
-    val glass = if (source == null || opaque) Modifier.background(plate, shape) else Modifier.drawBackdrop(
-        backdrop = source, shape = { shape },
-        effects = { vibrancy(); blur(12.dp.toPx()); lens(12.dp.toPx(), 20.dp.toPx()) },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (prominent) .85f else .78f)) },
-    )
-    return shadow(12.dp, shape, ambientColor = Color.Black.copy(alpha = .12f), spotColor = Color.Black.copy(alpha = .12f))
-        .then(glass).border(.75.dp, rim, shape).clip(shape)
-}
+internal fun Modifier.liquidGlass(shape: Shape = Liquid.pill, prominent: Boolean = false): Modifier =
+    glassMaterial(shape, prominent)
 
-/** Video controls use a translucent plate; decoding surfaces are deliberately never sampled. */
+/** Decoder surfaces are never sampled. */
 @Composable
-internal fun Modifier.mediaGlass(shape: Shape = Liquid.pill): Modifier {
-    val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    if (MaterialTheme.colorScheme.background.red < .3f) {
-        // SurfaceView video is never sampled. Keep a contrast plate even in transparent mode.
-        return shadow(8.dp, shape).background(if (opaque) Color(0xFF181A1D) else Color(0xD9181A1D), shape)
-            .then(if (opaque) Modifier else Modifier.background(DarkGlass.reflection, shape))
-            .border(.75.dp, DarkGlass.rim, shape).clip(shape)
-    }
-    return shadow(8.dp, shape, ambientColor = Color.Black.copy(alpha = .16f), spotColor = Color.Black.copy(alpha = .2f))
-        .background(if (opaque) Color(0xFF171B24) else Color(0x99171B24), shape)
-        .background(Brush.verticalGradient(listOf(Color.White.copy(alpha = .16f), Color.White.copy(alpha = .025f),
-            Color.Black.copy(alpha = .08f))), shape)
-        .border(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .62f), Color.White.copy(alpha = .08f),
-            Color.White.copy(alpha = .28f))), shape).clip(shape)
-}
+internal fun Modifier.mediaGlass(shape: Shape = Liquid.pill): Modifier =
+    glassMaterial(shape, role = GlassMaterialRole.MediaOverlay)
 
 @Composable
 internal fun GlassIconButton(icon: ImageVector, description: String, modifier: Modifier = Modifier,
     enabled: Boolean = true, prominent: Boolean = false, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .94f else 1f, spring(dampingRatio = .8f), label = "glass-press")
-    IconButton(onClick, modifier.graphicsLayer { scaleX = scale; scaleY = scale }.size(48.dp)
-        .liquidGlass(CircleShape, prominent), enabled = enabled, interactionSource = interaction) {
-        Icon(icon, description, tint = if (!enabled) MaterialTheme.colorScheme.onSurface.copy(alpha = .38f)
-            else if (prominent) MaterialTheme.colorScheme.primary else LocalContentColor.current)
+    val feedback = rememberGlassInteraction(interaction)
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = rememberGlassContentColors(bounds, prominent = prominent)
+    IconButton(onClick, modifier.onGloballyPositioned { bounds = it.boundsInRoot() }.size(48.dp)
+        .glassMaterial(CircleShape, prominent, interaction = feedback), enabled = enabled, interactionSource = interaction) {
+        GlassForeground(foreground) {
+            GlassIcon(icon, description, tint = LocalContentColor.current.copy(alpha = if (enabled) 1f else .38f))
+        }
     }
 }
 
@@ -241,11 +176,14 @@ internal fun SectionHeading(title: String, modifier: Modifier = Modifier, detail
 internal fun <T> LiquidSegments(options: List<T>, selected: T, label: (T) -> String,
     modifier: Modifier = Modifier, tag: (T) -> String = { "" }, select: (T) -> Unit) {
     if (options.isEmpty()) return
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = rememberGlassContentColors(bounds)
+    GlassForeground(foreground) {
     val position by animateFloatAsState(options.indexOf(selected).coerceAtLeast(0).toFloat(),
         spring(dampingRatio = .86f, stiffness = 420f), label = "segment-selection")
     val selection = MaterialTheme.colorScheme.primary.copy(alpha = .12f)
     val indicator = MaterialTheme.colorScheme.primary.takeIf { MaterialTheme.colorScheme.background.red < .3f }
-    Row(modifier.browseGlass().padding(4.dp).selectableGroup().drawBehind {
+    Row(modifier.onGloballyPositioned { bounds = it.boundsInRoot() }.browseGlass().padding(4.dp).selectableGroup().drawBehind {
         val gap = 4.dp.toPx()
         val cell = (size.width - gap * (options.size - 1)) / options.size
         drawLiquidSelection(selection, indicator, Offset(position * (cell + gap), 0f), Size(cell, size.height))
@@ -253,12 +191,14 @@ internal fun <T> LiquidSegments(options: List<T>, selected: T, label: (T) -> Str
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         options.forEach { option ->
             val active = option == selected
-            Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(Liquid.pill)
-                .selectable(active, role = Role.Tab, onClick = { select(option) }).testTag(tag(option))
+            val interaction = remember(option) { MutableInteractionSource() }
+            Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(Liquid.pill).glassItemFeedback(interaction, active)
+                .selectable(active, interactionSource = interaction, indication = null, role = Role.Tab, onClick = { select(option) }).testTag(tag(option))
                 .padding(horizontal = 10.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text(label(option), style = MaterialTheme.typography.labelLarge,
+                GlassLabel(label(option), style = MaterialTheme.typography.labelLarge,
                     color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
+}
 }

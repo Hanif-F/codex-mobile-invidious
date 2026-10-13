@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "collection_kind": "pre_implementation_baseline",
+  "inspection_date": "2026-10-13",
+  "client_timezone": "Asia/Jakarta",
+  "inspected_source_revision": "e956aabb4fbcd503f4dd51443f9a0b5812d96a7a",
+  "working_tree_clean_before_handoff": true,
+  "emulator": {
+    "serial": "emulator-5554",
+    "model": "sdk_gphone64_x86_64",
+    "display_pixels": [
+      1344,
+      2992
+    ],
+    "density_dpi": 480,
+    "animator_duration_scale": 1.0
+  },
+  "inspected_application": {
+    "package": "net.wingress.mobivious",
+    "version_name": "0.10.2",
+    "version_code": 20
+  },
+  "installed_older_debug_application": {
+    "package": "net.wingress.mobivious.debug",
+    "version_name": "0.10.1-debug",
+    "version_code": 19,
+    "used_for_fresh_captures": false
+  },
+  "limitations": [
+    "User attachment build/device/settings unverified",
+    "Fresh emulator captures cover dark/default-width states only",
+    "Historical light captures remain in their 2026-10-11 collection",
+    "Watch video was ended in the fresh captures",
+    "Pointer-down image does not establish animation timing or peak",
+    "No baseline motion recording, runtime suite, fresh light-mode journey or frame-timing acceptance"
+  ],
+  "copy_verification": "All saved PNG files match their original bytes; PNG chunk CRCs validated",
+  "images": [
+    {
+      "path": "baseline/user-watch-colored.png",
+      "origin": "user_attachment",
+      "original_filename": "codex-clipboard-1a5ab436-0053-4155-98cd-3832d4f02b75.png",
+      "observation": "Supplied Watch crop; device, build and settings unverified",
+      "sha256": "7a6fc74d65d4354bc63a1cc8b8d9e2f81fab38ce6ab6829ca80388538a466d14",
+      "width": 643,
+      "height": 585,
+      "bytes": 182075
+    },
+    {
+      "path": "baseline/discover-dark.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-discover.png",
+      "observation": "Discover before scrolling",
+      "sha256": "458b243f85ce3ca77da16df83e2741368443cee89220a2b1e698c7b3d3860502",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 2010472
+    },
+    {
+      "path": "baseline/discover-dark-scrolled.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-discover-scroll.png",
+      "observation": "Discover after vertical scroll",
+      "sha256": "ddce2a4d0621fb6ab7e303ed2ac5f398ab7312c3954885f35a1f2667954a4733",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 1546448
+    },
+    {
+      "path": "baseline/you-dark.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-you.png",
+      "observation": "You dashboard",
+      "sha256": "217d6f2b1dd7258f293a94ab688f86d96d9e06663b2024450df0b8390dba029d",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 312149
+    },
+    {
+      "path": "baseline/settings-dark.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-settings.png",
+      "observation": "Settings root",
+      "sha256": "ae05dd70767591157754db9f30bf59d662f2650b8ac04af2625d0d1385a4a129",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 237336
+    },
+    {
+      "path": "baseline/settings-playback-dark.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-playback-settings.png",
+      "observation": "Playback preferences",
+      "sha256": "df060e840e75e21d487db5a32e26229b60ee356a0cd1214dd0e26f723890c7c4",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 332214
+    },
+    {
+      "path": "baseline/watch-dark-ended.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-watch.png",
+      "observation": "Watch with existing video ended",
+      "sha256": "27c465f088e5de295cc0aafa9751ff03ebc0adacb1354dac2ed69bd27c9e3ac5",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 1170431
+    },
+    {
+      "path": "baseline/watch-description-pointer-down.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-disclosure-pressed.png",
+      "observation": "Description between injected pointer DOWN/UP; animation peak not established",
+      "sha256": "4ab7b9c1dad5bcb165ce6eeabe556c2dac378948699d6253599dd40a4363c276",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 1170295
+    },
+    {
+      "path": "baseline/watch-description-expanded.png",
+      "origin": "emulator_capture",
+      "original_filename": "mobivious-overhaul-description-expanded.png",
+      "observation": "Description expanded after release",
+      "sha256": "5e25b33e3394d924cf32387311fac3b9b85346c16629574341ff7a704a3925b8",
+      "width": 1344,
+      "height": 2992,
+      "bytes": 440072
+    }
+  ]
+}

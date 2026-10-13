@@ -36,17 +36,14 @@ internal fun WatchPrimaryActions(vm: AppViewModel, details: VideoDetails, save: 
                     .onFailure { vm.message.value = "No app could share this link." }
             }
         }, more = { expanded = true }, moreMenu = {
-            DropdownMenu(expanded, { expanded = false }, shape = Liquid.card,
-                containerColor = Color.Transparent, tonalElevation = 0.dp, shadowElevation = 0.dp) {
-              WatchGlassScene(Modifier.clip(Liquid.card)) { Column(Modifier.watchGlass()) {
-                if (ClipRules.eligible(details)) DropdownMenuItem(text = { Text("Create clip") },
+            GlassDropdownMenu(expanded, { expanded = false }) {
+                if (ClipRules.eligible(details)) GlassMenuItem(text = { Text("Create clip") },
                     leadingIcon = { Icon(Icons.Default.ContentCut, null) }, modifier = Modifier.testTag("create-clip"), onClick = {
                         expanded = false
                         if (vm.account.value == null) { vm.requestClipSignIn(); signIn() } else vm.openClipEditor()
                     })
-                DropdownMenuItem(text = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) },
+                GlassMenuItem(text = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) },
                     onClick = { expanded = false; if (vm.account.value == null) signIn() else vm.openDeArrow(details.video.id) })
-              } }
             }
         })
 }

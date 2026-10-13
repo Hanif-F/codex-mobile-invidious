@@ -23,7 +23,7 @@ internal fun BlockChannelMenuItem(vm: AppViewModel, id: String, name: String, si
     val state by vm.blocked.collectAsStateWithLifecycle()
     val context = state.context ?: vm.api.context()
     if (!ContentVisibility.validChannel(id)) return
-    DropdownMenuItem(text = { Text(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel") },
+    GlassMenuItem(text = { Text(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel") },
         onClick = { close(); vm.toggleBlocked(id, name, context) }, enabled = id !in state.busy,
         modifier = modifier)
 }
@@ -42,8 +42,10 @@ internal fun BlockedChannelsScreen(vm: AppViewModel, modifier: Modifier, signIn:
     val context = state.context ?: vm.api.context()
     LaunchedEffect(vm.api.context()) { vm.refreshBlockedChannels() }
     LazyColumn(modifier.fillMaxSize().testTag("blocked-channel-manager"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Blocked channels are hidden from discovery, search and recommendations. Subscriptions, history, playlists and direct links remain accessible.") }
-        if (account == null) item { Text("Blocked channels are saved for guests on this device and instance.") }
+        item { GlassSection {
+            Text("Blocked channels are hidden from discovery, search and recommendations. Subscriptions, history, playlists and direct links remain accessible.")
+            if (account == null) Text("Blocked channels are saved for guests on this device and instance.")
+        } }
         run {
             item { LibraryControlScene { LibraryActionButton("Refresh blocked channels", enabled = !state.loading, onClick = vm::refreshBlockedChannels) } }
             if (state.loading) item { CircularProgressIndicator() }
@@ -54,7 +56,7 @@ internal fun BlockedChannelsScreen(vm: AppViewModel, modifier: Modifier, signIn:
             } }
             if (state.loaded && state.channels.isEmpty() && !state.loading) item { Text("No blocked channels") }
             items(state.channels, key = { it.id }) { channel ->
-                Column(Modifier.fillMaxWidth()) {
+                GlassSection {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { openChannel(channel.id) }) { Text(channel.name) }
                         LibraryControlScene { LibraryActionButton(if (channel.id in state.busy) "Unblocking…" else "Unblock",

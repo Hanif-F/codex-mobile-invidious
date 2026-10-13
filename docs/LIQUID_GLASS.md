@@ -18,8 +18,9 @@ appearance of this design; there is no theme collection or legacy-design switch.
   floating navigation and content-first layouts in Music, Safari and Photos.
 - [Landmarks: Building an app with Liquid Glass](https://developer.apple.com/documentation/swiftui/landmarks-building-an-app-with-liquid-glass)
 
-These examples guide the hierarchy: glass belongs to navigation and controls
-floating over content. Video artwork, text, lists and forms use quiet surfaces.
+These examples guide navigation and controls floating over content. The approved
+Android adaptation also places related form controls on shared glass sections.
+Reading lists remain continuous and interior form rows keep quiet editing boundaries.
 A native Android implementation approximates the material; it does not use
 Apple's proprietary rendering implementation.
 
@@ -97,8 +98,7 @@ the same material language while preserving preview ownership and trimming.
 scrolling phone/centered wide panels. Dashboard controls sample a separate
 background-only radial wash. Floating page/panel toolbars sample separately
 recorded scrolling bodies, using measured header padding. Glass never samples
-its own recording or a video decoding surface. Forms and reading surfaces stay
-quiet. Large text stacks controls and clip timestamp fields; reduced transparency
+its own recording or a video decoding surface. Forms share related glass sections; reading lists stay continuous. Large text stacks controls and clip timestamp fields; reduced transparency
 uses the shared opaque fallback. Presentation/journey captures are written to
 `/data/local/tmp/mobivious-library-glass/`.
 
@@ -106,7 +106,7 @@ uses the shared opaque fallback. Presentation/journey captures are written to
 
 Discover and global search now own pinned glass toolbars, with moving selection
 feedback and quiet feed content below them. Country selection and search filters
-use the shared adaptive panel. Settings keeps forms and reading surfaces quiet,
+use the shared adaptive panel. Settings groups preferences on glass sections,
 centers content up to 800dp, and floats its toolbar above scrolling preferences.
 Save remains accessible above system navigation and the keyboard. Authentication,
 account sessions, token creation, DeArrow contributions and chat settings reuse
@@ -120,7 +120,7 @@ Shared popup menus own a separate background recording within their own window.
 Explicit content colors keep standalone controls readable in both appearances.
 Glass selection feedback uses interruptible springs and observes the system
 animation duration scale. Content choices such as switches, checkboxes and form
-fields retain quiet, legible surfaces; glass is reserved for navigation and actions.
+fields retain quiet editing boundaries within their shared material.
 
 Channel and playlist controls show Subscribe or a checked Subscribed pill.
 Subscribed opens an explicit Unsubscribe menu. Pending operations show
@@ -135,7 +135,7 @@ clears that intent. Playlist subscriptions keep their existing sign-in continuat
 
 The watch page records its own background independently of its controls. A subtle
 blurred thumbnail wash fades into the page; thin mode, unavailable artwork and
-offline playback use a neutral wash. `WatchGlassUi.kt` owns the background,
+offline playback use the designed blue/teal/violet environment. `WatchGlassUi.kt` owns the background,
 refractive materials, disclosure rows and panel toolbars. It never records the
 glass into the backdrop that glass samples.
 
@@ -147,8 +147,9 @@ verification sits beside the channel name, and Subscribe uses a glass pill.
 Comments and Description are the two disclosure rows; Description expands inline.
 Chapters and chat replay are opened from the player.
 
-`PlayerControlsUi.kt` uses white icons, text shadows and shallow neutral edge
-contrast rather than tinted capsules or a full-picture scrim. Collapse is at the
+`PlayerControlsUi.kt` uses shared slate media-overlay controls with white icons,
+glyph shadows and shallow edge contrast. No decoder backdrop or full-picture contrast
+scrim is introduced. Collapse is at the
 top left, with chat beside settings at the top right. The footer puts the timestamp,
 clickable current chapter and fullscreen above a full-width seek track. Separate
 48dp rows keep their touch targets clear of seeking. In portrait the visible labels
@@ -181,8 +182,8 @@ artwork; compact density uses thumbnail rows. Thumbnail display preferences,
 watched states, warnings, menus and content visibility continue to apply.
 
 Light appearance uses pearl content surfaces with a restrained blue accent. Dark
-appearance uses neutral charcoal surfaces and pearl emphasis for actions, links
-and selection; semantic error colors remain distinct. Neutral selection pills
+appearance uses a blue-black environment with blue, teal and violet light pools;
+adaptive dark or pearl foregrounds express actions, links and selection; semantic error colors remain distinct. Neutral selection pills
 include a small pearl marker so selection does not rely on hue. Main margins are
 20dp, cards 24dp, media 20dp and floating controls pills
 or circles. Controls have at least 48dp targets; larger text can hide dock labels
@@ -191,20 +192,51 @@ Compose springs and Compose respects the system animator duration scale.
 
 ## Rendering and accessibility
 
-The shell records content into a Backdrop layer. Floating chrome, which is a
-sibling of that recorded content, samples the layer with blur, vibrancy, lens
-refraction, a tint plate and a fine highlight. A recording layer must never sample
-itself: recorded content receives a null backdrop. This prevents render cycles.
+The shell records content for sibling floating chrome. Sections consume a separate
+background-only environment, so no glass samples a recording containing itself.
+`GlassMaterial.kt` owns control, section and media-overlay roles and their optical
+tokens. The compatibility modifiers delegate to it in both appearances.
 
-Dark shell, browse and watch controls share `DarkGlass` tokens and one material
-renderer in `LiquidDesign.kt`. Sampled content is blurred and refracted, with
-restrained saturation and exposure to keep pearl labels legible over bright
-artwork. The content outside the glass and the foreground labels are not filtered.
-Soft internal reflections and a fine directional rim define the glass instead of
-bright silver outlines. Neutral ambient washes and localized, fading artwork color
-give media headers depth without a persistent blue cast. Light material retains
-its original rendering. Video overlays use a separate neutral contrast plate and
-never sample the decoding surface.
+Control tints start at .14/.20 dark and .20/.26 light for ordinary/prominent states;
+sections use .20 dark/.28 light. Sharp control backgrounds use 12dp/18dp lens
+depth/displacement; sections use 18dp/20dp. Depth is clamped to half the smaller
+dimension. The sampled background is magnified 3.5% before depth-enabled
+refraction, without backdrop blur or chromatic fringes. Foregrounds remain
+undistorted. Neutral exposure preserves transmitted hue and movement.
+Directional rims, restrained reflections and soft elevation define depth.
+
+`GlassScene.kt` shares a 24×48 spatial sample from a GPU-downsampled Compose layer,
+limited to four updates per second while it redraws. It reuses bounded resources,
+waits for recording completion, observes resumed lifecycle/hardware/transparency,
+and has no idle timer or per-control readback. Ambient Watch consumes existing
+generated palette statistics. Stable foreground polarity changes atomically with
+hysteresis. Labels, icons and menu slots have transparent backgrounds and no
+inherited text halo. Contrast adjustment applies to the entire shared glass
+material, never a separate rectangle around text or disc around an icon.
+Even apparently uniform page samples need conservative material tint because
+narrow artwork bands can escape the coarse grid. Generated light pools use
+analytic bounds that include their opacity and compositing order, allowing
+lower tint when those bounds already guarantee contrast. `GlassForeground`
+supplies actual colors for primary, secondary and meaningful icon content,
+including explicit theme uses.
+
+Press position, focus and press state drive local illumination. Backdrop's
+`layerBlock` limits deformation to 2% (1% broad surfaces) and lift to 2dp while
+keeping sampled content aligned. Selection springs are interruptible. Reduced
+motion suppresses deformation, and opaque/software fallback skips readback.
+Menus, alert dialogs and tooltips copy native-resolution regions from the
+originating Window and own independent recordings of those pixels. Crops align
+in screen coordinates and refresh on parent redraw/geometry changes at no more
+than four captures per second while resumed. Two buffers are reused; only one
+request may be in flight, and stale callbacks are rejected. There is no idle
+capture timer. Capture unavailability uses the readable solid fallback.
+Full-page panels retain their own scrolling sources. Generated environments
+remain the actual background of quiet pages; artwork sources are sharp.
+
+Video controls, player settings and the mini-player are explicitly deferred.
+Their internal material profile preserves 4dp/10dp blur, 8dp/18dp lens geometry
+and palette-seeded popup backgrounds. Descriptions, comments and surrounding
+watch-page actions use the new refractive material.
 
 Media3 retains its decoding SurfaceView and service ownership. Video overlays
 use neutral contrast plates and do not sample the decoder as a glass backdrop.
@@ -230,12 +262,29 @@ text and system reduced motion. Screenshots are saved on-device
 under `/data/local/tmp/mobivious-liquid/`. The dated verification record records
 actual completed checks and limitations.
 
-`DarkGlassPresentationTest` captures ordinary and prominent shell, browse and
-watch glass over black, white, saturated and checkerboard backdrops. It checks
-rendered dark-mode secondary-text contrast at 4.5:1 with transparency enabled and
-in opaque mode, and verifies palette text/action/status contrast. Its light capture
-provides a regression comparison. Library and subscription presentation scenarios
-exercise dark transparency separately from Reduce transparency; the shell journey
-also captures matching light/dark discovery, search, library, settings, watch,
-menu and comment screens, plus System appearance changes and an explicit Light
-override while the device uses dark appearance.
+`DarkGlassPresentationTest` checks actual adaptive primary/secondary foregrounds
+against the rendered shared material at 4.5:1 for text and 3:1 for icons in both
+appearances. Its black/white/saturated/checkerboard matrix separately measures
+interior transmission, including ordinary, prominent, section and opaque roles.
+`GlassFoundationTest` checks bounded sampling, settled-idle behavior, fallback
+policy, nested recording/corner behavior, press cancellation and pixel equality
+between glass content helpers and plain, unbacked text/icons/menu slots. The toolbar
+regression checks wrapped-title contrast, absence of scrolling glyph leakage,
+measured insets and clear-control transmission. Ambient tests reuse palette
+statistics without an extra Compose readback. Fixture journeys cover settings,
+accounts, library, subscriptions, Watch, keyboard, responsiveness and playback.
+
+The approved [overhaul brief](LIQUID_GLASS_OVERHAUL_PLAN.md) and immutable
+[baseline](liquid-glass-overhaul-2026-10-13/README.md) describe the design decision
+and before state. Current implementation acceptance is recorded separately in
+[the implementation report](liquid-glass-implementation-2026-10-13/README.md).
+
+## Unbacked text and icon cleanup (2026-10-13)
+
+The app-wide cleanup removes per-label rectangles, per-icon discs and inherited
+text halos. Shared material tint preserves contrast over arbitrary artwork.
+Thumbnail/clip badges use transparent backgrounds and glyph shadows. Media
+controls and SponsorBlock prompts use a slate plate at .80 opacity; native
+clip-preview chrome and caption rendering follow the same policy. Caption cue
+windows and embedded background spans are ignored so they cannot restore black
+boxes. See [the source and emulator audit](no-black-backgrounds-2026-10-13/README.md).

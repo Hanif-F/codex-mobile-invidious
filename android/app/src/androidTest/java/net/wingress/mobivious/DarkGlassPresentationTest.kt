@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -14,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -35,17 +39,20 @@ class DarkGlassPresentationTest {
         var dark by mutableStateOf(false)
         var opaque by mutableStateOf(false)
         var prominent by mutableStateOf(false)
+        val foregrounds = java.util.concurrent.ConcurrentHashMap<String, GlassContentColors>()
+        val scenes = java.util.concurrent.ConcurrentHashMap<Int, GlassScene>()
         val backgrounds = listOf(Color.Black, Color.White, Color(0xFFFF3377), Color(0xFF00DD99), Color.Black)
         compose.setContent {
             MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light, typography = Liquid.typography) {
                 CompositionLocalProvider(LocalReduceTransparency provides opaque) {
                     Column(Modifier.fillMaxSize().testTag("glass-matrix").background(MaterialTheme.colorScheme.surface).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Text("Glass over dark, bright, colored and detailed content", color = MaterialTheme.colorScheme.onSurface)
+                        Text("Adaptive text, clear interiors and directional depth", color = MaterialTheme.colorScheme.onSurface)
                         backgrounds.forEachIndexed { index, background ->
-                            val backdrop = rememberLayerBackdrop()
+                            val scene = rememberGlassScene(background)
+                            SideEffect { scenes[index] = scene }
                             Box(Modifier.fillMaxWidth().height(84.dp)) {
-                                Box(Modifier.matchParentSize().layerBackdrop(backdrop).background(background).drawBehind {
+                                Box(Modifier.matchParentSize().recordGlassScene(scene).background(background).drawBehind {
                                     if (index == backgrounds.lastIndex) {
                                         val cell = 12.dp.toPx()
                                         for (x in 0..(size.width / cell).toInt()) for (y in 0..(size.height / cell).toInt()) {
@@ -53,15 +60,28 @@ class DarkGlassPresentationTest {
                                         }
                                     }
                                 })
-                                CompositionLocalProvider(LocalGlassBackdrop provides backdrop) {
+                                CompositionLocalProvider(LocalGlassBackdrop provides scene.backdrop, LocalGlassScene provides scene) {
                                     Row(Modifier.fillMaxSize().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                        for (material in listOf("Shell", "Browse", "Watch")) {
-                                            Box(Modifier.weight(1f).fillMaxHeight().then(when (material) {
-                                                "Shell" -> Modifier.liquidGlass(prominent = prominent)
-                                                "Browse" -> Modifier.browseGlass(prominent = prominent)
-                                                else -> Modifier.watchGlass(Liquid.pill, prominent)
-                                            }).testTag("glass-$index-$material"), contentAlignment = Alignment.Center) {
-                                                Text(material, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        for (material in listOf("Shell", "Browse", "Watch", "Section")) {
+                                            val role = if (material == "Section") GlassMaterialRole.Section else GlassMaterialRole.Control
+                                            var bounds by remember { mutableStateOf(androidx.compose.ui.geometry.Rect.Zero) }
+                                            val colors = rememberGlassContentColors(bounds, role, prominent)
+                                            SideEffect { foregrounds["$index-$material"] = colors }
+                                            Box(Modifier.weight(1f).fillMaxHeight()
+                                                .onGloballyPositioned { bounds = it.boundsInRoot() }
+                                                .then(when (material) {
+                                                    "Shell" -> Modifier.liquidGlass(prominent = prominent)
+                                                    "Browse" -> Modifier.browseGlass(prominent = prominent)
+                                                    "Watch" -> Modifier.watchGlass(Liquid.pill, prominent)
+                                                    else -> Modifier.glassMaterial(Liquid.card, role = role)
+                                                }).testTag("glass-$index-$material"), contentAlignment = Alignment.Center) {
+                                                GlassForeground(colors) {
+                                                    GlassLabel(material, Modifier.testTag("label-$index-$material"),
+                                                        color = colors.secondary, style = MaterialTheme.typography.labelMedium)
+                                                    GlassIcon(Icons.Default.Check, "Selected $material",
+                                                        Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp).size(18.dp)
+                                                            .testTag("icon-$index-$material"), tint = colors.primary)
+                                                }
                                             }
                                         }
                                     }
@@ -73,25 +93,35 @@ class DarkGlassPresentationTest {
             }
         }
         for ((isDark, isOpaque, isProminent) in listOf(Triple(false, false, false), Triple(true, false, false),
-            Triple(true, true, false), Triple(true, false, true), Triple(true, true, true))) {
+            Triple(false, true, false), Triple(true, true, false), Triple(true, false, true), Triple(false, false, true))) {
             compose.runOnIdle { dark = isDark; opaque = isOpaque; prominent = isProminent }
-            // A semantics assertion alone can observe the previous frame on the emulator's render thread.
+            compose.waitUntil(5_000) { isOpaque || scenes.values.all { it.captures > 0 } }
             val surface = if (isDark) Liquid.dark.surface else Liquid.light.surface
             compose.waitUntil(5_000) {
                 val pixels = compose.onNodeWithTag("glass-matrix").captureToImage().toPixelMap()
-                val actual = pixels[pixels.width - 2, pixels.height / 2]
-                kotlin.math.abs(actual.red - surface.red) < .005f
+                kotlin.math.abs(pixels[pixels.width - 2, pixels.height / 2].red - surface.red) < .005f
             }
-            compose.onNodeWithTag("glass-1-Shell").assertIsDisplayed()
+            compose.waitForIdle()
             captureWatchScreenshot("glass-matrix-${if (isDark) "dark" else "light"}-${if (isOpaque) "opaque" else "transparent"}${if (isProminent) "-prominent" else ""}")
-            if (isDark) for (index in backgrounds.indices) for (material in listOf("Shell", "Browse", "Watch")) {
-                val pixels = compose.onNodeWithTag("glass-$index-$material").captureToImage().toPixelMap()
-                // Sample beside the glyphs at text height, including the upper reflection.
-                for (x in listOf(.18f, .82f)) for (y in listOf(.35f, .5f, .65f)) {
-                    val background = pixels[(pixels.width * x).toInt(), (pixels.height * y).toInt()]
-                    assertContrast(Liquid.dark.onSurfaceVariant, background, 4.5f,
-                        "$material backdrop $index opaque=$isOpaque prominent=$isProminent")
+            for (index in backgrounds.indices) for (material in listOf("Shell", "Browse", "Watch", "Section")) {
+                val colors = foregrounds.getValue("$index-$material")
+                val pixels = compose.onNodeWithTag("label-$index-$material").captureToImage().toPixelMap()
+                // Read the continuous glass material next to actual glyphs.
+                for (y in listOf(1, pixels.height - 2)) {
+                    assertContrast(colors.secondary, pixels[pixels.width / 2, y], 4.5f,
+                        "$material backdrop $index dark=$isDark opaque=$isOpaque prominent=$isProminent colors=$colors stats=${scenes[index]?.contrastAt(scenes[index]!!.bounds)}")
                 }
+                val icon = compose.onNodeWithTag("icon-$index-$material").captureToImage().toPixelMap()
+                assertContrast(colors.primary, icon[icon.width / 2, 2], 3f, "Actual meaningful icon $index-$material")
+            }
+            for (material in listOf("Shell", "Browse", "Watch", "Section")) {
+                fun interior(index: Int): Color {
+                    val pixels = compose.onNodeWithTag("glass-$index-$material").captureToImage().toPixelMap()
+                    return pixels[pixels.width / 2, (pixels.height * .2f).toInt()]
+                }
+                val transmission = kotlin.math.abs(interior(1).luminance() - interior(0).luminance())
+                assertTrue("$material transmission=$transmission opaque=$isOpaque",
+                    if (isOpaque) transmission < .025f else transmission > .35f)
             }
         }
     }

@@ -3,10 +3,8 @@ package net.wingress.mobivious.ui
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -17,23 +15,19 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawOutline
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -44,82 +38,46 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
-import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
-import com.kyant.backdrop.effects.colorControls
-import com.kyant.backdrop.effects.exposureAdjustment
 
 /** A background-only recording, never an ancestor recording the glass that samples it. */
 @Composable
 internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = null, inheritAmbient: Boolean = false,
     content: @Composable BoxScope.() -> Unit) {
-    if (inheritAmbient && LocalWatchAmbientMaterial.current != null) {
-        Box(modifier, content = content)
-        return
-    }
-    val backdrop = rememberLayerBackdrop()
+    val ambient = LocalWatchAmbientMaterial.current.takeIf { inheritAmbient }
+    val localScene = rememberGlassScene(samplingEnabled = ambient == null)
+    val scene = if (ambient != null) LocalGlassScene.current ?: localScene else localScene
+    val backdrop = scene.backdrop
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
     val washHeight = if (dark) 280.dp else 380.dp
     var artworkFailed by remember(artwork) { mutableStateOf(false) }
     Box(modifier) {
-        Box(Modifier.matchParentSize().clipToBounds().layerBackdrop(backdrop)
-            .background(colors.surface)) {
-            Box(Modifier.fillMaxWidth().height(washHeight).background(Brush.verticalGradient(listOf(
-                colors.primaryContainer.copy(alpha = if (dark) .24f else .48f), Color.Transparent))))
-            if (artwork != null && !artworkFailed && !LocalReduceTransparency.current) {
-                AsyncImage(artwork, null, Modifier.fillMaxWidth().height(washHeight)
-                    .graphicsLayer { alpha = if (dark) .12f else .18f }.blur(64.dp),
-                    contentScale = ContentScale.Crop, onError = { artworkFailed = true })
-                Box(Modifier.fillMaxWidth().height(washHeight).background(Brush.verticalGradient(listOf(
-                    colors.surface.copy(alpha = .25f), colors.surface))))
+        if (ambient == null) {
+            Box(Modifier.matchParentSize().clipToBounds().recordGlassScene(scene)
+                .background(colors.surface)) {
+                GlassEnvironment(Modifier.matchParentSize())
+                if (artwork != null && !artworkFailed && !LocalReduceTransparency.current) {
+                    AsyncImage(artwork, null, Modifier.fillMaxWidth().height(washHeight)
+                        .graphicsLayer { alpha = if (dark) .32f else .26f }
+                        .then(if (LocalGlassMaterialProfile.current == GlassMaterialProfile.DeferredPlayer) Modifier.blur(64.dp) else Modifier),
+                        contentScale = ContentScale.Crop, onError = { artworkFailed = true })
+                    Box(Modifier.fillMaxWidth().height(washHeight).background(Brush.verticalGradient(listOf(
+                        colors.surface.copy(alpha = .25f), colors.surface))))
+                }
             }
         }
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalWatchAmbientMaterial provides null) { content() }
+        // Keep one content call site when the first ambient palette arrives. Moving the
+        // subtree between branches would discard open menus and focused controls.
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalGlassScene provides scene,
+            LocalWatchAmbientMaterial provides ambient) { content() }
     }
 }
 
-/** Watch chrome catches the ambient colors while retaining its reading contrast plate. */
+/** Watch and browse share optics; ambient scenes supply generated colors, never video. */
 @Composable
-internal fun Modifier.watchGlass(shape: Shape = Liquid.card, prominent: Boolean = false): Modifier {
-    val source = LocalGlassBackdrop.current
-    val colors = MaterialTheme.colorScheme
-    val dark = colors.background.red < .3f
-    val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated
-    val ambient = LocalWatchAmbientMaterial.current.takeUnless { opaque }
-    if (dark && ambient == null) return darkLiquidGlass(shape, prominent)
-    val plate = if (prominent) colors.primaryContainer else if (dark) DarkGlass.plate else Color.White
-    val material = if (opaque || source == null) Modifier.background(plate, shape) else Modifier.drawBackdrop(
-        backdrop = source, shape = { shape },
-        effects = {
-            blur(10.dp.toPx()); lens(8.dp.toPx(), 18.dp.toPx())
-            if (dark) { colorControls(saturation = 1.1f); exposureAdjustment(-.7f) } else vibrancy()
-        },
-        onDrawSurface = { drawRect(plate.copy(alpha = if (dark) { if (prominent) .60f else .52f }
-            else if (prominent) .64f else .46f)) },
-    )
-    return shadow(10.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .12f))
-        .then(material)
-        .background(if (dark) DarkGlass.reflection else Brush.verticalGradient(listOf(Color.White.copy(alpha = .30f),
-            Color.White.copy(alpha = .02f), Color.Black.copy(alpha = .025f))), shape)
-        .border(1.dp, if (dark) DarkGlass.rim else Brush.linearGradient(listOf(Color.White.copy(alpha = .95f),
-            Color.White.copy(alpha = .08f), Color.White.copy(alpha = .65f))), shape)
-        .then(if (ambient == null) Modifier else Modifier.drawWithContent {
-            val left = ambient.colors[0].value
-            val right = ambient.colors[2].value
-            val bottom = ambient.colors[8].value
-            drawRect(Brush.linearGradient(listOf(left.copy(alpha = left.alpha * .055f),
-                right.copy(alpha = right.alpha * .035f), bottom.copy(alpha = bottom.alpha * .025f))))
-            drawContent()
-            drawOutline(shape.createOutline(size, layoutDirection, this),
-                Brush.linearGradient(listOf(left.copy(alpha = left.alpha * .65f),
-                    right.copy(alpha = right.alpha * .28f), bottom.copy(alpha = bottom.alpha * .55f))), style = Stroke(1.dp.toPx()))
-        }).clip(shape)
-}
+internal fun Modifier.watchGlass(shape: Shape = Liquid.card, prominent: Boolean = false): Modifier =
+    glassMaterial(shape, prominent)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -127,18 +85,20 @@ internal fun WatchIconButton(icon: ImageVector, description: String, modifier: M
     enabled: Boolean = true, size: Dp = 48.dp, media: Boolean = false, prominent: Boolean = false, busy: Boolean = false,
     onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .93f else 1f, spring(dampingRatio = .78f), label = "watch-press")
+    val feedback = rememberGlassInteraction(interaction)
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = if (media) GlassContentColors.light else rememberGlassContentColors(bounds, prominent = prominent)
     TooltipBox(positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-        tooltip = { PlainTooltip { Text(description) } }, state = rememberTooltipState()) {
-        IconButton(onClick, modifier.size(size).graphicsLayer { scaleX = scale; scaleY = scale }
-            .then(if (media) Modifier.mediaGlass(CircleShape) else Modifier.watchGlass(CircleShape, prominent)),
+        tooltip = { GlassTooltip(description) }, state = rememberTooltipState()) {
+        IconButton(onClick, modifier.size(size).onGloballyPositioned { bounds = it.boundsInRoot() }
+            .glassMaterial(CircleShape, prominent, if (media) GlassMaterialRole.MediaOverlay else GlassMaterialRole.Control, feedback),
             enabled = enabled, interactionSource = interaction) {
-            Icon(icon, description, Modifier.size(if (size > 56.dp) 36.dp else 24.dp),
-                tint = (if (media) Color.White else if (prominent) MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.onSurface).copy(alpha = if (enabled) 1f else .38f))
+            GlassForeground(foreground) {
+            GlassIcon(icon, description, Modifier.size(if (size > 56.dp) 36.dp else 24.dp),
+                tint = foreground.primary.copy(alpha = if (enabled) 1f else .38f))
             if (busy) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Buffering" },
                 color = Color.White, strokeWidth = 2.dp)
+            }
         }
     }
 }
@@ -147,24 +107,27 @@ internal fun WatchIconButton(icon: ImageVector, description: String, modifier: M
 internal fun WatchDisclosureRow(title: String, icon: ImageVector, modifier: Modifier = Modifier,
     detail: String? = null, expanded: Boolean = false, actionLabel: String = "Open $title", onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) .985f else 1f, spring(dampingRatio = .85f), label = "watch-row-press")
+    val feedback = rememberGlassInteraction(interaction)
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = rememberGlassContentColors(bounds)
     val rotation by animateFloatAsState(if (expanded) 180f else 0f, spring(dampingRatio = 1f), label = "watch-disclosure")
-    Row(modifier.fillMaxWidth().graphicsLayer { scaleX = scale; scaleY = scale }.watchGlass()
+    GlassForeground(foreground) {
+    Row(modifier.fillMaxWidth().onGloballyPositioned { bounds = it.boundsInRoot() }.glassMaterial(Liquid.card, interaction = feedback)
         .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
         .clickable(interactionSource = interaction, indication = null, role = Role.Button,
             onClickLabel = actionLabel, onClick = onClick).heightIn(min = 56.dp)
         .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+        GlassIcon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall)
-            detail?.takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall,
+            GlassLabel(title, style = MaterialTheme.typography.titleSmall)
+            detail?.takeIf(String::isNotBlank)?.let { GlassLabel(it, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         }
-        Icon(Icons.Default.ExpandMore, null, Modifier.size(20.dp).rotate(rotation),
+        GlassIcon(Icons.Default.ExpandMore, null, Modifier.size(20.dp).rotate(rotation),
             tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
 }
 
 @Composable
@@ -176,20 +139,10 @@ internal fun WatchPanelSurface(modifier: Modifier = Modifier, content: @Composab
 @Composable
 internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () -> Unit,
     content: @Composable (Modifier, Dp) -> Unit) {
-    val backdrop = rememberLayerBackdrop()
-    val density = LocalDensity.current
-    var toolbarHeight by remember { mutableStateOf(136.dp) }
-    val surface = MaterialTheme.colorScheme.surface
-    Box(modifier.clip(Liquid.card).background(surface)) {
-        CompositionLocalProvider(LocalGlassBackdrop provides null, LocalWatchAmbientMaterial provides null,
-            LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-            content(Modifier.fillMaxSize().layerBackdrop(backdrop).background(surface), toolbarHeight + 8.dp)
-        }
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalWatchAmbientMaterial provides null,
-            LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-            Column(Modifier.fillMaxWidth().testTag("comments-toolbar").onSizeChanged { toolbarHeight = with(density) { it.height.toDp() } }
-                .padding(bottom = 8.dp)) { toolbar() }
-        }
+    CompositionLocalProvider(LocalWatchAmbientMaterial provides null) {
+        BrowseGlassSurface(modifier.clip(Liquid.card), softEdge = true, toolbar = {
+            Column(Modifier.testTag("comments-toolbar")) { toolbar() }
+        }, content = content)
     }
 }
 
@@ -198,16 +151,22 @@ internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () ->
 internal fun WatchPanelToolbar(title: String, closeLabel: String, close: () -> Unit,
     icon: ImageVector, detail: String? = null, backLabel: String = "Back", back: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}) {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).watchGlass()
+    var bounds by remember { mutableStateOf(Rect.Zero) }
+    val foreground = rememberGlassContentColors(bounds)
+    GlassForeground(foreground) {
+
+    Row(Modifier.fillMaxWidth().onGloballyPositioned { bounds = it.boundsInRoot() }.padding(horizontal = 12.dp, vertical = 8.dp).watchGlass()
         .heightIn(min = 56.dp).padding(start = if (back == null) 16.dp else 4.dp, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (back != null) IconButton(onClick = back, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) }
-        else Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+        if (back != null) GlassInsetIconButton(onClick = back, modifier = Modifier.size(48.dp)) { GlassIcon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) }
+        else GlassIcon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
-            detail?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            GlassLabel(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
+            detail?.let { GlassLabel(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         actions()
-        IconButton(onClick = close, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, closeLabel) }
+        GlassInsetIconButton(onClick = close, modifier = Modifier.size(48.dp)) { GlassIcon(Icons.Default.Close, closeLabel) }
+    }
+
     }
 }

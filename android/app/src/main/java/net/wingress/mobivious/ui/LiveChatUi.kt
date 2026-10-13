@@ -124,8 +124,8 @@ import kotlin.math.roundToInt
 
 @Composable private fun ChatPanelHeader(settings: () -> Unit, close: () -> Unit, adjustOverlay: (() -> Unit)?, watchStyle: Boolean = false) {
     var menu by remember { mutableStateOf(false) }
-    BoxWithConstraints(Modifier.fillMaxWidth().then(if (watchStyle) Modifier.padding(horizontal = 12.dp, vertical = 8.dp).watchGlass()
-        else Modifier.background(MaterialTheme.colorScheme.surfaceContainer))) {
+    val header: @Composable () -> Unit = {
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
         val compact = maxWidth < 200.dp
         Row(Modifier.fillMaxWidth().heightIn(min = if (watchStyle) 56.dp else 48.dp).padding(start = if (compact) 0.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -134,24 +134,27 @@ import kotlin.math.roundToInt
             if (!compact) Text("Chat replay", Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
+                GlassInsetIconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
                     Icon(Icons.Default.MoreVert, "Chat menu")
                 }
                 GlassDropdownMenu(expanded = menu, dismiss = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
+                    GlassMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
                         onClick = { menu = false; settings() }, modifier = Modifier.testTag("chat-settings"))
-                    if (adjustOverlay != null) DropdownMenuItem(text = { Text("Adjust overlay") },
+                    if (adjustOverlay != null) GlassMenuItem(text = { Text("Adjust overlay") },
                         leadingIcon = { Icon(Icons.Default.OpenInFull, null) }, onClick = { menu = false; adjustOverlay() },
                         modifier = Modifier.testTag("chat-overlay-edit"))
-                    DropdownMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
+                    GlassMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
                         onClick = { menu = false; close() }, modifier = Modifier.testTag("chat-menu-close"))
                 }
             }
-            if (!compact) IconButton(onClick = close, modifier = Modifier.size(48.dp).testTag("chat-close")) {
+            if (!compact) GlassInsetIconButton(onClick = close, modifier = Modifier.size(48.dp).testTag("chat-close")) {
                 Icon(Icons.Default.Close, "Close chat replay")
             }
         }
     }
+    }
+    if (watchStyle) GlassSurface(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), shape = Liquid.card) { header() }
+    else Box(Modifier.background(MaterialTheme.colorScheme.surfaceContainer)) { header() }
 }
 
 /** Owned by the player host so hiding the surface during recreation retains the draft. */
@@ -217,10 +220,10 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                 BoxWithConstraints(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
                     val narrow = maxWidth < 144.dp
                     @Composable fun controls() {
-                        IconButton(onClick = { editing = false }, modifier = Modifier.size(48.dp).testTag("chat-overlay-cancel")) {
+                        GlassInsetIconButton(onClick = { editing = false }, modifier = Modifier.size(48.dp).testTag("chat-overlay-cancel")) {
                             Icon(Icons.Default.Close, "Cancel overlay adjustment")
                         }
-                        IconButton(onClick = { if (vm.setChatAppearance(clamp(draft), editorContext)) editing = false },
+                        GlassInsetIconButton(onClick = { if (vm.setChatAppearance(clamp(draft), editorContext)) editing = false },
                             modifier = Modifier.size(48.dp).testTag("chat-overlay-save")) { Icon(Icons.Default.Check, "Done adjusting overlay") }
                     }
                     if (narrow) Column {
@@ -288,36 +291,40 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
             LazyColumn(Modifier.weight(1f).testTag("chat-settings-list"),
                 contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top + 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item {
+                item { GlassSection {
                     Text("Chat layout", style = MaterialTheme.typography.labelLarge)
                     LibraryControlScene { LiquidSegments(listOf(false, true), appearance.overlay,
                         { if (it) "Overlay" else "Docked" }, Modifier.fillMaxWidth(),
                         tag = { "chat-layout-${if (it) "overlay" else "docked"}" }) { vm.setChatAppearance(appearance.copy(overlay = it), ctx) } }
                     Text("Appearance saves automatically.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
                 if (appearance.overlay) {
-                    item { ChatSlider("Background opacity", "chat-opacity", appearance.opacity.toFloat(), 0f..100f, "${appearance.opacity}%") {
+                    run { ChatSlider("Background opacity", "chat-opacity", appearance.opacity.toFloat(), 0f..100f, "${appearance.opacity}%") {
                         vm.setChatAppearance(appearance.copy(opacity = it.roundToInt()), ctx) } }
                 } else {
-                    item { ChatSlider("Side panel width", "chat-side-width", appearance.besideFraction, ChatAppearance.BESIDE_FRACTION_RANGE) {
+                    run { ChatSlider("Side panel width", "chat-side-width", appearance.besideFraction, ChatAppearance.BESIDE_FRACTION_RANGE) {
                         vm.setChatAppearance(appearance.copy(besideFraction = it), ctx) } }
-                    item { ChatSlider("Bottom panel height", "chat-bottom-height", appearance.belowFraction, .3f.. .7f) {
+                    run { ChatSlider("Bottom panel height", "chat-bottom-height", appearance.belowFraction, .3f.. .7f) {
                         vm.setChatAppearance(appearance.copy(belowFraction = it), ctx) } }
                 }
-                item { ChatSlider("Text size", "chat-text-size", appearance.fontScale.toFloat(), 25f..300f, "${appearance.fontScale}%") {
+                run { ChatSlider("Text size", "chat-text-size", appearance.fontScale.toFloat(), 25f..300f, "${appearance.fontScale}%") {
                     vm.setChatAppearance(appearance.copy(fontScale = it.roundToInt()), ctx) } }
-                item { ChatSwitch("Show channel IDs", "chat-channel-ids", !appearance.hideUserIds) {
+                run { ChatSwitch("Show channel IDs", "chat-channel-ids", !appearance.hideUserIds) {
                     vm.setChatAppearance(appearance.copy(hideUserIds = !it), ctx) } }
-                item { ChatSwitch("Show timestamps", "chat-timestamps", timestamps, enabled = !busy) { timestamps = it; error = null } }
-                item { OutlinedTextField(users, { users = it; error = null }, label = { Text("Blocked users") },
+                } }
+                item { GlassSection {
+                run { ChatSwitch("Show timestamps", "chat-timestamps", timestamps, enabled = !busy) { timestamps = it; error = null } }
+                run { OutlinedTextField(users, { users = it; error = null }, label = { Text("Blocked users") },
                     supportingText = { Text("Channel IDs or @handles, separated by spaces.") }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().testTag("chat-users")) }
-                item { OutlinedTextField(words, { words = it; error = null }, label = { Text("Blocked words") },
+                run { OutlinedTextField(words, { words = it; error = null }, label = { Text("Blocked words") },
                     supportingText = { Text("For example: spam /pattern/. Separate entries with spaces.") }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().testTag("chat-words")) }
-                item { OutlinedTextField(timing, { timing = it; error = null }, label = { Text("Chat delay (seconds)") }, singleLine = true,
+                } }
+                item { GlassSection {
+                run { OutlinedTextField(timing, { timing = it; error = null }, label = { Text("Chat delay (seconds)") }, singleLine = true,
                     supportingText = { Text("Positive values show messages later; negative values show them earlier.") }, enabled = !busy,
                     modifier = Modifier.fillMaxWidth().testTag("chat-timing")) }
+                } }
                 state.filterWarning?.let { warning -> item { Text(warning, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
             }
             HorizontalDivider()

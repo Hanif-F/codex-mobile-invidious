@@ -125,7 +125,7 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
                 Text(DisplayFormats.compact(post.comment.likes), style = MaterialTheme.typography.labelMedium)
             }
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = share, enabled = validId,
+            GlassInsetIconButton(onClick = share, enabled = validId,
                 modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).testTag("post-share-${post.key}")) {
                 Icon(Icons.Default.Share, "Share post")
             }
@@ -172,7 +172,7 @@ internal fun PostCommentsSheet(vm: AppViewModel, state: CommentsState, channel: 
             // Platform dismissal may already have hidden the sheet; returning from replies keeps it open.
             scope.launch { sheetState.show() }
         } else vm.closePostComments()
-    }, sheetState = sheetState, sheetMaxWidth = 640.dp) {
+    }, sheetState = sheetState, sheetMaxWidth = 640.dp, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
         BackHandler(state.threadKey != null) { vm.backPostComments() }
         CommentsPanel(state, prefs.thinMode, Modifier.fillMaxWidth().height(height).testTag("post-comments-sheet"),
             vm::closePostComments, { vm.backPostComments() }, vm::sortPostComments, vm::loadPostComments,
@@ -200,7 +200,7 @@ internal fun PostGallery(images: List<PostImage>, server: String, tag: String) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 BrowseGlassSurface(Modifier.fillMaxSize(), softEdge = true, toolbar = {
                     LibraryToolbar("Image ${largePager.currentPage + 1} of ${images.size}", statusInset = false, actions = {
-                        IconButton({ viewer = false }, Modifier.size(48.dp).browseGlass(androidx.compose.foundation.shape.CircleShape)) { Icon(Icons.Default.Close, "Close image") }
+                        GlassIconButton(Icons.Default.Close, "Close image") { viewer = false }
                     })
                 }) { body, top ->
                     HorizontalPager(largePager, body.padding(top = top)) { index ->

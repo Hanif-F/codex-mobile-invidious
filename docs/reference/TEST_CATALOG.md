@@ -824,6 +824,29 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `subscriptionStateAndExplicitActionRemainClearWithLargeText`
 - `settingsToolbarAndSegmentedControlsFitNarrowLargeTextAndKeepRowsReachable`
 
+### GlassFoundationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/GlassFoundationTest.kt) — Hardware sampling, foreground adaptation, shared-material contrast, transparent content pixel checks, native captions, fallback policy and interaction cancellation.
+
+- `nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans`
+- `labelsIconsAndMenuSlotsNeverPaintTheirOwnBackgrounds`
+- `generatedEnvironmentsKeepReadableLabelsWithoutAdditionalBacking`
+- `navigationLabelsRemainReadableOverNarrowArtworkBands`
+- `sceneDownsamplesChangesAndStopsWhenSettled`
+- `nestedPageRecordingPreservesForegroundsAndCornerTransparency`
+- `softwareAndReducedTransparencyUseReadablePlatesWithoutReadback`
+- `pressCancellationAndRapidRepetitionKeepOneSemanticAction`
+
+### GlassRefractionTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/GlassRefractionTest.kt) — Sharp-feature refraction, foreground geometry, real dialog pixel transmission, invalidation/idle/disposal and clipped source-window crop coordinates.
+
+- `sharpStripesBendAcrossControlSectionAndCircularGlass`
+- `refractionLeavesForegroundGlyphsUndistortedAndPlayerProfileFrozen`
+- `dialogCopiesActualOriginatingPixelsRefreshesAndStopsWhenDismissed`
+- `reducedTransparencyAndDeferredPlayerSkipWindowReadback`
+- `captureGeometryIncludesInsetsAndClipsAtSourceEdges`
+
 ### HomeSubscriptionsSmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/HomeSubscriptionsSmokeTest.kt) — Home Subscriptions Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -999,6 +1022,7 @@ Test support/helper file; no declared `@Test` methods.
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/RemainingGlassJourneyTest.kt) — Remaining Glass Journey declared scenarios; exact cases are enumerated in the test catalog.
 
 - `settingsFormsMenusAndAuthenticationStayReachable`
+- `everySettingsCategorySharesGlassAndKeepsItsFooterReachable`
 - `accountManagementUsesQuietFormsAndExplicitConfirmations`
 - `subscriptionMenuPendingFailureAndRetryNeverMisrepresentMembership`
 - `guestSubscribeCompletesAfterSignInAndReturnsToTheCreator`
@@ -1121,8 +1145,9 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/VisualSurfaceRegressionTest.kt) — Visual Surface Regression declared scenarios; exact cases are enumerated in the test catalog.
 
+- `artworkAvailabilityPreservesAnOpenControlMenu`
 - `roundedActionsLeaveTheContrastingContainerVisibleAtTheirCorners`
-- `wrappedToolbarTitleHasAnOpaqueBackdropAcrossItsEntireHeight`
+- `wrappedToolbarTitleMasksScrollingGlyphsAndReservesMeasuredInsets`
 - `launcherSymbolsStayInsideTheSafeRegionForEveryMask`
 - `multipartToolbarPlacesControlsBelowTheSafeTitle`
 
@@ -1136,6 +1161,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/WatchGlassPresentationTest.kt) — Watch Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
+- `arrivingAmbientPalettePreservesAnOpenMenu`
 - `actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads`
 - `narrowLargeTextKeepsActionLabelsWhole`
 - `disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode`
@@ -1161,4 +1187,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **684 declared test methods** (including ignored tests).
+Inventory total: **700 declared test methods** (including ignored tests).

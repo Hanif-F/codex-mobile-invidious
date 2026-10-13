@@ -1,0 +1,145 @@
+{
+  "date": "2026-10-13",
+  "device": "emulator-5554",
+  "api": 36,
+  "status": "passed; visual evidence collected",
+  "jvm": {
+    "tests": 347,
+    "failures": 0
+  },
+  "initial_emulator_tests": {
+    "tests": 24,
+    "failures": 0
+  },
+  "player_deferred": [
+    "video controls",
+    "player settings",
+    "mini-player"
+  ],
+  "journeys": {
+    "tests": 34,
+    "initial_failures": 1,
+    "errors": 0,
+    "skipped": 0,
+    "failure_reason": "Corner transparency tolerance rejected the existing elevation shadow (3/255 alpha). Updated to allow <.03 alpha; opaque source rectangles remain rejected.",
+    "passed": [
+      "net.wingress.mobivious.GlassRefractionTest#refractionLeavesForegroundGlyphsUndistortedAndPlayerProfileFrozen",
+      "net.wingress.mobivious.GlassRefractionTest#sharpStripesBendAcrossControlSectionAndCircularGlass",
+      "net.wingress.mobivious.GlassRefractionTest#reducedTransparencyAndDeferredPlayerSkipWindowReadback",
+      "net.wingress.mobivious.GlassRefractionTest#captureGeometryIncludesInsetsAndClipsAtSourceEdges",
+      "net.wingress.mobivious.GlassFoundationTest#nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans",
+      "net.wingress.mobivious.GlassFoundationTest#nestedPageRecordingPreservesForegroundsAndCornerTransparency",
+      "net.wingress.mobivious.GlassFoundationTest#pressCancellationAndRapidRepetitionKeepOneSemanticAction",
+      "net.wingress.mobivious.GlassFoundationTest#labelsIconsAndMenuSlotsNeverPaintTheirOwnBackgrounds",
+      "net.wingress.mobivious.GlassFoundationTest#generatedEnvironmentsKeepReadableLabelsWithoutAdditionalBacking",
+      "net.wingress.mobivious.GlassFoundationTest#sceneDownsamplesChangesAndStopsWhenSettled",
+      "net.wingress.mobivious.GlassFoundationTest#navigationLabelsRemainReadableOverNarrowArtworkBands",
+      "net.wingress.mobivious.GlassFoundationTest#softwareAndReducedTransparencyUseReadablePlatesWithoutReadback",
+      "net.wingress.mobivious.DarkGlassPresentationTest#neutralPalettePreservesTextActionAndStatusContrast",
+      "net.wingress.mobivious.DarkGlassPresentationTest#materialsRemainVisibleInBothAppearancesAndOpaqueMode",
+      "net.wingress.mobivious.WatchGlassPresentationTest#longPressShowsTheActionTooltipWithoutActivatingTheButton",
+      "net.wingress.mobivious.WatchGlassPresentationTest#narrowLargeTextKeepsActionLabelsWhole",
+      "net.wingress.mobivious.WatchGlassPresentationTest#arrivingAmbientPalettePreservesAnOpenMenu",
+      "net.wingress.mobivious.WatchGlassPresentationTest#actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads",
+      "net.wingress.mobivious.WatchGlassPresentationTest#disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest#artworkAvailabilityPreservesAnOpenControlMenu",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest#multipartToolbarPlacesControlsBelowTheSafeTitle",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest#roundedActionsLeaveTheContrastingContainerVisibleAtTheirCorners",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest#launcherSymbolsStayInsideTheSafeRegionForEveryMask",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest#wrappedToolbarTitleMasksScrollingGlyphsAndReservesMeasuredInsets",
+      "net.wingress.mobivious.PlayerFeedbackPresentationTest#compactActionsStayAtBottomLeftAndClearTheTimelineAndOtherControls",
+      "net.wingress.mobivious.PlayerFeedbackPresentationTest#seekHasNoBackdropAndSponsorHonorsReduceTransparency",
+      "net.wingress.mobivious.PlayerFeedbackPresentationTest#skipAndCloseRemainAccessibleAndConfirmationIsCompact",
+      "net.wingress.mobivious.RemainingGlassJourneyTest#everySettingsCategorySharesGlassAndKeepsItsFooterReachable",
+      "net.wingress.mobivious.RemainingGlassJourneyTest#settingsFormsMenusAndAuthenticationStayReachable",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#discoverFeedsAndBottomSearchPreserveTheirOrigin",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#wideSidebarAndLargeTextRemainReachable",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#systemReducedMotionKeepsNavigationAndMinimizationUsable"
+    ],
+    "command": "scripts/test-android.sh -Pandroid.testInstrumentationRunnerArguments.class=<classes and methods below>",
+    "selection": [
+      "net.wingress.mobivious.DarkGlassPresentationTest",
+      "net.wingress.mobivious.GlassFoundationTest",
+      "net.wingress.mobivious.GlassRefractionTest",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#discoverFeedsAndBottomSearchPreserveTheirOrigin",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#systemReducedMotionKeepsNavigationAndMinimizationUsable",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances",
+      "net.wingress.mobivious.LiquidRedesignSmokeTest#wideSidebarAndLargeTextRemainReachable",
+      "net.wingress.mobivious.PlayerFeedbackPresentationTest",
+      "net.wingress.mobivious.RemainingGlassJourneyTest#everySettingsCategorySharesGlassAndKeepsItsFooterReachable",
+      "net.wingress.mobivious.RemainingGlassJourneyTest#settingsFormsMenusAndAuthenticationStayReachable",
+      "net.wingress.mobivious.VisualSurfaceRegressionTest",
+      "net.wingress.mobivious.WatchGlassPresentationTest"
+    ]
+  },
+  "final_refraction_rerun": {
+    "tests": 5,
+    "failures": 0,
+    "command": "adb shell am instrument -w -r -e class net.wingress.mobivious.GlassRefractionTest net.wingress.mobivious.debug.test/androidx.test.runner.AndroidJUnitRunner",
+    "includes": "Post-resize transmitted color and retained snapshot, plus original five scenarios."
+  },
+  "unique_emulator_checks_passed": 34,
+  "build": {
+    "debug_apk": "passed",
+    "instrumentation_apk": "passed",
+    "lint": {
+      "errors": 0,
+      "warnings": 36,
+      "new_warnings": 0
+    },
+    "command": "JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME=/home/haha.m.lady/Android/Sdk ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --offline --console=plain"
+  },
+  "scrolling": {
+    "before": {
+      "frames": "82",
+      "jank_percent": "40.24",
+      "p50_ms": "44",
+      "p90_ms": "109"
+    },
+    "after": {
+      "frames": "64",
+      "jank_percent": "59.38",
+      "p50_ms": "65",
+      "p90_ms": "150"
+    },
+    "method": "Four 500ms swipes on Discover: twice (650,2000) to (650,850), twice reverse. gfxinfo reset before each trace.",
+    "limitations": "Cold rendering, image loading, concurrent host compilation and different scroll offsets/nav expansion make these informal emulator traces non-equivalent. The after trace is slower; no performance improvement or physical-device performance is claimed.",
+    "warm_after": {
+      "frames": "127",
+      "jank_percent": "15.75",
+      "p50_ms": "32",
+      "p90_ms": "48"
+    }
+  },
+  "recorded_journeys": {
+    "tests": 4,
+    "failures": 0,
+    "normal_speed": true,
+    "video": "normal-speed-journeys.mp4",
+    "resolution": "720x1280; emulator encoder rejected native resolution",
+    "processing": "Trimmed and re-encoded at original timestamps; playback speed unchanged.",
+    "duration_seconds": 60.492279
+  },
+  "limitations": [
+    "Physical-device battery/GPU performance has not been measured.",
+    "The complete connected suite was not run; only the listed 34 unique checks.",
+    "Player UI is intentionally deferred."
+  ],
+  "final_crop_check": {
+    "tests": 1,
+    "failures": 0,
+    "purpose": "Final debug APK: real originating pixels, retained color after resize, transparent corners, idle stopping and disposal; stored crop protected from Window PixelCopy surface-inset mutation."
+  },
+  "emulator_left_open": "net.wingress.mobivious.debug/net.wingress.mobivious.MainActivity; original shared preferences restored",
+  "emulator_restart": {
+    "reported_by_user": true,
+    "restarted_by_user": true,
+    "reconnected_transport_id": 11,
+    "installed_apk_sha256": "cca429b1ac99da19078f409903b5ea0be3d9ad14696eb538fd8392d76b538239",
+    "installed_apk_matches_final_build": true,
+    "cause": "Unconfirmed. Fresh-boot Android crash buffer was empty; no host crash trace was available.",
+    "app_reopened": true,
+    "real_touch_navigation": "Passed: tap on You opened its dashboard; MainActivity remained focused, PID 4089, crash buffer empty."
+  }
+}

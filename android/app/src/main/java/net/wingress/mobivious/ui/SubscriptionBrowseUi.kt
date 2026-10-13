@@ -23,19 +23,14 @@ internal fun SubscriptionFeedToolbar(signedIn: Boolean, query: String, submitted
     channels: () -> Unit, visibility: () -> Unit, actions: @Composable RowScope.() -> Unit) {
     BrowsePageTitle("Subscriptions", large = true, actions = {
         if (signedIn) {
-            IconButton(onClick = refresh, enabled = !loading, modifier = Modifier.size(48.dp).browseGlass(CircleShape).testTag("subscription-refresh")) {
-                Icon(Icons.Default.Refresh, "Refresh subscriptions")
-            }
+            GlassIconButton(Icons.Default.Refresh, "Refresh subscriptions", Modifier.testTag("subscription-refresh"), enabled = !loading, onClick = refresh)
             actions()
         }
     })
     BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset)) {
         val stackSearch = maxWidth < 340.dp || LocalDensity.current.fontScale > 1.3f
         val channelsButton: @Composable () -> Unit = {
-            TextButton(onClick = channels, modifier = Modifier.heightIn(min = 48.dp).browseGlass(prominent = true).testTag("subscription-channels-button"),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
-                Icon(Icons.Default.Subscriptions, null); Spacer(Modifier.width(8.dp)); Text("Channels")
-            }
+            LibraryActionButton("Channels", Modifier.testTag("subscription-channels-button"), Icons.Default.Subscriptions, prominent = true, onClick = channels)
         }
         if (!signedIn) channelsButton()
         else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -48,9 +43,7 @@ internal fun SubscriptionFeedToolbar(signedIn: Boolean, query: String, submitted
             }
             if (query.isNotBlank() || submitted.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = clear) { Text("Clear search") }
-                if (submitted.isNotBlank()) IconButton(onClick = visibility, modifier = Modifier.size(48.dp).browseGlass(CircleShape)) {
-                    Icon(Icons.Default.Tune, "Search visibility")
-                }
+                if (submitted.isNotBlank()) GlassIconButton(Icons.Default.Tune, "Search visibility", onClick = visibility)
             }
         }
     }
@@ -62,7 +55,7 @@ internal fun ChannelBrowseToolbar(channel: Channel?, tab: ChannelTab?, videoSort
     edit: (String) -> Unit, submit: () -> Unit, clear: () -> Unit, selectTab: (ChannelTab) -> Unit,
     sortVideo: (ChannelSort) -> Unit, sortPlaylist: (String) -> Unit) {
     BrowsePageTitle(channel?.name ?: "Channel", back = back, actions = {
-        IconButton(onClick = refresh, enabled = !loading, modifier = Modifier.size(48.dp).browseGlass(CircleShape)) { Icon(Icons.Default.Refresh, "Refresh channel") }
+        GlassIconButton(Icons.Default.Refresh, "Refresh channel", enabled = !loading, onClick = refresh)
     })
     if (channel != null) Column(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         SearchField(query, edit, "Search this channel", "channel-search", Modifier.fillMaxWidth(), glass = true, submit = submit)

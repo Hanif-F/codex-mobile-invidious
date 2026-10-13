@@ -38,7 +38,7 @@ internal fun DeArrowTitle(vm: AppViewModel, video: Video, style: TextStyle, modi
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(if (original) video.title else replacement ?: video.title, modifier.weight(1f), style = style,
             maxLines = maxLines, fontWeight = fontWeight, overflow = TextOverflow.Ellipsis)
-        if (replacement != null && prefs.dearrowShowOriginal) IconButton(onClick = { original = !original },
+        if (replacement != null && prefs.dearrowShowOriginal) GlassInsetIconButton(onClick = { original = !original },
             modifier = Modifier.semantics { stateDescription = if (original) "Original title" else "DeArrow title" }) {
             Icon(Icons.AutoMirrored.Filled.CompareArrows, if (original) "Show DeArrow title" else "Show original title", tint = MaterialTheme.colorScheme.primary)
         }
@@ -99,8 +99,8 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
                 if (state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 state.status?.let { text -> item { Text(text, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) } }
                 if (state.review) {
-                    item { Text(state.draft.trim(), style = MaterialTheme.typography.titleMedium) }
-                    items(guidelines.indices.toList()) { index ->
+                    item { GlassSection { Text(state.draft.trim(), style = MaterialTheme.typography.titleMedium)
+                    guidelines.indices.forEach { index ->
                         val (title, detail) = guidelines[index]
                         Row(Modifier.fillMaxWidth().testTag("dearrow-guideline-$index").toggleable(
                             value = index in state.acknowledgements, enabled = ready, role = Role.Checkbox,
@@ -110,23 +110,24 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
                             Column(Modifier.weight(1f).padding(top = 12.dp)) { Text(title); Text(detail, style = MaterialTheme.typography.bodySmall) }
                         }
                     }
-                    item {
+                    run {
                         Text("Check all four guidelines to submit.")
                         LibraryControlScene { LibraryActionButton("Submit title", Modifier.fillMaxWidth(), enabled = ready && state.acknowledgements.size == 4, prominent = true) { vm.contributeDeArrow("submit") } }
                         TextButton(enabled = !state.busy, onClick = { vm.reviewDeArrow(false) }) { Text("Back to editing") }
                     }
+                    } }
                 } else {
                     item {
                         Text("Original title", style = MaterialTheme.typography.titleMedium)
                         val original = state.titles.firstOrNull { it.original }
                         DeArrowVoteRow(vm, playback.details?.video?.title.orEmpty(), original, true, ready && state.loaded)
                     }
-                    item {
+                    item { GlassSection {
                         OutlinedTextField(state.draft, vm::editDeArrowDraft, label = { Text("Your suggested title") }, enabled = !state.busy, singleLine = true,
                             isError = state.draft.isNotBlank() && !DeArrowRules.validTitle(state.draft), supportingText = { Text("1–110 characters") },
                             modifier = Modifier.fillMaxWidth().testTag("dearrow-draft"))
                         LibraryControlScene { LibraryActionButton("Review title", enabled = ready && DeArrowRules.validTitle(state.draft), prominent = true) { vm.reviewDeArrow(true) } }
-                    }
+                    } }
                     item { Text("Community titles", style = MaterialTheme.typography.titleMedium) }
                     val proposals = state.titles.filter { !it.original }
                     if (state.loaded && proposals.isEmpty()) item { Text("No community titles yet. Suggest the first one.") }
@@ -146,8 +147,8 @@ private fun DeArrowVoteRow(vm: AppViewModel, title: String, item: DeArrowSubmiss
     Column(Modifier.fillMaxWidth()) {
         Text(title)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            IconButton(enabled = enabled, onClick = { vm.contributeDeArrow("upvote", item, original) }) { Icon(Icons.Default.ThumbUp, "Upvote: $title") }
-            IconButton(enabled = enabled && DeArrowRules.canDownvote(item), onClick = { vm.contributeDeArrow("downvote", item, original) }) { Icon(Icons.Default.ThumbDown, "Downvote: $title") }
+            GlassInsetIconButton(enabled = enabled, onClick = { vm.contributeDeArrow("upvote", item, original) }) { Icon(Icons.Default.ThumbUp, "Upvote: $title") }
+            GlassInsetIconButton(enabled = enabled && DeArrowRules.canDownvote(item), onClick = { vm.contributeDeArrow("downvote", item, original) }) { Icon(Icons.Default.ThumbDown, "Downvote: $title") }
             if (item != null) Text("${item.votes} votes", style = MaterialTheme.typography.labelMedium)
         }
         if (item?.locked == true) Text("This title is locked.", style = MaterialTheme.typography.bodySmall)

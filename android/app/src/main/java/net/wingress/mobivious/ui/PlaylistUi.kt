@@ -66,7 +66,7 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
             if (!embedded) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
         }
     }
-    if (embedded) CompositionLocalProvider(LocalGlassBackdrop provides null, content = content)
+    if (embedded) LibraryControlScene { content() }
     else BrowseArtworkSurface(null, content)
 }
 
@@ -89,11 +89,11 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
         FlowRow(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             LibraryActionButton("Play", icon = Icons.Default.PlayArrow, prominent = true, onClick = play)
             PlaylistSubscriptionButton(vm, list, signIn)
-            OverflowMenu("Actions for playlist ${list.title}", listOf(list, vm.api.context(), owned), Modifier.size(48.dp).browseGlass(CircleShape).testTag("playlist-actions-${list.id}")) { close ->
-                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
+            OverflowMenu("Actions for playlist ${list.title}", listOf(list, vm.api.context(), owned), Modifier.size(48.dp).testTag("playlist-actions-${list.id}")) { close ->
+                GlassMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
                 if (owned) {
-                    DropdownMenuItem(text = { Text("Edit playlist") }, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
-                    DropdownMenuItem(text = { Text("Delete playlist") }, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
+                    GlassMenuItem(text = { Text("Edit playlist") }, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
+                    GlassMenuItem(text = { Text("Delete playlist") }, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
                 }
             }
         }
@@ -110,11 +110,15 @@ internal fun PlaylistDialog(playlist: Playlist?, dismiss: () -> Unit, save: (Str
         LibraryActionButton("Save", Modifier.testTag("playlist-form-save"), enabled = title.isNotBlank(), prominent = true) { save(title.trim(), privacy, description) }
     }) { modifier, top ->
         Column(modifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            GlassSection {
+
             OutlinedTextField(title, { title = it.take(150) }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("playlist-form-title"))
             Text("Privacy", style = MaterialTheme.typography.titleMedium)
             BrowseArtworkSurface(null) { BrowseTabs(listOf("private", "unlisted", "public"), privacy, { it.replaceFirstChar(Char::uppercase) }, { "playlist-privacy-$it" }, select = { privacy = it }) }
             if (playlist != null) OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
             TextButton(onClick = dismiss) { Text("Cancel") }
+
+            }
         }
     }
 }

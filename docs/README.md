@@ -1,8 +1,9 @@
 # Mobivious documentation
 
 This is the current documentation for the Android app in `androidInvidious`.
-It was checked against source commit `8476d08` (Mobivious **0.10.2**, version code
-**20**) on **11 October 2026**. It describes source behavior; it does not assert
+The UI guides and inventories were reviewed against the Liquid Glass implementation
+working tree over `e956aabb` (Mobivious **0.10.2**, version code **20**) on
+**13 October 2026**. It describes source behavior; it does not assert
 that a production server is updated or that every device scenario passes.
 
 ## Start here
@@ -17,6 +18,8 @@ that a production server is updated or that every device scenario passes.
 | Work on accounts, subscriptions, history, playlists, clips or downloads | [Library and account systems](LIBRARY.md) |
 | Understand persistence, isolation and privacy | [Storage and security](STORAGE_AND_SECURITY.md) |
 | Work on layouts, accessibility, glass or ambient mode | [UI system](UI.md) |
+| Review the app-wide Liquid Glass overhaul | [Implementation and acceptance](liquid-glass-implementation-2026-10-13/README.md), [brief](LIQUID_GLASS_OVERHAUL_PLAN.md), [baseline](liquid-glass-overhaul-2026-10-13/README.md) |
+| Review clear refraction and originating-window overlays | [Refraction implementation and verification](refraction-2026-10-13/README.md) |
 | Build, sign or release the APK | [Development guide](DEVELOPMENT.md) |
 | Run or extend checks | [Testing guide](TESTING.md), [test catalog](reference/TEST_CATALOG.md) |
 | Diagnose a failure | [Troubleshooting](TROUBLESHOOTING.md) |
@@ -45,11 +48,13 @@ screenshots/logs are documented by category, rather than treated as application 
 ## Existing records
 
 [LIQUID_GLASS.md](LIQUID_GLASS.md) provides the extended visual design rationale.
+[LIQUID_GLASS_OVERHAUL_PLAN.md](LIQUID_GLASS_OVERHAUL_PLAN.md) is the approved
+overhaul brief, with dated baseline evidence. The [implementation report](liquid-glass-implementation-2026-10-13/README.md) records the completed changes, emulator checks and validation limits.
 [FEATURE_PARITY.md](../FEATURE_PARITY.md) is a dated web/native comparison, and
 [VERIFICATION.md](../VERIFICATION.md) contains chronological test and release
 evidence. Their old versions, counts and deployment statements belong to their
 stated dates. Use the current source and this index for today's behavior.
 
 Dated evidence collections are indexed in [the source map](reference/SOURCE_MAP.md).
-No new emulator, production deployment or release acceptance is implied by this
-documentation pass. To maintain the docs, follow [Testing → documentation checks](TESTING.md#documentation-checks).
+Emulator acceptance is recorded explicitly in the implementation report; production
+deployment and release acceptance are separate. To maintain the docs, follow [Testing → documentation checks](TESTING.md#documentation-checks).

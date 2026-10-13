@@ -219,12 +219,28 @@ internal fun WatchAmbientAnimation(state: WatchAmbientState) {
 internal fun WatchAmbientScene(modifier: Modifier, playerBounds: Rect, content: @Composable BoxScope.() -> Unit) {
     val state = LocalWatchAmbient.current
     val active = state?.available == true && !LocalReduceTransparency.current && LocalView.current.isHardwareAccelerated
-    val backdrop = rememberLayerBackdrop()
+    val scene = rememberGlassScene(samplingEnabled = !active)
+    val backdrop = scene.backdrop
     val surface = MaterialTheme.colorScheme.surface
     val dark = MaterialTheme.colorScheme.background.red < .3f
+    // Reuse the bounded decoder palette; glass controls never copy or sample the decoder.
+    val palette = state?.palette
+    SideEffect {
+        // The entire ambient canvas is composited at this alpha. Even overlapping
+        // radial lights cannot exceed these channel/luminance bounds; reuse that
+        // guarantee rather than treating generated light as an unbounded checkerboard.
+        val opacity = if (dark) .55f else .30f
+        scene.contentRange = if (active) Color.Black.copy(alpha = opacity).compositeOver(surface) to
+            Color.White.copy(alpha = opacity).compositeOver(surface) else null
+        scene.generated = if (active) palette?.colors?.map {
+            val light = ambientIllumination(Color(it), surface, dark)
+            light.copy(alpha = light.alpha * if (dark) .55f else .30f).compositeOver(surface)
+        }?.plus(surface) else null
+    }
     var origin by remember { mutableStateOf(Offset.Zero) }
     Box(modifier.onGloballyPositioned { origin = it.positionInRoot() }) {
-        Box(Modifier.matchParentSize().clipToBounds().layerBackdrop(backdrop).background(surface)) {
+        Box(Modifier.matchParentSize().clipToBounds().recordGlassScene(scene).background(surface)) {
+            if (!active) GlassEnvironment(Modifier.matchParentSize())
             if (active) Canvas(Modifier.matchParentSize().testTag("watch-ambient-background")
                 .graphicsLayer { alpha = if (dark) .55f else .30f }) {
                 val picture = playerBounds.translate(-origin)
@@ -242,7 +258,7 @@ internal fun WatchAmbientScene(modifier: Modifier, playerBounds: Rect, content: 
                 }
             }
         }
-        CompositionLocalProvider(LocalGlassBackdrop provides backdrop,
+        CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalGlassScene provides scene,
             LocalWatchAmbientMaterial provides state.takeIf { active }) { content() }
     }
 }

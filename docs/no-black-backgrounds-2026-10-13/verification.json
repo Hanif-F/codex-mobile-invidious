@@ -1,0 +1,11 @@
+{
+  "distinct_device_tests": 123,
+  "passing": 123,
+  "failing": 0,
+  "unit_tests": 347,
+  "unit_failures": 0,
+  "lint": {
+    "Warning": 36
+  },
+  "apk_sha256": "8790c5c7eb111388fbbb0303b25e6abfa301741b1da65c4875ee3aa88d2e0596"
+}

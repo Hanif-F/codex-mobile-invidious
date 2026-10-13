@@ -4,7 +4,8 @@
 [Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)
 
 The current guides describe Mobivious 0.10.2 (version code 20), reviewed against
-application source at `8476d08` on 11 October 2026. The review covers the maintained
+the Liquid Glass implementation working tree over `e956aabb` on 13 October 2026.
+Runtime acceptance is recorded in the [implementation record](../liquid-glass-overhaul-2026-10-13/IMPLEMENTATION.md). The review covers the maintained
 Android project and its supporting scripts/deployment examples in this repository.
 The sibling Invidious project is described at its integration boundary; it is not
 an additional Android module.
@@ -13,11 +14,11 @@ an additional Android module.
 
 | Maintained files | Count | Documentation |
 | --- | ---: | --- |
-| Main application Kotlin | 89 | Per-file responsibilities and owning guides in [Source map](SOURCE_MAP.md). |
+| Main application Kotlin | 93 | Per-file responsibilities and owning guides in [Source map](SOURCE_MAP.md). |
 | JVM test Kotlin | 34 | Every file and declared test method in [Test catalog](TEST_CATALOG.md). |
-| Android device test/support Kotlin | 59 | Every suite/helper, declared method and explicit Ignore in the test catalog. |
+| Android device test/support Kotlin | 60 | Every suite/helper, declared method and explicit Ignore in the test catalog. |
 | Build, manifests, resources, scripts, deployment and repository support | 39 | Per-file responsibilities and owning guides in the source map. |
-| **Total** | **221** | Explicit entries with reviewed SHA-256 fingerprints in `coverage.json`. |
+| **Total** | **226** | Explicit entries with reviewed SHA-256 fingerprints in `coverage.json`. |
 
 The inventory uses Git's tracked and non-ignored untracked files under `android/`,
 `scripts/` and `deploy/`, plus `.env.example`, `.gitignore`, `docker-compose.yml`
@@ -57,7 +58,7 @@ belong to their upstream projects; the guides document their use by this app.
 Run `python3 scripts/check-documentation.py` from the repository root. It checks
 inventory completeness, required descriptions/guide assignments, reviewed source
 fingerprints, generated catalog contents and local Markdown file links across the
-18 indexed documents. Remote URLs and Markdown section anchors are not part of
+22 indexed documents. Remote URLs and Markdown section anchors are not part of
 that automated check. [Testing](../TESTING.md#documentation-checks) explains the
 explicit review-and-refresh workflow.
 

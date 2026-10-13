@@ -78,12 +78,15 @@ internal fun RssSheet(vm: AppViewModel) {
             } catch (e: Exception) { if (selected.context == vm.api.context()) vm.message.value = e.message ?: "Could not export this feed." }
         }
     }
-    ModalBottomSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+    ModalBottomSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = androidx.compose.ui.graphics.Color.Transparent) {
         val maxHeight = with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp() * .85f }
         BrowseGlassSurface(Modifier.fillMaxWidth().height(480.dp.coerceAtMost(maxHeight)).testTag("rss-sheet"), toolbar = {
             BrowsePanelToolbar(state.title, "Close feed", vm::dismissRss)
         }) { contentModifier, topInset ->
         Column(contentModifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            GlassSection {
+
             if (state.privateLink) Text("Anyone with this link can read your subscription feed. Share it only when you want to grant that access.")
             if (state.playlist?.let { it.owned && it.privacy == "private" } == true) Text("This exports a snapshot of your private playlist. The file does not update automatically.")
             if (state.opml) LibraryControlScene {
@@ -106,6 +109,8 @@ internal fun RssSheet(vm: AppViewModel) {
                 LibraryActionButton("Open", prominent = true, onClick = { fileIntent(false) })
                 LibraryActionButton("Save file", onClick = { if (state.context == vm.api.context()) { pendingSave = state; save.launch(state.filename) } })
                 LibraryActionButton("Share", onClick = { fileIntent(true) })
+            }
+
             }
         }
     }

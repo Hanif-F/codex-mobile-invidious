@@ -1,0 +1,57 @@
+{
+  "origin": "Selector membership from declared source, reconciled with executed counts and failures in the retained run log.",
+  "tests": 10,
+  "failures": 0,
+  "cases": [
+    {
+      "classname": "net.wingress.mobivious.VisibilitySmokeTest",
+      "name": "guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisibilitySmokeTest",
+      "name": "managerRetainsFailedChangesAndRefreshesWebsiteState",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.VisibilitySmokeTest",
+      "name": "cardBlockSearchOverrideAndChannelHeaderPreserveLibraryAccess",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.DeArrowSmokeTest",
+      "name": "contributionsGuidelinesFailuresAndPrivateIdentity",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AiFilterSmokeTest",
+      "name": "warningsRenderAcrossThemesAndTextOnlyWithoutFetchingOriginalImages",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.AiFilterSmokeTest",
+      "name": "failedAccountSaveRetainsDraftAndListStatusExplainsStaleData",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.PlaylistRssSmokeTest",
+      "name": "rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.DiscoverySearchSmokeTest",
+      "name": "searchTypesUseCorrectFiltersAndKeepVideoChoices",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.DiscoverySearchSmokeTest",
+      "name": "mixedSearchPreservesOrderChannelBackScrollRecreationAndRetry",
+      "failed": false
+    },
+    {
+      "classname": "net.wingress.mobivious.DiscoverySearchSmokeTest",
+      "name": "controlsAndMixedCardsRemainReachableOnCompactDisplays",
+      "failed": false
+    }
+  ]
+}

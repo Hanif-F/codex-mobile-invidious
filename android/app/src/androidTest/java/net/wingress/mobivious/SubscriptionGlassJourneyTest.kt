@@ -61,6 +61,8 @@ class SubscriptionGlassJourneyTest {
         shell("settings put secure show_ime_with_hard_keyboard 1")
         shell("settings put secure stylus_handwriting_enabled 0")
         command("reset")
+        // System appearance may be dark; these journey captures explicitly start in light mode.
+        command("preferences", JSONObject().put("dark_mode", "light"))
         command("watched", JSONObject().put("indicatorVideos", true))
         command("community")
         command("home-subscriptions", JSONObject().put("subscriptionChannels", JSONArray((0..25).map { index ->

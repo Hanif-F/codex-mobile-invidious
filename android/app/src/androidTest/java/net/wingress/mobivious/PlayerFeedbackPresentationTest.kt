@@ -9,6 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
@@ -160,7 +161,7 @@ class PlayerFeedbackPresentationTest {
                 sponsor.value = SponsorBlockPlayback(active = segment)
             }
             val plate = compose.onNodeWithTag("sponsorblock-actions").captureToImage().toPixelMap()
-            val expected = if (reduce) Color(0xFF181A1D).red else if (background == Color.White) .4f else 0f
+            val expected = if (reduce) GlassOptics.mediaPlate.red else GlassOptics.mediaPlate.copy(alpha = GlassOptics.mediaTint).compositeOver(background).red
             assertEquals(expected, plate[plate.width / 2, plate.height / 2].red, .03f)
             captureWatchScreenshot("player-feedback-pill-${if (night) "dark" else "light"}-${if (reduce) "opaque" else "transparent"}")
             for (offset in listOf(-10_000L, 30_000L)) {

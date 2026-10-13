@@ -64,6 +64,8 @@ def source_catalog(files):
         '| [README](../../README.md) | Installation, overview and links into the current guides. |',
         '| [Development](../DEVELOPMENT.md) | Prerequisites, wrapper builds, signing, release publishing and upstream maintenance. |',
         '| [Liquid Glass](../LIQUID_GLASS.md) | Extended design references and presentation rationale. |',
+        '| [Overhaul baseline](../liquid-glass-overhaul-2026-10-13/README.md) | Immutable pre-implementation images, provenance and approved brief. |',
+        '| [Overhaul implementation](../liquid-glass-implementation-2026-10-13/README.md) | App-wide material changes, emulator acceptance, screenshots, normal-speed recordings and frame timing. |',
         '| [Feature parity](../../FEATURE_PARITY.md) | Dated web/native capability comparison, with exclusions and server requirements. |',
         '| [Verification](../../VERIFICATION.md) | Chronological commands, results, device limitations and release evidence. |',
         '| [Visual audit report](../visual-audit-2026-10-11/REPORT.md) | Dated screenshot/motion audit, EVIDENCE index, manifests, collector/grouping scripts, temporary harness/fixture patches and diagnostic logs. |',

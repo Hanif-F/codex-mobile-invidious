@@ -131,11 +131,11 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
         color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (thread != null) IconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
+                if (thread != null) GlassInsetIconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
                 else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
                 if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
-                IconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
+                GlassInsetIconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
             }
             if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,
@@ -149,19 +149,8 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
 
 @Composable
 private fun WatchCommentSort(selected: CommentSort, changeSort: (CommentSort) -> Unit) {
-    Row(Modifier.padding(horizontal = 16.dp).watchGlass(Liquid.pill).padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        CommentSort.entries.forEach { sort ->
-            Box(Modifier.clip(Liquid.pill)
-                .background(if (selected == sort) MaterialTheme.colorScheme.onSurface.copy(alpha = .08f) else Color.Transparent)
-                .selectable(selected == sort, role = Role.Tab, onClick = { changeSort(sort) })
-                .heightIn(min = 48.dp).padding(horizontal = 20.dp, vertical = 8.dp)
-                .testTag("comments-sort-${sort.apiValue}"), contentAlignment = Alignment.Center) {
-                Text(sort.label, style = MaterialTheme.typography.labelLarge,
-                    color = if (selected == sort) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
+    LiquidSegments(CommentSort.entries, selected, { it.label }, Modifier.padding(horizontal = 16.dp),
+        tag = { "comments-sort-${it.apiValue}" }, select = changeSort)
 }
 
 @Composable

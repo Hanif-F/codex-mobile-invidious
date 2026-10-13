@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.test.*
 import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.toArgb
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -46,6 +47,9 @@ class LiquidRedesignSmokeTest {
         compose.waitForIdle()
         compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
         compose.waitForIdle()
+    }
+    private fun menuVisible(label: String) = until {
+        runCatching { compose.onNodeWithText(label).assertIsDisplayed() }.isSuccess
     }
     private fun preferences(value: AccountPreferences) {
         compose.runOnUiThread { vm.store.guestDeArrow(value); vm.refreshSharedSettings() }
@@ -133,6 +137,7 @@ class LiquidRedesignSmokeTest {
     @Test fun transparentGlassKeepsActionsReachableAcrossLightAndDarkPages() {
         for (appearance in listOf("light", "dark")) {
             preferences(AccountPreferences(darkMode = appearance, autoplay = false, continueAutoplay = false))
+            screenshot("overhaul-pages-start-$appearance")
             compose.onNodeWithTag("navigation-Discover").performClick().assertIsSelected()
             screenshot("neutral-discover-$appearance")
             compose.onNodeWithTag("global-search").performClick()
@@ -158,6 +163,7 @@ class LiquidRedesignSmokeTest {
             compose.onNodeWithTag("watch-more").assertIsDisplayed()
             screenshot("neutral-watch-$appearance")
             compose.onNodeWithTag("watch-more").performClick()
+            menuVisible("Create clip")
             compose.onNodeWithText("Create clip").assertIsDisplayed()
             screenshot("neutral-menu-$appearance")
             shell("input keyevent KEYCODE_BACK")
@@ -168,18 +174,28 @@ class LiquidRedesignSmokeTest {
             screenshot("neutral-comments-$appearance")
             compose.onNodeWithContentDescription("Close comments").performClick()
             back()
+            until { compose.onAllNodesWithTag("navigation-Discover").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("navigation-Discover").performClick()
             compose.runOnUiThread { vm.closePlayer() }
+            // Closing the service queue is asynchronous; wait before changing appearance.
+            until { vm.queue.value.token.isEmpty() && vm.playback.value.details == null }
+            until { compose.onAllNodesWithTag("navigation-Discover").fetchSemanticsNodes().isNotEmpty() }
         }
     }
     @Test fun systemAppearanceUsesDarkGlassAndHonorsAnExplicitLightChoice() {
         val original = shell("cmd uimode night").substringAfter(":").trim()
         assertTrue(original in listOf("yes", "no", "auto", "custom"))
         fun waitForSurface(expected: androidx.compose.ui.graphics.Color) {
+            val expectDark = expected.red < .3f
             until {
-                val image = compose.onRoot().captureToImage()
-                val actual = image.toPixelMap()[1, image.height / 2]
-                kotlin.math.abs(actual.red - expected.red) < .005f
+                currentActivity()
+                if (!activity.window.decorView.hasWindowFocus()) false else try {
+                    val image = compose.onRoot().captureToImage()
+                    val actual = image.toPixelMap()[1, image.height / 2]
+                    // The designed environment replaces a flat surface. Verify appearance and visible hue.
+                    val lightness = androidx.core.graphics.ColorUtils.calculateLuminance(actual.toArgb())
+                    (if (expectDark) lightness < .20 else lightness > .55) && actual.blue - actual.red > .015f
+                } catch (_: androidx.compose.ui.test.ComposeTimeoutException) { false }
             }
         }
         try {
@@ -250,8 +266,8 @@ class LiquidRedesignSmokeTest {
         compose.onNodeWithTag("navigation-You").performClick()
         compose.onNodeWithTag("global-settings").assertIsDisplayed()
         screenshot("you-wide")
-        shell("wm density 640")
-        shell("settings put system font_scale 1.5")
+        shell("wm density 672")
+        shell("settings put system font_scale 2.0")
         until { activity.resources.configuration.screenWidthDp <= 360 }
         currentActivity()
         compose.onNodeWithTag("navigation-Discover").performClick()
@@ -260,7 +276,21 @@ class LiquidRedesignSmokeTest {
         compose.onNodeWithTag("global-settings").performClick()
         compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Appearance"))
         compose.onNodeWithText("Appearance").performClick()
+        compose.onNodeWithTag("settings-save").assertIsDisplayed()
+        assertTrue("Large-text rows must stop above the fixed footer",
+            compose.onNodeWithTag("settings-list").getUnclippedBoundsInRoot().bottom <=
+                compose.onNodeWithTag("settings-footer").getUnclippedBoundsInRoot().top)
         screenshot("appearance-narrow-large-text")
+        compose.onNodeWithContentDescription("Back from Appearance").performClick()
+        compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Server"))
+        compose.onNodeWithText("Server", substring = false).performClick()
+        compose.onNodeWithText("HTTPS address").performClick()
+        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets)
+            .isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        compose.onNodeWithText("HTTPS address").assertIsDisplayed()
+        screenshot("overhaul-server-320dp-2x-ime-field")
+        compose.onNodeWithText("Connect", substring = false).performScrollTo().assertIsDisplayed()
+        screenshot("overhaul-server-320dp-2x-ime-action")
     }
     @Test fun systemReducedMotionKeepsNavigationAndMinimizationUsable() {
         val scale = shell("settings get global animator_duration_scale")
@@ -290,6 +320,8 @@ class LiquidRedesignSmokeTest {
         until { vm.playback.value.playing && compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isNotEmpty() }
         val token = vm.queue.value.token
         compose.onNodeWithTag("watch-more").performClick()
+        menuVisible("DeArrow Title")
+        screenshot("overhaul-guest-watch-menu")
         compose.onNodeWithText("DeArrow Title").performClick()
         compose.onNodeWithTag("sign-in-screen").assertIsDisplayed()
         back()
@@ -308,6 +340,8 @@ class LiquidRedesignSmokeTest {
             compose.onNodeWithContentDescription(name).assertIsDisplayed().assertWidthIsEqualTo(androidx.compose.ui.unit.Dp(56f))
         screenshot("watch-glass-light")
         compose.onNodeWithTag("watch-more").performClick()
+        screenshot("overhaul-watch-menu-diagnostic")
+        menuVisible("Create clip")
         compose.onNodeWithText("Create clip").assertIsDisplayed()
         screenshot("watch-glass-more")
         shell("input keyevent KEYCODE_BACK")
@@ -348,7 +382,7 @@ class LiquidRedesignSmokeTest {
         compose.runOnUiThread { vm.openLink(VideoLink("landscape01")); activity.sharedVideo.value = true }
         until { vm.playback.value.duration > 0 && !vm.playback.value.loading }
         compose.runOnUiThread { vm.controller.value!!.pause() }
-        shell("wm density 640"); shell("settings put system font_scale 2.0")
+        shell("wm density 672"); shell("settings put system font_scale 2.0")
         until { currentActivity(); activity.resources.configuration.screenWidthDp <= 360 && activity.resources.configuration.fontScale >= 2f }
         compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()
         screenshot("watch-glass-narrow-large-text")

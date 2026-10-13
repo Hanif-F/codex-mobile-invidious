@@ -26,6 +26,31 @@ import org.junit.runner.RunWith
 class WatchGlassPresentationTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test fun arrivingAmbientPalettePreservesAnOpenMenu() {
+        val ambient = mutableStateOf<WatchAmbientState?>(null)
+        compose.setContent { MaterialTheme(colorScheme = Liquid.dark, typography = Liquid.typography) {
+            GlassBackgroundScene {
+                CompositionLocalProvider(LocalWatchAmbientMaterial provides ambient.value) {
+                    WatchGlassScene(Modifier.width(320.dp), inheritAmbient = true) {
+                        var open by remember { mutableStateOf(false) }
+                        WatchActionRow(true, {}, {}, {}, { open = true }, moreMenu = {
+                            GlassDropdownMenu(open, { open = false }) {
+                                GlassMenuItem(text = { GlassLabel("Keep this menu open") }, onClick = { open = false })
+                            }
+                        })
+                    }
+                }
+            }
+        } }
+        compose.onNodeWithContentDescription("More").performClick()
+        compose.onNodeWithText("Keep this menu open").assertIsDisplayed()
+        compose.runOnIdle { ambient.value = WatchAmbientState() }
+        compose.onNodeWithText("Keep this menu open").assertIsDisplayed()
+        compose.runOnIdle { ambient.value = null }
+        compose.onNodeWithText("Keep this menu open").assertIsDisplayed().performClick()
+        compose.onNodeWithText("Keep this menu open").assertDoesNotExist()
+    }
+
     @Test fun actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads() {
         val width = mutableIntStateOf(320)
         val enabled = mutableStateOf(true)

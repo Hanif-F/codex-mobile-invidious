@@ -20,17 +20,17 @@ internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit
     removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true) {
     val account by vm.account.collectAsStateWithLifecycle()
     OverflowMenu("Actions for ${video.title}", listOf(video, ApiContext(vm.store.server, account)), Modifier.testTag("video-actions-${video.id}")) { close ->
-        DropdownMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
-        DropdownMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
-        DropdownMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
-        DropdownMenuItem(text = { Text("Play next") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
-        DropdownMenuItem(text = { Text("Add to queue") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })
+        GlassMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
+        GlassMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
+        GlassMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
+        GlassMenuItem(text = { Text("Play next") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
+        GlassMenuItem(text = { Text("Add to queue") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })
         if (ContentVisibility.validChannel(video.channelId)) {
-            DropdownMenuItem(text = { Text("Open channel") }, onClick = { close(); channel(video.channelId) })
+            GlassMenuItem(text = { Text("Open channel") }, onClick = { close(); channel(video.channelId) })
             BlockChannelMenuItem(vm, video.channelId, video.author, signIn, close = close)
         }
-        if (remove != null) DropdownMenuItem(text = { Text(removalLabel) }, onClick = { close(); remove() })
-        if (removeFromPlaylist != null) DropdownMenuItem(text = { Text("Remove from playlist") }, enabled = removeFromPlaylistEnabled,
+        if (remove != null) GlassMenuItem(text = { Text(removalLabel) }, onClick = { close(); remove() })
+        if (removeFromPlaylist != null) GlassMenuItem(text = { Text("Remove from playlist") }, enabled = removeFromPlaylistEnabled,
             onClick = { close(); removeFromPlaylist() })
     }
 }
@@ -58,7 +58,7 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
                         enabled = enabled, actionLabel = "Save to ${list.title}") { vm.saveVideo(list) }
                 }
                 item { LibraryActionButton("Reload playlists", enabled = enabled, onClick = vm::loadSaveLists); HorizontalDivider() }
-                item {
+                item { GlassSection {
                     Text("Create and save", style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(state.title, { vm.editSave(it, state.privacy) }, label = { Text("Playlist title") }, singleLine = true, enabled = enabled && state.created == null,
                         modifier = Modifier.fillMaxWidth().testTag("save-playlist-title"))
@@ -69,7 +69,7 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
                     }
                     BrowseArtworkSurface(null) { LibraryActionButton("Create and save", Modifier.testTag("create-and-save"), enabled = enabled && state.title.isNotBlank() && state.created == null,
                         prominent = true) { vm.saveVideo() } }
-                }
+                } }
             }
             item { TextButton(onClick = vm::dismissSave, enabled = !state.busy) { Text("Cancel") } }
         }

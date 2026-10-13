@@ -90,10 +90,10 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true,
                 bottomInset = with(androidx.compose.ui.platform.LocalDensity.current) { 12.sp.toDp() } + 16.dp)
             else AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Row(Modifier.align(Alignment.BottomEnd).padding(5.dp).clip(RoundedCornerShape(5.dp)).background(Color.Black.copy(alpha = .82f))
+            Row(Modifier.align(Alignment.BottomEnd).padding(5.dp)
                 .padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.ContentCut, null, Modifier.size(13.dp), Color.White)
-                Text(playerTime(clip.durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                PlayerIcon(Icons.Default.ContentCut, null, size = 13.dp)
+                Text(playerTime(clip.durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow))
             }
           }
         }
@@ -106,9 +106,9 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
         }
         OverflowMenu("Actions for clip ${clip.title}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
-            DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip) { vm.message.value = "No app could share this clip." } })
-            DropdownMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
-            if (clip.owned(vm.api.context())) DropdownMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
+            GlassMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip) { vm.message.value = "No app could share this clip." } })
+            GlassMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
+            if (clip.owned(vm.api.context())) GlassMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
         }
     }
 }
@@ -127,8 +127,8 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 Icon(Icons.Default.ContentCut, null, Modifier.padding(9.dp).size(20.dp), MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Text("Clip", Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            if (clip.owned(vm.api.context())) IconButton(onClick = { vm.confirmDeleteClip(clip) }, Modifier.testTag("clip-delete")) { Icon(Icons.Default.DeleteOutline, "Delete clip") }
-            IconButton(onClick = close) { Icon(Icons.Default.Close, "Close clip") }
+            if (clip.owned(vm.api.context())) GlassInsetIconButton(onClick = { vm.confirmDeleteClip(clip) }, Modifier.testTag("clip-delete")) { Icon(Icons.Default.DeleteOutline, "Delete clip") }
+            GlassInsetIconButton(onClick = close) { Icon(Icons.Default.Close, "Close clip") }
         }
         if (clip.creator.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(36.dp)) {
@@ -157,7 +157,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
                     AsyncImage(resolved(clip.server, source.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    DisplayFormats.duration(source.duration).takeIf(String::isNotBlank)?.let { Text(it, Modifier.align(Alignment.BottomEnd).padding(4.dp).background(Color.Black.copy(alpha = .8f)).padding(3.dp), color = Color.White, style = MaterialTheme.typography.labelSmall) }
+                    DisplayFormats.duration(source.duration).takeIf(String::isNotBlank)?.let { Text(it, Modifier.align(Alignment.BottomEnd).padding(7.dp), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow)) }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(source.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
@@ -182,7 +182,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val busy by vm.clipDeleteBusy.collectAsStateWithLifecycle()
     val error by vm.clipDeleteError.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    if (resolution.link != null) AlertDialog(onDismissRequest = vm::dismissClipResolution, containerColor = MaterialTheme.colorScheme.surfaceContainer, icon = { Icon(Icons.Default.ContentCut, null) },
+    if (resolution.link != null) GlassAlertDialog(onDismissRequest = vm::dismissClipResolution,  icon = { Icon(Icons.Default.ContentCut, null) },
         title = { Text(if (resolution.foreign) "Clip from another instance" else if (resolution.loading) "Opening clip" else "Clip unavailable") },
         text = { if (resolution.loading) CircularProgressIndicator() else Text(if (resolution.foreign) "This clip belongs to ${resolution.link!!.server}. Open it there to watch it." else resolution.error.orEmpty()) },
         confirmButton = { if (!resolution.loading) TextButton(onClick = {
@@ -210,6 +210,8 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
         }) { modifier, top ->
         Column(modifier.testTag("clip-editor").verticalScroll(rememberScrollState())
             .padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            GlassSection {
+
                         ClipPreview(vm, editor)
                         if (editor.published == null) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -251,6 +253,8 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                             }
                         }
             TextButton(onClick = vm::closeClipEditor, enabled = !editor.busy) { Text(if (editor.published == null) "Cancel" else "Done") }
+
+            }
         }
     }
 }
@@ -299,6 +303,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             AndroidView(factory = { (LayoutInflater.from(it).inflate(R.layout.clip_preview, null) as PlayerView).apply {
+                removeBlackUiBackgrounds()
                 this.player = player; setShowNextButton(false); setShowPreviousButton(false)
             } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().height(minOf(maxWidth * 9 / 16, 210.dp))
                 .clip(RoundedCornerShape(12.dp)).testTag("clip-preview"))
@@ -385,8 +390,8 @@ private class StoryboardCrop(private val frame: StoryboardFrame) : Transformatio
                 })
             }) {
                 val left = size.width * startFraction; val right = size.width * endFraction
-                drawRect(Color.Black.copy(alpha = .58f), size = Size(left, size.height))
-                drawRect(Color.Black.copy(alpha = .58f), topLeft = Offset(right, 0f), size = Size(size.width - right, size.height))
+                drawRect(GlassOptics.mediaPlate.copy(alpha = .58f), size = Size(left, size.height))
+                drawRect(GlassOptics.mediaPlate.copy(alpha = .58f), topLeft = Offset(right, 0f), size = Size(size.width - right, size.height))
                 drawRect(primary, topLeft = Offset(left, 2.dp.toPx()), size = Size((right - left).coerceAtLeast(0f), size.height - 4.dp.toPx()), style = Stroke(3.dp.toPx()))
                 for (x in listOf(left, right)) {
                     drawLine(primary, Offset(x, 0f), Offset(x, size.height), 9.dp.toPx())

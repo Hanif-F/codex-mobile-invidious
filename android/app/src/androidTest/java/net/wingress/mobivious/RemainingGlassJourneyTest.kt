@@ -92,6 +92,27 @@ class RemainingGlassJourneyTest {
         compose.onNodeWithTag("account-confirm-password").assertDoesNotExist()
     }
 
+    @Test fun everySettingsCategorySharesGlassAndKeepsItsFooterReachable() {
+        login(); settings()
+        for (name in listOf("Playback", "Appearance", "Browsing", "Subscriptions", "History & library", "DeArrow", "AI channel filter", "About")) {
+            page(name)
+            compose.onNodeWithContentDescription("Back from $name").assertIsDisplayed()
+            capture("overhaul-category-${name.lowercase().replace(Regex("[^a-z]+"), "-")}-top")
+            if (name != "About") {
+                compose.onNodeWithTag("settings-save").assertIsDisplayed()
+                compose.onNodeWithTag("settings-list").performTouchInput { swipeUp(); swipeUp() }
+                capture("overhaul-category-${name.lowercase().replace(Regex("[^a-z]+"), "-")}-scrolled")
+                // The footer stays reachable independently of how tall a section becomes.
+                compose.onNodeWithTag("settings-save").assertIsDisplayed()
+            }
+            back(name)
+        }
+        page("SponsorBlock")
+        compose.onNodeWithTag("sponsorblock-sheet").assertIsDisplayed()
+        capture("overhaul-category-sponsorblock")
+        compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+    }
+
     @Test fun accountManagementUsesQuietFormsAndExplicitConfirmations() {
         login(); settings(); page("Account"); capture("account")
         page("Sessions & API tokens")

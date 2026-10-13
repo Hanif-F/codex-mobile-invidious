@@ -71,9 +71,11 @@ internal fun AccountSettingsContent(vm: AppViewModel, page: String, modifier: Mo
     val context = vm.api.context()
     when {
         account == null -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(settingsPadding()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            GlassSection {
             Text("Sign in to manage your account", style = MaterialTheme.typography.titleLarge)
             Text(vm.store.server, color = MaterialTheme.colorScheme.onSurfaceVariant)
             LibraryControlScene { LibraryActionButton("Sign in", enabled = !busy, prominent = true, onClick = signIn) }
+            }
         }
         page == "Sessions & API tokens" -> AccountSessionsScreen(vm, context, modifier) { navigate("Create API token") }
         page == "Create API token" -> TokenForm(vm, context, modifier) { navigate("Sessions & API tokens") }
@@ -81,9 +83,11 @@ internal fun AccountSettingsContent(vm: AppViewModel, page: String, modifier: Mo
         else -> Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(settingsPadding()).testTag("account-settings-screen")) {
             Text("Signed in as ${account!!.username}", Modifier.padding(horizontal = 20.dp, vertical = 12.dp), style = MaterialTheme.typography.titleLarge)
             Text(vm.store.server, Modifier.padding(horizontal = 20.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            GlassSection {
             ActionRow("Change username", enabled = !busy, icon = Icons.Default.Person) { navigate("Change username") }
             ActionRow("Change password", enabled = !busy, icon = Icons.Default.Lock) { navigate("Change password") }
             ActionRow("Sessions & API tokens", enabled = !busy, icon = Icons.Default.Devices) { navigate("Sessions & API tokens") }
+            }
             HorizontalDivider(Modifier.padding(vertical = 16.dp))
             LibraryControlScene { LibraryActionButton("Sign out", Modifier.testTag("account-sign-out"), enabled = !busy, onClick = vm::logout) }
             TextButton(onClick = { navigate("Delete account") }, enabled = !busy, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
@@ -98,7 +102,7 @@ private fun SecretField(value: String, update: (String) -> Unit, label: String, 
     var revealed by remember(label) { mutableStateOf(false) }
     OutlinedTextField(value, update, label = { Text(label) }, singleLine = true, enabled = enabled,
         visualTransformation = if (revealed) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
-        trailingIcon = { IconButton({ revealed = !revealed }, enabled = enabled) {
+        trailingIcon = { GlassInsetIconButton({ revealed = !revealed }, enabled = enabled) {
             Icon(if (revealed) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (revealed) "Hide $label" else "Show $label")
         } }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
         modifier = modifier.fillMaxWidth().testTag(tag))
@@ -131,6 +135,7 @@ private fun AuthenticationForm(vm: AppViewModel, context: ApiContext) {
         finally { loading = false }
     }
     LaunchedEffect(signup) { error = null; password = ""; confirmation = ""; answer = ""; if (signup) challenge() }
+    GlassSection {
     LibraryControlScene {
         BrowseTabs(listOf(false, true), signup, { if (it) "Create account" else "Sign in" }, { "authentication-$it" }, enabled = !busy) { signup = it }
     }
@@ -170,6 +175,7 @@ private fun AuthenticationForm(vm: AppViewModel, context: ApiContext) {
                 } finally { busy = false }
             }
         }) }
+    }
 }
 
 @Composable
@@ -198,6 +204,8 @@ private fun CredentialForm(vm: AppViewModel, context: ApiContext, page: String, 
         }
     }
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(settingsPadding()).imePadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        GlassSection {
+
         Text(if (deleting) "Permanently remove your account, subscriptions, history, playlists, preferences and sessions on ${context.server}."
             else "All old browser sessions and API tokens will be revoked. This app will stay signed in with a new session.")
         SecretField(password, { password = it }, "Current password", "account-current-password", !busy)
@@ -214,6 +222,8 @@ private fun CredentialForm(vm: AppViewModel, context: ApiContext, page: String, 
             Modifier.testTag("account-change-submit"), prominent = !deleting, destructive = deleting,
             enabled = !busy && password.isNotEmpty() && (deleting || value.isNotBlank() && (!changingPassword || value == confirmation)),
             onClick = { if (deleting) confirmDelete = true else submit() }) }
+
+        }
     }
     if (confirmDelete) LibraryConfirmation("Delete ${context.account?.username}?", { confirmDelete = false }, ::submit,
         enabled = !busy, confirmLabel = "Permanently delete") {
@@ -249,8 +259,8 @@ private fun AccountSessionsScreen(vm: AppViewModel, context: ApiContext, modifie
             if (loaded && sessions.isEmpty()) Text("No sessions")
         }
         items(sessions, key = { it.id }) { session ->
-            Surface(Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.surfaceContainer, shape = Liquid.card) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            GlassSection {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(if (session.current) "This session" else if (session.type == "browser") "Browser session" else "API token", style = MaterialTheme.typography.titleMedium)
                     Text("Created ${accountDate(session.issuedAt)}")
                     Text(session.expiresAt?.let { "${if (it <= System.currentTimeMillis() / 1000) "Expired" else "Expires"} ${accountDate(it)}" } ?: "Expiry unavailable for this token")
@@ -287,6 +297,8 @@ private fun TokenForm(vm: AppViewModel, context: ApiContext, modifier: Modifier,
     val androidContext = LocalContext.current
     val scopes = AccountPermissions.scopes(selected, advanced)
     Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(settingsPadding()).imePadding(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        GlassSection {
+
         if (token != null) {
             Text("Copy this token now. It is only displayed here and grants the permissions you selected.")
             Text(token!!, modifier = Modifier.testTag("account-created-token"))
@@ -328,6 +340,8 @@ private fun TokenForm(vm: AppViewModel, context: ApiContext, modifier: Modifier,
                     finally { busy = false }
                 }
             }, modifier = Modifier.testTag("account-create-token")) }
+        }
+
         }
     }
 }
