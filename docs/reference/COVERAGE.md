@@ -3,8 +3,8 @@
 [Documentation index](../README.md) · [Source map](SOURCE_MAP.md) ·
 [Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)
 
-The current guides describe Mobivious 0.10.2 (version code 20), reviewed against
-the Liquid Glass implementation working tree over `e956aabb` on 13 October 2026.
+The current guides describe Mobivious 0.10.3 (version code 21), reviewed against
+the implementation at `2df3584` plus the patch release version bump on 13 October 2026.
 Runtime acceptance is recorded in the [implementation record](../liquid-glass-overhaul-2026-10-13/IMPLEMENTATION.md). The review covers the maintained
 Android project and its supporting scripts/deployment examples in this repository.
 The sibling Invidious project is described at its integration boundary; it is not

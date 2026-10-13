@@ -2,8 +2,8 @@
 
 This is the current documentation for the Android app in `androidInvidious`.
 The UI guides and inventories include the neutral-background and adaptive-control
-Appearance preferences and were reviewed against the Liquid Glass implementation
-working tree over `e956aabb` (Mobivious **0.10.2**, version code **20**) on
+Appearance preferences and were reviewed against the implementation at `2df3584`
+plus the patch release version bump (Mobivious **0.10.3**, version code **21**) on
 **13 October 2026**. It describes source behavior; it does not assert
 that a production server is updated or that every device scenario passes.
 

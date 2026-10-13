@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "e956aabb4fbcd503f4dd51443f9a0b5812d96a7a",
+  "reviewedSourceCommit": "2df3584e388bb5a0915da984c33c15f65ec88ba2",
   "reviewedDate": "2026-10-13",
-  "version": "0.10.2",
+  "version": "0.10.3",
   "documents": [
     "README.md",
     "docs/README.md",
@@ -57,7 +57,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, build variants/signing, Java target and all runtime/test dependencies.",
-      "sha256": "74a480b953b8d020a6a74a9ad9888c3b2a9141e14f7a333a46d3da484ee9fafa"
+      "sha256": "e1c8f313c0a3fd558a6b89d794e427ecbfcac389a5aecfdcd1703db189be6d46"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AccountNavigationSmokeTest.kt": {
       "area": "Android device tests",

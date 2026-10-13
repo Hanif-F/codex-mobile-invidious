@@ -3640,3 +3640,39 @@ notes are in `artifacts/release-notes-0.10.2.md`. Build, metadata, signing,
 emulator update and startup evidence is retained in the ignored
 `artifacts/release-0.10.2/` directory. Release target:
 [GitHub Releases v0.10.2](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.10.2).
+
+## Mobivious 0.10.3 release — 13 October 2026
+
+This patch ships the Liquid Glass/refraction and player-background improvements,
+plus Colored backgrounds and Adaptive control colors in Appearance. Both new
+device preferences default off. Video-driven Ambient mode remains independent.
+Version name is **0.10.3**, version code **21**, with the existing
+`net.wingress.mobivious` application ID and signing certificate.
+
+| Check | Result |
+| --- | --- |
+| `scripts/build-release.sh` | Passed; signed release built in 1m58s |
+| Unit/API tests | 347 passed; zero failures, errors or skips |
+| Release lint | Passed; zero errors, 36 existing warnings |
+| Implementation device regression checks | 36 distinct cases passed before the version-only bump, including appearance persistence/contrast, System mode, menus/focus, glass/refraction and ambient rendering/playback |
+| APK metadata | Version 0.10.3 / 21; minimum API 33, target API 37; not debuggable |
+| Signing continuity | Same certificate as the published v0.10.2 APK; the previous local APK matches GitHub's asset digest |
+| APK SHA-256 | `8ba4ac493d6f893cbdedf70e5cd0d5df6e14e0c0086a32d261147628c02c1968` |
+| APK bytes | 59,185,358 |
+| Signed update | v0.10.2/20 to v0.10.3/21 using `adb install -r`; first-install timestamp retained |
+| Signed cold launch and navigation | Discover, You, Settings and Appearance passed on the running Android 16 emulator; crash buffer unchanged |
+| Appearance upgrade defaults | Colored backgrounds and Adaptive control colors both off |
+| Documentation and whitespace | Coverage/fingerprints, local links and `git diff --check` passed |
+
+The release package was absent on the restarted emulator, so the signed-update
+check first installed the verified v0.10.2 asset. Updating it retained the new
+baseline's `2026-10-13 15:38:25` first-install timestamp. The certificate SHA-256 is
+`5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`.
+No server migration, sign-in renewal or server deployment is required for this
+patch. Physical/OEM rendering remains unverified.
+
+Assets are `artifacts/Mobivious-0.10.3.apk` and its `.apk.sha256` file, with notes
+in `artifacts/release-notes-0.10.3.md`. Build, signing, metadata, signed-update and
+startup/appearance evidence is retained in the ignored
+`artifacts/release-0.10.3/` directory. Release target:
+[GitHub Releases v0.10.3](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.10.3).
