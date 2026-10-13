@@ -96,9 +96,11 @@ positions. Reduced motion suppresses deformation; system animation scale governs
 transitions. Reduce transparency and software rendering use readable solid plates
 and skip contrast readback. These are accessibility fallbacks, not the dark default.
 
-Player chrome uses the shared slate media-overlay styling, white foregrounds and
-glyph shadows, preserving measured rails and separate ≥48dp targets. It never records
-the decoder. Save/Download/Share/More retain labels and long-press tooltips; narrow
+Player chrome uses white icons and glyph shadows without circular plates, borders
+or edge washes, preserving measured rails and separate ≥48dp targets. Every video
+player has solid black backing and a black native loading shutter, including watch,
+mini-player and fullscreen letterbox areas. It never records the decoder.
+Save/Download/Share/More retain labels and long-press tooltips; narrow
 layouts compact time/chapter labels while preserving full semantic descriptions.
 
 ## Video and motion
@@ -140,6 +142,8 @@ radial light is recorded separately from consuming glass and the decoder. It
 follows fitted picture bounds instead of letterbox bars and uses bounded luminance
 with lower light-theme opacity to retain supporting-text contrast. Reduce
 transparency, disabled animator duration and power-save mode pause the effect.
+When ambient colors are unavailable or disabled, the expanded watch canvas and
+metadata use flat theme surface color, with no thumbnail fallback or decorative wash.
 
 ## Rich content and imagery
 
@@ -149,6 +153,8 @@ no web scripts. Video description/information, channel description and community
 posts reuse native link resolution. Gallery failures retain navigation and Close.
 Avatar handling reads existing metadata without adding creator lookup requests,
 proxies supported image hosts and handles Unicode initials conservatively.
+Channel headers keep their banner and avatar above a flat theme surface; their
+glass controls sample that plain background rather than an enlarged banner.
 MetadataUi and DisplayFormats share date/count precision rules across cards.
 
 ## Panels and accessibility
@@ -173,7 +179,7 @@ The native `PlayerView` uses transparent caption/window backgrounds, including
 cues with embedded background spans. Caption font/typeface preferences are
 retained, with a glyph shadow when no edge is requested. Native clip-preview
 controls use a transparent scrim and slate footer/settings popup through
-`media_colors.xml`; loading shutters also use slate. Thumbnail durations, watched
+`media_colors.xml`; video backing and loading shutters use black. Thumbnail durations, watched
 labels and clip badges have transparent backgrounds.
 
 Modal bottom sheets use transparent container fills, so their drag-handle region

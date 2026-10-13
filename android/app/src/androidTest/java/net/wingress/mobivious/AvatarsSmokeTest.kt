@@ -2,11 +2,13 @@ package net.wingress.mobivious
 
 import android.content.Intent
 import androidx.compose.ui.test.*
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.ui.AvatarImageLoader
+import net.wingress.mobivious.ui.Liquid
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -90,6 +92,35 @@ class AvatarsSmokeTest {
         compose.waitForIdle()
         assertEquals(before, state().getJSONArray("avatarRequests").length())
         screenshot("queue")
+    }
+
+    @Test fun channelHeaderHasAFlatThemeBackgroundWithBannerMissingBannerAndThinMode() {
+        command("community")
+        compose.onNodeWithText("Mobivious Studio").performClick()
+        until { activity.model.channel.value != null && !activity.model.browse.value.loading }
+        val info = activity.model.channel.value!!
+        assertTrue(info.banner.isNotBlank())
+        for (night in listOf(true, false)) {
+            for ((banner, thin) in listOf(true to false, false to false, true to true)) {
+                compose.runOnUiThread {
+                    activity.model.store.guestDeArrow(AccountPreferences(autoplay = false,
+                        darkMode = if (night) "dark" else "light", thinMode = thin))
+                    activity.model.refreshSharedSettings()
+                    activity.model.channel.value = info.copy(banner = if (banner) info.banner else "")
+                }
+                until { activity.model.preferences.value.darkMode == if (night) "dark" else "light" }
+                if (banner && !thin) compose.onNodeWithTag("channel-banner").assertExists()
+                else compose.onNodeWithTag("channel-banner").assertDoesNotExist()
+                val pixels = compose.onNodeWithTag("channel-header").captureToImage().toPixelMap()
+                val expected = if (night) Liquid.dark.surface else Liquid.light.surface
+                for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
+                    assertEquals(expected.red, pixels[1, y].red, .01f)
+                    assertEquals(expected.green, pixels[1, y].green, .01f)
+                    assertEquals(expected.blue, pixels[1, y].blue, .01f)
+                }
+                captureWatchScreenshot("player-background-channel-${if (night) "dark" else "light"}-${if (thin) "thin" else if (banner) "banner" else "no-banner"}")
+            }
+        }
     }
 
     @Test fun commentsRepliesAndCreatorHeartsDisplayAvatars() {

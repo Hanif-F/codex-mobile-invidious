@@ -75,13 +75,13 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Ambient Mode Presentation declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "7682d030fd6d21772262890791cc3c14a1277fa1d0733c6ce312ab6583ec4a5c"
+      "sha256": "bce67b3760a95109cf1c4a8c402b7fa51f646a0a159bf8e1d6c66d45ae57c18e"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AmbientModeSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Ambient Mode Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "746707851083a7413b37c79c2123855d83e760fcea34f6f6a3d0d6301c8ae104"
+      "sha256": "f7586aad586160f2a39daf22fe0c095e53cbc66f8e92c25fa7812173c3b41f0f"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AppSmokeTest.kt": {
       "area": "Android device tests",
@@ -99,7 +99,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Avatars Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "1f39a541f7183329e9ca4584305300ff2057a846bae6663cd8de38f5f5812668"
+      "sha256": "df6c1bd0de39400181c9cb0b97506ee7b5662e79847a3c1f364451f7153e25bf"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ChannelDescriptionPresentationTest.kt": {
       "area": "Android device tests",
@@ -285,7 +285,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Player Controls Presentation declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "f204fce6a0633f8f63582ce98b93ccd3a64d3e4c430187507c4b0baa56d00cfe"
+      "sha256": "c6156c0c5eccf32de3fa8d9b9f49c5dee90549a4a394fd9d76774f91bd5ebdbf"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/PlayerFeedbackPresentationTest.kt": {
       "area": "Android device tests",
@@ -399,7 +399,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Watch Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "120cee0cc22056ffb252fd01498ff8f76447d3b47a9af376ee0b84d949c83cd5"
+      "sha256": "25a8368a58c669d575c351c67f80ea08224641ecd05debfadc078254b2180bdb"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/WatchPlayerResizePresentationTest.kt": {
       "area": "Android device tests",
@@ -735,13 +735,13 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Redirect-free Coil avatar loader, fallback identity, creator/channel headers and subscription chips.",
-      "sha256": "76ffd24f6102c1a9280ae7d806b59b2f24fe8272a674b5d7da660d9b28967741"
+      "sha256": "d6b327945f193acc3017a07d4ff371126d741ca97a167b4d357e4d2c19440b06"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/BrowseGlassUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Measured floating browse toolbars, separate backdrop recording, content padding and artwork surfaces.",
-      "sha256": "9e12e41c523237479bf5d120494b4738fa4831eb92a61aac6fcaa153cf3e6240"
+      "sha256": "a915ebeae24605260ee700bca72fa777f3f6b4e25e0a5b779cd8769f991c3298"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/ChannelDescriptionUi.kt": {
       "area": "Compose UI",
@@ -861,7 +861,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "8c43190f83b504b86cdb1cee64d2e4f0942a54ae8f4b21be213b9c43c1e7ec33"
+      "sha256": "cb372ae6d67d8d7c1ba47ab8e5720e9e9e274a5c930d1153a8d70654c8cea5c8"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlaybackQueueUi.kt": {
       "area": "Compose UI",
@@ -873,13 +873,13 @@
       "area": "Compose UI",
       "guide": "docs/PLAYBACK.md",
       "description": "Service-owned native video surface, screen-awake lifecycle, transparent caption/error backgrounds and slate loading shutters.",
-      "sha256": "729376d8767c92a21af7123dc2199709fbf059538290272f32da4d63db3906ea"
+      "sha256": "a3fb826f782740569675e7bc4d0acb11f0c5eedf11bbc781aea0610903ab091e"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlayerControlsUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Measured transport/header/footer, full-width timeline slot and compact seek/SponsorBlock feedback placement.",
-      "sha256": "71e1c6c2f31b05227c15a5f499bd1e3d306b9e8479e16904e957ddf720be4490"
+      "sha256": "b8ddf26ea13c3229c5735d62a9cc2ce962e2b8ebcfadc056d9c20918f7fa1b37"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlayerGestures.kt": {
       "area": "Compose UI",
@@ -897,13 +897,13 @@
       "area": "Compose UI",
       "guide": "docs/PLAYBACK.md",
       "description": "Video controls, timeline/scrub gestures, SponsorBlock prompt, tracks/settings, speed/audio/caption/refresh controls.",
-      "sha256": "a5c2472491a3ee5398417f2aea474abea7677b15ef7b402c7a743bc2d90acafc"
+      "sha256": "258bca846e7826da7c989504c886caffeac5a6e23d1439bb40071510d84b9b97"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlaylistUi.kt": {
       "area": "Compose UI",
       "guide": "docs/LIBRARY.md",
       "description": "Playlist cards/headers, subscribe state and owned title/privacy/description editor.",
-      "sha256": "a6d0a9c7fa65f7fd76d9e8eb8dc0958341b48613bfe63f0d437c133081743b91"
+      "sha256": "a6f934a12b3ffde0f622a7bb9855a517ec0d68b1f56fbbc32656bc8d85c16e64"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/RssUi.kt": {
       "area": "Compose UI",
@@ -969,13 +969,13 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "PixelCopy sampler lifecycle, animation/power gates, color smoothing, contrast-bounded light and separate backdrop scene.",
-      "sha256": "a709bc92e7ec63dcb677ec802eac8284cd69a6d4eb57bc10511a6702c8488f8e"
+      "sha256": "44bc25178022e39b9ab2e1857901bfbfa4dafc72e7957f0511c25df9870c14de"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/WatchGlassUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Independent artwork sources, shared adaptive Watch actions/disclosures and measured secondary-panel toolbars.",
-      "sha256": "afcf8968e3fb8ff976997fa28b3e406040e2e919ca65a16e903fed3c581baf78"
+      "sha256": "56d56c01565c70ef5da6d6b91491b270308facf218f454fb78f792b36e495749"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/WatchPlayerResize.kt": {
       "area": "Compose UI",

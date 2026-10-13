@@ -6,6 +6,7 @@ import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -25,6 +26,39 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class WatchGlassPresentationTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun expandedWatchFallbackIsFlatBeforeAmbientArrivesAndAfterItIsDisabled() {
+        var dark by mutableStateOf(true)
+        var ambient by mutableStateOf<WatchAmbientState?>(null)
+        compose.setContent {
+            MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light) {
+                GlassBackgroundScene {
+                    CompositionLocalProvider(LocalWatchAmbientMaterial provides ambient) {
+                        WatchGlassScene(Modifier.size(320.dp, 180.dp).testTag("watch-flat-fallback"),
+                            artwork = "http://127.0.0.1:18080/media/thumbnail.jpg", inheritAmbient = true) {}
+                    }
+                }
+            }
+        }
+        for (night in listOf(true, false)) {
+            compose.runOnIdle { dark = night; ambient = null }
+            for (afterAmbient in listOf(false, true)) {
+                if (afterAmbient) {
+                    compose.runOnIdle { ambient = WatchAmbientState() }
+                    compose.runOnIdle { ambient = null }
+                }
+                val expected = if (night) Liquid.dark.surface else Liquid.light.surface
+                val pixels = compose.onNodeWithTag("watch-flat-fallback").captureToImage().toPixelMap()
+                for (x in listOf(1, pixels.width / 2, pixels.width - 2)) {
+                    for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
+                        assertEquals(expected.red, pixels[x, y].red, .01f)
+                        assertEquals(expected.green, pixels[x, y].green, .01f)
+                        assertEquals(expected.blue, pixels[x, y].blue, .01f)
+                    }
+                }
+            }
+        }
+    }
 
     @Test fun arrivingAmbientPalettePreservesAnOpenMenu() {
         val ambient = mutableStateOf<WatchAmbientState?>(null)

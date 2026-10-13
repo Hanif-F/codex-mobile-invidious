@@ -861,8 +861,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
             else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
                 playback.details?.let { details ->
                     item(key = "watch:metadata") {
-                      WatchGlassScene(Modifier.fillMaxWidth(), inheritAmbient = true, artwork = if (prefs.thinMode || playback.downloadId != null) null else
-                          resolved(vm.store.server, details.video.thumbnail.ifBlank { "/vi/${details.video.id}/mqdefault.jpg" })) {
+                      WatchGlassScene(Modifier.fillMaxWidth().testTag("watch-metadata"), inheritAmbient = true) {
                       Column(Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
                         val titleStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp)

@@ -87,6 +87,16 @@ class AmbientModePresentationTest {
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         compose.runOnIdle { opaque = false; state.enabled = false }
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
+        for (night in listOf(true, false)) {
+            compose.runOnIdle { dark = night }
+            val expected = if (night) Liquid.dark.surface else Liquid.light.surface
+            val pixels = compose.onNodeWithTag("ambient-scene").captureToImage().toPixelMap()
+            for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
+                assertEquals(expected.red, pixels[1, y].red, .01f)
+                assertEquals(expected.green, pixels[1, y].green, .01f)
+                assertEquals(expected.blue, pixels[1, y].blue, .01f)
+            }
+        }
     }
 
     private fun difference(a: Color, b: Color) = kotlin.math.abs(a.red - b.red) +

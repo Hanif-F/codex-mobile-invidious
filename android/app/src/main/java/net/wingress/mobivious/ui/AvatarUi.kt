@@ -125,8 +125,8 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
     subscriptionBusy: Boolean = false, subscriptionKnown: Boolean = true, subscriptionChecking: Boolean = false,
     subscriptionError: String? = null, subscribe: () -> Unit) {
     var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
-    BrowseArtworkSurface(if (thinMode || bannerFailed) null else ChannelImages.url(server, channel.banner)) {
-        Column(Modifier.fillMaxWidth().padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    BrowseArtworkSurface(null, plainBackground = true) {
+        Column(Modifier.fillMaxWidth().testTag("channel-header").padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
                 AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(Liquid.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
             }

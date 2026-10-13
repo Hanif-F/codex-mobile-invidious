@@ -67,7 +67,7 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
         }
     }
     if (embedded) LibraryControlScene { content() }
-    else BrowseArtworkSurface(null, content)
+    else BrowseArtworkSurface(null, content = content)
 }
 
 @Composable

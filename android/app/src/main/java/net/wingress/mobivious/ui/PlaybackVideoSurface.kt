@@ -9,7 +9,6 @@ import android.view.accessibility.CaptioningManager
 import android.widget.TextView
 import android.graphics.Color as AndroidColor
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -31,7 +30,7 @@ internal fun PlaybackState.keepVideoScreenOn(visible: Boolean): Boolean =
 /** Native captions and loading/error views follow the same unbacked-content policy. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun PlayerView.removeBlackUiBackgrounds() {
-    setShutterBackgroundColor(GlassOptics.mediaPlate.toArgb())
+    setShutterBackgroundColor(AndroidColor.BLACK)
     val preferred = context.getSystemService(CaptioningManager::class.java)?.userStyle
         ?.let(CaptionStyleCompat::createFromCaptionStyle) ?: CaptionStyleCompat.DEFAULT
     subtitleView?.apply {

@@ -147,8 +147,9 @@ verification sits beside the channel name, and Subscribe uses a glass pill.
 Comments and Description are the two disclosure rows; Description expands inline.
 Chapters and chat replay are opened from the player.
 
-`PlayerControlsUi.kt` uses shared slate media-overlay controls with white icons,
-glyph shadows and shallow edge contrast. No decoder backdrop or full-picture contrast
+`PlayerControlsUi.kt` uses white icons and glyph shadows without circular plates,
+borders or edge washes. Video backing and native loading shutters are solid black
+in watch, mini-player and fullscreen. No decoder backdrop or full-picture contrast
 scrim is introduced. Collapse is at the
 top left, with chat beside settings at the top right. The footer puts the timestamp,
 clickable current chapter and fullscreen above a full-width seek track. Separate
@@ -283,8 +284,9 @@ and before state. Current implementation acceptance is recorded separately in
 
 The app-wide cleanup removes per-label rectangles, per-icon discs and inherited
 text halos. Shared material tint preserves contrast over arbitrary artwork.
-Thumbnail/clip badges use transparent backgrounds and glyph shadows. Media
-controls and SponsorBlock prompts use a slate plate at .80 opacity; native
-clip-preview chrome and caption rendering follow the same policy. Caption cue
+Thumbnail/clip badges use transparent backgrounds and glyph shadows.
+SponsorBlock prompts retain a slate plate at .80 opacity; player icons have no
+plate. Native clip-preview footer/settings chrome keeps its slate styling, while
+video backing and loading shutters use black. Caption cue
 windows and embedded background spans are ignored so they cannot restore black
 boxes. See [the source and emulator audit](no-black-backgrounds-2026-10-13/README.md).

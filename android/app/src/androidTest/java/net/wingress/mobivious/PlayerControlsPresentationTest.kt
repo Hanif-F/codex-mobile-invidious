@@ -3,6 +3,7 @@ package net.wingress.mobivious
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -159,6 +160,39 @@ class PlayerControlsPresentationTest {
         captureWatchScreenshot("watch-controls-chat-shallow")
         compose.runOnIdle { playback.value = playback.value.copy(live = true) }
         compose.onNodeWithTag("player-chat").assertDoesNotExist()
+    }
+
+    @Test fun playerIconsAndEdgesExposeThePictureWithoutLosingTouchTargets() {
+        height.intValue = 320
+        playback.value = playback.value.copy(details = playback.value.details!!.copy(liveChatReplay = true))
+        var opaque by mutableStateOf(false)
+        compose.setContent {
+            CompositionLocalProvider(LocalReduceTransparency provides opaque) { Content() }
+        }
+        val expected = Color(0xFF535862)
+        for (reduce in listOf(false, true)) {
+            compose.runOnIdle { opaque = reduce }
+            for (control in listOf(
+                compose.onNodeWithTag("player-play-pause"),
+                compose.onNodeWithContentDescription("Player settings"),
+                compose.onNodeWithContentDescription("Minimize player"),
+                compose.onNodeWithContentDescription("Full screen"),
+                compose.onNodeWithContentDescription("Show chat replay"),
+            )) {
+                control.assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
+                val pixels = control.captureToImage().toPixelMap()
+                val color = pixels[(pixels.width * .1f).toInt(), pixels.height / 2]
+                assertEquals(expected.red, color.red, .01f)
+                assertEquals(expected.green, color.green, .01f)
+                assertEquals(expected.blue, color.blue, .01f)
+            }
+            val pixels = compose.onNodeWithTag("controls-surface").captureToImage().toPixelMap()
+            for (y in listOf(1, pixels.height - 2)) {
+                assertEquals(expected.red, pixels[pixels.width / 2, y].red, .01f)
+                assertEquals(expected.blue, pixels[pixels.width / 2, y].blue, .01f)
+            }
+        }
+        captureWatchScreenshot("player-background-icons-only")
     }
 
     @Test fun multiHourTimestampCompactsAtLargeFontsWithoutLosingChapterOrSeeking() {

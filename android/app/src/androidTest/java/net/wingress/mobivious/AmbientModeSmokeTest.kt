@@ -12,6 +12,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.SessionStore
+import net.wingress.mobivious.ui.Liquid
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -105,6 +106,13 @@ class AmbientModeSmokeTest {
         assertFalse(SessionStore(activity).ambientMode.value)
         compose.onNodeWithContentDescription("Close player settings").performClick()
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
+        val metadata = compose.onNodeWithTag("watch-metadata").captureToImage().toPixelMap()
+        for (y in listOf(1, metadata.height / 2, metadata.height - 2)) {
+            assertEquals(Liquid.light.surface.red, metadata[1, y].red, .01f)
+            assertEquals(Liquid.light.surface.green, metadata[1, y].green, .01f)
+            assertEquals(Liquid.light.surface.blue, metadata[1, y].blue, .01f)
+        }
+        captureWatchScreenshot("player-background-ambient-off")
         compose.openAppSettings()
         compose.onNodeWithText("Appearance").performScrollTo().performClick()
         compose.onNodeWithText("Ambient mode").performScrollTo().performClick()
@@ -142,6 +150,72 @@ class AmbientModeSmokeTest {
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         shell("settings put global animator_duration_scale 1")
         until { compose.onAllNodesWithTag("watch-ambient-background").fetchSemanticsNodes().isNotEmpty() }
+    }
+
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    @Test fun playerBackingAndNativeShutterStayBlackAcrossWatchAndFullscreen() {
+        fun nativePlayer(view: android.view.View): androidx.media3.ui.PlayerView? {
+            if (view is androidx.media3.ui.PlayerView) return view
+            if (view is android.view.ViewGroup) for (i in 0 until view.childCount) {
+                nativePlayer(view.getChildAt(i))?.let { return it }
+            }
+            return null
+        }
+        fun assertShutter(expected: Int) = ui {
+            val player = nativePlayer(activity.window.decorView)!!
+            val shutter = player.findViewById<android.view.View>(androidx.media3.ui.R.id.exo_shutter)
+            assertEquals(expected, (shutter.background as android.graphics.drawable.ColorDrawable).color)
+        }
+        fun assertBarsBlack() {
+            val bounds = compose.onNodeWithTag("player-surface").fetchSemanticsNode().boundsInRoot
+            val ratio = vm.playback.value.geometry.ratio!!
+            val sideBars = bounds.width / bounds.height > ratio
+            val barWidth = if (sideBars) (bounds.width - bounds.height * ratio) / 2
+                else (bounds.height - bounds.width / ratio) / 2
+            // An exactly fitted watch picture has no unused pixels to sample.
+            if (barWidth < 4f) return
+            // System rotation/cutout animations can outlive Compose's idle state.
+            compose.waitUntil(5_000) {
+                val bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()!!
+                try {
+                    listOf(false, true).all { farEdge ->
+                        val x = if (!sideBars) bounds.center.x.toInt() else if (farEdge) bounds.right.toInt() - 3 else bounds.left.toInt() + 2
+                        val y = if (sideBars) bounds.center.y.toInt() else if (farEdge) bounds.bottom.toInt() - 3 else bounds.top.toInt() + 2
+                        bitmap.getPixel(x, y) == android.graphics.Color.BLACK
+                    }
+                } finally { bitmap.recycle() }
+            }
+        }
+        for ((id, night) in listOf("portrait001" to true, "landscape01" to false)) {
+            ui {
+                vm.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = if (night) "dark" else "light"))
+                vm.refreshSharedSettings(); vm.play(id)
+            }
+            until { vm.playback.value.mediaId == id && vm.playback.value.playerState == Player.STATE_READY &&
+                vm.playback.value.geometry.ratio != null }
+            compose.onNodeWithContentDescription("Full screen").performClick()
+            val orientation = if (night) android.content.res.Configuration.ORIENTATION_PORTRAIT
+                else android.content.res.Configuration.ORIENTATION_LANDSCAPE
+            until { currentActivity(); activity.resources.configuration.orientation == orientation &&
+                compose.onAllNodesWithContentDescription("Exit full screen").fetchSemanticsNodes().isNotEmpty() }
+            compose.waitForIdle()
+            assertShutter(android.graphics.Color.BLACK)
+            assertBarsBlack()
+            captureWatchScreenshot("player-background-fullscreen-${if (night) "portrait" else "landscape"}-shown")
+            compose.onNodeWithTag("player-gestures").performClick()
+            until { compose.onAllNodesWithTag("player-controls").fetchSemanticsNodes().isEmpty() }
+            compose.waitForIdle()
+            assertBarsBlack()
+            captureWatchScreenshot("player-background-fullscreen-${if (night) "portrait" else "landscape"}-hidden")
+            ui { activity.onBackPressedDispatcher.onBackPressed() }
+            until { currentActivity(); activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT &&
+                compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("player-gestures").performClick()
+            until { currentActivity(); compose.onAllNodesWithContentDescription("Full screen").fetchSemanticsNodes().isNotEmpty() }
+            assertShutter(android.graphics.Color.BLACK)
+            assertBarsBlack()
+            captureWatchScreenshot("player-background-watch-${if (night) "portrait" else "landscape"}")
+        }
     }
 
     @Test fun wideAndLargeTextWatchLayoutsAndCommentsRetainTheirReadingSurfaces() {

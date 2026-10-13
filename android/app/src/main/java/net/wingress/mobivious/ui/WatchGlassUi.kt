@@ -45,19 +45,23 @@ import com.kyant.backdrop.effects.blur
 internal fun WatchGlassScene(modifier: Modifier = Modifier, artwork: String? = null, inheritAmbient: Boolean = false,
     content: @Composable BoxScope.() -> Unit) {
     val ambient = LocalWatchAmbientMaterial.current.takeIf { inheritAmbient }
-    val localScene = rememberGlassScene(samplingEnabled = ambient == null)
+    val localScene = rememberGlassScene(samplingEnabled = ambient == null && !inheritAmbient)
     val scene = if (ambient != null) LocalGlassScene.current ?: localScene else localScene
     val backdrop = scene.backdrop
     val colors = MaterialTheme.colorScheme
     val dark = colors.background.red < .3f
     val washHeight = if (dark) 280.dp else 380.dp
     var artworkFailed by remember(artwork) { mutableStateOf(false) }
+    SideEffect {
+        localScene.contentRange = if (inheritAmbient) colors.surface to colors.surface else null
+        localScene.generated = if (inheritAmbient) listOf(colors.surface) else null
+    }
     Box(modifier) {
         if (ambient == null) {
             Box(Modifier.matchParentSize().clipToBounds().recordGlassScene(scene)
                 .background(colors.surface)) {
-                GlassEnvironment(Modifier.matchParentSize())
-                if (artwork != null && !artworkFailed && !LocalReduceTransparency.current) {
+                if (!inheritAmbient) GlassEnvironment(Modifier.matchParentSize())
+                if (!inheritAmbient && artwork != null && !artworkFailed && !LocalReduceTransparency.current) {
                     AsyncImage(artwork, null, Modifier.fillMaxWidth().height(washHeight)
                         .graphicsLayer { alpha = if (dark) .32f else .26f }
                         .then(if (LocalGlassMaterialProfile.current == GlassMaterialProfile.DeferredPlayer) Modifier.blur(64.dp) else Modifier),

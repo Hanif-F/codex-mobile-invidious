@@ -575,6 +575,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 - `pausedSeeksAndRestorationUseLiveFramesAndBothTogglesShareTheSavedPreference`
 - `liveColorPhasesAndSystemAnimationPreferenceAreObserved`
+- `playerBackingAndNativeShutterStayBlackAcrossWatchAndFullscreen`
 - `wideAndLargeTextWatchLayoutsAndCommentsRetainTheirReadingSurfaces`
 
 ### AppSmokeTest
@@ -602,6 +603,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AvatarsSmokeTest.kt) — Avatars Smoke declared scenarios; exact cases are enumerated in the test catalog.
 
 - `browsingChannelHeaderAndWatchReuseImagesWithoutExtraMetadataLookups`
+- `channelHeaderHasAFlatThemeBackgroundWithBannerMissingBannerAndThinMode`
 - `commentsRepliesAndCreatorHeartsDisplayAvatars`
 - `subscriptionsHistoryAndPlaylistCreatorsUseExistingPayloads`
 - `thinModeMakesNoAvatarRequestsAndFailuresKeepAuthorsUsable`
@@ -973,6 +975,7 @@ Test support/helper file; no declared `@Test` methods.
 
 - `measuredChromeKeepsTransportCenteredOrInHeaderAboveFullWidthSeeking`
 - `noSeekButtonsAndChatStaysToTheLeftOfSettings`
+- `playerIconsAndEdgesExposeThePictureWithoutLosingTouchTargets`
 - `multiHourTimestampCompactsAtLargeFontsWithoutLosingChapterOrSeeking`
 - `loadingAndRetryRemainInsideTheRailInShallowVideo`
 - `chapterTracksScrubbingAndSupportsClickAndKeyboardWithoutDisplacingSettings`
@@ -1161,6 +1164,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/WatchGlassPresentationTest.kt) — Watch Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
+- `expandedWatchFallbackIsFlatBeforeAmbientArrivesAndAfterItIsDisabled`
 - `arrivingAmbientPalettePreservesAnOpenMenu`
 - `actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads`
 - `narrowLargeTextKeepsActionLabelsWhole`
@@ -1187,4 +1191,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **700 declared test methods** (including ignored tests).
+Inventory total: **704 declared test methods** (including ignored tests).

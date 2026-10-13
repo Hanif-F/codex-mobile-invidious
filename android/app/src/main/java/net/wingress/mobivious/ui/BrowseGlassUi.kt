@@ -104,31 +104,36 @@ internal fun Modifier.browseGlass(shape: Shape = Liquid.pill, prominent: Boolean
 
 /** A separate background-only source gives the hero's Subscribe control its own safe material. */
 @Composable
-internal fun BrowseArtworkSurface(artwork: String?, content: @Composable () -> Unit) {
-    if (LocalInsideGlassSection.current) { content(); return }
+internal fun BrowseArtworkSurface(artwork: String?, plainBackground: Boolean = false, content: @Composable () -> Unit) {
+    if (LocalInsideGlassSection.current && !plainBackground) { content(); return }
     val inheritedBackdrop = LocalGlassBackdrop.current
     val inheritedScene = LocalGlassScene.current
-    val scene = rememberGlassScene(samplingEnabled = artwork != null)
-    val fallback = if (inheritedBackdrop == null)
+    val scene = rememberGlassScene(samplingEnabled = artwork != null && !plainBackground)
+    val fallback = if (inheritedBackdrop == null && !plainBackground)
         rememberGlassScene(environmentOnly = true, samplingEnabled = artwork == null) else null
-    val backdrop = if (artwork != null) scene.backdrop else inheritedBackdrop ?: fallback?.backdrop
+    val ownBackground = plainBackground || artwork != null
+    val backdrop = if (ownBackground) scene.backdrop else inheritedBackdrop ?: fallback?.backdrop
     val surface = MaterialTheme.colorScheme.surface
     var failed by remember(artwork) { mutableStateOf(false) }
-    Box(Modifier.fillMaxWidth().then(if (artwork == null && fallback != null) Modifier.recordGlassScene(fallback) else Modifier)) {
+    SideEffect {
+        scene.contentRange = if (plainBackground) surface to surface else null
+        scene.generated = if (plainBackground) listOf(surface) else null
+    }
+    Box(Modifier.fillMaxWidth().then(if (!ownBackground && fallback != null) Modifier.recordGlassScene(fallback) else Modifier)) {
         // No-artwork controls keep the surrounding environment at their corners.
-        if (artwork != null) Box(Modifier.matchParentSize().clipToBounds().recordGlassScene(scene).background(surface)) {
-            GlassEnvironment(Modifier.matchParentSize())
-            if (artwork != null && !failed && !LocalReduceTransparency.current) {
+        if (ownBackground) Box(Modifier.matchParentSize().clipToBounds().recordGlassScene(scene).background(surface)) {
+            if (!plainBackground) GlassEnvironment(Modifier.matchParentSize())
+            if (!plainBackground && artwork != null && !failed && !LocalReduceTransparency.current) {
                 AsyncImage(artwork, null, modifier = Modifier.matchParentSize().graphicsLayer {
                     alpha = if (surface.red < .3f) .32f else .26f
                 }.then(if (LocalGlassMaterialProfile.current == GlassMaterialProfile.DeferredPlayer) Modifier.blur(56.dp) else Modifier),
                     contentScale = ContentScale.Crop, imageLoader = AvatarImageLoader.get(androidx.compose.ui.platform.LocalContext.current), onError = { failed = true })
             }
-            Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, surface))))
+            if (!plainBackground) Box(Modifier.matchParentSize().background(Brush.verticalGradient(listOf(Color.Transparent, surface))))
         }
         // Keep one content call site while artwork arrives, fails or is removed.
         CompositionLocalProvider(LocalGlassBackdrop provides backdrop,
-            LocalGlassScene provides (if (artwork != null) scene else inheritedScene ?: fallback)) { content() }
+            LocalGlassScene provides (if (ownBackground) scene else inheritedScene ?: fallback)) { content() }
     }
 }
 
