@@ -1,6 +1,8 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import android.app.UiModeManager
+import android.content.res.Configuration
 import androidx.compose.ui.test.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -8,6 +10,8 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import java.net.URL
 import net.wingress.mobivious.data.AccountPreferences
+import net.wingress.mobivious.data.SessionStore
+import net.wingress.mobivious.ui.GlassContentColors
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -18,6 +22,8 @@ import org.junit.runner.RunWith
 class SettingsSmokeTest {
     @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
+    private var originalColored = false
+    private var originalAdaptive = false
     private fun until(condition: () -> Boolean) = compose.waitUntil(30_000, condition)
     private fun command(path: String, body: String = "{}") {
         (URL("http://127.0.0.1:18080/test/$path").openConnection() as java.net.HttpURLConnection).apply {
@@ -29,15 +35,101 @@ class SettingsSmokeTest {
         command("reset")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular") }
+        compose.runOnUiThread {
+            originalColored = activity.model.store.coloredBackgrounds.value
+            originalAdaptive = activity.model.store.adaptiveControlColors.value
+            activity.model.store.coloredBackgrounds(false); activity.model.store.adaptiveControlColors(false)
+            activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
+        }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
-        if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
+        if (::activity.isInitialized) compose.runOnUiThread {
+            activity.model.store.coloredBackgrounds(originalColored); activity.model.store.adaptiveControlColors(originalAdaptive)
+            activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
+        }
     }
     private fun open(page: String) { compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings(); compose.onNodeWithText(page).performScrollTo().performClick() }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
     private fun save(page: String) { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
+
+    @Test fun appearanceSwitchesSaveImmediatelyAndSurviveRecreationWithoutSavingDraft() {
+        open("Appearance")
+        compose.onNodeWithText("Colored backgrounds").assertIsOff()
+        compose.onNodeWithText("Adaptive control colors").assertIsOff()
+        val sharedBefore = activity.model.preferences.value
+        toggle("Colored backgrounds"); toggle("Adaptive control colors")
+        assertEquals(sharedBefore, activity.model.preferences.value)
+        assertTrue(SessionStore(activity).coloredBackgrounds.value)
+        assertTrue(SessionStore(activity).adaptiveControlColors.value)
+        compose.runOnUiThread { activity.recreate() }
+        until { var ready = false; compose.runOnUiThread {
+            ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== activity }
+        }; ready }
+        compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
+        compose.onNodeWithText("Colored backgrounds").performScrollTo().assertIsOn()
+        compose.onNodeWithText("Adaptive control colors").performScrollTo().assertIsOn()
+        toggle("Colored backgrounds")
+        compose.onNodeWithText("Colored backgrounds").assertIsOff()
+        compose.onNodeWithText("Adaptive control colors").assertIsOn()
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithContentDescription("Back from Settings").performClick()
+        compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
+        until { activity.model.account.value != null && !activity.model.accountBusy.value }
+        assertFalse(activity.model.store.coloredBackgrounds.value)
+        assertTrue(activity.model.store.adaptiveControlColors.value)
+        open("Appearance")
+        compose.onNodeWithText("Colored backgrounds").assertIsOff()
+        compose.onNodeWithText("Adaptive control colors").assertIsOn()
+        captureWatchScreenshot("appearance-settings-defaults-and-switches")
+    }
+
+    @Test(timeout = 60_000) fun fixedGlassFollowsSystemColorModeWhenSystemAppearanceChanges() {
+        val manager = activity.getSystemService(UiModeManager::class.java)
+        val originalMode = manager.nightMode
+        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+        open("Appearance")
+        automation.adoptShellPermissionIdentity()
+        try {
+            for (dark in listOf(true, false, true)) {
+                val previous = activity
+                val previousDark = activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                compose.runOnUiThread { manager.setNightMode(if (dark) UiModeManager.MODE_NIGHT_YES else UiModeManager.MODE_NIGHT_NO) }
+                // Wait for the replacement activity before asking Compose for nodes.
+                // Querying the disposed root during recreation can stall Espresso.
+                until {
+                    var ready = false
+                    compose.runOnUiThread {
+                        val resumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                            .filterIsInstance<MainActivity>().firstOrNull()
+                        if (resumed != null && (previousDark == dark || resumed !== previous)) {
+                            activity = resumed
+                            ready = (resumed.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES) == dark
+                        }
+                    }
+                    ready
+                }
+                val expected = if (dark) GlassContentColors.light.primary else GlassContentColors.dark.primary
+                until {
+                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                    if (compose.onAllNodesWithText("Colored backgrounds").fetchSemanticsNodes().isEmpty()) false else {
+                        compose.onNodeWithText("Colored backgrounds").performSemanticsAction(
+                        androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                        layouts.singleOrNull()?.layoutInput?.style?.color == expected
+                    }
+                }
+                compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
+                assertEquals("", activity.model.preferences.value.darkMode)
+                compose.onNodeWithText("Adaptive control colors").assertIsOff()
+            }
+        } finally {
+            compose.runOnUiThread { manager.setNightMode(originalMode) }
+            automation.dropShellPermissionIdentity()
+            compose.waitForIdle()
+            compose.runOnUiThread { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>()
+                .firstOrNull()?.let { activity = it } }
+        }
+    }
 
     @Test fun fullScreenNavigationAndDraftSurviveRecreation() {
         open("Browsing")
@@ -93,8 +185,10 @@ class SettingsSmokeTest {
         until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
         open("Playback")
         compose.onNodeWithText("Preferred video codec").performScrollTo()
-        assertTrue(compose.onNodeWithText("Preferred video codec").fetchSemanticsNode().boundsInRoot.top <
-            compose.onNodeWithText("Default quality").fetchSemanticsNode().boundsInRoot.top)
+        // The following row can be below the viewport after scrollTo. Compare
+        // layout positions rather than clipped bounds (which collapse to zero).
+        assertTrue(compose.onNodeWithText("Preferred video codec").getUnclippedBoundsInRoot().top <
+            compose.onNodeWithText("Default quality").getUnclippedBoundsInRoot().top)
         compose.onNodeWithText("Preferred video codec").performClick()
         option("Auto").assertIsSelected(); option("H.264").assertExists()
         option("AV1").performClick(); save("Playback")

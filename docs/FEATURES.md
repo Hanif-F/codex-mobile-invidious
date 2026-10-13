@@ -191,6 +191,11 @@ tracks to H.264/AAC. Device capability failures are reported. See
 
 Light, Dark or System appearance, Comfortable/Compact lists, hidden thumbnails,
 default homepage, playback defaults and browsing filters are configurable.
+Colored backgrounds and Adaptive control colors are independent Appearance
+switches, both off by default and saved immediately on the device. Pages default
+to neutral surfaces; glass controls follow Color mode while retaining readable
+contrast. Enabling the switches restores page gradients and backdrop-driven
+light/dark control switching respectively.
 Reduce transparency replaces glass with solid controls. Ambient mode projects
 sampled video colors into the expanded watch background; its device-wide toggle
 is available in Appearance and player settings. It pauses under its accessibility,

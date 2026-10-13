@@ -34,7 +34,7 @@ import kotlinx.coroutines.delay
 
 internal enum class GlassMaterialRole { Control, Section, MediaOverlay }
 
-/** Foregrounds belong to the material, rather than to the app's light/dark preference. */
+/** Foregrounds follow the app theme unless adaptive control colors are enabled. */
 @Immutable
 internal data class GlassContentColors(val primary: Color, val secondary: Color, val plate: Color,
     val tint: Float = 0f) {
@@ -49,6 +49,8 @@ internal data class GlassSceneContrast(val average: Color, val darkest: Color, v
     val sampled: Boolean, val bounded: Boolean = false)
 
 internal val LocalGlassScene = staticCompositionLocalOf<GlassScene?> { null }
+internal val LocalColoredBackgrounds = staticCompositionLocalOf { false }
+internal val LocalAdaptiveControlColors = staticCompositionLocalOf { false }
 internal val LocalGlassContentColors = staticCompositionLocalOf { GlassContentColors.light }
 internal val LocalGlassMotionEnabled = staticCompositionLocalOf { true }
 internal val LocalInsideGlassSection = staticCompositionLocalOf { false }
@@ -113,17 +115,22 @@ internal fun rememberGlassScene(seed: Color = MaterialTheme.colorScheme.surface,
     environmentOnly: Boolean = false,
     sourceDraw: (androidx.compose.ui.graphics.drawscope.ContentDrawScope.() -> Unit)? = null): GlassScene {
     val dark = MaterialTheme.colorScheme.background.luminance() < .3f
+    val coloredBackgrounds = LocalColoredBackgrounds.current
+    val backgroundSeed = if (environmentOnly && !coloredBackgrounds) neutralGlassSurface(dark) else seed
     val currentSourceDraw by rememberUpdatedState(sourceDraw)
     val backdrop = rememberLayerBackdrop(onDraw = {
         val customDraw = currentSourceDraw
         if (customDraw != null) customDraw()
         else if (environmentOnly) {
-            drawRect(seed)
-            drawRect(Brush.linearGradient(listOf((if (dark) Color(0xFF155BA0) else Color(0xFF83BFFF)).copy(alpha = .28f),
+            drawRect(backgroundSeed)
+            if (coloredBackgrounds) drawRect(Brush.linearGradient(listOf((if (dark) Color(0xFF155BA0) else Color(0xFF83BFFF)).copy(alpha = .28f),
                 (if (dark) Color(0xFF6944AA) else Color(0xFFC2ACF6)).copy(alpha = .18f))))
         } else drawContent()
     })
-    val scene = remember(backdrop, seed) { GlassScene(backdrop, seed) }
+    val scene = remember(backdrop, backgroundSeed) { GlassScene(backdrop, backgroundSeed) }
+    if (environmentOnly) SideEffect {
+        scene.contentRange = if (coloredBackgrounds) null else backgroundSeed to backgroundSeed
+    }
     val sampleLayer = rememberGraphicsLayer()
     val density = LocalDensity.current
     val direction = androidx.compose.ui.platform.LocalLayoutDirection.current
@@ -192,9 +199,10 @@ private fun environmentRange(palette: GlassEnvironmentPalette, dark: Boolean): P
 }
 
 @Composable
-internal fun glassEnvironmentPalette(): GlassEnvironmentPalette = LocalGlassEnvironmentPalette.current ?: run {
+internal fun glassEnvironmentPalette(): GlassEnvironmentPalette {
     val dark = MaterialTheme.colorScheme.background.luminance() < .3f
-    GlassEnvironmentPalette(MaterialTheme.colorScheme.surface, if (dark)
+    if (!LocalColoredBackgrounds.current) return GlassEnvironmentPalette(neutralGlassSurface(dark), emptyList())
+    return LocalGlassEnvironmentPalette.current ?: GlassEnvironmentPalette(MaterialTheme.colorScheme.surface, if (dark)
         listOf(Color(0xFF155BA0), Color(0xFF077B89), Color(0xFF6944AA))
         else listOf(Color(0xFF83BFFF), Color(0xFF8ADBD3), Color(0xFFC2ACF6)))
 }
@@ -254,7 +262,7 @@ internal fun GlassBackgroundScene(modifier: Modifier = Modifier, content: @Compo
 internal fun glassContrast(a: Color, b: Color): Float =
     (maxOf(a.luminance(), b.luminance()) + .05f) / (minOf(a.luminance(), b.luminance()) + .05f)
 
-/** Polarity switches atomically with hysteresis; it never fades through gray. */
+/** Optional backdrop-driven polarity switches atomically with hysteresis. */
 @Composable
 internal fun rememberGlassContentColors(bounds: Rect = Rect.Zero, role: GlassMaterialRole = GlassMaterialRole.Control,
     prominent: Boolean = false): GlassContentColors {
@@ -262,6 +270,7 @@ internal fun rememberGlassContentColors(bounds: Rect = Rect.Zero, role: GlassMat
     if (role == GlassMaterialRole.MediaOverlay) return GlassContentColors.light.copy(plate = GlassOptics.mediaPlate, tint = GlassOptics.mediaTint)
     val scene = LocalGlassScene.current
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < .3f
+    val adaptive = LocalAdaptiveControlColors.current
     val opaque = LocalReduceTransparency.current || !LocalView.current.isHardwareAccelerated || scene == null
     val contrast = scene?.contrastAt(if (bounds.isEmpty) scene.bounds else bounds)
         ?: GlassSceneContrast(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surface, false)
@@ -270,12 +279,15 @@ internal fun rememberGlassContentColors(bounds: Rect = Rect.Zero, role: GlassMat
         else GlassOptics.controlTint(darkTheme, prominent)
     fun material(color: Color) = plate.copy(alpha = tint).compositeOver(color)
     val background = material(contrast.average)
-    var light by remember(scene, opaque) { mutableStateOf(darkTheme) }
+    var adaptiveLight by remember(scene, opaque, darkTheme, adaptive) { mutableStateOf(darkTheme) }
+    val light = if (adaptive) adaptiveLight else darkTheme
     val lightContrast = glassContrast(GlassContentColors.light.secondary, background)
     val darkContrast = glassContrast(GlassContentColors.dark.secondary, background)
     SideEffect {
-        if (light && darkContrast > lightContrast * 1.18f) light = false
-        else if (!light && lightContrast > darkContrast * 1.18f) light = true
+        if (adaptive) {
+            if (adaptiveLight && darkContrast > lightContrast * 1.18f) adaptiveLight = false
+            else if (!adaptiveLight && lightContrast > darkContrast * 1.18f) adaptiveLight = true
+        }
     }
     val colors = if (light) GlassContentColors.light else GlassContentColors.dark
     // Keep one continuous material behind the entire control. Never add a separate

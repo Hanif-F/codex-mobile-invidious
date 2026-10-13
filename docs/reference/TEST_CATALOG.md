@@ -589,6 +589,15 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `hlsExplicitResumeCaptionsAndAudioOnly`
 - `accountBrowsingAndServicePlayback`
 
+### AppearancePresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppearancePresentationTest.kt) — Device appearance defaults/persistence, neutral and colored recordings including overlay fallbacks, fixed/adaptive foreground contrast, media policy and open-menu/focused-draft preservation.
+
+- `preferencesDefaultOffAndPersistAcrossStoresAndContexts`
+- `backgroundSettingsReachPagesOverlayFallbacksAndGeneratedRecordings`
+- `foregroundsFollowThemeUnlessAdaptiveAndKeepContrastOverChangingArtwork`
+- `appearanceChangesPreserveOpenMenusAndFocusedFieldDrafts`
+
 ### AvatarsPresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AvatarsPresentationTest.kt) — Avatars Presentation declared scenarios; exact cases are enumerated in the test catalog.
@@ -1053,8 +1062,10 @@ Test support/helper file; no declared `@Test` methods.
 
 ### SettingsSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Settings Smoke declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Settings drafts and shared-save failures, playback/codec settings, immediate device appearance saves, recreation/account isolation and System color-mode updates.
 
+- `appearanceSwitchesSaveImmediatelyAndSurviveRecreationWithoutSavingDraft`
+- `fixedGlassFollowsSystemColorModeWhenSystemAppearanceChanges`
 - `fullScreenNavigationAndDraftSurviveRecreation`
 - `guestPlaybackDefaultsAndLocalResumeReachPlayer`
 - `failedSharedSaveKeepsDraftAndRetryPreservesOtherPreferences`
@@ -1191,4 +1202,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **704 declared test methods** (including ignored tests).
+Inventory total: **710 declared test methods** (including ignored tests).

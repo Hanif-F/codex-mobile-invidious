@@ -68,6 +68,14 @@ local test contracts, not production app endpoints. The fixture server supplies
 account/queue/search/community/chat/clip/optional-tool responses and Range/slow/
 failed media transfers without real accounts or upstream YouTube calls.
 
+`AppearancePresentationTest` checks absent-key defaults, device persistence,
+neutral/colored page and fallback recordings, fixed/adaptive foreground contrast
+over changing artwork, opaque fallbacks, media-overlay colors and preservation of
+open menus/focused field drafts. `SettingsSmokeTest`
+also exercises immediate saving without a shared draft, activity recreation,
+account changes and System appearance updates. Tests requiring the older automatic
+polarity behavior explicitly provide `LocalAdaptiveControlColors = true`.
+
 Standalone checks:
 
 ```sh

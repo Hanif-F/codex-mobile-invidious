@@ -12,7 +12,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.SessionStore
-import net.wingress.mobivious.ui.Liquid
+import net.wingress.mobivious.ui.liquidColorScheme
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -108,9 +108,10 @@ class AmbientModeSmokeTest {
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         val metadata = compose.onNodeWithTag("watch-metadata").captureToImage().toPixelMap()
         for (y in listOf(1, metadata.height / 2, metadata.height - 2)) {
-            assertEquals(Liquid.light.surface.red, metadata[1, y].red, .01f)
-            assertEquals(Liquid.light.surface.green, metadata[1, y].green, .01f)
-            assertEquals(Liquid.light.surface.blue, metadata[1, y].blue, .01f)
+            val surface = liquidColorScheme(false, vm.store.coloredBackgrounds.value).surface
+            assertEquals(surface.red, metadata[1, y].red, .01f)
+            assertEquals(surface.green, metadata[1, y].green, .01f)
+            assertEquals(surface.blue, metadata[1, y].blue, .01f)
         }
         captureWatchScreenshot("player-background-ambient-off")
         compose.openAppSettings()

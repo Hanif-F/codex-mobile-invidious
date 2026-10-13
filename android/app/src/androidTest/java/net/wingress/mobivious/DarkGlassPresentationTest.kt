@@ -44,7 +44,7 @@ class DarkGlassPresentationTest {
         val backgrounds = listOf(Color.Black, Color.White, Color(0xFFFF3377), Color(0xFF00DD99), Color.Black)
         compose.setContent {
             MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light, typography = Liquid.typography) {
-                CompositionLocalProvider(LocalReduceTransparency provides opaque) {
+                CompositionLocalProvider(LocalReduceTransparency provides opaque, LocalAdaptiveControlColors provides true) {
                     Column(Modifier.fillMaxSize().testTag("glass-matrix").background(MaterialTheme.colorScheme.surface).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Text("Adaptive text, clear interiors and directional depth", color = MaterialTheme.colorScheme.onSurface)

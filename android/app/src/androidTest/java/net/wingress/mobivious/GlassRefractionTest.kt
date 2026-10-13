@@ -41,6 +41,7 @@ class GlassRefractionTest {
         var circle by mutableStateOf(false)
         var dark by mutableStateOf(true)
         compose.setContent {
+            CompositionLocalProvider(LocalAdaptiveControlColors provides true) {
             density = LocalDensity.current.density
             MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light) {
                 scene = rememberGlassScene()
@@ -58,6 +59,7 @@ class GlassRefractionTest {
                             role = if (section) GlassMaterialRole.Section else GlassMaterialRole.Control) { }
                     }
                 }
+            }
             }
         }
         for ((isSection, isCircle, isDark) in listOf(Triple(false, false, true), Triple(true, false, true),
@@ -120,6 +122,7 @@ class GlassRefractionTest {
         var width by mutableStateOf(240.dp)
         var capture: GlassWindowCapture? = null
         compose.setContent {
+            CompositionLocalProvider(LocalAdaptiveControlColors provides true) {
             MaterialTheme(colorScheme = Liquid.dark) {
                 val source = rememberGlassWindowSource()
                 Box(Modifier.fillMaxSize().background(color))
@@ -130,6 +133,7 @@ class GlassRefractionTest {
                             role = GlassMaterialRole.Section) { GlassLabel("Actual page", Modifier.align(Alignment.Center)) }
                     }
                 }
+            }
             }
         }
         compose.waitUntil(5_000) { capture?.captures?.let { it > 0 } == true }

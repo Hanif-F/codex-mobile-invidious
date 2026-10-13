@@ -160,6 +160,7 @@ class GlassFoundationTest {
         var actual by mutableStateOf(GlassContentColors.light)
         compose.setContent {
             MaterialTheme(colorScheme = Liquid.dark, typography = Liquid.typography) {
+                CompositionLocalProvider(LocalAdaptiveControlColors provides true) {
                 scene = rememberGlassScene()
                 Box(Modifier.size(300.dp, 220.dp)) {
                     Box(Modifier.matchParentSize().recordGlassScene(scene).background(background))
@@ -169,6 +170,7 @@ class GlassFoundationTest {
                             Text("Adaptive secondary label", color = actual.secondary, modifier = Modifier.padding(20.dp))
                         }
                     }
+                }
                 }
             }
         }

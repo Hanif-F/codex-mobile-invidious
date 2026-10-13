@@ -182,9 +182,15 @@ provides the shared action/settings rows. Comfortable video cards keep 16:9
 artwork; compact density uses thumbnail rows. Thumbnail display preferences,
 watched states, warnings, menus and content visibility continue to apply.
 
-Light appearance uses pearl content surfaces with a restrained blue accent. Dark
-appearance uses a blue-black environment with blue, teal and violet light pools;
-adaptive dark or pearl foregrounds express actions, links and selection; semantic error colors remain distinct. Neutral selection pills
+Light appearance defaults to neutral #F5F5F5 content surfaces with a restrained
+blue accent; dark appearance defaults to neutral #121212 surfaces. The immediate,
+device-wide Colored backgrounds switch restores the existing pearl/blue-black
+environments and blue, teal and violet light pools. Adaptive control colors is a
+separate immediate device switch: off keeps glass foreground/material polarity
+aligned with Color mode, while on allows backdrop-driven dark or pearl foregrounds.
+Both switches default off, including upgrades without saved keys. Ambient mode,
+artwork and media-overlay controls retain their independent behavior. Semantic
+error colors remain distinct. Neutral selection pills
 include a small pearl marker so selection does not rely on hue. Main margins are
 20dp, cards 24dp, media 20dp and floating controls pills
 or circles. Controls have at least 48dp targets; larger text can hide dock labels
@@ -210,8 +216,12 @@ Directional rims, restrained reflections and soft elevation define depth.
 limited to four updates per second while it redraws. It reuses bounded resources,
 waits for recording completion, observes resumed lifecycle/hardware/transparency,
 and has no idle timer or per-control readback. Ambient Watch consumes existing
-generated palette statistics. Stable foreground polarity changes atomically with
-hysteresis. Labels, icons and menu slots have transparent backgrounds and no
+generated palette statistics. When Adaptive control colors is enabled, stable
+foreground polarity changes atomically with hysteresis. With it disabled, only
+the continuous shared material tint adjusts to preserve contrast; polarity follows
+the resolved app appearance. Generated backgrounds and popup fallbacks omit color
+pools and use solid neutral contrast bounds when Colored backgrounds is disabled.
+Labels, icons and menu slots have transparent backgrounds and no
 inherited text halo. Contrast adjustment applies to the entire shared glass
 material, never a separate rectangle around text or disc around an icon.
 Even apparently uniform page samples need conservative material tint because

@@ -52,6 +52,15 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     @Synchronized fun ambientMode(value: Boolean) {
         if (persistence.edit(mapOf("appearance.ambientMode" to value), emptySet())) ambientMode.value = value
     }
+    /** Immediate appearance choices are device-wide and opt-in. */
+    val coloredBackgrounds = MutableStateFlow(prefs.getBoolean("appearance.coloredBackgrounds", false))
+    @Synchronized fun coloredBackgrounds(value: Boolean) {
+        if (persistence.edit(mapOf("appearance.coloredBackgrounds" to value), emptySet())) coloredBackgrounds.value = value
+    }
+    val adaptiveControlColors = MutableStateFlow(prefs.getBoolean("appearance.adaptiveControlColors", false))
+    @Synchronized fun adaptiveControlColors(value: Boolean) {
+        if (persistence.edit(mapOf("appearance.adaptiveControlColors" to value), emptySet())) adaptiveControlColors.value = value
+    }
     val storageError = MutableStateFlow<String?>(null)
     private val persistence = SharedProfilePersistence(prefs) { storageError.value = it }
     private val profiles = DeviceProfiles(persistence)

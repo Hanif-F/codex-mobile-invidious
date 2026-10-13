@@ -93,6 +93,14 @@ internal object Liquid {
         medium = RoundedCornerShape(20.dp), large = card, extraLarge = RoundedCornerShape(32.dp))
 }
 
+internal fun neutralGlassSurface(dark: Boolean): Color = if (dark) Color(0xFF121212) else Color(0xFFF5F5F5)
+
+internal fun liquidColorScheme(dark: Boolean, coloredBackgrounds: Boolean): ColorScheme {
+    val scheme = if (dark) Liquid.dark else Liquid.light
+    return if (coloredBackgrounds) scheme else scheme.copy(
+        background = neutralGlassSurface(dark), surface = neutralGlassSurface(dark))
+}
+
 internal val LocalGlassBackdrop = staticCompositionLocalOf<Backdrop?> { null }
 internal val LocalReduceTransparency = staticCompositionLocalOf { false }
 internal val LocalContentBottomInset = staticCompositionLocalOf { 20.dp }

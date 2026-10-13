@@ -41,6 +41,8 @@ Defaults do not create tracks missing from the manifest or unsupported by the de
 | UI / model | Wire or local key | Default | Behavior / scope |
 | --- | --- | --- | --- |
 | Color mode / `darkMode` | `dark_mode` | empty / System | Empty, `light`, `dark`. Shared. |
+| Colored backgrounds | `appearance.coloredBackgrounds` | false | Device-wide, immediate; enables blue/teal/purple page gradients. Off uses neutral light/dark page surfaces. |
+| Adaptive control colors | `appearance.adaptiveControlColors` | false | Device-wide, immediate; lets glass controls switch light/dark style based on the backdrop. Off follows Color mode while retaining contrast tint. |
 | List density / `uiDensity` | `ui_density` | `balanced` | Comfortable (`balanced`) or `compact`. Shared. |
 | Hide thumbnails / `thinMode` | `thin_mode` | false | Text-focused video lists, also suppresses ordinary creator artwork surfaces. Shared. |
 | Ambient mode | `appearance.ambientMode` | true | Device-wide, immediate; player toggle shares the same value. |
@@ -54,6 +56,13 @@ Defaults do not create tracks missing from the manifest or unsupported by the de
 | Trending category | local `discovery.category` | `livestreams` | `livestreams` or `gaming`; profile-local, immediate. |
 | Search members override | local search `showMembers` | null | null inherits current shared preference; true/false explicitly override it. Profile-local. |
 | Search include blocked | local search `includeBlocked` | false | Profile-local search visibility exception. |
+
+Colored backgrounds and Adaptive control colors appear directly after Color mode.
+Both start off when their device keys are absent, including existing installations.
+They save without pressing Save and remain independent of account/instance changes.
+Colored backgrounds does not change thumbnails, banners, artwork washes, accent
+colors or the separate Ambient mode preference. Media-overlay controls retain
+their consistently light treatment over video.
 
 `feed_menu` is retained in the account JSON for website compatibility (default
 Popular, Trending, Subscriptions, Playlists). It does not reconfigure the native

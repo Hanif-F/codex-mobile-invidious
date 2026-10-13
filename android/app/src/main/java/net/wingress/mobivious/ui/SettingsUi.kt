@@ -70,7 +70,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                         item { GlassSection {
                             SectionHeading("Preferences")
                             SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate)
-                            SettingsLink("Appearance", "Color mode and video list layout", Icons.Default.Palette, navigate)
+                            SettingsLink("Appearance", "Color mode, background effects and video list layout", Icons.Default.Palette, navigate)
                             SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate)
                             SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate)
                             SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate)
@@ -190,6 +190,12 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                 }
                 "Appearance" -> item { GlassSection {
                     SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode, !busy) { update(value.copy(darkMode = it)) }
+                    val coloredBackgrounds by vm.store.coloredBackgrounds.collectAsStateWithLifecycle()
+                    val adaptiveControlColors by vm.store.adaptiveControlColors.collectAsStateWithLifecycle()
+                    SettingsToggle("Colored backgrounds", "Add colored gradients behind app pages. Saves on this device immediately.",
+                        coloredBackgrounds, true) { vm.store.coloredBackgrounds(it) }
+                    SettingsToggle("Adaptive control colors", "Let glass controls switch between light and dark to suit the backdrop. When off, controls follow Color mode. Saves on this device immediately.",
+                        adaptiveControlColors, true) { vm.store.adaptiveControlColors(it) }
                     val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
                     val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
                     SettingsToggle("Ambient mode", if (reduceTransparency) "Paused while Reduce transparency is on. Your choice is saved on this device."

@@ -37,8 +37,12 @@ Ordinary/prominent control tint is .14/.20 in dark appearance and .20/.26 in lig
 section tint is .20/.28. Refractive controls use 12dp depth/18dp displacement;
 sections use 18dp/20dp, with depth clamped to half the smaller dimension. The
 background alone is magnified by 1.035 before depth-enabled refraction, with no
-backdrop blur or chromatic aberration. Glyphs and icons remain sharp. Broad blue, teal and violet pools
-illuminate non-media destinations. Artwork and the existing bounded ambient
+backdrop blur or chromatic aberration. Glyphs and icons remain sharp. Page surfaces
+default to neutral #F5F5F5 in light appearance and #121212 in dark appearance.
+The device-wide Colored backgrounds preference enables the existing broad blue,
+teal and violet pools. Its composition policy covers visible environments,
+background-only recordings and overlay fallbacks; disabled environments have
+exact solid-color contrast bounds. Artwork and the existing bounded ambient
 palette supply media environments. Stationary screens have no ornamental loops.
 
 Settings root categories and related preference groups, account forms, playlist/
@@ -65,7 +69,12 @@ use the internal deferred-player profile, retaining their prior optics and
 palette-based popup backgrounds; surrounding watch-page glass uses refraction.
 
 `GlassContentColors` supplies actual primary/secondary/icon colors through
-`GlassForeground`. Polarity switches atomically with hysteresis. Labels, icons
+`GlassForeground`. Foreground and material polarity default to the resolved app
+Color mode. The device-wide Adaptive control colors preference enables atomic
+backdrop-driven polarity changes with hysteresis. Theme and preference changes
+reset polarity immediately without relocating content or discarding control state.
+Both device preferences are provided before any glass scenes are created.
+Labels, icons
 and menu slots paint only their content, with no rectangular
 backing, circular backing or inherited text halo. Readability comes from the
 continuous surrounding glass material: its tint increases only when the

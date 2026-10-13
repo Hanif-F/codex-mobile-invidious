@@ -29,6 +29,12 @@
     "docs/no-black-backgrounds-2026-10-13/README.md"
   ],
   "files": {
+    "android/app/src/androidTest/java/net/wingress/mobivious/AppearancePresentationTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Device appearance defaults/persistence, neutral and colored recordings including overlay fallbacks, fixed/adaptive foreground contrast, media policy and open-menu/focused-draft preservation.",
+      "sha256": "10446e89dae2388012bbd8ad6c15757babec41cdd128c1c3f54e13c644b9dc91"
+    },
     ".env.example": {
       "area": "Deployment and repository support",
       "guide": "deploy/README.md",
@@ -81,7 +87,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Ambient Mode Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "f7586aad586160f2a39daf22fe0c095e53cbc66f8e92c25fa7812173c3b41f0f"
+      "sha256": "43474a623592d7d2f75b97841c8513cb9c2309ec5da5c7ca3afc6671725e8648"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AppSmokeTest.kt": {
       "area": "Android device tests",
@@ -171,7 +177,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Dark Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "c5cc5e780577b9a4577113524b059a2db6c50fccde29dc36486d46609ca870eb"
+      "sha256": "33908475537589ad360545263200ec302147ae858e37dcac15ea15482bb4df28"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/DeArrowSmokeTest.kt": {
       "area": "Android device tests",
@@ -219,7 +225,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Hardware sampling, foreground adaptation, shared-material contrast, transparent content pixel checks, native captions, fallback policy and interaction cancellation.",
-      "sha256": "8dd0e47d1551ffbb2fe900ff0f58b2e457f5e435e63999755edd20fad765d53c"
+      "sha256": "3025b5bfe1a95ac2fb58c33469c38d6b29073f1654924cd46ff805eb804809cc"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/HomeSubscriptionsSmokeTest.kt": {
       "area": "Android device tests",
@@ -326,8 +332,8 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Settings Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "80eea339dc185dccf9446b52cd87b905bce26772febe91bebac327b0159b2a1e"
+      "description": "Settings drafts and shared-save failures, playback/codec settings, immediate device appearance saves, recreation/account isolation and System color-mode updates.",
+      "sha256": "097c0feda68b84876f467f8cd011591d1b13a5f751752147677a3952bf057867"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/SponsorBlockSmokeTest.kt": {
       "area": "Android device tests",
@@ -597,7 +603,7 @@
       "area": "Data and domain",
       "guide": "docs/STORAGE_AND_SECURITY.md",
       "description": "Encrypted session, checked SharedPreferences, context generation and profile-local/device-wide settings access.",
-      "sha256": "1683db76f8152f5eb77c2a049b7d02ac6da499310654f4de9c6c722fc5aff0ad"
+      "sha256": "805c31f470b718a30a15ad82e533a0bb6cd64981f4b1c1d4003e323e3d428f45"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt": {
       "area": "Data and domain",
@@ -818,8 +824,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/GlassScene.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Acyclic background/page scenes, colored environments, bounded contrast sampling, adaptive foregrounds/shared material tint and grouped surfaces.",
-      "sha256": "7e9083308bb101e01bcf2c6f185a3282a67f7fcd29cadfd9f506b808e44886ea"
+      "description": "Acyclic background/page scenes, optional colored environments, bounded contrast sampling, theme-fixed/optional adaptive foregrounds, shared material tint and grouped surfaces.",
+      "sha256": "2735eb62b9423c3a7fbfc12d1f119add2275579c9c77ec3b6660046b8666c869"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/LibraryActionsUi.kt": {
       "area": "Compose UI",
@@ -836,8 +842,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/LiquidDesign.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Light/dark palette, typography, shape/spacing tokens, shared material facades and adaptive glass controls/segments.",
-      "sha256": "31448bdc9b18e60bb0cf74a8e786386d0175d0220c3effaa7bc3089e1ce1de5e"
+      "description": "Light/dark and neutral page palettes, typography, shape/spacing tokens, shared material facades and glass controls/segments.",
+      "sha256": "185ac5ccda3d4bb0c3ca4b928e6d4d99c97a28413f64f92fbca9d9e267c509cb"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/LiquidNavigation.kt": {
       "area": "Compose UI",
@@ -861,7 +867,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "cb372ae6d67d8d7c1ba47ab8e5720e9e9e274a5c930d1153a8d70654c8cea5c8"
+      "sha256": "3b9bac254c9f4142f3e144c6eb0a818346104f76d87f44dc9f0734097b8a4c5f"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlaybackQueueUi.kt": {
       "area": "Compose UI",
@@ -921,7 +927,7 @@
       "area": "Compose UI",
       "guide": "docs/SETTINGS.md",
       "description": "Colored settings environment, related glass preference sections, Save/Cancel footer, server/about and category routing.",
-      "sha256": "d8f7994b094076760d82bd7a49a466f5b6e3dbaf95e7d0ce4dbfdcf4b3732b5a"
+      "sha256": "0e6e6c8b22c893973702b5670ba585016b39796b83b9a8d845e39ec69b51de1c"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt": {
       "area": "Compose UI",
@@ -1401,7 +1407,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Sharp-feature refraction, foreground geometry, real dialog pixel transmission, invalidation/idle/disposal and clipped source-window crop coordinates.",
-      "sha256": "39d442ba89185a5cd712e0038f2daab0a4744e1adaa986cd9ad49a3cd982a2df"
+      "sha256": "17dd5aadc7da1f335faa6b073f23e96bccd1708b31baa92d5d1f37f5773302a6"
     }
   },
   "reviewedSourceState": "Liquid Glass implementation working tree over the recorded commit; see the dated acceptance record."

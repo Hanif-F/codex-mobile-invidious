@@ -8,7 +8,7 @@ Paths describe Android sandbox locations, not host repository paths.
 
 | Store | Contents and lifetime |
 | --- | --- |
-| SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide ambient/transparency settings. |
+| SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide colored-background/adaptive-control/ambient/transparency settings. |
 | AndroidKeyStore alias `mobivious.session` | AES key for session encryption; the key is not a checked-in file. |
 | `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions and visibility snapshots. |
 | `cacheDir/feeds/` | Selected successful feed/search response snapshots, hashed keys, bounded count/age/size. |

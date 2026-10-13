@@ -104,6 +104,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
+    val coloredBackgrounds by vm.store.coloredBackgrounds.collectAsStateWithLifecycle()
+    val adaptiveControlColors by vm.store.adaptiveControlColors.collectAsStateWithLifecycle()
     val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
@@ -338,7 +340,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    MaterialTheme(colorScheme = if (darkTheme) Liquid.dark else Liquid.light, typography = Liquid.typography, shapes = Liquid.shapes) {
+    CompositionLocalProvider(LocalColoredBackgrounds provides coloredBackgrounds,
+        LocalAdaptiveControlColors provides adaptiveControlColors) {
+    MaterialTheme(colorScheme = liquidColorScheme(darkTheme, coloredBackgrounds), typography = Liquid.typography, shapes = Liquid.shapes) {
       val glassMotion = rememberAmbientAnimationsEnabled()
       val shellScene = rememberGlassScene(samplingEnabled = !reduceTransparency && !watch && !fullscreen && !pip && settingsPage.isEmpty())
       val backdrop = shellScene.backdrop
@@ -650,6 +654,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
           }
         }
       }
+    }
     }
 }
 
