@@ -82,24 +82,22 @@ changes warn before discarding unconfirmed edits. Passwords, identities, tokens,
 playlist/clip creation and edits, destructive actions, exports and chat overlay
 geometry retain explicit submission and appropriate dismissal confirmations.
 
-## Watch and ambient lighting
+## Watch presentation
 
 Watch metadata and tools use opaque neutral surfaces. Native white player controls
-have transparent backgrounds above one full-picture black dim layer at 10% opacity.
+have transparent backgrounds above one full-picture black dim layer at 25% opacity.
 The layer fades with control visibility over 160ms in embedded and fullscreen
 playback. SponsorBlock prompts and seek feedback have no individual backings.
 Settings sheets, chat panels, captions, mini-player and PiP retain their styling. Save,
-Download, Share and More have visible labels and tooltips; large text wraps action
-rows or stacks icon/label without shrinking type. Queue opens as a full-height
+Download, Share and More use four equal-width columns with filled circular icon
+buttons and centered labels underneath. Circles are 56dp where space permits and
+48dp on narrow rows; labels wrap at large text sizes without shrinking type.
+Portrait Play/Pause/Replay stays centered in the player. Short pictures use a
+single-row footer for time, seeking and fullscreen, with chapters in the header.
+Tiny pictures put secondary controls and SponsorBlock prompts in More player
+controls; opening this popup keeps controls visible. Queue opens as a full-height
 phone sheet or wide supporting pane. Comments, chapters, queue and docked chat
 are mutually exclusive; closing a tool preserves playback and occurrence identity.
-
-Ambient mode is the only optional color lighting. An absent key means off;
-explicit saved true/false values survive migration. It uses bounded 32×18 samples
-from the existing decoder surface at most every 250ms. Off, hidden playback, PiP,
-audio-only, reduced motion, power saving, software drawing and Reduce transparency
-suppress its work. Ambient colors never tint metadata, controls or popup surfaces.
-The sampler is independent of ordinary UI rendering and does not create a decoder.
 
 ## Accessibility and verification
 

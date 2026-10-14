@@ -36,11 +36,9 @@ class LibraryPresentationTest {
 
     @Test fun narrowLargeTextDashboardKeepsEveryDestinationReachableInBothAppearances() {
         var dark by mutableStateOf(false)
-        var opaque by mutableStateOf(false)
         val opened = mutableListOf<String>()
         compose.setContent { AppTheme(dark, AccentPreset.BLUE) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides opaque,
-                LocalContentBottomInset provides 100.dp) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalContentBottomInset provides 100.dp) {
                 BrowseAppSurface(Modifier.width(320.dp).height(850.dp), toolbar = {
                     LibraryToolbar("You", statusInset = false)
                 }) { modifier, top ->
@@ -48,15 +46,15 @@ class LibraryPresentationTest {
                 }
             }
         } }
-        for ((isDark, isOpaque) in listOf(false to false, true to false, true to true)) {
-            compose.runOnIdle { dark = isDark; opaque = isOpaque }
+        for (isDark in listOf(false, true)) {
+            compose.runOnIdle { dark = isDark }
             for (destination in listOf("playlists", "clips", "history", "downloads")) {
                 compose.onNodeWithTag("you-library-list").performScrollToNode(hasTestTag("you-$destination"))
                 compose.onNodeWithTag("you-$destination").assertHeightIsAtLeast(48.dp).performClick()
             }
-            capture(if (isDark) "dashboard-narrow-large-dark-${if (isOpaque) "opaque" else "transparent"}" else "dashboard-narrow-large-light")
+            capture(if (isDark) "dashboard-narrow-large-dark-neutral" else "dashboard-narrow-large-light")
         }
-        assertEquals(List(3) { listOf("playlists", "clips", "history", "downloads") }.flatten(), opened)
+        assertEquals(List(2) { listOf("playlists", "clips", "history", "downloads") }.flatten(), opened)
     }
 
     @Test fun wideDashboardKeepsLibraryRowsInOrderAndGuestDownloadsAvailable() {
@@ -82,7 +80,7 @@ class LibraryPresentationTest {
     @Test fun opaqueToolbarLeavesFirstAndLastRowsAccessibleAtLargeText() {
         var created = false
         compose.setContent { AppTheme(true, AccentPreset.BLUE) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides true) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 BrowseAppSurface(Modifier.width(320.dp).height(850.dp), toolbar = {
                     LibraryToolbar("Playlists", statusInset = false, back = {}, actions = {
                         IconButton({ created = true }, Modifier.size(48.dp).testTag("create")) { Icon(Icons.Default.Add, "New playlist") }

@@ -53,7 +53,7 @@ An `OK` result confirms the APK matches the supplied checksum.
 ### Watch and listen
 
 - Adaptive streaming with quality, codec, audio-track, speed and caption controls.
-- Transparent player controls over a uniform 10% dim layer while controls are visible.
+- Transparent player controls over a uniform 25% dim layer while controls are visible.
 - Background playback, audio-only mode, system media controls, fullscreen,
   picture in picture and a mini-player while browsing.
 - Playlists, mixes, Play next and Add to queue, with previous/next and repeat.
@@ -94,8 +94,6 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 - Four direct destinations with light, dark or system appearance and six accent
   presets; compact lists and optional hidden thumbnails.
-- Optional ambient lighting behind the expanded watch view. An absent saved choice
-  defaults off; existing explicit choices are preserved.
 - Choose your launch homepage; retain your place and child screens independently
   in Popular, Trending, Subscriptions and You.
 - Playback defaults, browsing and feed preferences, and channel blocking.

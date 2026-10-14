@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.ui.graphics.Color
@@ -11,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -49,6 +51,7 @@ class PlayerControlsPresentationTest {
     private val height = mutableIntStateOf(180)
     private val fontScale = mutableFloatStateOf(1f)
     private val direction = mutableStateOf(LayoutDirection.Ltr)
+    private val portrait = mutableStateOf(true)
     private val controlsVisible = mutableStateOf(true)
     private val backdrop = mutableStateOf(Color(0xFF535862))
     private var chapterClicks = 0
@@ -61,7 +64,10 @@ class PlayerControlsPresentationTest {
         inputModeManager = LocalInputModeManager.current
         MaterialTheme {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue),
-                LocalLayoutDirection provides direction.value) {
+                LocalLayoutDirection provides direction.value,
+                LocalConfiguration provides Configuration(LocalConfiguration.current).apply {
+                    orientation = if (portrait.value) Configuration.ORIENTATION_PORTRAIT else Configuration.ORIENTATION_LANDSCAPE
+                }) {
                 Box(Modifier.width(width.intValue.dp).height(height.intValue.dp).testTag("controls-surface").background(backdrop.value)) {
                     PlayerControlsDim(controlsVisible.value, Modifier.matchParentSize())
                     PlayerControlsLayout(playback.value, position.longValue, fullscreen.value, true,
@@ -80,70 +86,84 @@ class PlayerControlsPresentationTest {
         }
     }
 
-    @Test fun measuredChromeKeepsTransportCenteredOrInHeaderAboveFullWidthSeeking() {
+    @Test fun portraitTransportStaysCenteredAcrossPhoneSizesLargeTextRtlAndTinyPictures() {
         compose.setContent { Content() }
         for ((wide, tall, scale, rtl, full) in listOf(
-            Layout(320, 220, 1f, false, false), Layout(320, 160, 2f, false, false),
-            Layout(390, 220, 1f, false, false), Layout(600, 340, 1f, false, true),
-            Layout(320, 400, 2f, true, true), Layout(320, 96, 1f, false, false))) {
+            Layout(320, 180, 1f, false, false), Layout(360, 203, 1f, false, false),
+            Layout(390, 220, 1f, false, false), Layout(240, 160, 2f, true, false),
+            Layout(320, 96, 1f, false, false), Layout(320, 400, 2f, true, true),
+            Layout(600, 340, 1f, false, true))) {
             compose.runOnIdle {
                 width.intValue = wide; height.intValue = tall; fontScale.floatValue = scale
                 direction.value = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
                 fullscreen.value = full
             }
-            compose.waitForIdle()
             val surface = compose.onNodeWithTag("controls-surface").getUnclippedBoundsInRoot()
-            val button = compose.onNodeWithTag("player-play-pause").getUnclippedBoundsInRoot()
-            val rail = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
-            val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
-            val expand = compose.onNodeWithContentDescription(if (full) "Exit full screen" else "Full screen").getUnclippedBoundsInRoot()
-            if (tall >= 144) assertTrue(settings.bottom <= rail.top)
-            else assertTrue(settings.top >= rail.top && settings.bottom <= rail.bottom)
-            assertTrue(expand.top >= rail.top && expand.bottom <= rail.bottom)
-            assertTrue(button.top >= surface.top && button.bottom <= surface.bottom)
-            val centered = compose.onAllNodesWithTag("player-transport").fetchSemanticsNodes().isNotEmpty()
-            if (centered) {
-                assertEquals(surface.middleX, button.middleX, .5f)
-                assertEquals(surface.middleY, button.middleY, .5f)
-                assertTrue(button.right - button.left >= 48.dp)
-                val header = compose.onNodeWithTag("player-header").getUnclippedBoundsInRoot()
-                assertTrue(header.bottom < button.top)
-                assertTrue(button.bottom < rail.top)
-
+            val button = compose.onNodeWithTag("player-play-pause").assertIsDisplayed()
+                .assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp).getUnclippedBoundsInRoot()
+            compose.onAllNodesWithTag("player-play-pause").assertCountEquals(1)
+            assertEquals(surface.middleX, button.middleX, .5f)
+            assertEquals(surface.middleY, button.middleY, .5f)
+            compose.onNodeWithTag("player-transport").assertExists()
+            val tiny = compose.onAllNodesWithTag("player-more-controls").fetchSemanticsNodes().isNotEmpty()
+            if (tiny) {
+                val more = compose.onNodeWithTag("player-more-controls").getUnclippedBoundsInRoot()
+                assertSeparate(button, more)
+                compose.onNodeWithTag("player-more-controls").performClick()
+                compose.onNodeWithTag("player-controls-popup").assertIsDisplayed()
+                compose.onNodeWithTag("test-timeline").assertIsDisplayed().assertWidthIsAtLeast(64.dp)
+                compose.onNodeWithText("Chapters").assertIsDisplayed().assertContentDescriptionEquals("Current chapter: $title")
+                compose.onNodeWithContentDescription("Full screen").assertIsDisplayed()
+                compose.onNodeWithContentDescription("Player settings").assertIsDisplayed()
+                compose.onNodeWithContentDescription("Close player controls").performClick()
             } else {
-                assertEquals(48f, (button.right - button.left).value, .5f)
-                val header = compose.onNodeWithTag("player-header").getUnclippedBoundsInRoot()
-                assertTrue(button.top >= header.top && button.bottom <= header.bottom)
-                compose.onNodeWithTag("player-back-10").assertDoesNotExist()
-                compose.onNodeWithTag("player-forward-10").assertDoesNotExist()
-            }
-            run {
-                val chapter = compose.onNodeWithTag("player-chapter-title").getUnclippedBoundsInRoot()
-                assertTrue(chapter.right - chapter.left >= 48.dp)
-                assertTrue(chapter.top >= rail.top && chapter.bottom <= rail.bottom)
-                val track = compose.onNodeWithTag("test-timeline").getUnclippedBoundsInRoot()
-                assertTrue(track.right - track.left >= 64.dp)
-                assertTrue(chapter.bottom <= track.top)
-                assertTrue(expand.bottom <= track.top)
-                assertEquals(rail.left.value, track.left.value, .5f)
-                assertEquals(rail.right.value, track.right.value, .5f)
-                val line = compose.onNodeWithTag("test-seek-track").getUnclippedBoundsInRoot()
-                val time = compose.onNodeWithTag("player-time").getUnclippedBoundsInRoot()
-                val gap = line.middleY - time.middleY
-                if (!full && tall >= 144) assertTrue("Portrait spacing: $gap", gap in 23.5f..32.5f)
-                else assertEquals(48f, gap, .5f)
-                compose.onNodeWithTag("player-chapter-title").assertContentDescriptionEquals("Current chapter: $title")
-                if (compose.onAllNodesWithTag("player-current-chapter", true).fetchSemanticsNodes().isNotEmpty()) {
-                    val layouts = mutableListOf<TextLayoutResult>()
-                    compose.onNodeWithTag("player-current-chapter", true).assertTextEquals(title)
-                        .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-                    assertEquals(1, layouts.single().lineCount)
-                    assertTrue(layouts.single().isLineEllipsized(0))
+                for (control in listOf(compose.onNodeWithContentDescription("Player settings"),
+                    compose.onNodeWithContentDescription(if (full) "Exit full screen" else "Full screen"),
+                    compose.onNodeWithTag("player-chapter-title"), compose.onNodeWithTag("test-timeline"))) {
+                    control.assertIsDisplayed()
+                    assertSeparate(button, control.getUnclippedBoundsInRoot())
                 }
+                compose.onNodeWithTag("player-chapter-title").assertContentDescriptionEquals("Current chapter: $title")
+                compose.onNodeWithTag("test-timeline").assertWidthIsAtLeast(64.dp)
+                compose.onNodeWithTag("player-time").assertIsDisplayed()
             }
-            compose.onNodeWithTag("player-time").assertIsDisplayed()
-            if (rtl) captureWatchScreenshot("watch-controls-rtl-large-text")
+            captureWatchScreenshot("portrait-centered-$wide-$tall-${if (rtl) "rtl" else "ltr"}")
         }
+    }
+
+    private fun assertSeparate(a: DpRect, b: DpRect) {
+        assertTrue("Controls overlap: $a and $b", a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top)
+    }
+
+    @Test fun tinyPopupDispatchesChapterSettingsChatAndFullscreenActions() {
+        height.intValue = 96
+        playback.value = playback.value.copy(details = playback.value.details!!.copy(liveChatReplay = true))
+        var chatClicks = 0
+        compose.setContent { MaterialTheme {
+            Box(Modifier.size(320.dp, 96.dp)) {
+                PlayerControlsLayout(playback.value, 5_000, false, true, onPlay = {},
+                    onSettings = { settingsClicks++ }, onFullscreen = { fullscreen.value = true },
+                    onChapters = { chapterClicks++ }, onChat = { chatClicks++ }, onCollapse = {},
+                    timeline = { modifier, _ -> Box(modifier.testTag("popup-timeline")) })
+            }
+        } }
+        for (action in listOf("Chapters", "Player settings", "Show chat replay", "Full screen")) {
+            compose.onNodeWithContentDescription("More player controls").performClick()
+            compose.onNodeWithTag("popup-timeline").assertIsDisplayed()
+            if (action == "Chapters") compose.onNodeWithText(action).performClick()
+            else compose.onNodeWithContentDescription(action).performClick()
+            compose.onNodeWithTag("player-controls-popup").assertDoesNotExist()
+        }
+        assertEquals(1, chapterClicks); assertEquals(1, settingsClicks); assertEquals(1, chatClicks)
+        assertTrue(fullscreen.value)
+    }
+
+    @Test fun landscapeRetainsItsCompactHeaderTransportFallback() {
+        portrait.value = false; height.intValue = 96
+        compose.setContent { Content() }
+        compose.onNodeWithTag("player-transport").assertDoesNotExist()
+        compose.onNodeWithTag("player-play-pause").assertIsDisplayed()
+        compose.onNodeWithTag("test-timeline").assertIsDisplayed()
     }
 
     @Test fun noSeekButtonsAndChatStaysToTheLeftOfSettings() {
@@ -151,7 +171,7 @@ class PlayerControlsPresentationTest {
         compose.setContent { Content() }
         compose.onNodeWithContentDescription("Back 10 seconds").assertDoesNotExist()
         compose.onNodeWithContentDescription("Forward 10 seconds").assertDoesNotExist()
-        for (tall in listOf(180, 96)) {
+        for (tall in listOf(180, 220)) {
             compose.runOnIdle { height.intValue = tall }
             val chat = compose.onNodeWithTag("player-chat").assertIsDisplayed().getUnclippedBoundsInRoot()
             val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
@@ -165,21 +185,17 @@ class PlayerControlsPresentationTest {
         compose.onNodeWithTag("player-chat").assertDoesNotExist()
     }
 
-    @Test fun oneTenPercentDimCoversThePictureWithoutLocalControlBackings() {
+    @Test fun oneTwentyFivePercentDimCoversThePictureWithoutLocalControlBackings() {
         height.intValue = 320
         playback.value = playback.value.copy(details = playback.value.details!!.copy(liveChatReplay = true))
-        var opaque by mutableStateOf(false)
-        compose.setContent {
-            CompositionLocalProvider(LocalReduceTransparency provides opaque) { Content() }
-        }
-        for ((background, reduce) in listOf(Color(0xFF535862) to false, Color.White to false,
-            Color(0xFFF3E4C9) to true, Color(0xFF142536) to true)) {
-            compose.runOnIdle { opaque = reduce; backdrop.value = background; controlsVisible.value = true }
+        compose.setContent { Content() }
+        for (background in listOf(Color(0xFF535862), Color.White, Color(0xFFF3E4C9), Color(0xFF142536))) {
+            compose.runOnIdle { backdrop.value = background; controlsVisible.value = true }
             compose.mainClock.advanceTimeBy(200)
             fun assertDim(color: Color) {
-                assertEquals(background.red * .9f, color.red, .012f)
-                assertEquals(background.green * .9f, color.green, .012f)
-                assertEquals(background.blue * .9f, color.blue, .012f)
+                assertEquals(background.red * .75f, color.red, .012f)
+                assertEquals(background.green * .75f, color.green, .012f)
+                assertEquals(background.blue * .75f, color.blue, .012f)
             }
             for (control in listOf(
                 compose.onNodeWithTag("player-play-pause"),
@@ -237,6 +253,7 @@ class PlayerControlsPresentationTest {
     }
 
     @Test fun chapterTracksScrubbingAndSupportsClickAndKeyboardWithoutDisplacingSettings() {
+        height.intValue = 320
         compose.setContent { Content() }
         compose.onNodeWithTag("player-time").assertTextEquals("0:05 / 2:00")
         compose.onNodeWithTag("player-chapter-title").performClick()

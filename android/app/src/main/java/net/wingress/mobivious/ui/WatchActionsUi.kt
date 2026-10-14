@@ -2,6 +2,7 @@ package net.wingress.mobivious.ui
 
 import android.content.Intent
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.*
@@ -9,14 +10,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.style.TextAlign
 import net.wingress.mobivious.data.*
 
 @Composable
@@ -48,25 +48,32 @@ internal fun WatchPrimaryActions(vm: AppViewModel, details: VideoDetails, save: 
 internal fun WatchActionRow(downloadEnabled: Boolean, save: () -> Unit, download: () -> Unit,
     share: () -> Unit, more: () -> Unit, moreMenu: @Composable () -> Unit = {}) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-    val stackLabel = maxWidth < 360.dp && LocalDensity.current.fontScale > 1.3f
-    FlowRow(Modifier.fillMaxWidth().padding(vertical=8.dp).testTag("watch-actions"),
-        horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    val gap = minOf(8.dp, ((maxWidth - 192.dp) / 3).coerceAtLeast(0.dp))
+    val circleSize = if ((maxWidth - gap * 3) / 4 >= 56.dp) 56.dp else 48.dp
+    Row(Modifier.fillMaxWidth().padding(vertical=8.dp).testTag("watch-actions"),
+        horizontalArrangement=Arrangement.spacedBy(gap), verticalAlignment = Alignment.Top) {
         val action: @Composable (ImageVector,String,String,Boolean,() -> Unit) -> Unit = {icon,label,tag,enabled,click ->
+          Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally,
+              verticalArrangement = Arrangement.spacedBy(6.dp)) {
             TooltipBox(positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
                 tooltip = { AppTooltip(label) }, state = rememberTooltipState()) {
-                OutlinedButton(click,Modifier.heightIn(min=48.dp).testTag(tag).semantics {contentDescription=label},enabled=enabled, border=androidx.compose.foundation.BorderStroke(1.dp,
-                    if(enabled) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface.copy(alpha=.12f))) {
-                    if (stackLabel) Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(icon,null,Modifier.size(24.dp))
-                        Text(label,maxLines=1,softWrap=false)
-                    } else { Icon(icon,null,Modifier.size(24.dp));Spacer(Modifier.width(8.dp));Text(label) }
+                FilledIconButton(click, Modifier.size(circleSize).testTag(tag).semantics { contentDescription = label },
+                    enabled = enabled, shape = CircleShape,
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurface)) {
+                    Icon(icon, null, Modifier.size(24.dp))
                 }
             }
+            Text(label, Modifier.fillMaxWidth(), textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
+          }
         }
-        action(Icons.AutoMirrored.Filled.PlaylistAdd,"Save","watch-save",true,save)
-        action(Icons.Default.Download,"Download","watch-download",downloadEnabled,download)
-        action(Icons.Default.Share,"Share","watch-share",true,share)
-        Box { action(Icons.Default.MoreHoriz,"More","watch-more",true,more);moreMenu() }
+        Box(Modifier.weight(1f)) { action(Icons.AutoMirrored.Filled.PlaylistAdd,"Save","watch-save",true,save) }
+        Box(Modifier.weight(1f)) { action(Icons.Default.Download,"Download","watch-download",downloadEnabled,download) }
+        Box(Modifier.weight(1f)) { action(Icons.Default.Share,"Share","watch-share",true,share) }
+        Box(Modifier.weight(1f)) { action(Icons.Default.MoreHoriz,"More","watch-more",true,more);moreMenu() }
     }
     }
 }

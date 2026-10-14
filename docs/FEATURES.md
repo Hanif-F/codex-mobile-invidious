@@ -54,7 +54,7 @@ and fullscreen controls sit above the full-width timeline. Loading, buffering,
 errors and Retry remain actionable within the controls.
 
 Player settings offer supported Quality, Audio and Caption tracks, speed from
-0.25× to 2×, Audio only, Ambient mode, Picture in picture and Refresh buffer.
+0.25× to 2×, Audio only, Picture in picture and Refresh buffer.
 Quality can be adaptive Auto or a specific stream. Audio groups distinguish
 Original Audio, Stable Volume, Dubbed Audio and other tracks when metadata permits.
 Options reflect decoder-supported tracks; unavailable choices are disabled.
@@ -194,11 +194,8 @@ default homepage, playback defaults and browsing filters are configurable.
 Six device-wide accent presets accompany exact light/dark neutral Material 3
 surfaces. Preferences save automatically, with field-level pending/error feedback,
 Retry and Revert. Legacy Colored backgrounds and Adaptive control colors have no
-interface effect. Reduce transparency pauses optional ambient lighting. Ambient
-mode defaults off only when its key is absent; explicit saved choices survive.
-It illuminates the watch background from bounded decoder samples, while metadata
-and tools stay opaque. Appearance and player settings share its device-wide toggle;
-accessibility, power, motion and presentation gates suppress its work.
+interface effect. Watch actions use filled circles with labels below; portrait
+transport stays centered and visible player controls use a 25% black dim layer.
 
 Channel blocking hides discovery and recommendation content and, unless overridden,
 search results. It preserves deliberate library/channel access. A brief Undo is

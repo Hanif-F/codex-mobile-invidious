@@ -7,6 +7,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
@@ -31,7 +34,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.media3.common.Player
+import net.wingress.mobivious.data.ChapterRules
 
 
 @Composable
@@ -40,12 +45,19 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
     onFullscreen: () -> Unit, onChapters: () -> Unit, modifier: Modifier = Modifier,
     onCollapse: (() -> Unit)? = null, onChat: (() -> Unit)? = null, chatOpen: Boolean = false, onRetry: (() -> Unit)? = null,
     showControls: Boolean = true, notice: (@Composable () -> Unit)? = null,
+    onOverflowChanged: (Boolean) -> Unit = {},
     timeline: @Composable (modifier: Modifier, trackOffset: Dp) -> Unit) {
     val density = LocalDensity.current
     var headerHeight by remember { mutableStateOf(48.dp) }
     var footerHeight by remember { mutableStateOf(96.dp) }
     var noticeHeight by remember { mutableStateOf(48.dp) }
+    val portrait = !fullscreen && LocalConfiguration.current.orientation == Configuration.ORIENTATION_PORTRAIT
     BoxWithConstraints(modifier.fillMaxSize()) {
+        if (portrait && !playback.loading && playback.error == null) {
+            PortraitPlayerControls(playback, positionMs, settingsEnabled, onPlay, onSettings, onFullscreen,
+                onChapters, onCollapse, onChat, chatOpen, showControls, notice, onOverflowChanged, timeline)
+            return@BoxWithConstraints
+        }
         // Two 48dp rows keep chapter/fullscreen targets separate from full-width seeking.
         // A bottom notice also needs room clear of the header in short pictures.
         val noticeSpace = if (notice == null) 0.dp else noticeHeight + 16.dp
@@ -89,6 +101,126 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
                 Box(Modifier.onSizeChanged { noticeHeight = with(density) { it.height.toDp() } }) { notice() }
             }
         }
+    }
+}
+
+/** Portrait transport never moves: surrounding controls adapt to the available picture. */
+@Composable
+private fun PortraitPlayerControls(playback: PlaybackState, positionMs: Long, settingsEnabled: Boolean,
+    onPlay: () -> Unit, onSettings: () -> Unit, onFullscreen: () -> Unit, onChapters: () -> Unit,
+    onCollapse: (() -> Unit)?, onChat: (() -> Unit)?, chatOpen: Boolean, showControls: Boolean,
+    notice: (@Composable () -> Unit)?, onOverflowChanged: (Boolean) -> Unit,
+    timeline: @Composable (Modifier, Dp) -> Unit) {
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelSmall
+    var headerHeight by remember { mutableStateOf(48.dp) }
+    var regularFooterHeight by remember { mutableStateOf(96.dp) }
+    var compactFooterHeight by remember { mutableStateOf(48.dp) }
+    var noticeWidth by remember { mutableStateOf(120.dp) }
+    var noticeHeight by remember { mutableStateOf(48.dp) }
+    var popup by remember(playback.mediaId) { mutableStateOf(false) }
+    val overflowChanged by rememberUpdatedState(onOverflowChanged)
+    LaunchedEffect(popup) { overflowChanged(popup) }
+    DisposableEffect(Unit) { onDispose { overflowChanged(false) } }
+    LaunchedEffect(showControls) { if (!showControls) popup = false }
+    val hasChat = onChat != null && playback.clip == null && playback.details?.chatAvailable == true && !playback.live
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        fun fits(size: Dp, footer: Dp) = maxHeight / 2 - size / 2 >= headerHeight + 1.dp &&
+            maxHeight / 2 + size / 2 <= maxHeight - footer - 1.dp
+        val regularSize = if (fits(64.dp, regularFooterHeight)) 64.dp else 48.dp
+        val regular = fits(regularSize, regularFooterHeight)
+        val compactSize = if (fits(64.dp, compactFooterHeight)) 64.dp else 48.dp
+        val size = if (regular) regularSize else compactSize
+        val footerHeight = if (regular) regularFooterHeight else compactFooterHeight
+        fun textWidth(text: String) = with(density) {
+            measurer.measure(AnnotatedString(text), style, maxLines = 1, softWrap = false).size.width.toDp()
+        } + 4.dp
+        val timeSpace = maxWidth - 16.dp - 48.dp - 64.dp - 8.dp
+        val compactTime = textWidth(playbackTimeLabel(playback, positionMs)) > timeSpace
+        val timeWidth = textWidth(if (compactTime) playerTime(positionMs) else playbackTimeLabel(playback, positionMs))
+        val headerTargets = 1 + (if (onCollapse != null) 1 else 0) +
+            (if (hasChat) 1 else 0) + (if (playback.chapters.isNotEmpty()) 1 else 0)
+        // Notices occupy a corner, rather than reserving a full-width band below transport.
+        val noticeFits = notice == null || noticeWidth + 8.dp <= maxWidth / 2 - size / 2 &&
+            maxHeight - footerHeight - noticeHeight - 16.dp >= headerHeight + 1.dp
+        val overflow = (!regular && (!fits(48.dp, compactFooterHeight) || timeWidth > timeSpace ||
+            48.dp * headerTargets + 8.dp > maxWidth)) || !noticeFits
+        val transportSize = if (overflow) 48.dp else size
+        AnimatedVisibility(showControls, enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
+            if (overflow) Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp).testTag("player-header")) {
+                if (onCollapse != null) PlayerIconButton(Icons.Default.KeyboardArrowDown, "Minimize player", onClick = onCollapse)
+                Spacer(Modifier.weight(1f))
+                PlayerIconButton(Icons.Default.MoreHoriz, "More player controls",
+                    Modifier.testTag("player-more-controls"), onClick = { popup = true })
+            } else if (regular) PlayerControlHeader(playback, false, settingsEnabled, onSettings,
+                Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } }.padding(horizontal = 4.dp),
+                onCollapse, onChat, chatOpen)
+            else Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp).testTag("player-header")
+                .onSizeChanged { headerHeight = with(density) { it.height.toDp() } }, verticalAlignment = Alignment.CenterVertically) {
+                if (onCollapse != null) PlayerIconButton(Icons.Default.KeyboardArrowDown, "Minimize player", onClick = onCollapse)
+                if (playback.chapters.isNotEmpty()) PlayerChapterTitle(playback.chapters, positionMs,
+                    Modifier.size(48.dp), compact = true, open = onChapters)
+                Spacer(Modifier.weight(1f))
+                if (hasChat) PlayerIconButton(Icons.AutoMirrored.Filled.Chat, if (chatOpen) "Hide chat replay" else "Show chat replay",
+                    Modifier.testTag("player-chat").semantics { selected = chatOpen }, onClick = onChat)
+                PlayerIconButton(Icons.Default.Settings, "Player settings", enabled = settingsEnabled, onClick = onSettings)
+            }
+        }
+        AnimatedVisibility(showControls && !overflow, enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp)) {
+            if (regular) Box(Modifier.onSizeChanged { regularFooterHeight = with(density) { it.height.toDp() } }) {
+                PlayerControlFooter(playback, positionMs, false, onFullscreen, onChapters, timeline = timeline)
+            } else Row(Modifier.fillMaxWidth().testTag("player-footer")
+                .onSizeChanged { compactFooterHeight = with(density) { it.height.toDp() } },
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                PlayerTime(playback, positionMs, Modifier.width(timeWidth), compactTime)
+                timeline(Modifier.weight(1f).height(48.dp), 0.dp)
+                PlayerIconButton(Icons.Default.Fullscreen, "Full screen", onClick = onFullscreen)
+            }
+        }
+        AnimatedVisibility(showControls, enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.Center)) {
+            Box(Modifier.testTag("player-transport")) {
+                PlayerPlayControl(playback, Modifier.size(transportSize), play = onPlay)
+            }
+        }
+        if (notice != null && !overflow) Box(Modifier.align(AbsoluteAlignment.BottomLeft)
+            .absolutePadding(left = 8.dp, right = maxWidth / 2 + size / 2, bottom = if (showControls) footerHeight + 8.dp else 8.dp)
+            .onSizeChanged {
+                noticeWidth = with(density) { it.width.toDp() }
+                noticeHeight = with(density) { it.height.toDp() }
+            }) { notice() }
+        if (popup && overflow) Dialog(onDismissRequest = { popup = false }) {
+            Surface(color = Color(0xFF202124), contentColor = Color.White, shape = MaterialTheme.shapes.large) {
+                Column(Modifier.fillMaxWidth().heightIn(max = LocalConfiguration.current.screenHeightDp.dp * .85f)
+                    .verticalScroll(rememberScrollState()).padding(16.dp).testTag("player-controls-popup")) {
+                    Text("More player controls", style = MaterialTheme.typography.titleMedium)
+                    PlayerTime(playback, positionMs, Modifier.padding(vertical = 12.dp))
+                    timeline(Modifier.fillMaxWidth().height(48.dp), 0.dp)
+                    if (playback.chapters.isNotEmpty()) PlayerPopupAction("Chapters",
+                        description = "Current chapter: ${ChapterRules.current(playback.chapters, positionMs)?.title ?: "Chapters"}") {
+                        popup = false; onChapters()
+                    }
+                    if (hasChat) PlayerPopupAction(if (chatOpen) "Hide chat replay" else "Show chat replay") { popup = false; onChat() }
+                    PlayerPopupAction("Full screen") { popup = false; onFullscreen() }
+                    PlayerPopupAction("Player settings", settingsEnabled) { popup = false; onSettings() }
+                    if (notice != null) notice()
+                    PlayerPopupAction("Close player controls") { popup = false }
+                }
+            }
+        }
+        LaunchedEffect(overflow) { if (!overflow) popup = false }
+    }
+}
+
+@Composable
+private fun PlayerPopupAction(label: String, enabled: Boolean = true, description: String = label, action: () -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .clickable(enabled = enabled, role = Role.Button, onClick = action)
+        .semantics { contentDescription = description }.padding(vertical = 12.dp)) {
+        Text(label, color = Color.White.copy(alpha = if (enabled) 1f else .38f))
     }
 }
 
@@ -177,7 +309,7 @@ internal val PlayerTextShadow = Shadow(Color.Black.copy(alpha = .8f), Offset(0f,
 /** One continuous dim layer, behind every on-picture overlay and never a touch target. */
 @Composable
 internal fun PlayerControlsDim(visible: Boolean, modifier: Modifier = Modifier) {
-    val alpha by animateFloatAsState(if (visible) .10f else 0f, tween(160), label = "player-controls-dim")
+    val alpha by animateFloatAsState(if (visible) .25f else 0f, tween(160), label = "player-controls-dim")
     Box(modifier.background(Color.Black.copy(alpha = alpha)).testTag("player-controls-dim"))
 }
 

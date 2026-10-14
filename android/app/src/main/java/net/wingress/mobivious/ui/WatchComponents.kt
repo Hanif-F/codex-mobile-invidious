@@ -63,11 +63,9 @@ internal fun WatchPanelSurface(modifier: Modifier = Modifier, content: @Composab
 @Composable
 internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () -> Unit,
     content: @Composable (Modifier, Dp) -> Unit) {
-    CompositionLocalProvider(LocalWatchAmbient provides null) {
-        BrowseAppSurface(modifier.clip(AppTokens.card), toolbar = {
-            Column(Modifier.testTag("comments-toolbar")) { toolbar() }
-        }, content = content)
-    }
+    BrowseAppSurface(modifier.clip(AppTokens.card), toolbar = {
+        Column(Modifier.testTag("comments-toolbar")) { toolbar() }
+    }, content = content)
 }
 
 

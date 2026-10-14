@@ -17,7 +17,7 @@ The [testing guide](TESTING.md) defines repeatable validation; the
 | Work on playback, queues, tracks or gestures | [Playback system](PLAYBACK.md) |
 | Work on accounts, subscriptions, history, playlists, clips or downloads | [Library and account systems](LIBRARY.md) |
 | Understand persistence, isolation and privacy | [Storage and security](STORAGE_AND_SECURITY.md) |
-| Understand current layouts, accessibility, theme or ambient mode | [UI system](UI.md) |
+| Understand current layouts, accessibility, theme or player controls | [UI system](UI.md) |
 | Review the repository cleanup and its validation | [Cleanup report](CLEANUP.md) |
 | Build, sign or release the APK | [Development guide](DEVELOPMENT.md) |
 | Run or extend checks | [Testing guide](TESTING.md), [test catalog](reference/TEST_CATALOG.md) |

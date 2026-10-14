@@ -71,7 +71,7 @@ class AppUiSmokeTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.store.guestPreferences(AccountPreferences())
             vm.store.clearVisibilitySnapshot(vm.api.context()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() && activity.window.decorView.hasWindowFocus() }
@@ -82,7 +82,7 @@ class AppUiSmokeTest {
         shell(if (originalHandwriting == "null") "settings delete secure stylus_handwriting_enabled" else "settings put secure stylus_handwriting_enabled $originalHandwriting")
         currentActivity()
         if (::activity.isInitialized) compose.runOnUiThread {
-            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences())
             activity.finishAndRemoveTask()
         }
     }
@@ -116,7 +116,7 @@ class AppUiSmokeTest {
         until { vm.tab == "Popular" }
         assertEquals(popular, vm.browse.value.position)
     }
-    @Test fun youOwnsGuestSettingsAndOpaqueAccessibilityMode() {
+    @Test fun youOwnsGuestSettingsAndAppearance() {
         compose.selectFeed("You")
         compose.onNodeWithTag("you-guest").assertExists()
         screenshot("you-guest")
@@ -127,9 +127,6 @@ class AppUiSmokeTest {
         compose.onNodeWithTag("global-settings").performClick()
         screenshot("settings-root")
         compose.onNodeWithText("Appearance").performClick()
-        compose.onNodeWithText("Reduce transparency").performScrollTo().performClick()
-        until { vm.store.reduceTransparency.value }
-        assertTrue(SessionStore(activity).reduceTransparency.value)
         screenshot("appearance-opaque")
         back(); back()
         compose.selectFeed("Popular")
@@ -283,7 +280,9 @@ class AppUiSmokeTest {
         compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Appearance"))
         compose.onNodeWithText("Appearance").performClick()
         compose.onAllNodesWithTag("settings-save").assertCountEquals(0)
-        compose.onNodeWithText("Ambient mode").performScrollTo().assertIsDisplayed()
+        compose.onAllNodesWithText("Ambient mode").assertCountEquals(0)
+        compose.onAllNodesWithText("Reduce transparency").assertCountEquals(0)
+        compose.onNodeWithText("Video list density").performScrollTo().assertIsDisplayed()
         compose.onNodeWithContentDescription("Back from Appearance").assertIsDisplayed()
         screenshot("appearance-narrow-large-text")
         compose.onNodeWithContentDescription("Back from Appearance").performClick()
@@ -400,7 +399,6 @@ class AppUiSmokeTest {
         preferences(AccountPreferences(autoplay = false, continueAutoplay = false, darkMode = "dark"))
         compose.onNodeWithTag("watch-more").performScrollTo()
         screenshot("watch-native-dark")
-        compose.runOnUiThread { vm.store.reduceTransparency(true) }
         screenshot("watch-native-opaque")
     }
 

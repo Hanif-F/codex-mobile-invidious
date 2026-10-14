@@ -79,21 +79,21 @@ class AppThemePresentationTest {
         }
         item.performClick();field.assertTextContains("Retained edit")
     }
-    @Test fun appearanceMigrationRespectsExplicitAmbientAndIgnoresDormantGlassKeys() {
+    @Test fun appearanceIgnoresRetiredVisualPreferencesAndKeepsAccent() {
         val context=InstrumentationRegistry.getInstrumentation().targetContext
         val prefs=context.getSharedPreferences("mobivious",0)
-        val keys=listOf("appearance.ambientMode","appearance.accentPreset","appearance.coloredBackgrounds","appearance.adaptiveControlColors")
+        val keys=listOf("appearance.ambientMode","appearance.accentPreset","appearance.coloredBackgrounds","appearance.adaptiveControlColors","accessibility.reduceTransparency")
         val previous=keys.associateWith {prefs.all[it]}
         try {
             prefs.edit().remove(keys[0]).putString(keys[1],"unknown").putBoolean(keys[2],true).putBoolean(keys[3],true).commit()
-            assertFalse(SessionStore(context).ambientMode.value)
             assertEquals(AccentPreset.BLUE,SessionStore(context).accentPreset.value)
             for(saved in listOf(true,false)) {
-                prefs.edit().putBoolean(keys[0],saved).commit()
-                val store=SessionStore(context);assertEquals(saved,store.ambientMode.value)
+                prefs.edit().putBoolean(keys[0],saved).putBoolean(keys[4],saved).commit()
+                val store=SessionStore(context)
                 store.accentPreset(AccentPreset.TEAL)
                 assertEquals(AccentPreset.TEAL,SessionStore(context).accentPreset.value)
-                assertEquals(saved,SessionStore(context).ambientMode.value)
+                assertEquals(saved,prefs.getBoolean(keys[0],!saved))
+                assertEquals(saved,prefs.getBoolean(keys[4],!saved))
             }
         } finally {
             prefs.edit().apply {previous.forEach { (key,value) -> when(value) {

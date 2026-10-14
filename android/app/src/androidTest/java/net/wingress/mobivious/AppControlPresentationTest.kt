@@ -36,7 +36,7 @@ class AppControlPresentationTest {
         var subscribed by mutableStateOf(true)
         var changes = 0
         compose.setContent { AppTheme(dark, AccentPreset.BLUE) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides dark) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 Surface(Modifier.width(320.dp).height(850.dp)) {
                     Column(Modifier.padding(20.dp)) {
                         SubscriptionControl(subscribed, { changes++ }, busy = busy, known = known, checking = !known,
@@ -64,7 +64,7 @@ class AppControlPresentationTest {
         var selected by mutableStateOf("Popular")
         var backed = false
         compose.setContent { AppTheme(true, AccentPreset.BLUE) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides true) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 BrowseAppSurface(Modifier.width(320.dp).height(850.dp), toolbar = {
                     LibraryToolbar("History & library", back = { backed = true }, statusInset = false, backLabel = "Back from History & library", controls = {
                             AppSegments(listOf("Popular", "Trending"), selected, { it }, Modifier.fillMaxWidth(), tag = { "feed-$it" }) { selected = it }

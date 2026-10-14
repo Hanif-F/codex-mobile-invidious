@@ -131,16 +131,6 @@ class UiScrollBenchmark {
             required(By.text("Your library"))
         }
     }
-    private fun ambient(value: Boolean) {
-        scrollBounds = null
-        root("You"); openSettings(); openPreferencePage("Appearance"); scrollTo("Ambient mode")
-        var control = required(By.text("Ambient mode"))
-        while (!control.isCheckable && control.parent != null) control = control.parent
-        check(control.isCheckable) { "Ambient mode must expose a semantic switch" }
-        if (control.isChecked != value) control.click()
-        device.pressBack(); device.pressBack()
-        root("Popular")
-    }
     private fun waitForAccountPreferences() {
         val deadline = SystemClock.uptimeMillis() + 20_000
         do {
@@ -191,11 +181,10 @@ class UiScrollBenchmark {
         repeat(6) { swipe(false); SystemClock.sleep(100) }
     }
     private fun runJourney(id: String, density: String = "balanced", thin: Boolean = false,
-        cold: Boolean = false, pagination: Boolean = false, mixed: Boolean = false, ambientEnabled: Boolean = false,
+        cold: Boolean = false, pagination: Boolean = false, mixed: Boolean = false,
         downloads: Boolean = false, saving: Boolean = false,
         prepare: () -> Unit, measure: () -> Unit = ::scrollJourney) {
         currentJourney=id
-        ambient(ambientEnabled)
         fun seed() = fixture(density,thin,cold,pagination,mixed,downloads,saving)
         if (args.getString("recordVideo") == "true") {
             device.executeShellCommand("am force-stop $TARGET"); seed()
@@ -324,9 +313,6 @@ class UiScrollBenchmark {
     @Test fun watch() = runJourney("watch", prepare = {
         feed("Popular"); click("Benchmark video 000"); required(By.text("Benchmark playing video"))
         required(By.desc("Pause"))
-    })
-    @Test fun watchAmbient() = runJourney("watch-ambient", ambientEnabled = true, prepare = {
-        feed("Popular"); click("Benchmark video 000"); required(By.text("Benchmark playing video")); required(By.desc("Pause"))
     })
     @Test fun navigation() = runJourney("navigation", prepare = { feed("Popular") }, measure = {
         listOf("Trending", "Subscriptions", "You", "Popular").forEach {root(it);SystemClock.sleep(350)}

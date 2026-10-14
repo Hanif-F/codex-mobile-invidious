@@ -75,7 +75,7 @@ class SubscriptionJourneyTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestPreferences(AccountPreferences(autoplay = false)); vm.store.reduceTransparency(false); vm.refreshSharedSettings()
+            vm.store.guestPreferences(AccountPreferences(autoplay = false)); vm.refreshSharedSettings()
             vm.action { vm.login("UiViewer", "fixture-password") }
         }
         until { vm.account.value != null && vm.subscriptionChannels.value.loaded && vm.dearrowIdentity.value != null }
@@ -88,7 +88,7 @@ class SubscriptionJourneyTest {
         shell(if (handwriting == "null") "settings delete secure stylus_handwriting_enabled" else "settings put secure stylus_handwriting_enabled $handwriting")
         currentActivity()
         if (::activity.isInitialized) compose.runOnUiThread {
-            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences())
             activity.finishAndRemoveTask()
         }
     }
@@ -151,7 +151,6 @@ class SubscriptionJourneyTest {
     @Test fun darkOpaqueFeedAndExportsRetainAccessibleControls() {
         compose.runOnUiThread { vm.preferences.value = vm.preferences.value.copy(darkMode = "dark") }
         capture("subscriptions-dark")
-        compose.runOnUiThread { vm.store.reduceTransparency(true) }
         capture("subscriptions-dark-opaque")
         compose.onNodeWithTag("subscription-actions").performClick()
         compose.onNodeWithText("Export OPML").performClick()

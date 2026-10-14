@@ -28,7 +28,6 @@
 | Export fails resolution/frame-rate check | Device cannot produce the requested unchanged geometry. Save individual tracks or use a capable device; the app does not silently downscale. |
 | Export Interrupted | Process stopped during pending export. Partial output/temp file is cleaned; choose Save to files again. |
 | Local save fails | Checked preferences/database/storage operation failed. Retry after correcting device storage availability; do not assume UI changes persisted. |
-| Ambient light absent | Check toggle, Reduce transparency, system animation scale, power-save mode, hardware acceleration and expanded video visibility. Paused/no-ready-frame/mini/PiP/audio-only states may intentionally have no sampling. |
 | SponsorBlock/DeArrow/AI data absent | Optional server/community data may be missing or disabled. Check enabled settings/list status/API support. Ordinary playback remains available. |
 | Shared link does not open automatically | Manifest app-link registration covers declared Wingress hosts only. Use Android Share or paste supported URLs into Search; arbitrary instance/YouTube parsing does not mean Android auto-verifies all those hosts. |
 

@@ -94,7 +94,6 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val deviceContext = vm.api.context()
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
-    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
     val accent by vm.store.accentPreset.collectAsStateWithLifecycle()
     val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
     val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
@@ -322,7 +321,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    CompositionLocalProvider(LocalReduceTransparency provides reduceTransparency) {
+
     AppTheme(darkTheme,accent) {
       Box(Modifier.fillMaxSize()) {
         AppBackground(Modifier.fillMaxSize()) {
@@ -646,7 +645,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         }
       }
     }
-    }
+
 }
 
 @Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) {
@@ -849,8 +848,8 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
     val chatDocked = chat.open && chat.available && !chatAppearance.overlay
     val queueOpen by vm.queueExpanded.collectAsStateWithLifecycle()
     val drawerOpen = commentsOpen || chapterPanel.open || chatDocked || queueOpen
-    WatchAmbientScene(modifier.fillMaxSize(), ambientPictureBounds(presentation.watchBounds, playback.geometry.ratio)) {
-    BoxWithConstraints(Modifier.fillMaxSize().testTag("watch-content")
+
+    BoxWithConstraints(modifier.fillMaxSize().testTag("watch-content")
         .pointerInput(Unit) {
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
             awaitEachGesture { awaitFirstDown().consume(); waitForUpOrCancellation()?.consume() }
@@ -940,7 +939,7 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
             detailsContent(WatchPane.PHONE)
         }
     }
-    }
+
 }
 
 

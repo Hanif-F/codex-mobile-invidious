@@ -155,8 +155,7 @@ recovery and the distinction between server, token, device and decoder failures.
 ## Opaque UI and automatic preference intents
 
 `AppTheme` owns fixed neutral roles and six device accent presets. Native Material
-components replace all optical rendering; `WatchAmbient` alone samples bounded
-video colors when explicitly enabled. `AppScaffold` defines four roots and rail
+components use opaque neutral surfaces. `AppScaffold` defines four roots and rail
 breakpoints; `AppWindowLayout` selects a contiguous pane around an occluding hinge.
 
 `PreferenceSaveController` lives in `AppViewModel`. It retains confirmed/requested

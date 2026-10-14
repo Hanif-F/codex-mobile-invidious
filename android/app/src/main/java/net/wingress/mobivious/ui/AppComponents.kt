@@ -18,7 +18,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 
 internal val LocalInsideAppSection = staticCompositionLocalOf { false }
-internal val LocalReduceTransparency = staticCompositionLocalOf { false }
 internal val LocalContentBottomInset = staticCompositionLocalOf { 16.dp }
 internal enum class AppSurfaceRole { CONTROL, SECTION, MINI_PLAYER }
 

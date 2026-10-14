@@ -219,8 +219,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (api.context() != edit.context) throw CancellationException("Account or instance changed")
                 when (edit.key) {
                     "device:accent" -> store.accentPreset(AccentPreset.saved(patch.getString("value")))
-                    "device:ambient" -> store.ambientMode(patch.getBoolean("value"))
-                    "device:reduceTransparency" -> store.reduceTransparency(patch.getBoolean("value"))
                     "profile:background" -> store.background(patch.getBoolean("value"),edit.context)
                     "profile:pip" -> store.pip(patch.getBoolean("value"),edit.context)
                     "profile:searchVisibility" -> {
@@ -329,7 +327,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     internal fun localPreferenceValue(key: String, confirmed: Any): Any = preferenceSaves.edits.value[key]
         ?.let { JSONObject(it.requested).get("value") } ?: confirmed
-    internal fun requestAmbientMode(value: Boolean) = requestLocalPreference("device:ambient","Appearance",store.ambientMode.value,value)
     private var preferencesContext: ApiContext? = null
     private var identityGeneration = 0L
     private var browseGeneration = 0

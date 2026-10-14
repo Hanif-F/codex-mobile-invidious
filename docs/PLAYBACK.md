@@ -202,7 +202,7 @@ state. Explicit PiP uses the player command. Background disabled pauses outside
 PiP; task removal stops a paused or background-disabled service. Destruction
 closes the queue and releases controller/session/player resources.
 
-## SponsorBlock and ambient integration
+## SponsorBlock integration
 
 SponsorBlock runs in the service, evaluating at roughly 100 ms intervals. Valid
 non-live seekable online videos fetch segments once per occurrence. Overlapping
@@ -211,8 +211,5 @@ behavior on replay. Dismissal lasts within the range and resets after leaving it
 Markers/colors and brief skip confirmation are presentation state. Errors fetching
 segments are non-fatal. Clips/downloads bypass segment work.
 
-Ambient lighting is UI-owned and does not control playback. It samples a tiny
-frame into nine colors under bounded lifecycle/presentation/power gates; no frame
-is stored in application state or sent to a server. See [UI](UI.md#watch-and-ambient-lighting).
 The clip editor uses a separate preview player with carefully scoped lifetime,
 described in [Library](LIBRARY.md#clips).

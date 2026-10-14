@@ -13,7 +13,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -72,7 +71,7 @@ internal fun VideoPlayer(
     gesturesEnabled: Boolean = true, chromeVisible: Boolean = true, gestureKey: Any? = null,
     onCollapse: (() -> Unit)? = null, onRestore: (() -> Unit)? = null, onDismiss: (() -> Unit)? = null, surfaceAlpha: Float = 1f,
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
-    onChat: (() -> Unit)? = null, onVideoSurfaceChanged: (android.view.SurfaceView?) -> Unit = {},
+    onChat: (() -> Unit)? = null,
     pictureOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
@@ -89,6 +88,7 @@ internal fun VideoPlayer(
     var feedback by remember(playback.mediaId, controls) { mutableStateOf<Long?>(null) }
     var feedbackGeneration by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
+    var overflowOpen by remember(playback.mediaId, controls) { mutableStateOf(false) }
     var inputOrigin by remember { mutableStateOf(Offset.Zero) }
     val density = LocalDensity.current
     val fullscreenTopEdge by rememberUpdatedState(maxOf(with(density) { 32.dp.toPx() },
@@ -110,9 +110,9 @@ internal fun VideoPlayer(
     }
     LaunchedEffect(settingsOpen, controls) { if (settingsOpen || !controls) vm.cancelAccumulatedSeek() }
     LaunchedEffect(pendingSeek) { if (pendingSeek != null) interact() }
-    LaunchedEffect(visible, interaction, playback.playWhenReady, playback.playerState, playback.error, playback.loading, scrub != null, settingsOpen, exploring, focused, controls, pendingSeek) {
+    LaunchedEffect(visible, interaction, playback.playWhenReady, playback.playerState, playback.error, playback.loading, scrub != null, settingsOpen, overflowOpen, exploring, focused, controls, pendingSeek) {
         if (controls && visible && playback.playWhenReady && playback.playerState != Player.STATE_ENDED && playback.error == null &&
-            !playback.loading && scrub == null && !settingsOpen && !exploring && !focused && pendingSeek == null) {
+            !playback.loading && scrub == null && !settingsOpen && !overflowOpen && !exploring && !focused && pendingSeek == null) {
             delay(3000)
             visible = false
         }
@@ -126,7 +126,7 @@ internal fun VideoPlayer(
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller,
-            Modifier.fillMaxSize(), onVideoSurfaceChanged)
+            Modifier.fillMaxSize())
         else playback.details?.video?.let { video ->
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
@@ -206,6 +206,7 @@ internal fun VideoPlayer(
                 onCollapse = onCollapse?.let { collapse -> { vm.cancelAccumulatedSeek(); collapse() } },
                 onChat = onChat, chatOpen = replay.open, onRetry = { interact(); vm.retryPlayback() }, showControls = visible && chromeVisible,
                 notice = if (chromeVisible) notice else null,
+                onOverflowChanged = { overflowOpen = it },
                 modifier = Modifier.then(if (visible && chromeVisible) Modifier.testTag("player-controls") else Modifier)
                     .onFocusChanged { focused = it.hasFocus }.focusGroup(),
                 timeline = { timelineModifier, trackOffset ->
@@ -315,10 +316,6 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 @Composable
 internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
-    val savedAmbient by vm.store.ambientMode.collectAsStateWithLifecycle()
-    val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
-    val ambientMode = remember(savedAmbient, preferenceEdits) { vm.localPreferenceValue("device:ambient",savedAmbient) as Boolean }
-    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
     val formats = playback.details?.formats.orEmpty()
     val video = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_VIDEO, formats)
     val audio = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, formats)
@@ -349,21 +346,6 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     run { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
                     run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
                     run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
-                    run {
-                        Row(Modifier.fillMaxWidth().testTag("player-ambient-mode")
-                            .toggleable(ambientMode, role = Role.Switch, onValueChange = vm::requestAmbientMode)
-                            .semantics { contentDescription = "Ambient mode" }.padding(horizontal = 24.dp, vertical = 4.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Ambient mode")
-                                Text(if (reduceTransparency) "Paused while Reduce transparency is on" else "Video colors illuminate the watch view",
-                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            Switch(checked = ambientMode, onCheckedChange = null)
-                        }
-                        preferenceEdits["device:ambient"]?.let { edit -> PreferenceSaveFeedback(edit.status,edit.error,
-                            {vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)}) }
-                    }
                     run {
                         Row(Modifier.fillMaxWidth().clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Audio only", Modifier.weight(1f), color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))

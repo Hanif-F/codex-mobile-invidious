@@ -7,6 +7,32 @@ Its scope is `androidInvidious`: the Android application, benchmark module,
 tests, fixtures, build/release runners, deployment examples and documentation.
 The sibling Invidious repository is an integration boundary and is unchanged.
 
+## Watch presentation follow-up
+
+The expanded watch page now uses four filled circular action buttons with labels
+below; narrow rows reduce spacing and labels wrap without shrinking text. Portrait
+Play/Pause/Replay stays centered, using a compact footer or a secondary-control
+popup when the picture is too short. The shared player dim layer is 25%. Retired
+visual settings, decoder sampling, dedicated fixtures/tests and the corresponding
+performance journey are removed; legacy saved values have no runtime consumers.
+
+Validation on `emulator-5554` (Pixel 8 Pro AVD, Android 16/API 36): 354 JVM tests,
+27 focused device tests and 19 Python documentation/workflow tests passed, with
+no skipped cases in the focused device run. The device selection combines
+`WatchPresentationTest`, `PlayerControlsPresentationTest`,
+`PlayerFeedbackPresentationTest`, `WatchPlayerResizePresentationTest`,
+`AppSmokeTest.unifiedControlsGesturesAndFullscreen`, the two retired-setting/accent
+checks in `SettingsSmokeTest`, and the retired-preference check in
+`AppThemePresentationTest`. This covers geometry, label wrapping, RTL, opacity,
+popup actions, recreation/account changes, seeking, fullscreen/PiP and resizing.
+
+Debug/instrumentation and app/macrobenchmark APK builds passed. `lintDebug`
+reported zero errors and 20 warnings. `scripts/check-documentation.py` verifies
+the refreshed source/test catalogs and fingerprints. Current reports are under
+`android/app/build/reports/`; screenshots are in ignored `.tools/`. The full
+connected suite and the affected physical phone were not verified by this
+follow-up; the earlier full-suite baseline limitations below remain separate.
+
 ## Application inventory and preservation
 
 The `:app` module uses Kotlin/Compose, an activity-owned AndroidViewModel,
@@ -93,8 +119,8 @@ only after successful key generation. Existing release keys remain untouched.
 Workflow regression tests use disposable repositories and fake ADB/keytool tools.
 
 Removed both retired UI benchmark adapters, their source-commit override and old
-manual-save/Discover navigation branches. All nineteen current journeys remain,
-including automatic-save retry, ambient watch and gesture/video provenance gates.
+manual-save/Discover navigation branches. All eighteen current journeys remain,
+including automatic-save retry and gesture/video provenance gates.
 Settings setup now opens You, matching its actual navigation ownership. Output
 uses `.tools/ui-performance/`; this cleanup does not claim timing acceptance.
 
@@ -179,7 +205,7 @@ allow comparison without treating the current working tree as the baseline.
 
 A complete final-source connected suite was not repeated after the broad run;
 the focused suites exercise the changed paths. Physical-device/Android 13
-acceptance, accepted video conversion, all nineteen performance timing journeys
+acceptance, accepted video conversion, all eighteen performance timing journeys
 and production/server rollout were not performed. There is no physical device;
 the conversion test retains its known emulator-crash Ignore, and timing/production
 acceptance is outside this local cleanup. Build/test success does not close those
@@ -192,7 +218,7 @@ gates.
    unchanged export have separate tests.
 2. Diagnose the inherited system PiP expansion timeout. Check complete-suite
    ordering around clip playback readiness; repeat the complete suite after fixes.
-3. Measure the nineteen current performance journeys on the intended device.
+3. Measure the eighteen current performance journeys on the intended device.
    Emulator/software-renderer diagnostics cannot establish physical-device smoothness.
 4. Keep account/profile migrations and older-server response fallbacks. They protect
    existing user data and supported instance compatibility; age alone is not

@@ -92,7 +92,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                         item { AppSection {
                             SectionHeading("Preferences")
                             SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate)
-                            SettingsLink("Appearance", "Color mode, accents, ambient light and video list layout", Icons.Default.Palette, navigate)
+                            SettingsLink("Appearance", "Color mode, accents and video list layout", Icons.Default.Palette, navigate)
                             SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate)
                             SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate)
                             SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate)
@@ -143,7 +143,6 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     CompositionLocalProvider(LocalPreferenceFeedback provides { label ->
         val key = when(label) {
             "Background playback" -> "profile:background"; "Picture in picture" -> "profile:pip"
-            "Ambient mode" -> "device:ambient"; "Reduce transparency" -> "device:reduceTransparency"
             else -> settingsPreferenceKeys[label]
         }
         val edit = edits[key]
@@ -230,17 +229,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         }
                     }
                     edits["device:accent"]?.let { edit -> PreferenceSaveFeedback(edit.status,edit.error,{vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)}) }
-                    val savedAmbient by vm.store.ambientMode.collectAsStateWithLifecycle()
-                    val ambientMode = vm.localPreferenceValue("device:ambient",savedAmbient) as Boolean
-                    val savedTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
-                    val reduceTransparency = vm.localPreferenceValue("device:reduceTransparency",savedTransparency) as Boolean
-                    SettingsToggle("Ambient mode", if (reduceTransparency) "Paused while Reduce transparency is on. Your choice is saved on this device."
-                        else "Let video colors illuminate the expanded watch view. Saves on this device immediately.",
-                        ambientMode, true) { vm.requestAmbientMode(it) }
                     SettingsChoice("Video list density", listOf("balanced" to "Comfortable", "compact" to "Compact"), value.uiDensity) { update(value.copy(uiDensity = it)) }
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode) { update(value.copy(thinMode = it)) }
-                    SettingsHeading("Accessibility")
-                    SettingsToggle("Reduce transparency", "Suppress optional ambient lighting. The interface already uses solid surfaces. Saves on this device immediately.", reduceTransparency) { vm.requestLocalPreference("device:reduceTransparency","Appearance",savedTransparency,it) }
                 } }
                 "Browsing" -> {
                     item { AppSection {

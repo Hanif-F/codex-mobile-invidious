@@ -52,7 +52,7 @@ an emulator. It creates generated media in ignored `.tools/test-media`, starts
 matching ADB reverse mapping when needed, then runs JVM/device tests and debug
 lint. It rejects an occupied port or conflicting mapping and removes only its
 own server/mapping on exit. FFmpeg generates synthetic audiovisual/caption media;
-`generate-player-fixture.py` adds shapes, codec/track/ambient and download fixtures.
+`generate-player-fixture.py` adds shapes, codec/track and download fixtures.
 The runner leaves APKs installed afterward to preserve the preview's app identity
 and Android Keystore namespace. Fixture journeys still replace app preferences
 and accounts; preserve device settings before a run and restore them afterward.
@@ -85,7 +85,7 @@ threshold, scroll behavior and the accessible Refresh action. `FeedRefreshJourne
 checks the three root feeds against delayed/failed fixture requests, preserving
 rows and active filters, replacing page one, empty results and navigation during
 refresh. Player presentation tests sample known backgrounds to verify a uniform
-10% dim layer, transparent individual controls and an unobscured picture after
+25% dim layer, transparent individual controls and an unobscured picture after
 controls hide; they also retain their layout and interaction checks.
 
 Standalone checks:
@@ -202,7 +202,7 @@ per-iteration traces and exit status under `.tools/ui-performance/`.
 
 Every timing uses Full compilation and ten iterations. Fixture account/origin are
 configured through ordinary UI; account preference reads must finish before
-measurement. Warm/cold artwork, density, pagination, mixed search, watch ambient
+measurement. Warm/cold artwork, density, pagination, mixed search, watch
 and navigation have distinct scenarios. Use `scripts/summarize-ui-performance.py
 RAW_JSON --output SUMMARY_JSON` to compute the median of per-iteration P50/P90/P95/
 P99 CPU/overrun values and positive-overrun fractions without pooling frames or
@@ -223,7 +223,7 @@ from being reported. Do not record during a timing run.
 API. `trendingChanges` waits for the selected category/country's returned content;
 `settingsSaving` confirms delayed/failing toggle and speed changes. Downloads
 queues three slow fixture transfers. Warm scrolling primes artwork outside the
-measured region; cold-artwork runs use fresh URL identities. All nineteen journeys
+measured region; cold-artwork runs use fresh URL identities. All eighteen journeys
 use current controls and automatic preference saving. The runner records HEAD
 alongside the exact source archive/diff; retired UI adapters and commit overrides
 have been removed.

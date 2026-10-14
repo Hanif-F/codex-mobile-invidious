@@ -47,7 +47,6 @@ class PlayerFeedbackPresentationTest {
     private val height = mutableIntStateOf(220)
     private val fontScale = mutableFloatStateOf(1f)
     private val dark = mutableStateOf(false)
-    private val opaque = mutableStateOf(false)
     private val backdrop = mutableStateOf(Color(0xFFECEFF1))
     private val seek = mutableStateOf<Long?>(null)
     private var skipped = ""
@@ -58,8 +57,7 @@ class PlayerFeedbackPresentationTest {
     @Composable private fun Content() {
         inputModeManager = LocalInputModeManager.current
         MaterialTheme(colorScheme = if (dark.value) darkColorScheme() else lightColorScheme()) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue),
-                LocalReduceTransparency provides opaque.value) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue)) {
                 Box(Modifier.width(width.intValue.dp).height(height.intValue.dp)
                     .background(backdrop.value).testTag("feedback-surface")) {
                     PlayerControlsDim(controls.value, Modifier.matchParentSize())
@@ -85,7 +83,7 @@ class PlayerFeedbackPresentationTest {
         compose.setContent { Content() }
         for ((wide, tall, scale, full) in listOf(
             Layout(390, 220, 1f, false), Layout(320, 180, 1f, false),
-            Layout(240, 160, 2f, false), Layout(600, 340, 1f, true))) {
+            Layout(600, 340, 1f, true))) {
             compose.runOnIdle {
                 width.intValue = wide; height.intValue = tall; fontScale.floatValue = scale; fullscreen.value = full
                 controls.value = true
@@ -116,7 +114,7 @@ class PlayerFeedbackPresentationTest {
             assertTrue(hiddenPill.bottom > pill.bottom)
             assertTrue(hiddenPill.bottom <= surface.bottom - 8.dp)
         }
-        assertEquals(3, fullscreenClicks)
+        assertEquals(2, fullscreenClicks)
     }
 
     @Test fun skipAndCloseRemainAccessibleAndConfirmationIsCompact() {
@@ -143,8 +141,9 @@ class PlayerFeedbackPresentationTest {
             compose.onNodeWithTag("sponsorblock-actions").getUnclippedBoundsInRoot().top)
         captureWatchScreenshot("player-feedback-confirmation-and-actions")
         compose.runOnIdle { height.intValue = 160 }
+        compose.onNodeWithContentDescription("More player controls").performClick()
         compose.onNodeWithTag("sponsorblock-skip").assertIsDisplayed().assertHeightIsAtLeast(48.dp)
-        compose.onNodeWithTag("sponsorblock-notice").assertDoesNotExist()
+        compose.onNodeWithTag("sponsorblock-notice").assertIsDisplayed()
         compose.runOnIdle { sponsor.value = sponsor.value.copy(active = null) }
         compose.onNodeWithTag("sponsorblock-actions").assertDoesNotExist()
         compose.onNodeWithTag("sponsorblock-notice").assertIsDisplayed()
@@ -154,24 +153,23 @@ class PlayerFeedbackPresentationTest {
 
     @Test fun seekAndSponsorActionsUseTheSharedDimWithoutLocalBackings() {
         compose.setContent { Content() }
-        for ((background, night, reduce) in listOf(
-            Triple(Color.White, false, false), Triple(Color.Black, true, false), Triple(Color.White, true, true))) {
+        for ((background, night) in listOf(Color.White to false, Color.Black to true, Color.White to true)) {
             compose.runOnIdle {
-                backdrop.value = background; dark.value = night; opaque.value = reduce
+                backdrop.value = background; dark.value = night
                 sponsor.value = SponsorBlockPlayback(active = segment)
             }
             val plate = compose.onNodeWithTag("sponsorblock-actions").captureToImage().toPixelMap()
             val sample = plate[2, 2]
-            assertEquals(background.red * .9f, sample.red, .01f)
-            assertEquals(background.green * .9f, sample.green, .01f)
-            assertEquals(background.blue * .9f, sample.blue, .01f)
-            captureWatchScreenshot("player-feedback-pill-${if (night) "dark" else "light"}-${if (reduce) "opaque" else "transparent"}")
+            assertEquals(background.red * .75f, sample.red, .01f)
+            assertEquals(background.green * .75f, sample.green, .01f)
+            assertEquals(background.blue * .75f, sample.blue, .01f)
+            captureWatchScreenshot("player-feedback-pill-${if (night) "dark" else "light"}-shared-dim")
             for (offset in listOf(-10_000L, 30_000L)) {
                 compose.runOnIdle { seek.value = offset }
                 compose.onNodeWithTag("player-seek-feedback").assertTextEquals(if (offset < 0) "−10 seconds" else "+30 seconds")
                 val pixels = compose.onNodeWithTag("player-seek-feedback").captureToImage().toPixelMap()
-                assertEquals(background.red * .9f, pixels[2, pixels.height / 2].red, .01f)
-                captureWatchScreenshot("player-feedback-${if (offset < 0) "back" else "forward"}-${if (night) "dark" else "light"}-${if (reduce) "opaque" else "transparent"}")
+                assertEquals(background.red * .75f, pixels[2, pixels.height / 2].red, .01f)
+                captureWatchScreenshot("player-feedback-${if (offset < 0) "back" else "forward"}-${if (night) "dark" else "light"}-shared-dim")
             }
             compose.runOnIdle { seek.value = null }
         }

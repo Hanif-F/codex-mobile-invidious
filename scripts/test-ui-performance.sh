@@ -2,7 +2,7 @@
 # Disposable release-like UI measurements. No release package mutations.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-journeys=(popular popularCompact popularTextOnly popularColdArt searchPagination trending trendingChanges subscriptions channels search mixedSearch history playlists settings settingsSaving downloads watch watchAmbient navigation)
+journeys=(popular popularCompact popularTextOnly popularColdArt searchPagination trending trendingChanges subscriptions channels search mixedSearch history playlists settings settingsSaving downloads watch navigation)
 label='' journey=all record=false
 while [[ $# -gt 0 ]]; do
   case "$1" in

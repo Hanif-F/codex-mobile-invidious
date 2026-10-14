@@ -73,24 +73,68 @@ class SettingsSmokeTest {
         compose.onNodeWithTag("preference-status-Chat settings").assertDoesNotExist()
         assertEquals("",activity.model.preferences.value.chat.words)
     }
-    @Test fun deviceAccentAndAmbientSaveImmediatelyAndSurviveRecreationAndAccountChange() {
+    @Test fun deviceAccentSavesImmediatelyAndSurvivesRecreationAndAccountChange() {
         val previous=activity.model.store.accentPreset.value
-        val previousAmbient=activity.model.store.ambientMode.value
         try {
             open("Appearance")
             compose.onNodeWithTag("accent-teal").performScrollTo().performClick()
             assertEquals(AccentPreset.TEAL,SessionStore(activity).accentPreset.value)
             recreate()
             compose.onNodeWithTag("accent-teal").performScrollTo().assertIsSelected()
+            compose.onAllNodesWithText("Ambient mode").assertCountEquals(0)
+            compose.onAllNodesWithText("Reduce transparency").assertCountEquals(0)
             save("Appearance")
             compose.runOnUiThread {activity.model.action {activity.model.login("Fixture","transient-password")}}
             until {activity.model.account.value!=null && !activity.model.accountBusy.value}
             assertEquals(AccentPreset.TEAL,activity.model.store.accentPreset.value)
-            assertEquals(previousAmbient,activity.model.store.ambientMode.value)
-            open("Appearance");compose.onAllNodesWithText("Colored backgrounds").assertCountEquals(0)
+            open("Appearance");compose.onAllNodesWithText("Ambient mode").assertCountEquals(0)
+            compose.onAllNodesWithText("Reduce transparency").assertCountEquals(0)
+            compose.onAllNodesWithText("Colored backgrounds").assertCountEquals(0)
             compose.onAllNodesWithText("Adaptive control colors").assertCountEquals(0)
         } finally {compose.runOnUiThread {activity.model.store.accentPreset(previous)}}
     }
+    @Test fun retiredDeviceOptionsStayAbsentInAppearanceAndPlayerSettings() {
+        val saved = activity.getSharedPreferences("mobivious", 0)
+        val keys = listOf("appearance.ambientMode", "accessibility.reduceTransparency")
+        val previous = keys.associateWith { saved.all[it] }
+        try {
+            saved.edit().putBoolean(keys[0], true).putBoolean(keys[1], true).commit()
+            open("Appearance")
+            compose.onAllNodesWithText("Ambient mode").assertCountEquals(0)
+            compose.onAllNodesWithText("Reduce transparency").assertCountEquals(0)
+            recreate()
+            compose.onAllNodesWithText("Ambient mode").assertCountEquals(0)
+            compose.onAllNodesWithText("Reduce transparency").assertCountEquals(0)
+            save("Appearance")
+            compose.runOnUiThread { activity.model.play("testvideo01") }
+            until { activity.model.playback.value.details?.video?.id == "testvideo01" &&
+                activity.model.playback.value.playerState == androidx.media3.common.Player.STATE_READY }
+            compose.runOnUiThread { activity.model.controller.value?.pause() }
+            until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("mini-player-preview").performClick()
+            until { compose.onAllNodesWithContentDescription("Player settings").fetchSemanticsNodes().isNotEmpty() ||
+                compose.onAllNodesWithContentDescription("More player controls").fetchSemanticsNodes().isNotEmpty() }
+            val surface = compose.onNodeWithTag("player-surface").getUnclippedBoundsInRoot()
+            val transport = compose.onNodeWithTag("player-play-pause").getUnclippedBoundsInRoot()
+            assertEquals((surface.left.value + surface.right.value) / 2, (transport.left.value + transport.right.value) / 2, .5f)
+            assertEquals((surface.top.value + surface.bottom.value) / 2, (transport.top.value + transport.bottom.value) / 2, .5f)
+            if (compose.onAllNodesWithContentDescription("More player controls").fetchSemanticsNodes().isNotEmpty())
+                compose.onNodeWithContentDescription("More player controls").performClick()
+            compose.onNodeWithContentDescription("Player settings").performClick()
+            compose.onNodeWithTag("player-settings-list").assertExists()
+            compose.onAllNodesWithText("Ambient mode").assertCountEquals(0)
+            compose.onAllNodesWithText("Reduce transparency").assertCountEquals(0)
+            assertTrue(saved.getBoolean(keys[0], false)); assertTrue(saved.getBoolean(keys[1], false))
+            compose.onNodeWithContentDescription("Close player settings").performClick()
+        } finally {
+            saved.edit().apply { previous.forEach { (key, value) -> when (value) {
+                is Boolean -> putBoolean(key, value)
+                is String -> putString(key, value)
+                else -> remove(key)
+            } } }.commit()
+        }
+    }
+
     @Test(timeout=90_000) fun systemAppearanceChangesPreserveAutomaticPreferencePage() {
         val manager=activity.getSystemService(UiModeManager::class.java)
         val original=manager.nightMode

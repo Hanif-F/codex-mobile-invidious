@@ -18,7 +18,6 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.unit.IntOffset
@@ -157,15 +156,6 @@ internal fun PlayerPresentationHost(
     val lifecycleState by lifecycle.currentStateFlow.collectAsState()
     val replay by vm.chatReplay.collectAsStateWithLifecycle()
     val appearance by vm.chatAppearance.collectAsStateWithLifecycle()
-    val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
-    val animationsEnabled = rememberAmbientAnimationsEnabled()
-    val ambient = remember(playback.mediaId, occurrence) { WatchAmbientState() }
-    val ambientEnabled = controller != null && ambientMode && !LocalReduceTransparency.current && animationsEnabled &&
-        LocalView.current.isHardwareAccelerated && playback.videoEnabled && playback.error == null &&
-        playback.mediaId.isNotBlank() && playback.details?.video?.id == playback.mediaId
-    WatchAmbientEffects(ambient, controller, playback, ambientEnabled,
-        !hidden && !pip && state.mode == PlayerPresentation.WATCH && !state.active &&
-            lifecycleState.isAtLeast(Lifecycle.State.RESUMED))
     var chatSettings by rememberSaveable(replay.context?.server, replay.occurrence) { mutableStateOf(false) }
     val chatOverlayEditor = rememberSaveable(replay.context, replay.occurrence, saver = ChatOverlayEditor.StateSaver) { ChatOverlayEditor(appearance) }
     LaunchedEffect(replay.open, appearance.overlay, state.watch, pip, hidden) {
@@ -177,7 +167,7 @@ internal fun PlayerPresentationHost(
     val docked = chatVisible && replay.open && !appearance.overlay
     LaunchedEffect(windowSize, playback.mediaId, occurrence, pip, hidden, modal, lifecycleState) { state.cancelMotion() }
     DisposableEffect(state) { onDispose { state.cancelMotion() } }
-    CompositionLocalProvider(LocalWatchAmbient provides ambient) {
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         AppUsablePane(usablePane) { content { chatSettings = true } }
         val full = if (pip) Rect(0f, 0f, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()) else usablePane
@@ -209,7 +199,6 @@ internal fun PlayerPresentationHost(
                 chromeVisible = !state.active && !chatOverlayEditor.editing.value, gestureKey = windowSize to occurrence,
                 onCollapse = collapse, onRestore = restore, onDismiss = close,
                 onFullscreen = fullscreen, onSettings = settings, onChapters = chapters, onChat = chat,
-                onVideoSurfaceChanged = ambient::attach,
                 surfaceAlpha = if (dismissing) 1f - state.fraction else 1f,
                 pictureOverlay = {
                   if (chatVisible && replay.open && !state.active && appearance.overlay) {
@@ -232,7 +221,7 @@ internal fun PlayerPresentationHost(
             if (chatSettings && chatVisible && replay.open) ChatSettings(vm) { chatSettings = false }
         }
     }
-    }
+
 }
 
 internal fun Modifier.playerAnchor(update: (Rect) -> Unit): Modifier = onGloballyPositioned {

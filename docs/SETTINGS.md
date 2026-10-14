@@ -47,8 +47,6 @@ Defaults do not create tracks missing from the manifest or unsupported by the de
 | Accent preset | `appearance.accentPreset` | `blue` | Device-wide; blue, teal, green, violet, amber, rose. Unknown IDs use blue. |
 | List density / `uiDensity` | `ui_density` | `balanced` | Comfortable (`balanced`) or `compact`. Shared. |
 | Hide thumbnails / `thinMode` | `thin_mode` | false | Text-focused video lists, also suppresses ordinary creator artwork surfaces. Shared. |
-| Ambient mode | `appearance.ambientMode` | false when absent | Device-wide, immediate; player toggle shares the same value. |
-| Reduce transparency | `accessibility.reduceTransparency` | false | Device-wide; pauses optional ambient lighting. All interface surfaces are already opaque. |
 | Show members-only / `showMemberVideos` | `show_member_videos` | false | Visibility only; grants no access. Shared. |
 | Homepage / `defaultHome` | `default_home` | `Popular` | Empty=Search, Popular, Trending, Subscriptions, Playlists (You library). Guests choose Search/Popular/Trending. |
 | Region | `region` | `US` | Two uppercase letters; picker uses the fixed content-region catalog. Shared. |
@@ -60,10 +58,9 @@ Defaults do not create tracks missing from the manifest or unsupported by the de
 | Search include blocked | local search `includeBlocked` | false | Profile-local search visibility exception. |
 
 Accent selection does not change neutral surface roles or server Color mode.
-Ambient migration preserves explicit true/false values and treats only an absent
-or invalid key as off. Legacy Colored backgrounds and Adaptive control colors keys
+Legacy Colored backgrounds and Adaptive control colors keys
 remain dormant; neither changes the new interface. Player controls retain white
-foregrounds over local black scrims.
+foregrounds over one 25% black dim layer while controls are visible.
 
 `feed_menu` is retained in the account JSON for website compatibility (default
 Popular, Trending, Subscriptions, Playlists). It does not reconfigure the native

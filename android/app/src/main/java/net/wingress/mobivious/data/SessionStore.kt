@@ -42,16 +42,6 @@ private class SharedProfilePersistence(private val prefs: SharedPreferences, pri
 
 class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
-    /** Accessibility is local to the device, independent of the account and server. */
-    val reduceTransparency = MutableStateFlow(prefs.getBoolean("accessibility.reduceTransparency", false))
-    @Synchronized fun reduceTransparency(value: Boolean) {
-        checked(mapOf("accessibility.reduceTransparency" to value)); reduceTransparency.value = value
-    }
-    /** A visual device preference, shared by player settings and Appearance. */
-    val ambientMode = MutableStateFlow((prefs.all["appearance.ambientMode"] as? Boolean) ?: false)
-    @Synchronized fun ambientMode(value: Boolean) {
-        checked(mapOf("appearance.ambientMode" to value)); ambientMode.value = value
-    }
     val accentPreset = MutableStateFlow(AccentPreset.saved(prefs.all["appearance.accentPreset"] as? String))
     @Synchronized fun accentPreset(value: AccentPreset) {
         checked(mapOf("appearance.accentPreset" to value.id)); accentPreset.value = value

@@ -33,12 +33,11 @@ class SubscriptionPresentationTest {
 
     @Test fun narrowLargeTextFeedReflowsAndKeepsItsContentBelowChrome() {
         var dark by mutableStateOf(false)
-        var opaque by mutableStateOf(false)
         var query by mutableStateOf("")
         var opened = 0
         var submitted = 0
         compose.setContent { AppTheme(dark, AccentPreset.BLUE) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides opaque) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 BrowseAppSurface(Modifier.width(320.dp).height(850.dp), toolbar = {
                     SubscriptionFeedToolbar {}
                 }) { modifier, top ->
@@ -49,8 +48,8 @@ class SubscriptionPresentationTest {
                 }
             }
         } }
-        for ((isDark, isOpaque) in listOf(false to false, true to false, true to true)) {
-            compose.runOnIdle { dark = isDark; opaque = isOpaque }
+        for (isDark in listOf(false, true)) {
+            compose.runOnIdle { dark = isDark }
             val header = compose.onNodeWithTag("app-toolbar").fetchSemanticsNode().boundsInRoot
             val first = compose.onNodeWithTag("upload-0").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             assertTrue(first.top >= header.bottom)
@@ -60,10 +59,10 @@ class SubscriptionPresentationTest {
             compose.onNodeWithText("Clear search").performClick()
             compose.onNodeWithTag("feed").performScrollToIndex(19)
             compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
-            capture(if (isDark) "feed-narrow-dark-${if (isOpaque) "opaque" else "transparent"}-large" else "feed-narrow-light-large")
+            capture(if (isDark) "feed-narrow-dark-neutral-large" else "feed-narrow-light-large")
             compose.onNodeWithTag("feed").performScrollToIndex(0)
         }
-        assertEquals(3, opened); assertEquals(3, submitted); assertEquals("", query)
+        assertEquals(2, opened); assertEquals(2, submitted); assertEquals("", query)
     }
 
     @Test fun directoryLastRowAndCountStayAccessibleWithLargeTextAndOpaqueSurfaces() {
@@ -71,7 +70,7 @@ class SubscriptionPresentationTest {
         var query by mutableStateOf("")
         var opened = ""
         compose.setContent { AppTheme(true, AccentPreset.BLUE) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides true) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 Surface(Modifier.width(320.dp).height(850.dp)) {
                     SubscriptionChannelsScreen(SubscriptionChannelsState(loaded = true, channels = channels, query = query), "", true,
                         rememberLazyListState(), { query = it }, {}, { opened = it },

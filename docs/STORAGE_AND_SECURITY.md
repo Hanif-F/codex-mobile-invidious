@@ -8,7 +8,7 @@ Paths describe Android sandbox locations, not host repository paths.
 
 | Store | Contents and lifetime |
 | --- | --- |
-| SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide accent/ambient/transparency settings; dormant legacy colored-background/adaptive-control keys. |
+| SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide accent settings; dormant legacy colored-background/adaptive-control keys. |
 | AndroidKeyStore alias `mobivious.session` | AES key for session encryption; the key is not a checked-in file. |
 | `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions and visibility snapshots. |
 | `cacheDir/feeds/` | Selected successful feed/search response snapshots, hashed keys, bounded count/age/size. |
@@ -131,8 +131,7 @@ Server APIs necessarily receive searches, video/channel IDs, account actions and
 enabled optional-tool requests. Proxy-stream preference controls media routing;
 server settings/upstream behavior determine its remaining network path. Android
 does not independently contact public DeArrow/SponsorBlock/AiSList APIs for these
-features. Ambient frames stay on-device and are reduced to colors without disk
-storage. Clipboard/share/file-picker actions disclose only what the user chooses.
+features. Clipboard/share/file-picker actions disclose only what the user chooses.
 
 Repository secrets are local `.env`, `android/signing.properties`, keystore files
 and SDK settings; they are ignored by Git. The coverage map documents their
@@ -141,9 +140,8 @@ preserved for compatible APK updates; see [Development](DEVELOPMENT.md).
 
 ## Appearance migration and pending preference intent
 
-An unknown or absent `appearance.accentPreset` uses `blue`. An absent/invalid
-`appearance.ambientMode` uses false; explicit true and false are preserved. No
-account setting is written by device appearance migration. Legacy optical flags
+An unknown or absent `appearance.accentPreset` uses `blue`. No account setting
+is written by device appearance migration. Legacy optical flags
 remain stored but have no rendering consumers.
 
 Unconfirmed preference requests live in the ViewModel, survive configuration

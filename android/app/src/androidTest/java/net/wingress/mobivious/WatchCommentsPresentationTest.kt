@@ -23,7 +23,6 @@ class WatchCommentsPresentationTest {
 
     @Test fun opaquePanelLeavesFirstCommentReadableAndKeepsSortAndRepliesWorking() {
         val dark = mutableStateOf(false)
-        val opaque = mutableStateOf(false)
         val scale = mutableFloatStateOf(1f)
         val sort = mutableStateOf(CommentSort.TOP)
         var replies = 0
@@ -31,8 +30,7 @@ class WatchCommentsPresentationTest {
             id = "$it", replyCount = 2, replyContinuation = "replies:$it") }
         compose.setContent {
             MaterialTheme(colorScheme = if (dark.value) appColorScheme(true) else appColorScheme(false), typography = AppTokens.typography) {
-                CompositionLocalProvider(LocalReduceTransparency provides opaque.value,
-                    LocalDensity provides Density(LocalDensity.current.density, scale.floatValue)) {
+                CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale.floatValue)) {
                     CommentsPanel(CommentsState(target = CommentTarget.Video("abcdefghijk"), open = true,
                         sort = sort.value, feed = CommentFeed(CommentPage(items, count = 20), loaded = true)),
                         false, Modifier.width(320.dp).height(700.dp), {}, {}, { sort.value = it }, { _, _ -> },
@@ -53,7 +51,7 @@ class WatchCommentsPresentationTest {
         assertEquals(toolbar, compose.onNodeWithTag("comments-toolbar").getUnclippedBoundsInRoot())
         compose.onNodeWithTag("comments-sort-new").performClick().assertIsSelected()
         compose.onNodeWithTag("comment-body-0").assertIsDisplayed()
-        compose.runOnIdle { dark.value = true; opaque.value = true; scale.floatValue = 2f }
+        compose.runOnIdle { dark.value = true; scale.floatValue = 2f }
         compose.onNodeWithContentDescription("Close comments").assertIsDisplayed()
         compose.onNodeWithTag("comments-sort-new").assertIsDisplayed().assertIsSelected()
         val largeToolbar = compose.onNodeWithTag("comments-toolbar").getUnclippedBoundsInRoot()
