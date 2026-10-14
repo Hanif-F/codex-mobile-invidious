@@ -55,8 +55,8 @@ class HomeSubscriptionsSmokeTest {
         until { activity.model.route.isEmpty() && activity.model.tab == "Subscriptions" && !activity.model.browse.value.loading }
     }
     private fun directory() {
-        val tag = if(compose.onAllNodesWithTag("subscription-channels-shortcut").fetchSemanticsNodes().isNotEmpty()) "subscription-channels-shortcut" else "subscription-channels-button"
-        compose.onNodeWithTag(tag).performClick()
+        compose.revealInBrowse(hasTestTag("subscription-channels-button"))
+        compose.onNodeWithTag("subscription-channels-button").performClick()
         until { activity.model.route == "subscription-channels" && !activity.model.subscriptionChannels.value.loading }
     }
     private fun back() {
@@ -116,7 +116,7 @@ class HomeSubscriptionsSmokeTest {
         login(); subscriptions()
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Live indicator fixture"))
         compose.waitForIdle()
-        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
         directory()
         compose.onNodeWithText("Channel 00").assertIsDisplayed()
         val requests = fixture().getJSONArray("subscriptionRequests").length()
@@ -141,8 +141,10 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithText("Channel 00").assertIsDisplayed()
         screenshot("channel-directory")
         compose.navigateBack()
-        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
         compose.waitForIdle()
+        compose.onNodeWithTag("subscription-channels-button").assertIsDisplayed()
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Live indicator fixture"))
         compose.onNodeWithText("Live indicator fixture").assertIsDisplayed()
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("subscription-search"))
         compose.onNodeWithTag("subscription-search").assertIsDisplayed()
@@ -167,7 +169,9 @@ class HomeSubscriptionsSmokeTest {
     }
 
     @Test fun directoryGuestPromptAndLateReadsCannotExposeFormerAccountChannels() {
-        subscriptions(); directory()
+        subscriptions()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
+        compose.onNodeWithTag("subscription-channels-button").assertDoesNotExist()
         compose.onNodeWithText("Sign in", substring = false).assertIsDisplayed()
         assertEquals(0, fixture().getJSONArray("subscriptionRequests").length())
         login(); subscriptions(); directory()

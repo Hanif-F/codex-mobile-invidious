@@ -53,6 +53,9 @@ matching ADB reverse mapping when needed, then runs JVM/device tests and debug
 lint. It rejects an occupied port or conflicting mapping and removes only its
 own server/mapping on exit. FFmpeg generates synthetic audiovisual/caption media;
 `generate-player-fixture.py` adds shapes, codec/track/ambient and download fixtures.
+The runner leaves APKs installed afterward to preserve the preview's app identity
+and Android Keystore namespace. Fixture journeys still replace app preferences
+and accounts; preserve device settings before a run and restore them afterward.
 
 Focus a class by passing a Gradle property:
 
@@ -76,6 +79,14 @@ opaque components and preservation of open menus/focused field drafts.
 also exercises immediate saving without a shared draft, activity recreation,
 account changes and System appearance updates. Dormant optical keys are migration
 fixtures and have no rendering effect.
+
+`FeedRefreshPresentationTest` checks pull progress, cancellation, the refresh
+threshold, scroll behavior and the accessible Refresh action. `FeedRefreshJourneyTest`
+checks the three root feeds against delayed/failed fixture requests, preserving
+rows and active filters, replacing page one, empty results and navigation during
+refresh. Player presentation tests sample known backgrounds to verify a uniform
+10% dim layer, transparent individual controls and an unobscured picture after
+controls hide; they also retain their layout and interaction checks.
 
 Standalone checks:
 

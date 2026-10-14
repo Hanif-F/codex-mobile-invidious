@@ -104,15 +104,16 @@ class SubscriptionJourneyTest {
             .isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
         compose.onNodeWithTag("player-surface").assertDoesNotExist()
-        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
         capture("subscriptions-search-ime")
         compose.onNodeWithTag("subscription-search-submit").performClick()
         until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("browse-video-list").performScrollToIndex(2)
         compose.onNodeWithTag("browse-video-list").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.ScrollBy) { it(0f, 120f) }
-        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
         capture("subscriptions-scrolled-mini")
-        compose.onNodeWithTag("subscription-channels-shortcut").performClick()
+        compose.revealInBrowse(hasTestTag("subscription-channels-button"))
+        compose.onNodeWithTag("subscription-channels-button").performClick()
         until { vm.route == "subscription-channels" && !vm.subscriptionChannels.value.loading }
         capture("channels-light")
         compose.onNodeWithTag("subscription-channel-list").performScrollToIndex(15)
@@ -160,7 +161,8 @@ class SubscriptionJourneyTest {
         compose.onNodeWithText("Save file").assertIsDisplayed()
         capture("subscriptions-opml-dark-opaque")
         compose.onNodeWithContentDescription("Close feed").assertWidthIsAtLeast(48.dp).performClick()
-        compose.onNodeWithTag("subscription-channels-shortcut").performClick()
+        compose.revealInBrowse(hasTestTag("subscription-channels-button"))
+        compose.onNodeWithTag("subscription-channels-button").performClick()
         until { vm.route == "subscription-channels" && !vm.subscriptionChannels.value.loading }
         capture("channels-dark-opaque")
         compose.onNodeWithTag("subscription-channel-search").performTextInput("Mobivious")
@@ -179,7 +181,8 @@ class SubscriptionJourneyTest {
         val second = compose.onNodeWithTag("video-card-testvideo02").fetchSemanticsNode().boundsInRoot
         assertEquals(first.top, second.top, 1f); assertTrue(second.left >= first.right)
         capture("subscriptions-wide")
-        compose.onNodeWithTag("subscription-channels-shortcut").performClick()
+        compose.revealInBrowse(hasTestTag("subscription-channels-button"))
+        compose.onNodeWithTag("subscription-channels-button").performClick()
         until { vm.route == "subscription-channels" && !vm.subscriptionChannels.value.loading }
         val directory = compose.onNodeWithTag("subscription-channel-list").fetchSemanticsNode().boundsInRoot
         val maxWidth = 800 * activity.resources.displayMetrics.density
@@ -188,13 +191,14 @@ class SubscriptionJourneyTest {
         shell("settings put global animator_duration_scale 0")
         compose.navigateBack()
         until { vm.route.isEmpty() && vm.tab == "Subscriptions" }
-        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
         shell("wm density 640"); shell("settings put system font_scale 1.5")
         until { currentActivity(); activity.resources.configuration.screenWidthDp <= 360 && activity.resources.configuration.fontScale >= 1.49f }
         feed()
         capture("subscriptions-narrow-large")
         compose.runOnUiThread { vm.preferences.value = vm.preferences.value.copy(thinMode = true) }
-        compose.onNodeWithTag("subscription-channels-shortcut").performClick()
+        compose.revealInBrowse(hasTestTag("subscription-channels-button"))
+        compose.onNodeWithTag("subscription-channels-button").performClick()
         until { vm.route == "subscription-channels" && !vm.subscriptionChannels.value.loading }
         capture("channels-narrow-large-thin")
     }

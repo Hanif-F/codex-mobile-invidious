@@ -170,6 +170,9 @@ messages are bounded to 300 characters; 5xx gets a retryable server message.
 Only GET Popular, Trending, Search and authenticated Feed have disk snapshots.
 Keys include the full URL and, for authenticated feeds, token identity. Network
 IO/5xx failures may use a snapshot younger than 24 hours; 4xx errors never do.
+Explicit root-feed refresh disables this fallback so failure retains the currently
+displayed rows and reports Retry. Normal browsing keeps its existing cached-results
+behavior; successful refresh responses still update the snapshot.
 Successful cached-endpoint bodies are shape-validated before storage. Other reads
 and all writes have no offline mutation queue. See [Storage](STORAGE_AND_SECURITY.md).
 

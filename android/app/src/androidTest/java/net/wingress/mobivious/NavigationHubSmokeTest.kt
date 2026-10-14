@@ -101,6 +101,8 @@ class NavigationHubSmokeTest {
         assertEquals(trending.position, vm.browse.value.position)
         compose.openAppSettings()
         back()
+        assertEquals("You", vm.tab)
+        tab("Trending")
         assertEquals(trending.position,vm.browse.value.position)
         val requests=fixture().getJSONArray("discoveryRequests").length()
         tab("Trending")
@@ -313,7 +315,9 @@ class NavigationHubSmokeTest {
             until { currentActivity(); activity.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
             screenshot("you-landscape-large-text")
             tab("Trending")
-            compose.onNodeWithTag("feed-refresh").assertIsDisplayed()
+            compose.onNodeWithTag("feed-refresh").assertDoesNotExist()
+            compose.onNodeWithTag("global-settings").assertDoesNotExist()
+            compose.onNodeWithTag("feed-refresh-container").assertIsDisplayed()
             compose.onNodeWithTag("navigation-Trending").assertIsSelected()
             screenshot("trending-landscape-large-text")
         } finally {

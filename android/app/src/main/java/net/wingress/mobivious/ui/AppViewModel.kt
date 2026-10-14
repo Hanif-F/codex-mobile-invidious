@@ -42,6 +42,7 @@ import net.wingress.mobivious.player.VideoSelection
 import net.wingress.mobivious.player.VideoGeometry
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
+    val refreshing: Boolean = false,
     val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
     val history: HistoryPage? = null, val clips: List<Clip> = emptyList(), val lists: List<Playlist> = emptyList(),
     val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
@@ -710,7 +711,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             searchInput.value = saved.search; searchType.value = saved.searchType
             sort = saved.searchSort; date = saved.searchDate; durationFilter = saved.searchDuration
         }
-        browse.value = saved.browse.copy(loading = false)
+        browse.value = saved.browse.copy(loading = false, refreshing = false)
         navigation.value = tab to route; restoredBrowse.value++
         if (route == "subscription-channels") refreshSubscriptions()
         if (saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
@@ -909,6 +910,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         selectTab(if (value == "trending") "Trending" else "Popular")
     }
     fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow); refreshWatched() }
+    /** Refresh the current root feed without clearing its rows or restarting an active request. */
+    fun refreshFeed() {
+        if (route.isNotEmpty() || tab !in listOf("Popular", "Trending", "Subscriptions") ||
+            tab == "Subscriptions" && account.value == null || browse.value.loading) return
+        dearrowTitles.clear()
+        load(false, retainFeed = true)
+        playback.value.details?.video?.id?.let(::ensureDeArrow)
+        refreshWatched()
+    }
     private fun refreshWatched() {
         if (preferencesContext == api.context()) app.watched.configure(api.context(), preferences.value.savePosition)
         viewModelScope.launch { app.watched.refresh() }
@@ -922,7 +932,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         action { app.watched.clearHistory(context); if (api.context() == context) refresh() }
     }
     fun more() = load(true)
-    fun retryBrowse() = load(browse.value.retryMore, refreshChannel = false)
+    fun retryBrowse() {
+        if (!browse.value.retryMore && route.isEmpty() && tab in listOf("Popular", "Trending", "Subscriptions")) refreshFeed()
+        else load(browse.value.retryMore, refreshChannel = false)
+    }
     fun selectChannelTab(value: ChannelTab) {
         val info = channel.value ?: return
         if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value && scopedSearch.value.submitted.isBlank()) return
@@ -939,7 +952,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             load(false, refreshChannel = false)
         }
     }
-    private fun load(more: Boolean, refreshChannel: Boolean = true) {
+    private fun load(more: Boolean, refreshChannel: Boolean = true, retainFeed: Boolean = false) {
         if (route == "downloads") { browseJob?.cancel(); browseGeneration++; browse.value = BrowseState(title = "Downloaded", end = true); downloads.refresh(); return }
 
         if (route == "subscription-channels") {
@@ -953,7 +966,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browseJob?.cancel()
         val generation = ++browseGeneration
         val old = if (more) browse.value else BrowseState()
-        if (!more) browseReset.value++
+        val displayed = if (retainFeed) browse.value else old
+        if (!more && !retainFeed) browseReset.value++
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
         val selectedDiscovery = discovery.value; val selectedRegion = preferences.value.region; val selectedCategory = trendingCategory.value
@@ -963,7 +977,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         val selectedPostLink = postDetail.value.link ?: selectedRoute.takeIf { it.startsWith("post:") }?.let { PostLink(it.substringAfter(':')) }
-        browse.value = old.copy(loading = true, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
+        browse.value = displayed.copy(loading = true, refreshing = retainFeed, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
                 var continuation = ""
@@ -1066,25 +1080,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     selectedTab == "Subscriptions" -> if (context.account == null) emptyList() else if (scopedQuery.isNotBlank()) {
                         val response = api.subscriptionSearch(scopedQuery, page, context)
                         hasMore = response.hasMore; response.items
-                    } else api.feed(page, preferences.value.notificationsOnly)
+                    } else api.feed(page, preferences.value.notificationsOnly, allowCachedFallback = !retainFeed)
                     selectedRoute == "sign-in" -> emptyList()
                     selectedTab == "You" -> { if (context.account != null) { val loaded = api.playlists(context); if (context == api.context() && revision == playlistRevision) playlists.value = loaded }; emptyList() }
-                    else -> api.discovery(selectedDiscovery, selectedRegion, selectedCategory, context)
+                    else -> api.discovery(selectedDiscovery, selectedRegion, selectedCategory, context, allowCachedFallback = !retainFeed)
                 }
                 if (generation == browseGeneration && context == api.context()) aiFilter.prepare(
                     (videos + clips.map { it.video }).map { it.channelId }, preferences.value.aiFilter, AiPageGroup.browsing(selectedTab, selectedRoute))
-                if (generation == browseGeneration && context == api.context()) browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, page = page,
-                    continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
-                    posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id },
-                    searchResults = SearchResults.merge(old.searchResults, searchResults), searchKeys = old.searchKeys + searchKeys,
-                    retryMore = false, end = if (selectedTab == "Search" && selectedRoute.isEmpty()) hasMore != true else if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
-                        PreferenceRules.isDiscovery(selectedTab) && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
-                        selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
+                if (generation == browseGeneration && context == api.context()) {
+                    browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, refreshing = false, page = page,
+                        continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
+                        posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id },
+                        searchResults = SearchResults.merge(old.searchResults, searchResults), searchKeys = old.searchKeys + searchKeys,
+                        position = if (retainFeed) CommentPosition() else browse.value.position,
+                        retryMore = false, end = if (selectedTab == "Search" && selectedRoute.isEmpty()) hasMore != true else if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
+                            PreferenceRules.isDiscovery(selectedTab) && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
+                            selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
+                    if (retainFeed) browseReset.value++
+                }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 if (generation == browseGeneration && context == api.context()) {
-                    browse.value = browse.value.copy(loading = false, error = friendly(e), retryMore = more)
+                    browse.value = browse.value.copy(loading = false, refreshing = false, error = friendly(e), retryMore = more)
                     if (selectedRoute.startsWith("post:")) postDetail.value = postDetail.value.copy(loading = false, error = friendly(e))
                 }
+            } finally {
+                if (generation == browseGeneration && context == api.context() && browse.value.refreshing)
+                    browse.value = browse.value.copy(loading = false, refreshing = false)
             }
         }
     }

@@ -7,8 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
@@ -57,14 +56,6 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
             maxHeight / 2 + size / 2 <= maxHeight - occupiedBottom - 1.dp
         val centerSize = if (centerFits(64.dp)) 64.dp else 48.dp
         val centered = centerFits(centerSize)
-        if(showControls) {
-            val fade=with(density) {96.dp.toPx()}
-            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(headerHeight+96.dp)
-                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.72f),Color.Black.copy(alpha=.72f),Color.Transparent),
-                    startY=with(density){headerHeight.toPx()},endY=with(density){headerHeight.toPx()}+fade)))
-            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(footerHeight+96.dp)
-                .background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.72f)),endY=fade)))
-        }
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
             AnimatedVisibility(showControls && !sharedHeader, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) {
                 PlayerControlHeader(playback, fullscreen, settingsEnabled, onSettings,
@@ -183,6 +174,13 @@ internal fun PlayerTime(playback: PlaybackState, positionMs: Long, modifier: Mod
 
 internal val PlayerTextShadow = Shadow(Color.Black.copy(alpha = .8f), Offset(0f, 1f), 3f)
 
+/** One continuous dim layer, behind every on-picture overlay and never a touch target. */
+@Composable
+internal fun PlayerControlsDim(visible: Boolean, modifier: Modifier = Modifier) {
+    val alpha by animateFloatAsState(if (visible) .10f else 0f, tween(160), label = "player-controls-dim")
+    Box(modifier.background(Color.Black.copy(alpha = alpha)).testTag("player-controls-dim"))
+}
+
 @Composable
 internal fun PlayerControlHeader(playback: PlaybackState, fullscreen: Boolean, settingsEnabled: Boolean,
     onSettings: () -> Unit, modifier: Modifier = Modifier, onCollapse: (() -> Unit)? = null,
@@ -229,7 +227,7 @@ internal fun PlayerPlayControl(playback: PlaybackState, modifier: Modifier = Mod
     val ended = playback.playerState == Player.STATE_ENDED
     val icon = if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow
     val description = if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play"
-    AppInsetIconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.background(Color.Black.copy(alpha=.72f),RoundedCornerShape(12.dp)).testTag("player-play-pause")) {
+    AppInsetIconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.testTag("player-play-pause")) {
         PlayerIcon(icon, description, size = 36.dp, enabled = playback.canPlay)
         if (playback.buffering) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Buffering" },
             color = Color.White, strokeWidth = 2.dp)

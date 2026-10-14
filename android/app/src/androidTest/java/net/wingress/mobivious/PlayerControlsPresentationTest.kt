@@ -49,6 +49,8 @@ class PlayerControlsPresentationTest {
     private val height = mutableIntStateOf(180)
     private val fontScale = mutableFloatStateOf(1f)
     private val direction = mutableStateOf(LayoutDirection.Ltr)
+    private val controlsVisible = mutableStateOf(true)
+    private val backdrop = mutableStateOf(Color(0xFF535862))
     private var chapterClicks = 0
     private var settingsClicks = 0
     private var playClicks = 0
@@ -60,14 +62,15 @@ class PlayerControlsPresentationTest {
         MaterialTheme {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue),
                 LocalLayoutDirection provides direction.value) {
-                Box(Modifier.width(width.intValue.dp).height(height.intValue.dp).testTag("controls-surface").background(Color(0xFF535862))) {
+                Box(Modifier.width(width.intValue.dp).height(height.intValue.dp).testTag("controls-surface").background(backdrop.value)) {
+                    PlayerControlsDim(controlsVisible.value, Modifier.matchParentSize())
                     PlayerControlsLayout(playback.value, position.longValue, fullscreen.value, true,
                         onPlay = {
                             playClicks++
                             playback.value = playback.value.copy(playWhenReady = !playback.value.playWhenReady)
                         }, onSettings = { settingsClicks++ },
                         onFullscreen = { fullscreen.value = !fullscreen.value }, onChapters = { chapterClicks++ },
-                        onCollapse = {}, onChat = {}, onRetry = { retries++ }, timeline = { modifier, trackOffset ->
+                        onCollapse = {}, onChat = {}, onRetry = { retries++ }, showControls = controlsVisible.value, timeline = { modifier, trackOffset ->
                             Box(modifier.testTag("test-timeline")) {
                                 Box(Modifier.align(Alignment.Center).fillMaxWidth().offset(y = trackOffset).height(3.dp).testTag("test-seek-track"))
                             }
@@ -162,16 +165,22 @@ class PlayerControlsPresentationTest {
         compose.onNodeWithTag("player-chat").assertDoesNotExist()
     }
 
-    @Test fun playerScrimsKeepWhiteControlsLegibleWithoutLosingTouchTargets() {
+    @Test fun oneTenPercentDimCoversThePictureWithoutLocalControlBackings() {
         height.intValue = 320
         playback.value = playback.value.copy(details = playback.value.details!!.copy(liveChatReplay = true))
         var opaque by mutableStateOf(false)
         compose.setContent {
             CompositionLocalProvider(LocalReduceTransparency provides opaque) { Content() }
         }
-        val expected = Color(0xFF535862)
-        for (reduce in listOf(false, true)) {
-            compose.runOnIdle { opaque = reduce }
+        for ((background, reduce) in listOf(Color(0xFF535862) to false, Color.White to false,
+            Color(0xFFF3E4C9) to true, Color(0xFF142536) to true)) {
+            compose.runOnIdle { opaque = reduce; backdrop.value = background; controlsVisible.value = true }
+            compose.mainClock.advanceTimeBy(200)
+            fun assertDim(color: Color) {
+                assertEquals(background.red * .9f, color.red, .012f)
+                assertEquals(background.green * .9f, color.green, .012f)
+                assertEquals(background.blue * .9f, color.blue, .012f)
+            }
             for (control in listOf(
                 compose.onNodeWithTag("player-play-pause"),
                 compose.onNodeWithContentDescription("Player settings"),
@@ -182,13 +191,17 @@ class PlayerControlsPresentationTest {
                 control.assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
                 val pixels = control.captureToImage().toPixelMap()
                 val color = pixels[(pixels.width * .1f).toInt(), pixels.height / 2]
-                assertTrue("Player controls need a dark local scrim", color.red < expected.red * .35f && color.green < expected.green * .35f && color.blue < expected.blue * .35f)
+                assertDim(color)
             }
             val pixels = compose.onNodeWithTag("controls-surface").captureToImage().toPixelMap()
-            for (y in listOf(1, pixels.height - 2)) {
-                assertTrue(pixels[pixels.width / 2,y].red < expected.red * .35f)
-                assertTrue(pixels[pixels.width / 2,y].blue < expected.blue * .35f)
-            }
+            for (y in listOf(1, pixels.height / 2, pixels.height - 2)) assertDim(pixels[1, y])
+            compose.runOnIdle { controlsVisible.value = false }
+            compose.mainClock.advanceTimeBy(200)
+            compose.onNodeWithTag("player-play-pause").assertDoesNotExist()
+            val clear = compose.onNodeWithTag("controls-surface").captureToImage().toPixelMap()[1, 1]
+            assertEquals(background.red, clear.red, .01f)
+            assertEquals(background.green, clear.green, .01f)
+            assertEquals(background.blue, clear.blue, .01f)
         }
         captureWatchScreenshot("player-background-icons-only")
     }

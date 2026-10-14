@@ -402,8 +402,6 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             })
                         else if (discoveryPage) LibraryToolbar(tab, actions = {
                             AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
-                            AppIconButton(Icons.Default.Settings,"Settings",Modifier.testTag("global-settings")) { vm.settingsOpened(); settingsPage="Settings" }
-                            AppIconButton(Icons.Default.Refresh, "Refresh $tab", Modifier.testTag("feed-refresh"), enabled = !state.loading, onClick = vm::refresh)
                         }, controls = {
                             if (tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
                         })
@@ -421,11 +419,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             if(filterLabels.isNotEmpty()) Text(filterLabels.joinToString(" · "),Modifier.testTag("search-filter-summary"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
 
                         })
-                        else if (subscriptionFeed) SubscriptionFeedToolbar(account != null, scopedSearch.draft, scopedSearch.submitted, state.loading,
-                            { vm.editSearch(it, true) }, { vm.submitSearch(true) }, vm::clearScopedSearch, vm::refresh,
-                            { navigate("Subscriptions", "subscription-channels") }, { dialog = "visibilityFilters" }) {
+                        else if (subscriptionFeed) SubscriptionFeedToolbar {
                             AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
-                            AppIconButton(Icons.Default.Settings,"Settings",Modifier.testTag("global-settings")) { vm.settingsOpened(); settingsPage="Settings" }
                             if(account!=null) OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
                                 DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
                                 DropdownMenuItem(text = { Text("Export OPML") }, onClick = { close(); vm.openOpml() })
@@ -436,7 +431,10 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             { vm.editSearch(it, true) }, { vm.submitSearch(true) }, vm::clearScopedSearch, vm::selectChannelTab,
                             vm::setChannelVideoSort, vm::setChannelPlaylistSort) { AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch) }
                     }) { browseModifier, browseTopInset ->
-                Column(browseModifier.padding(top = if (titledBrowsePage) 0.dp else padding.calculateTopPadding())
+                key(selectedTab, deviceContext) {
+                FeedRefreshContainer(discoveryPage || subscriptionFeed && account != null,
+                    state.refreshing, state.loading, tab, vm::refreshFeed, browseModifier) {
+                Column(Modifier.fillMaxSize().padding(top = if (titledBrowsePage) 0.dp else padding.calculateTopPadding())
                     .then(if (libraryPage) Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 800.dp) else Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max=1200.dp)).fillMaxSize()) {
                     if(offline && !titledBrowsePage) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (route == "downloads") DownloadedScreen(vm, browseList, browseTopInset) { id -> openPlayer(); vm.playDownload(id) }
@@ -574,7 +572,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                               }
                             }
                         }
-                        if (state.loading) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                        if (state.loading && !state.refreshing) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                         if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty() && state.searchResults.isEmpty()) LibraryActionButton("Configure server", Modifier.padding(horizontal = 16.dp)) { dialog = ""; settingsPage = "Server" } }
                         if (!state.loading && (if (generalSearch) vm.visibleSearchResults(state.searchResults).isEmpty() && state.searchResults.isNotEmpty() else visibleVideos.isEmpty() && state.videos.isNotEmpty())) item {
                             Column(Modifier.padding(16.dp)) {
@@ -586,9 +584,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty() &&
                             state.clips.isEmpty() && route != "clips" && !(channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank())) item { EmptyState(
                             if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
-                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", if (tab == "Search" && search.submitted.isBlank()) "" else "Refresh", vm::refresh) }
+                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", if (tab == "Search" && search.submitted.isBlank()) "" else "Refresh", if (discoveryPage || subscriptionFeed) vm::refreshFeed else vm::refresh) }
                         if (!state.end && !state.loading && state.error == null) item { LibraryActionButton("Load more", Modifier.fillMaxWidth(), onClick = vm::more) }
                     }
+                }
+                }
                 }
                 }
                 }

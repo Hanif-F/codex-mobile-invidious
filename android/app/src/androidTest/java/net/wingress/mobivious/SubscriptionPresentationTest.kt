@@ -40,7 +40,7 @@ class SubscriptionPresentationTest {
         compose.setContent { AppTheme(dark, AccentPreset.BLUE) {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f), LocalReduceTransparency provides opaque) {
                 BrowseAppSurface(Modifier.width(320.dp).height(850.dp), toolbar = {
-                    SubscriptionFeedToolbar(true, query, "", false, { query = it }, { submitted++ }, { query = "" }, {}, { opened++ }, {}) {}
+                    SubscriptionFeedToolbar {}
                 }) { modifier, top ->
                     LazyColumn(modifier.testTag("feed"), contentPadding = PaddingValues(top = top)) {
                         item { SubscriptionFeedControls(true,query,"",{query=it},{submitted++},{query=""},{opened++},{}) }
@@ -59,7 +59,7 @@ class SubscriptionPresentationTest {
             compose.onNodeWithTag("subscription-search-submit").performClick()
             compose.onNodeWithText("Clear search").performClick()
             compose.onNodeWithTag("feed").performScrollToIndex(19)
-            compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+            compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
             capture(if (isDark) "feed-narrow-dark-${if (isOpaque) "opaque" else "transparent"}-large" else "feed-narrow-light-large")
             compose.onNodeWithTag("feed").performScrollToIndex(0)
         }

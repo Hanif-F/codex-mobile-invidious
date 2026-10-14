@@ -63,6 +63,7 @@ class PlayerFeedbackPresentationTest {
                 LocalReduceTransparency provides opaque.value) {
                 Box(Modifier.width(width.intValue.dp).height(height.intValue.dp)
                     .background(backdrop.value).testTag("feedback-surface")) {
+                    PlayerControlsDim(controls.value, Modifier.matchParentSize())
                     val offset = seek.value
                     if (offset != null) PlayerSeekFeedback(offset,
                         Modifier.align(if (offset < 0) AbsoluteAlignment.CenterLeft else AbsoluteAlignment.CenterRight)
@@ -152,7 +153,7 @@ class PlayerFeedbackPresentationTest {
         compose.onNodeWithTag("sponsorblock-prompt").assertDoesNotExist()
     }
 
-    @Test fun seekKeepsPictureVisibleAndSponsorHasALegibleLocalScrim() {
+    @Test fun seekAndSponsorActionsUseTheSharedDimWithoutLocalBackings() {
         compose.setContent { Content() }
         for ((background, night, reduce) in listOf(
             Triple(Color.White, false, false), Triple(Color.Black, true, false), Triple(Color.White, true, true))) {
@@ -161,14 +162,16 @@ class PlayerFeedbackPresentationTest {
                 sponsor.value = SponsorBlockPlayback(active = segment)
             }
             val plate = compose.onNodeWithTag("sponsorblock-actions").captureToImage().toPixelMap()
-            val sample = plate[plate.width / 2, plate.height / 2]
-            assertTrue("Sponsor actions need a dark scrim in every appearance", sample.red <= .3f && sample.green <= .3f && sample.blue <= .3f)
+            val sample = plate[2, 2]
+            assertEquals(background.red * .9f, sample.red, .01f)
+            assertEquals(background.green * .9f, sample.green, .01f)
+            assertEquals(background.blue * .9f, sample.blue, .01f)
             captureWatchScreenshot("player-feedback-pill-${if (night) "dark" else "light"}-${if (reduce) "opaque" else "transparent"}")
             for (offset in listOf(-10_000L, 30_000L)) {
                 compose.runOnIdle { seek.value = offset }
                 compose.onNodeWithTag("player-seek-feedback").assertTextEquals(if (offset < 0) "−10 seconds" else "+30 seconds")
                 val pixels = compose.onNodeWithTag("player-seek-feedback").captureToImage().toPixelMap()
-                assertEquals(background.red, pixels[2, pixels.height / 2].red, .01f)
+                assertEquals(background.red * .9f, pixels[2, pixels.height / 2].red, .01f)
                 captureWatchScreenshot("player-feedback-${if (offset < 0) "back" else "forward"}-${if (night) "dark" else "light"}-${if (reduce) "opaque" else "transparent"}")
             }
             compose.runOnIdle { seek.value = null }

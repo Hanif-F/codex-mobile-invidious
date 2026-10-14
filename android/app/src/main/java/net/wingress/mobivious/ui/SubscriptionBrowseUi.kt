@@ -17,16 +17,8 @@ import net.wingress.mobivious.data.ChannelSort
 import net.wingress.mobivious.data.ChannelTab
 
 @Composable
-internal fun SubscriptionFeedToolbar(signedIn: Boolean, query: String, submitted: String, loading: Boolean,
-    edit: (String) -> Unit, submit: () -> Unit, clear: () -> Unit, refresh: () -> Unit,
-    channels: () -> Unit, visibility: () -> Unit, actions: @Composable RowScope.() -> Unit) {
-    BrowsePageTitle("Subscriptions", actions = {
-        AppIconButton(Icons.Default.Subscriptions, "Channels", Modifier.testTag("subscription-channels-shortcut"), onClick = channels)
-        if (signedIn) {
-            AppIconButton(Icons.Default.Refresh, "Refresh subscriptions", Modifier.testTag("subscription-refresh"), enabled = !loading, onClick = refresh)
-        }
-        actions()
-    })
+internal fun SubscriptionFeedToolbar(actions: @Composable RowScope.() -> Unit) {
+    BrowsePageTitle("Subscriptions", actions = actions)
 }
 
 @Composable

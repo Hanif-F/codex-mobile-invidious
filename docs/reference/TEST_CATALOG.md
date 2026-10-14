@@ -311,6 +311,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/NetworkReliabilityTest.kt) — Network Reliability declared scenarios; exact cases are enumerated in the test catalog.
 
+- `explicitRefreshReportsFailuresWithoutDiscardingTheNormalOfflineFallback`
 - `cancellingAResponseBodyReleasesTheCallAndDoesNotPublishOrCache`
 - `oldSessionSuccessAndFailureCannotChangeSnapshotsOrOfflineStatus`
 - `successfulHtmlDoesNotPoisonTheLastUsableFeed`
@@ -894,6 +895,24 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `combinedExportHasBothTracksAndDecliningConversionStartsNoExport`
 - `acceptedVideoConversionPreservesResolutionFrameRateAndBothTracks`
 
+### FeedRefreshJourneyTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/FeedRefreshJourneyTest.kt) — Root toolbar actions and retained first-page refresh across failure, empty results, navigation, Trending filters and subscription pagination/search.
+
+- `rootToolbarsKeepSearchAndYouOwnsSettings`
+- `refreshRetainsRowsReplacesPageOneAndRecoversFromFailureAndEmptyResults`
+- `navigatingAwayCancelsRefreshAndLateResponsesCannotReplaceTheOtherFeed`
+- `refreshKeepsTrendingFiltersAndSubscriptionSearchAndSeparatesPagination`
+
+### FeedRefreshPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/FeedRefreshPresentationTest.kt) — Pull indicator progress, threshold/cancellation gestures, scrolling, loading guards and accessible refresh actions.
+
+- `partialPullShowsProgressAndReleasingBelowThresholdCancels`
+- `thresholdPullRefreshesOnceAndStopsWhenTheRequestFinishes`
+- `scrollingTowardTheTopDoesNotRefreshUntilThereIsATopPull`
+- `accessibilityRefreshSharesTheLoadingGuardAndDisabledFeedsHaveNoAction`
+
 ### HomeSubscriptionsSmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/HomeSubscriptionsSmokeTest.kt) — Home Subscriptions Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -1007,7 +1026,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 - `measuredChromeKeepsTransportCenteredOrInHeaderAboveFullWidthSeeking`
 - `noSeekButtonsAndChatStaysToTheLeftOfSettings`
-- `playerScrimsKeepWhiteControlsLegibleWithoutLosingTouchTargets`
+- `oneTenPercentDimCoversThePictureWithoutLocalControlBackings`
 - `multiHourTimestampCompactsAtLargeFontsWithoutLosingChapterOrSeeking`
 - `loadingAndRetryRemainInsideTheRailInShallowVideo`
 - `chapterTracksScrubbingAndSupportsClickAndKeyboardWithoutDisplacingSettings`
@@ -1020,7 +1039,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 - `compactActionsStayAtBottomLeftAndClearTheTimelineAndOtherControls`
 - `skipAndCloseRemainAccessibleAndConfirmationIsCompact`
-- `seekKeepsPictureVisibleAndSponsorHasALegibleLocalScrim`
+- `seekAndSponsorActionsUseTheSharedDimWithoutLocalBackings`
 
 ### PlaylistRssSmokeTest
 
@@ -1234,4 +1253,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **722 declared test methods** (including ignored tests).
+Inventory total: **731 declared test methods** (including ignored tests).

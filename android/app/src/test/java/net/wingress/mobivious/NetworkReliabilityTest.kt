@@ -11,6 +11,35 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NetworkReliabilityTest {
+    @Test fun explicitRefreshReportsFailuresWithoutDiscardingTheNormalOfflineFallback() = runBlocking {
+        for (authenticated in listOf(false, true)) MockWebServer().use { server ->
+            val directory = Files.createTempDirectory("mobivious-refresh-network").toFile()
+            try {
+                val address = server.url("/").toString().trimEnd('/')
+                val account = if (authenticated) Account("fixture", "Viewer", Long.MAX_VALUE, address) else null
+                val events = mutableListOf<Boolean>()
+                val api = InvidiousApi({ address }, { account }, cache = ResponseCache(directory), onOffline = { events.add(it) })
+                val read: suspend (Boolean) -> List<Video> = if (authenticated)
+                    { fallback -> api.feed(1, allowCachedFallback = fallback) }
+                else { fallback -> api.discovery("popular", allowCachedFallback = fallback) }
+                val rows = "[{\"videoId\":\"testvideo01\",\"title\":\"Saved\"}]"
+                server.enqueue(MockResponse().setBody(if (authenticated) "{\"videos\":$rows}" else rows))
+                assertEquals("Saved", read(true).single().title)
+                val snapshot = directory.listFiles()!!.single().readText()
+                for (response in listOf(MockResponse().setResponseCode(503).setBody("{\"error\":\"Try again\"}"),
+                    MockResponse().setBody("<html>Proxy failure</html>"))) {
+                    server.enqueue(response)
+                    assertTrue(runCatching { read(false) }.exceptionOrNull() is ApiException)
+                    assertEquals(snapshot, directory.listFiles()!!.single().readText())
+                    assertEquals(listOf(false), events)
+                }
+                server.enqueue(MockResponse().setResponseCode(503))
+                assertEquals("Saved", read(true).single().title)
+                assertEquals(listOf(false, true), events)
+            } finally { directory.deleteRecursively() }
+        }
+    }
+
     @Test fun cancellingAResponseBodyReleasesTheCallAndDoesNotPublishOrCache() = runBlocking {
         MockWebServer().use { server ->
             val directory = Files.createTempDirectory("mobivious-network").toFile()

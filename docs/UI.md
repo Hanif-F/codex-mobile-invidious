@@ -18,6 +18,16 @@ originating root selected. Each root retains its own stack and list position.
 Reselecting a root scrolls to the top without refreshing; reselecting from its
 child returns to that root.
 
+Popular and Trending keep only Search in their title bars. Subscriptions keeps
+Search and its signed-in RSS/OPML menu; Channels remains beside scoped search.
+The app Settings gear belongs to You. All three feeds use Material 3 pull-to-refresh
+below the toolbar: pull downward at the top, then release beyond the standard
+threshold. The indicator follows the pull and stays active during the request.
+Existing rows remain visible until the refreshed first page replaces them;
+failures retain rows and offer Retry. Initial loading and pagination are separate.
+Refresh is also an accessibility action and is unavailable on the guest subscription
+prompt. Returning to the top alone does not refresh.
+
 The opaque mini-player spans the content width immediately above navigation. Its
 minimum height is 72dp with independent 48dp play/pause and close targets. The IME
 hides navigation and mini-player presentation while playback continues. Scaffold,
@@ -76,7 +86,10 @@ geometry retain explicit submission and appropriate dismissal confirmations.
 ## Watch and ambient lighting
 
 Watch metadata and tools use opaque neutral surfaces. Native white player controls
-sit on local black scrims at 72% opacity, with fades limited to 96dp. Save,
+have transparent backgrounds above one full-picture black dim layer at 10% opacity.
+The layer fades with control visibility over 160ms in embedded and fullscreen
+playback. SponsorBlock prompts and seek feedback have no individual backings.
+Settings sheets, chat panels, captions, mini-player and PiP retain their styling. Save,
 Download, Share and More have visible labels and tooltips; large text wraps action
 rows or stacks icon/label without shrinking type. Queue opens as a full-height
 phone sheet or wide supporting pane. Comments, chapters, queue and docked chat

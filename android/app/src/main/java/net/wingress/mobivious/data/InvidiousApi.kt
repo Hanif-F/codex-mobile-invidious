@@ -36,7 +36,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     fun url(path: String, query: Map<String, String> = emptyMap()): HttpUrl = server().toHttpUrl().newBuilder()
         .addPathSegments(path.removePrefix("/")).apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
     suspend fun request(path: String, method: String = "GET", data: JSONObject? = null, auth: Boolean = false,
-        query: Map<String, String> = emptyMap(), context: ApiContext? = null, accept: String = "application/json"): String = withContext(Dispatchers.IO) {
+        query: Map<String, String> = emptyMap(), context: ApiContext? = null, accept: String = "application/json",
+        allowCachedFallback: Boolean = true): String = withContext(Dispatchers.IO) {
         val target = context ?: this@InvidiousApi.context()
         if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context())
             throw CancellationException("Account or instance changed")
@@ -101,7 +102,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         } catch (e: IOException) {
             coroutineContext.ensureActive()
             if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
-            if (e is ApiException && e.status < 500) throw e
+            if (!allowCachedFallback || e is ApiException && e.status < 500) throw e
             val saved = cacheKey?.let { cache?.read(it) } ?: throw e
             onOffline(true)
             saved
@@ -135,8 +136,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
             .put("scopes", JSONArray(scopes)).put("expiresAt", expiresAt ?: JSONObject.NULL), auth = true, context = context)).getString("accessToken")
     }
     suspend fun discovery(kind: String, region: String = "US", category: TrendingCategory = TrendingCategory.LIVESTREAMS,
-        context: ApiContext = context()) = ApiParser.videos(JSONArray(scopedRead("api/v1/$kind",
-        if (kind == "trending") mapOf("region" to region, "type" to category.apiValue) else emptyMap(), false, context)))
+        context: ApiContext = context(), allowCachedFallback: Boolean = true) = ApiParser.videos(JSONArray(scopedRead("api/v1/$kind",
+        if (kind == "trending") mapOf("region" to region, "type" to category.apiValue) else emptyMap(), false, context, allowCachedFallback)))
     suspend fun searchResults(q: String, page: Int, type: SearchType, sort: String, date: String, duration: String,
         context: ApiContext = context()): GeneralSearchPage {
         val order = if (type != SearchType.CHANNELS && sort in listOf("views", "view_count")) "views" else "relevance"
@@ -205,8 +206,9 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         SearchPage.parse(scopedRead("api/v1/channels/$id/search", mapOf("q" to q, "page" to "$page"), false, context))
     suspend fun subscriptionSearch(q: String, page: Int, context: ApiContext = context()) =
         SearchPage.parse(scopedRead("api/v1/auth/subscriptions/search", mapOf("q" to q, "page" to "$page"), true, context))
-    private suspend fun scopedRead(path: String, query: Map<String, String>, auth: Boolean, context: ApiContext): String =
-        request(path, query = query, auth = auth, context = context).also {
+    private suspend fun scopedRead(path: String, query: Map<String, String>, auth: Boolean, context: ApiContext,
+        allowCachedFallback: Boolean = true): String =
+        request(path, query = query, auth = auth, context = context, allowCachedFallback = allowCachedFallback).also {
             if (context != this.context()) throw CancellationException("Account or instance changed")
         }
     private suspend fun scopedPlaylistWrite(path: String, method: String, context: ApiContext, data: JSONObject? = null): String =
@@ -290,8 +292,8 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
             put("source", "youtube"); put("sort_by", sort.apiValue)
             if (continuation.isNotBlank()) put("continuation", continuation)
         }, false, context)))
-    suspend fun feed(page: Int, notificationsOnly: Boolean = false): List<Video> {
-        val j = JSONObject(request("api/v1/auth/feed", auth = true, query = mapOf("page" to "$page")))
+    suspend fun feed(page: Int, notificationsOnly: Boolean = false, allowCachedFallback: Boolean = true): List<Video> {
+        val j = JSONObject(request("api/v1/auth/feed", auth = true, query = mapOf("page" to "$page"), allowCachedFallback = allowCachedFallback))
         val notifications = ApiParser.videos(j.optJSONArray("notifications") ?: JSONArray())
         return if (notificationsOnly) notifications else notifications + ApiParser.videos(j.optJSONArray("videos") ?: JSONArray())
     }

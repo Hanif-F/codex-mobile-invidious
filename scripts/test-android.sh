@@ -72,4 +72,6 @@ if ! awk '$2 == "tcp:18080" && $3 == "tcp:18080" {found=1} END {exit !found}' <<
   owned_reverse=true
 fi
 cd android
-./gradlew :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:lintDebug --console=plain "$@"
+# Keep the preview's app identity and Android Keystore keys across test runs.
+./gradlew :app:testDebugUnitTest :app:connectedDebugAndroidTest :app:lintDebug --console=plain \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true "$@"

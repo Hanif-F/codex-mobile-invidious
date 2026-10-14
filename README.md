@@ -40,6 +40,8 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 - Direct Popular and Trending destinations; choose Livestreams or Gaming and search
   for a Trending country by name or code.
+- Search-focused feed bars and pull-to-refresh in Popular, Trending and Subscriptions;
+  app Settings lives in You.
 - Search videos, channels and playlists together, or choose a specific result
   type; open channel results directly in the app.
 - Available channel tabs for videos, Shorts, streams, podcasts, releases,
@@ -51,6 +53,7 @@ An `OK` result confirms the APK matches the supplied checksum.
 ### Watch and listen
 
 - Adaptive streaming with quality, codec, audio-track, speed and caption controls.
+- Transparent player controls over a uniform 10% dim layer while controls are visible.
 - Background playback, audio-only mode, system media controls, fullscreen,
   picture in picture and a mini-player while browsing.
 - Playlists, mixes, Play next and Add to queue, with previous/next and repeat.

@@ -56,7 +56,6 @@ internal val LocalAppContentColors = staticCompositionLocalOf { AppContentColors
 }
 @Composable internal fun Modifier.appControl(shape: Shape=MaterialTheme.shapes.medium,prominent: Boolean=false,
     role: AppSurfaceRole=AppSurfaceRole.CONTROL): Modifier = clip(shape).background(appContentColors(role=role,prominent=prominent).plate)
-@Composable internal fun Modifier.playerScrim(shape: Shape=MaterialTheme.shapes.medium): Modifier = clip(shape).background(Color.Black.copy(alpha=.72f))
 @Composable internal fun Modifier.appItemFeedback(source: MutableInteractionSource): Modifier = indication(source,ripple())
 @Composable internal fun AppInsetIconButton(onClick: () -> Unit,modifier: Modifier=Modifier,enabled: Boolean=true,
     interactionSource: MutableInteractionSource?=null,content: @Composable () -> Unit) {

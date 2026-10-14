@@ -176,7 +176,8 @@ def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
                  subscriptionRequests=[], subscriptionDelayNext=0, failSubscriptionRead=False,
                  subscriptionStatsMode='full', subscriptionStats={}, subscriptionWriteDelayNext=0, failSubscriptionWrite=False,
-                 discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False, discoveryCategories=False)
+                 discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False, discoveryCategories=False,
+                 discoveryFailNext=False, discoveryEmpty=False, feedRequests=[], feedDelayNext=0, feedFailNext=False)
 reset_home_subscriptions()
 
 def reset_search_history():
@@ -490,8 +491,11 @@ class Handler(BaseHTTPRequestHandler):
                 state['discoveryRequests'].append(event)
                 delay = state['discoveryDelayNext']; state['discoveryDelayNext'] = 0
                 distinct = state['discoveryDistinct']
+                fail = state['discoveryFailNext']; state['discoveryFailNext'] = False
                 if delay: time.sleep(min(5000, max(0, delay)) / 1000)
                 event['completed'] = True
+                if fail: return self.respond(dict(error='Fixture discovery temporarily unavailable'), 503)
+                if state['discoveryEmpty']: return self.respond([])
                 if state['discoveryCategories']:
                     return self.respond([dict(video, title=f'{kind} {event["type"] or "instance"} {event["region"] or "all"}')])
                 if distinct: return self.respond([dict(video, title=f'{kind} discovery fixture')])
@@ -515,7 +519,16 @@ class Handler(BaseHTTPRequestHandler):
             if p == '/api/v1/search' and state['hiddenFirstPage']:
                 items = {1: [visibility_member], 2: [video]}.get(int(parse_qs(url.query).get('page', ['1'])[0]), [])
             self.respond(items)
-        elif p == '/api/v1/auth/feed': self.respond(dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]))
+        elif p == '/api/v1/auth/feed':
+            event = dict(page=int(parse_qs(url.query).get('page', ['1'])[0]), completed=False)
+            state['feedRequests'].append(event)
+            delay = state['feedDelayNext']; state['feedDelayNext'] = 0
+            fail = state['feedFailNext']; state['feedFailNext'] = False
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            event['completed'] = True
+            self.respond(dict(error='Fixture feed temporarily unavailable') if fail else
+                         dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]),
+                         503 if fail else 200)
         elif p == '/api/v1/videos/ambient0001':
             return self.respond(dict(video, videoId='ambient0001', title='Ambient color phases', lengthSeconds=24,
                                      formatStreams=[dict(url='/media/ambient.mp4', type='video/mp4', quality='medium')],
@@ -853,7 +866,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/home-subscriptions':
-            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'subscriptionWriteDelayNext', 'failSubscriptionWrite', 'discoveryDelayNext', 'discoveryDistinct'):
+            for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'subscriptionWriteDelayNext', 'failSubscriptionWrite', 'discoveryDelayNext', 'discoveryDistinct', 'discoveryFailNext', 'discoveryEmpty', 'feedDelayNext', 'feedFailNext'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/discovery-search':

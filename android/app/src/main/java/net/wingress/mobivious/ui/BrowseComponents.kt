@@ -12,12 +12,21 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.pullToRefresh
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.semantics.selected
@@ -35,6 +44,30 @@ internal fun BrowseAppSurface(modifier: Modifier = Modifier, enabled: Boolean = 
             Column(Modifier.fillMaxWidth().testTag("app-toolbar")) { toolbar() }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) { content(Modifier.fillMaxSize(),0.dp) }
+    }
+}
+
+/** A feed-only viewport: the toolbar stays fixed above the pull indicator. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FeedRefreshContainer(enabled: Boolean, refreshing: Boolean, loading: Boolean,
+    label: String, refresh: () -> Unit, modifier: Modifier = Modifier,
+    content: @Composable BoxScope.() -> Unit) {
+    val state = rememberPullToRefreshState()
+    Box(modifier.clipToBounds()
+        .pullToRefresh(isRefreshing = enabled && refreshing, state = state, enabled = enabled && !loading, onRefresh = refresh)
+        .then(if (enabled) Modifier.testTag("feed-refresh-container").semantics {
+            if (refreshing) stateDescription = "Refreshing $label"
+            customActions = listOf(CustomAccessibilityAction("Refresh $label") {
+                if (loading) false else { refresh(); true }
+            })
+        } else Modifier)) {
+        content()
+        if (enabled) PullToRefreshDefaults.Indicator(state = state, isRefreshing = refreshing,
+            modifier = Modifier.align(Alignment.TopCenter).testTag("feed-refresh-indicator").semantics {
+                progressBarRangeInfo = if (refreshing) ProgressBarRangeInfo.Indeterminate else
+                    ProgressBarRangeInfo(state.distanceFraction.coerceIn(0f, 1f), 0f..1f)
+            })
     }
 }
 

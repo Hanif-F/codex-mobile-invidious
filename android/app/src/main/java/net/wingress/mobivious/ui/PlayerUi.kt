@@ -131,6 +131,7 @@ internal fun VideoPlayer(
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
         }
+        PlayerControlsDim(controls && visible && chromeVisible, Modifier.matchParentSize())
         Box(Modifier.matchParentSize().testTag("player-gestures")
         .pointerInput(playback.mediaId, controls, presentation, gesturesEnabled, exploring, gestureKey) {
             if (!gesturesEnabled) return@pointerInput
@@ -270,13 +271,13 @@ internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -
         Column(Modifier.testTag("sponsorblock-prompt"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Preserve the actions if a very short picture cannot fit the passive confirmation too.
             if (showNotice) {
-                Text(sponsor.notice, Modifier.widthIn(max = 280.dp).playerScrim(CircleShape)
+                Text(sponsor.notice, Modifier.widthIn(max = 280.dp)
                     .padding(horizontal = 12.dp, vertical = 6.dp).testTag("sponsorblock-notice")
                     .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White,
                     style = noticeStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (active != null) {
-                Row(Modifier.playerScrim(CircleShape).testTag("sponsorblock-actions"),
+                Row(Modifier.testTag("sponsorblock-actions"),
                     verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { skip(active.id) }, modifier = Modifier.heightIn(min = 48.dp)
                         .testTag("sponsorblock-skip").semantics { contentDescription = "Skip ${active.category.label}" }) {
@@ -294,7 +295,7 @@ internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -
 @Composable
 internal fun PlayerSeekSponsorLabels(labels: List<String>, modifier: Modifier = Modifier) {
     if (labels.isEmpty()) return
-    Text(labels.joinToString(", "), modifier.playerScrim().padding(horizontal = 10.dp, vertical = 4.dp).testTag("player-seek-sponsor-labels"),
+    Text(labels.joinToString(", "), modifier.padding(horizontal = 10.dp, vertical = 4.dp).testTag("player-seek-sponsor-labels"),
         color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
