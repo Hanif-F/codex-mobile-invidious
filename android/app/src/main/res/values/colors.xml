@@ -1,1 +1,5 @@
-<resources><color name="launch_background">#F5F6F9</color><bool name="light_system_bars">true</bool></resources>
+<resources>
+    <color name="launch_background">#F5F6F9</color>
+    <color name="brand_icon_background">#131416</color>
+    <bool name="light_system_bars">true</bool>
+</resources>

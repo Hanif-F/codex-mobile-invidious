@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="18 18 72 72" role="img" aria-labelledby="title description">
+  <title id="title">Mobivious</title>
+  <desc id="description">An angular cyan M with a pale dot above its left peak on a flat charcoal background, inspired by the Invidious logo.</desc>
+  <path id="background" fill="#131416" d="M0,0h108v108h-108z" />
+  <path id="m" fill="#00B6F0" d="M30,76L40,40H45L54,60L63,40H68L78,76H71L64.5,52L54,74L43.5,52L37,76Z" />
+  <path id="dot" fill="#F0F0F0" d="M47,29A4.5,4.5 0,1 0,38,29A4.5,4.5 0,1 0,47,29Z" />
+</svg>

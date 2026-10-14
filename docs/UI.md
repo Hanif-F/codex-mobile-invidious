@@ -66,6 +66,35 @@ primary-container selection. Focus, selected state, disabled state, errors,
 progress and ripple remain native. [Storage](STORAGE_AND_SECURITY.md) describes
 appearance-key migration and retained saved values.
 
+## App icon and splash
+
+Mobivious uses a flat angular cyan M (`#00B6F0`) and pale dot (`#F0F0F0`) on
+charcoal (`#131416`). Its outward-slanted legs and dot above the left peak are
+derived from the original Invidious lambda-shaped mark. The reference was the
+`invidious.svg` supplied from `wingressHomepage/static/img/`; that reference stays
+unchanged. This artwork is distributed under the repository's existing
+[AGPL-3.0-only license](../LICENSE).
+
+The reusable [master icon](../branding/mobivious.svg),
+[transparent mark](../branding/mobivious-mark.svg),
+[1024px PNG](../branding/mobivious.png) and
+[preview sheet](../branding/mobivious-preview.png) live in `branding/`.
+Both SVGs use the Android artwork's 108-unit coordinates with a `18 18 72 72`
+viewBox, matching the launcher's visible central area. Edit the two paths in the
+master, then copy their geometry to the transparent SVG, launcher foreground and
+monochrome vector. Regenerate the PNG with
+`magick -background none branding/mobivious.svg branding/mobivious.png` from the
+repository root, and update the previews when the artwork changes.
+
+The adaptive icon separates a full-bleed charcoal background from a transparent
+foreground. All M-and-dot artwork fits inside the centered 66dp safe circle on
+the 108dp canvas; masks belong to the launcher. The monochrome layer uses the same
+two paths with solid white fills and lets Android supply themed colors. Both
+release and Mobivious Preview use this artwork, independent of app accent presets.
+The system splash uses the color foreground with a charcoal icon backing and
+retains the existing light/dark window backgrounds. Gradients, translucent fills
+and the former play-triangle icon are no longer used.
+
 ## Saving and editing
 
 Preferences save automatically. Choices commit immediately, sliders commit on

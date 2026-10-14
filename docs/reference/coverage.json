@@ -1017,20 +1017,20 @@
     "android/app/src/main/res/drawable/ic_launcher.xml": {
       "area": "Android manifests and resources",
       "guide": "docs/UI.md",
-      "description": "Launcher/splash vector artwork.",
-      "sha256": "49b4a0785cab1a60a7363baa356b98cf9864b2c7c23d9df4c021b50138046927"
+      "description": "Flat cyan M and pale-dot foreground shared by the launcher and system splash.",
+      "sha256": "f915a967aa5881bc8eda21958cfcffea334ca016385f36a5dc911c2a18f5eb31"
     },
     "android/app/src/main/res/drawable/ic_launcher_background.xml": {
       "area": "Android manifests and resources",
       "guide": "docs/UI.md",
-      "description": "Adaptive launcher background artwork.",
-      "sha256": "d35e49cc4ca797fc279643a3b40a4350910d09a7c100eb8ce03d7e19338a759b"
+      "description": "Solid charcoal full-bleed adaptive launcher background.",
+      "sha256": "485bd6f156f0b74466696381f79cf514b6ab8420e3cd21cb960967faf608e5b5"
     },
     "android/app/src/main/res/drawable/ic_launcher_monochrome.xml": {
       "area": "Android manifests and resources",
       "guide": "docs/UI.md",
-      "description": "Monochrome themed launcher vector.",
-      "sha256": "705489acaab4a570ae36b62083d85d1a8a789bbf1331f450092ef53634f9ec94"
+      "description": "M-and-dot silhouette for system-themed launcher icons.",
+      "sha256": "b762c160e856e3e991ca02d66ad90591364ba71c1f131519376ff1e225501a75"
     },
     "android/app/src/main/res/layout/clip_preview.xml": {
       "area": "Android manifests and resources",
@@ -1053,8 +1053,8 @@
     "android/app/src/main/res/values/colors.xml": {
       "area": "Android manifests and resources",
       "guide": "docs/UI.md",
-      "description": "Light launch background and light system-bar flag.",
-      "sha256": "573fcebc71e5b1a2d1dd3353d7e26e9725be1b6af2464cd62ee384c192f07f52"
+      "description": "Light launch background, fixed charcoal icon backing and light system-bar flag.",
+      "sha256": "7e4481122432a67206c0162f5c8223c4e8adb4c66738e51447b6fe55d376f9fd"
     },
     "android/app/src/main/res/values/media_colors.xml": {
       "area": "Android manifests and resources",
@@ -1065,8 +1065,8 @@
     "android/app/src/main/res/values/styles.xml": {
       "area": "Android manifests and resources",
       "guide": "docs/UI.md",
-      "description": "No-action-bar launch/splash theme, font and system-bar appearance.",
-      "sha256": "948ba60db0134688981fe5832f3c0dceac164f7a9798bdbd4c4c8a5862c0b802"
+      "description": "Window theme with light/dark launch background, branded splash icon and charcoal icon backing.",
+      "sha256": "e11c881046dc5158f64b7967fc99c6f41d2efaa4ca45fcaa17611594637a0996"
     },
     "android/app/src/main/res/xml/data_extraction_rules.xml": {
       "area": "Android manifests and resources",
