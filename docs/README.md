@@ -2,7 +2,7 @@
 
 This is the current documentation for the Android app in `androidInvidious`.
 The current guides describe the opaque Material 3 implementation in this working
-tree. Current release version is **0.11.0**, code **22**.
+tree. Current release version is **0.11.1**, code **23**.
 The [testing guide](TESTING.md) defines repeatable validation; the
 [cleanup report](CLEANUP.md) records the latest audit results and known failures.
 
