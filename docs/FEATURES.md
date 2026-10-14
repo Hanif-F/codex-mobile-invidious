@@ -220,7 +220,7 @@ other instances varies; an APK update does not update the server.
 
 ## Hide a channel’s video titles and thumbnails
 
-Use **Settings → Channel title and thumbnail settings**, or a channel/video/watch
+Use **Settings → Channel title and thumbnail settings**, or a channel/video
 menu shortcut, to hide either or both for one channel. Optionally reveal uploads
 after a number of days. Rules save automatically, share with the website when
 signed in, and stay isolated per instance for guests. A hidden thumbnail reveals

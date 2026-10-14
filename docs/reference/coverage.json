@@ -45,8 +45,8 @@
     "android/app/build.gradle.kts": {
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
-      "description": "App ID/version/SDK, build variants/signing, Java target and all runtime/test dependencies.",
-      "sha256": "9cb88d253adefbbbcaa768e92a0371b8485361fae1e41c6c79a8f5a32f72890a"
+      "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
+      "sha256": "9c292bf7f9325b460602b5e9d607c38028d6a163cc7e86fa82ceb7ba5503008e"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AccountNavigationSmokeTest.kt": {
       "area": "Android device tests",
@@ -1389,8 +1389,8 @@
     "scripts/build-release.sh": {
       "area": "Scripts",
       "guide": "docs/DEVELOPMENT.md",
-      "description": "Checked signing configuration or explicit first-identity initialization; unit/release/lint builds and versioned APK/checksum outputs.",
-      "sha256": "b2225e52e8d2a563108fd9dc29df2878376cc0e2308bd6dac4886a6e74629181"
+      "description": "Checked signing identity; unit/release/lint builds, immutable R8 mapping/report archives keyed by version and APK SHA-256, and APK/checksum outputs.",
+      "sha256": "455483690102acb2a465b8f8ba16db5cd621f06d30ebbd0474e529a779be8084"
     },
     "scripts/check-avatar-fixture.py": {
       "area": "Scripts",
@@ -1485,8 +1485,8 @@
     "scripts/tests/test_workflows.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Disposable regression checks for fixture ownership, port/device conflicts, signals and release signing safeguards.",
-      "sha256": "1a8464029c56a25aed43326408c684dbccfab25abdc4a1ef8394c152cb0c3755"
+      "description": "Disposable regression checks for fixture ownership, device/port conflicts, signals, release signing and R8 mapping archival/preservation safeguards.",
+      "sha256": "834dd7445f0b91e35051ef713c9505b7ee31a906c235ae67a7abac8ee3b9819a"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/ChannelSpoilers.kt": {
       "area": "Data and domain",
@@ -1517,6 +1517,12 @@
       "guide": "docs/TESTING.md",
       "description": "Emulator channel settings, masking, reveals, account failures, DeArrow, AI and offline acceptance.",
       "sha256": "73733dfa916eaa5023ff92778483de84f9d23dd450cba473508f77613a420c94"
+    },
+    "android/app/proguard-rules.pro": {
+      "area": "Build configuration",
+      "guide": "docs/DEVELOPMENT.md",
+      "description": "App-specific R8 keep-rule location; Android defaults and dependency consumer rules handle framework and library entry points.",
+      "sha256": "bc75eddcf921e3e3fa3e794574c24e0f3b50c6c8097cf92b46d0ac9b5ed0d6df"
     }
   },
   "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md."

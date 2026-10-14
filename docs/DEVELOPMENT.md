@@ -96,7 +96,13 @@ a dependency update.
 
 Release uses `net.wingress.mobivious`, version code 23 and version name 0.11.1.
 Debug adds `.debug` and `-debug`, allowing separate installation as Mobivious
-Preview. BuildConfig and Compose are enabled; release minification is disabled.
+Preview. BuildConfig and Compose are enabled. Release builds use R8 code
+optimization/obfuscation and resource shrinking; debug builds remain unoptimized.
+The benchmark variant inherits release optimization. Minimum SDK 33 keeps DEX
+and native libraries uncompressed in the APK; shrinking removes unused payload
+without changing that packaging policy. Android's default optimized rules and
+dependency consumer rules are supplemented by `app/proguard-rules.pro` only when
+verified indirect access needs a narrowly scoped keep rule.
 Personal signing configuration is loaded only when local `signing.properties`
 exists. JVM tests return Android default stub values where required; device-only
 behavior still needs instrumentation.
@@ -206,6 +212,21 @@ The script runs unit tests, builds the signed release and runs release lint.
 It writes `Mobivious-<version>.apk` and its `.apk.sha256` file to the ignored
 `artifacts/` directory. Confirm the signing certificate matches the previously
 published APK before distributing an update.
+
+The script requires a nonempty R8 mapping before copying release artifacts and
+archives it under `artifacts/r8/<version>/<APK-SHA256>/mapping.txt`. Available
+`configuration.txt`, `usage.txt`, `seeds.txt` and `resources.txt` reports are saved
+there too. `apk.sha256` identifies the exact APK; `SHA256SUMS` verifies the archived
+files. Rebuilding a version preserves previous archives, and a conflicting
+mapping for the same APK is rejected. Keep these local archives for as long as
+the corresponding APK may be installed; rebuilding overwrites Gradle's mapping
+output, and a different build's mapping cannot reliably decode an older crash.
+
+To recover an obfuscated crash, select the archive by the installed APK's
+SHA-256 and pass its mapping plus the captured stack trace to the SDK's
+`cmdline-tools/latest/bin/retrace`. Archive generation does not establish runtime
+acceptance. Follow the [optimized-build checks](TESTING.md#optimized-build-checks)
+before shipping.
 
 Write a short changelog and any server requirements to
 `artifacts/release-notes.md`. Account features and other server-dependent additions

@@ -185,7 +185,7 @@ in [Playback](PLAYBACK.md).
 ## Channel title and thumbnail settings
 
 Open **You → Settings → Preferences → Channel title and thumbnail settings**,
-or the shortcut in a channel, video, or watch action menu. Select a channel by
+or the shortcut in a channel or video action menu. Select a channel by
 canonical `UC…` ID or `/channel/UC…` URL. **Hide title** and **Hide thumbnail** save
 immediately; **Reveal after this many days since upload** saves valid text after
 500ms. Blank means indefinite hiding. Invalid delays remain editable with Revert;

@@ -20,7 +20,8 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 
 | File | Responsibility | Guide |
 | --- | --- | --- |
-| [android/app/build.gradle.kts](../../android/app/build.gradle.kts) | App ID/version/SDK, build variants/signing, Java target and all runtime/test dependencies. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
+| [android/app/build.gradle.kts](../../android/app/build.gradle.kts) | App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
+| [android/app/proguard-rules.pro](../../android/app/proguard-rules.pro) | App-specific R8 keep-rule location; Android defaults and dependency consumer rules handle framework and library entry points. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
 | [android/build.gradle.kts](../../android/build.gradle.kts) | Pinned Android Gradle and Compose compiler plugins. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
 | [android/gradle.properties](../../android/gradle.properties) | Gradle memory/encoding, AndroidX, resource and Kotlin style flags. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
 | [android/gradle/wrapper/gradle-wrapper.jar](../../android/gradle/wrapper/gradle-wrapper.jar) | Checked-in Gradle wrapper bootstrap binary. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
@@ -191,7 +192,7 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 
 | File | Responsibility | Guide |
 | --- | --- | --- |
-| [scripts/build-release.sh](../../scripts/build-release.sh) | Checked signing configuration or explicit first-identity initialization; unit/release/lint builds and versioned APK/checksum outputs. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
+| [scripts/build-release.sh](../../scripts/build-release.sh) | Checked signing identity; unit/release/lint builds, immutable R8 mapping/report archives keyed by version and APK SHA-256, and APK/checksum outputs. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
 | [scripts/check-avatar-fixture.py](../../scripts/check-avatar-fixture.py) | Disposable avatar metadata/proxy fixture assertions; requires generated thumbnail media. | [TESTING](../../docs/TESTING.md) |
 | [scripts/check-chapters-fixture.py](../../scripts/check-chapters-fixture.py) | Description chapter fixtures and forbidden ordinary timeline-preview request tracing. | [TESTING](../../docs/TESTING.md) |
 | [scripts/check-chat-fixture.py](../../scripts/check-chat-fixture.py) | Replay chunk/removal/replacement/failure and dedicated authenticated filter/delay fixture checks. | [TESTING](../../docs/TESTING.md) |
@@ -205,7 +206,7 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [scripts/test-android.sh](../../scripts/test-android.sh) | Running-device fixture/media/ADB runner for unit, connected and lint checks; owns cleanup. | [TESTING](../../docs/TESTING.md) |
 | [scripts/test-download-restart.sh](../../scripts/test-download-restart.sh) | Two-process background-download persistence/offline-resume check, existing APK installation and local evidence. | [TESTING](../../docs/TESTING.md) |
 | [scripts/tests/test_documentation.py](../../scripts/tests/test_documentation.py) | Disposable Git-inventory regression checks for new/removed sources, Markdown review, fingerprints, dated links and generated coverage. | [TESTING](../../docs/TESTING.md) |
-| [scripts/tests/test_workflows.py](../../scripts/tests/test_workflows.py) | Disposable regression checks for fixture ownership, port/device conflicts, signals and release signing safeguards. | [TESTING](../../docs/TESTING.md) |
+| [scripts/tests/test_workflows.py](../../scripts/tests/test_workflows.py) | Disposable regression checks for fixture ownership, device/port conflicts, signals, release signing and R8 mapping archival/preservation safeguards. | [TESTING](../../docs/TESTING.md) |
 
 ## Tests and test infrastructure
 

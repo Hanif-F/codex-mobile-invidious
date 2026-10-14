@@ -30,7 +30,11 @@ android {
         buildTypes.getByName("release").signingConfig = signingConfigs.getByName("personal")
     }
     buildTypes {
-        release { isMinifyEnabled = false }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         debug { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug"; buildConfigField("boolean", "ALLOW_FIXTURE_HTTP", "true") }
         create("benchmark") {
             initWith(getByName("release"))

@@ -12,7 +12,7 @@
 | Connected smoke/journey tests | Interactions and service behavior on the selected running device against local fixtures. |
 | Presentation tests | Layout/semantics/rendering checks and screenshots under device test paths. |
 | Python fixture checks | Local fixture contract consistency, without proving the production server matches it. |
-| Release checks | Unit/lint/build plus signed artifact/checksum verification; physical-device acceptance remains separate. |
+| Release checks | Unit/lint/build plus signed artifact/checksum and matching R8 archive verification; optimized runtime acceptance remains separate. |
 
 [Test catalog](reference/TEST_CATALOG.md) enumerates every maintained JVM/device
 test file and declared test method, including helper-only files and ignored cases.
@@ -36,6 +36,35 @@ Use `--offline` only when dependencies are already cached. The Gradle wrapper
 pins 9.4.1 with a distribution checksum; app configuration pins SDK/tool/library
 versions. See [Development](DEVELOPMENT.md) for prerequisites, signing and manual
 release commands. App tests require no sibling server checkout.
+
+## Optimized-build checks
+
+Release and benchmark builds use R8 optimization and resource shrinking. Debug
+tests still check domain behavior, but cannot establish that reflection, resource
+loading and framework entry points survive optimization.
+
+Build the optimized variants and run static/domain checks:
+
+```sh
+cd android
+./gradlew :app:testDebugUnitTest :app:assembleRelease :app:lintRelease \
+  :app:assembleBenchmark :macrobenchmark:assembleBenchmark --console=plain
+```
+
+On a connected device, use the isolated optimized benchmark package for focused
+ordinary-UI account setup, navigation, watch, settings-saving and download
+journeys. The existing performance runner's `--record` mode exercises those
+flows without a timing benchmark. Supplement these with background/PiP playback,
+clip preview, offline resume and paired-media export checks. Keep the existing
+accepted-video-conversion emulator limitation explicit; an ignored case is not
+runtime acceptance. Preserve the installed release and its data during tests.
+
+Before distribution, verify the release signature, uncompressed DEX ZIP entries
+and the matching [R8 archive](DEVELOPMENT.md#prepare-and-verify). APK measurements
+have no size threshold. Compare builds from the same application source and
+report APK/DEX bytes and percentage change; keep baseline/candidate artifacts
+separate from published releases. If a device is unavailable, report runtime
+acceptance as pending rather than inferring it from a successful build.
 
 ## Device runner and media fixtures
 

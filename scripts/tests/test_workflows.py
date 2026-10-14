@@ -97,6 +97,23 @@ class WorkflowTest(unittest.TestCase):
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(path.read_text()), 0)
 
+    def fake_release_build(self, mapping='fixture mapping', apk=b'fixture APK'):
+        gradle = self.root / 'android/gradlew'
+        gradle.write_text('#!/usr/bin/env python3\nfrom pathlib import Path\n'
+                          'p=Path("app/build/outputs/apk/release"); p.mkdir(parents=True, exist_ok=True)\n'
+                          f'(p/"app-release.apk").write_bytes({apk!r})\n'
+                          '(p/"output-metadata.json").write_text(\'{"elements":[{"versionName":"fixture"}]}\')\n'
+                          'r=Path("app/build/outputs/mapping/release"); r.mkdir(parents=True, exist_ok=True)\n'
+                          f'mapping={mapping!r}\n'
+                          'if mapping is None: (r/"mapping.txt").unlink(missing_ok=True)\n'
+                          'else: (r/"mapping.txt").write_text(mapping)\n'
+                          '(r/"configuration.txt").write_text("fixture rules")\n'
+                          '(r/"usage.txt").write_text("unused fixture classes")\n')
+        gradle.chmod(0o755)
+
+    def r8_archive(self, apk=b'fixture APK'):
+        return self.root / 'artifacts/r8/fixture' / hashlib.sha256(apk).hexdigest()
+
     def test_only_owned_mapping_is_removed_on_normal_exit(self):
         result = self.run_shell(self.setup_command('kill -0 "$fixture_pid"'))
         self.assertEqual(0, result.returncode, result.stderr)
@@ -191,12 +208,7 @@ class WorkflowTest(unittest.TestCase):
         keytool.write_text('#!/usr/bin/env python3\nimport sys\nfrom pathlib import Path\n'
                            'Path(sys.argv[sys.argv.index("-keystore") + 1]).write_bytes(b"fixture identity")\n')
         keytool.chmod(0o755)
-        gradle = self.root / 'android/gradlew'
-        gradle.write_text('#!/usr/bin/env python3\nfrom pathlib import Path\n'
-                          'p=Path("app/build/outputs/apk/release"); p.mkdir(parents=True)\n'
-                          '(p/"app-release.apk").write_bytes(b"fixture APK")\n'
-                          '(p/"output-metadata.json").write_text(\'{"elements":[{"versionName":"fixture"}]}\')\n')
-        gradle.chmod(0o755)
+        self.fake_release_build()
         result = self.run_shell('scripts/build-release.sh --init-signing')
         self.assertEqual(0, result.returncode, result.stderr)
         for name in ('android/keystore/mobivious.jks', 'android/signing.properties'):
@@ -207,6 +219,65 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(b'fixture APK', apk.read_bytes())
         self.assertEqual(hashlib.sha256(apk.read_bytes()).hexdigest() + '  Mobivious-fixture.apk\n',
                          apk.with_suffix('.apk.sha256').read_text())
+        archive = self.r8_archive()
+        self.assertEqual('fixture mapping', (archive / 'mapping.txt').read_text())
+        self.assertEqual('fixture rules', (archive / 'configuration.txt').read_text())
+        self.assertEqual('unused fixture classes', (archive / 'usage.txt').read_text())
+        self.assertEqual(apk.with_suffix('.apk.sha256').read_text(), (archive / 'apk.sha256').read_text())
+        for line in (archive / 'SHA256SUMS').read_text().splitlines():
+            digest, name = line.split('  ', 1)
+            self.assertEqual(digest, hashlib.sha256((archive / name).read_bytes()).hexdigest())
+
+    def test_missing_or_empty_r8_mapping_preserves_existing_release_artifacts(self):
+        (self.root / 'android/signing.properties').write_text('storeFile=preserved.jks\n')
+        apk = self.root / 'artifacts/Mobivious-fixture.apk'
+        apk.parent.mkdir()
+        apk.write_bytes(b'previous release')
+        checksum = apk.with_suffix('.apk.sha256')
+        checksum.write_text('previous checksum')
+        for mapping in (None, ''):
+            with self.subTest(mapping=mapping):
+                self.fake_release_build(mapping=mapping)
+                result = self.run_shell('scripts/build-release.sh')
+                self.assertNotEqual(0, result.returncode)
+                self.assertIn('Missing R8 mapping.txt', result.stderr)
+                self.assertEqual(b'previous release', apk.read_bytes())
+                self.assertEqual('previous checksum', checksum.read_text())
+                self.assertFalse((self.root / 'artifacts/r8').exists())
+
+    def test_r8_archives_preserve_both_builds_of_the_same_version(self):
+        (self.root / 'android/signing.properties').write_text('storeFile=preserved.jks\n')
+        self.fake_release_build()
+        first = self.run_shell('scripts/build-release.sh')
+        self.assertEqual(0, first.returncode, first.stderr)
+        original = {path.name: path.read_bytes() for path in self.r8_archive().iterdir()}
+        self.fake_release_build(mapping='second mapping', apk=b'second APK')
+        second = self.run_shell('scripts/build-release.sh')
+        self.assertEqual(0, second.returncode, second.stderr)
+        self.assertEqual(original, {path.name: path.read_bytes() for path in self.r8_archive().iterdir()})
+        self.assertEqual('second mapping', (self.r8_archive(b'second APK') / 'mapping.txt').read_text())
+
+    def test_rebuilding_the_same_apk_preserves_its_r8_archive(self):
+        (self.root / 'android/signing.properties').write_text('storeFile=preserved.jks\n')
+        self.fake_release_build()
+        first = self.run_shell('scripts/build-release.sh')
+        self.assertEqual(0, first.returncode, first.stderr)
+        mapping = self.r8_archive() / 'mapping.txt'
+        original_time = mapping.stat().st_mtime_ns
+        second = self.run_shell('scripts/build-release.sh')
+        self.assertEqual(0, second.returncode, second.stderr)
+        self.assertEqual(original_time, mapping.stat().st_mtime_ns)
+
+    def test_conflicting_mapping_for_an_existing_apk_is_rejected(self):
+        (self.root / 'android/signing.properties').write_text('storeFile=preserved.jks\n')
+        self.fake_release_build()
+        first = self.run_shell('scripts/build-release.sh')
+        self.assertEqual(0, first.returncode, first.stderr)
+        self.fake_release_build(mapping='conflicting mapping')
+        second = self.run_shell('scripts/build-release.sh')
+        self.assertNotEqual(0, second.returncode)
+        self.assertIn('preserved the archive', second.stderr)
+        self.assertEqual('fixture mapping', (self.r8_archive() / 'mapping.txt').read_text())
 
     def test_failed_key_generation_leaves_no_partial_signing_material(self):
         keytool = self.root / 'jbr/bin/keytool'

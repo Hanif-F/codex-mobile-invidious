@@ -31,8 +31,6 @@ internal fun WatchPrimaryActions(vm: AppViewModel, details: VideoDetails, save: 
             }
         }, more = { expanded = true }, moreMenu = {
             AppDropdownMenu(expanded, { expanded = false }) {
-                if (ContentVisibility.validChannel(details.video.channelId)) DropdownMenuItem(text = { Text(channelSpoilerSettingsPage) },
-                    onClick = { expanded = false; vm.openChannelSpoilers(details.video.channelId) })
                 if (ClipRules.eligible(details)) DropdownMenuItem(text = { Text("Create clip") },
                     leadingIcon = { Icon(Icons.Default.ContentCut, null) }, modifier = Modifier.testTag("create-clip"), onClick = {
                         expanded = false
