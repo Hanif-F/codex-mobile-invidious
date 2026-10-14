@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <queries><package android:name="net.wingress.mobivious.benchmark" /></queries>
+    <application android:networkSecurityConfig="@xml/fixture_network_security" tools:replace="android:networkSecurityConfig" />
+</manifest>

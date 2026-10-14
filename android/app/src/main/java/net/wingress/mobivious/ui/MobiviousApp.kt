@@ -1,30 +1,26 @@
 package net.wingress.mobivious.ui
 
-import android.content.Intent
 import android.content.pm.ActivityInfo
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.TrendingUp
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -48,16 +44,15 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.stateDescription
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -69,10 +64,6 @@ import kotlinx.coroutines.launch
 import net.wingress.mobivious.MainActivity
 import net.wingress.mobivious.data.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.graphics.Brush
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.backdrop.backdrops.layerBackdrop
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -104,8 +95,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
-    val coloredBackgrounds by vm.store.coloredBackgrounds.collectAsStateWithLifecycle()
-    val adaptiveControlColors by vm.store.adaptiveControlColors.collectAsStateWithLifecycle()
+    val accent by vm.store.accentPreset.collectAsStateWithLifecycle()
+    val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
     val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
@@ -122,7 +113,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val libraryPage = tab == "You" && route.isEmpty() || route in listOf("playlists", "history", "clips", "downloads") || route.startsWith("playlist:")
     val discoveryPage = route.isEmpty() && PreferenceRules.isDiscovery(tab)
     val searchPage = route.isEmpty() && tab == "Search"
-    val browseGlassPage = subscriptionFeed || channelPage || route == "subscription-channels" || libraryPage || discoveryPage || searchPage || route == "sign-in" || route.startsWith("post:")
+    val titledBrowsePage = subscriptionFeed || channelPage || route == "subscription-channels" || libraryPage || discoveryPage || searchPage || route == "sign-in" || route.startsWith("post:")
     val librarySection by vm.playlistLibrarySection.collectAsStateWithLifecycle()
     val libraryTitle = when {
         route.startsWith("playlist:") -> if (playlist?.mix == true) "Mix" else "Playlist"
@@ -132,26 +123,28 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         route == "downloads" -> "Downloads"
         else -> "You"
     }
-    val destination = ShellDestination.from(tab)
-    var lastDiscover by rememberSaveable { mutableStateOf("Popular") }
-    LaunchedEffect(tab) { if (PreferenceRules.isDiscovery(tab)) lastDiscover = tab }
+    val destination = AppDestination.from(tab) ?: AppDestination.from(vm.searchOriginTab)
     val browseReset by vm.browseReset.collectAsStateWithLifecycle()
     val browseList = key(selectedTab, if (route == "playlists") librarySection else null) {
-        val position = state.position
-        rememberLazyListState(position.index, position.offset)
+        remember {
+            val position=vm.browse.value.position
+            androidx.compose.foundation.lazy.LazyListState(position.index,position.offset)
+        }
     }
+    val latestBrowseList by rememberUpdatedState(browseList)
     val subscriptionList = key(vm.api.context()) { rememberLazyListState() }
     var handledBrowseReset by rememberSaveable { mutableLongStateOf(0L) }
     LaunchedEffect(browseReset) {
         if (browseReset > handledBrowseReset) { browseList.scrollToItem(0); handledBrowseReset = browseReset }
     }
-    val visibleVideos = vm.visibleVideos(state.videos, aiState = aiState)
+    val visibleVideos = remember(state.videos,aiState,prefs,blocked,searchVisibility,selectedTab) { vm.visibleVideos(state.videos, aiState=aiState) }
     var channelDescriptionOpen by rememberSaveable(vm.store.server, channel?.id, route) { mutableStateOf(false) }
     val presentation = rememberPlayerPresentation()
     val watch = presentation.watch
     val fullscreen = presentation.fullscreen
     val queue by vm.queue.collectAsStateWithLifecycle()
     val chapters = playback.chapters
+    val queuePanelOpen by vm.queueExpanded.collectAsStateWithLifecycle()
     val chapterPanel = key(vm.store.server, queue.token, queue.currentKey) { rememberChapterPanelState() }
     val watchList = key(queue.currentKey) { rememberLazyListState() }
     val watchResize = key(queue.currentKey) { rememberWatchPlayerResizeState() }
@@ -187,13 +180,15 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     var dialog by remember { mutableStateOf("") }
     fun openChapters() {
-        vm.cancelAccumulatedSeek(); vm.closeComments(); vm.closeChat(); dialog = ""
+        vm.cancelAccumulatedSeek(); vm.closeComments(); vm.closeChat(); vm.queueExpanded.value = false; dialog = ""
         chapterPanel.show(chapters, playback.position)
     }
-    fun toggleChat() { if (vm.chatReplay.value.open) vm.closeChat() else { chapterPanel.close(); dialog = ""; vm.openChat() } }
-    fun backWatch() { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else if (!vm.backComments()) collapsePlayer() }
+    fun toggleChat() { if (vm.chatReplay.value.open) vm.closeChat() else { chapterPanel.close(); vm.queueExpanded.value = false; dialog = ""; vm.openChat() } }
+    fun backWatch() { if (vm.queueExpanded.value) vm.queueExpanded.value = false else if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else if (!vm.backComments()) collapsePlayer() }
     LaunchedEffect(chapters, playback.loading) { if (!playback.loading && chapters.isEmpty()) chapterPanel.close() }
     LaunchedEffect(dialog) { if (dialog.isNotEmpty()) chapterPanel.close() }
+    var dialogContext by remember { mutableStateOf(deviceContext) }
+    LaunchedEffect(deviceContext) { if(dialogContext!=deviceContext) {dialog="";dialogContext=deviceContext} }
     var settingsPage by rememberSaveable { mutableStateOf("") }
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchDraft by rememberSaveable { mutableStateOf("") }
@@ -218,13 +213,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     val searchFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    LaunchedEffect(searchOpen) { if (searchOpen) { searchFocus.requestFocus(); keyboard?.show() } }
+    LaunchedEffect(searchOpen,selectedTab) { if (searchOpen && tab=="Search" && route.isEmpty()) { searchFocus.requestFocus(); keyboard?.show() } }
     val restoredBrowse by vm.restoredBrowse.collectAsStateWithLifecycle()
     val authenticationFinished by vm.authenticationFinished.collectAsStateWithLifecycle()
     var handledRestore by rememberSaveable { mutableLongStateOf(0L) }
     var handledAuth by rememberSaveable { mutableLongStateOf(0L) }
     var observedNavigation by remember { mutableStateOf(selectedTab) }
-    LaunchedEffect(selectedTab, librarySection, restoredBrowse, authenticationFinished, shared.value) {
+    LaunchedEffect(browseList,selectedTab, librarySection, restoredBrowse, authenticationFinished, shared.value) {
         // StateFlow collection can lag the shared-video event by one frame. Consume
         // the event only after its destination is visible so a late tab update
         // cannot immediately minimize the player we just opened.
@@ -248,7 +243,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     LaunchedEffect(browseList, selectedTab, browseReset) {
         snapshotFlow { CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset) }.collect { position ->
-            if (vm.restoredBrowse.value == handledRestore && (route != "playlists" || librarySection == vm.playlistLibrarySection.value)) vm.browsePosition(position)
+            if (selectedTab==vm.navigation.value && vm.restoredBrowse.value == handledRestore && (route != "playlists" || librarySection == vm.playlistLibrarySection.value)) vm.browsePosition(position)
         }
     }
     val saveSheet by vm.saveSheet.collectAsStateWithLifecycle()
@@ -266,7 +261,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     }
     fun signIn() {
         dialog = ""; searchOpen = false
-        originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset
+        originIndex = latestBrowseList.firstVisibleItemIndex; originOffset = latestBrowseList.firstVisibleItemScrollOffset
         originWatch = presentation.watch; authSettings = settingsPage; settingsPage = ""
         if (watch) { authWatchId = playback.details?.video?.id.orEmpty(); authWatchPosition = playback.position / 1000 }
         vm.openSignIn()
@@ -274,37 +269,24 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     fun submitGlobalSearch() {
         if (searchDraft.isBlank()) return
         searchOpen = false; keyboard?.hide(); vm.cancelAccumulatedSeek()
-        if (tab != "Search" || route.isNotEmpty() || watch) {
-            originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset; originWatch = presentation.watch
+        if (vm.tab != "Search" || vm.route.isNotEmpty() || presentation.watch) {
+            originIndex = latestBrowseList.firstVisibleItemIndex; originOffset = latestBrowseList.firstVisibleItemScrollOffset; originWatch = presentation.watch
         }
         val link = ContentLinks.parse(searchDraft, vm.store.server)
         if (link != null) { if (vm.openContent(link)) openPlayer() else browsePlayer() }
         else { browsePlayer(); vm.openGlobalSearch(searchDraft) }
     }
-    fun selectDestination(selected: ShellDestination) {
-        vm.browsePosition(CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset))
-        originWatch = selected == ShellDestination.SEARCH && presentation.watch; authWatchId = ""; authSettings = ""; vm.cancelAccumulatedSeek(); browsePlayer()
-        if (selected == ShellDestination.SEARCH) {
-            originIndex = browseList.firstVisibleItemIndex; originOffset = browseList.firstVisibleItemScrollOffset
-            searchDraft = search.submitted; vm.beginGlobalSearch(); searchOpen = true
-        } else {
-            searchOpen = false; keyboard?.hide()
-            vm.selectTab(when (selected) { ShellDestination.DISCOVER -> lastDiscover; ShellDestination.SUBSCRIPTIONS -> "Subscriptions"; else -> "You" })
-        }
+    fun openGlobalSearch() {
+        vm.browsePosition(CommentPosition(latestBrowseList.firstVisibleItemIndex,latestBrowseList.firstVisibleItemScrollOffset))
+        originWatch = presentation.watch
+        originIndex = latestBrowseList.firstVisibleItemIndex; originOffset = latestBrowseList.firstVisibleItemScrollOffset
+        authWatchId = ""; authSettings = ""; vm.cancelAccumulatedSeek(); browsePlayer()
+        searchDraft = vm.searchInput.value.submitted; vm.beginGlobalSearch(); searchOpen = true
     }
-    var dockCompact by remember { mutableStateOf(false) }
-    val exploring = rememberPlayerTouchExploration()
-    LaunchedEffect(browseList, exploring, selectedTab) {
-        dockCompact = false
-        var previous = CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset)
-        snapshotFlow { CommentPosition(browseList.firstVisibleItemIndex, browseList.firstVisibleItemScrollOffset) }.collect { next ->
-            if (!exploring) {
-                val direction = if (next.index != previous.index) (next.index - previous.index) * 100 else next.offset - previous.offset
-                if (next.index == 0 && next.offset < 64 || direction < -8) dockCompact = false
-                else if (direction > 12) dockCompact = true
-            }
-            previous = next
-        }
+    fun selectDestination(selected: AppDestination) {
+        vm.browsePosition(CommentPosition(latestBrowseList.firstVisibleItemIndex,latestBrowseList.firstVisibleItemScrollOffset))
+        authWatchId = ""; authSettings = ""; vm.cancelAccumulatedSeek(); browsePlayer()
+        searchOpen = false; keyboard?.hide(); vm.selectTab(selected.label)
     }
     fun play(video: Video, source: Playlist? = null) { openPlayer(); vm.playVideo(video, source) }
     LaunchedEffect(message, blockUndo) { message?.let {
@@ -323,7 +305,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         activity.setFullscreen(fullscreen && !pip)
         onDispose { activity.setFullscreen(false); activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
-    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { chapterPanel.close(); vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
+    LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.queueExpanded.value = false; chapterPanel.close(); vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
     LaunchedEffect(account) { dialog = "" }
     LaunchedEffect(watch, pip, settingsPage) { if (watch || pip || settingsPage.isNotEmpty()) {
         channelDescriptionOpen = false; vm.closePostComments()
@@ -340,137 +322,129 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             isAppearanceLightNavigationBars = !darkTheme
         }
     }
-    CompositionLocalProvider(LocalColoredBackgrounds provides coloredBackgrounds,
-        LocalAdaptiveControlColors provides adaptiveControlColors) {
-    MaterialTheme(colorScheme = liquidColorScheme(darkTheme, coloredBackgrounds), typography = Liquid.typography, shapes = Liquid.shapes) {
-      val glassMotion = rememberAmbientAnimationsEnabled()
-      val shellScene = rememberGlassScene(samplingEnabled = !reduceTransparency && !watch && !fullscreen && !pip && settingsPage.isEmpty())
-      val backdrop = shellScene.backdrop
-      CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalGlassScene provides shellScene, LocalReduceTransparency provides reduceTransparency, LocalGlassMotionEnabled provides glassMotion) {
-        GlassBackgroundScene(Modifier.fillMaxSize()) {
-          val environmentScene = LocalGlassScene.current
-          CompositionLocalProvider(LocalGlassBackdrop provides backdrop, LocalGlassScene provides shellScene) {
+    CompositionLocalProvider(LocalReduceTransparency provides reduceTransparency) {
+    AppTheme(darkTheme,accent) {
+      Box(Modifier.fillMaxSize()) {
+        AppBackground(Modifier.fillMaxSize()) {
+          Box(Modifier.fillMaxSize()) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip || clipEditor.open || keyboardVisible && !pip && !watch,
-            downloadDialog.video != null || fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
+            downloadDialog.video != null || queuePanelOpen || fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) { openChatSettings ->
-            if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { settingsPage = it }, { settingsPage = settingsParent(settingsPage) }, { signIn() }, { id -> settingsPage = ""; navigate("Popular", "channel:$id") })
-            else BoxWithConstraints(Modifier.fillMaxSize()) {
-              val wideLayout = maxWidth >= 840.dp
-              val shellStart = if (wideLayout && !watch) 204.dp else 0.dp
+            if (settingsPage.isNotEmpty() && !pip) SettingsScreen(vm, settingsPage, { page -> when(page) {
+                "Chat settings" -> dialog="chatPreferences"
+                "Search filters" -> dialog="filters"
+                "Trending" -> { settingsPage=""; vm.selectTab("Trending") }
+                "Channels" -> { settingsPage=""; navigate("Subscriptions","subscription-channels") }
+                else -> settingsPage=page
+            } }, { settingsPage = settingsParent(settingsPage) }, { signIn() }, { id -> settingsPage = ""; navigate("Popular", "channel:$id") })
+            else BoxWithConstraints(Modifier.fillMaxSize().semantics { testTagsAsResourceId=true }) {
+              val wideLayout = AppWindowWidth.from(maxWidth.value)!=AppWindowWidth.COMPACT
+              val shellStart = if (wideLayout && !watch) 112.dp else 0.dp
               val imeVisible = keyboardVisible
+              val feedColumns = if (maxWidth < 600.dp || prefs.thinMode || prefs.uiDensity=="compact") 1 else
+                  ((minOf(maxWidth-shellStart,1200.dp).value)/(280f*maxOf(1f,LocalDensity.current.fontScale/1.3f))).toInt().coerceAtLeast(1)
               val edgeColor = MaterialTheme.colorScheme.background
               Scaffold(
-                modifier = Modifier.padding(start = shellStart).hiddenPlayerContent(pip || fullscreen && !presentation.active),
+                modifier = Modifier.padding(start = if(imeVisible) 0.dp else shellStart).imePadding().hiddenPlayerContent(pip || fullscreen && !presentation.active),
                 containerColor = Color.Transparent,
                 topBar = {
-                    if (!watch && !fullscreen && !browseGlassPage) LiquidTopBar(
-                        title = when {
+                    if (!watch && !fullscreen && !titledBrowsePage) AppTopBar(title = when {
                             route == "sign-in" -> "Sign in"
                             route == "subscription-channels" -> "Channels"
                             route.isNotEmpty() -> channel?.name ?: playlist?.title ?: state.title
-                            else -> destination.label
-                        },
-                        large = route.isEmpty(),
-                        navigation = if (route.isNotEmpty() || vm.hasBrowseBack && tab != "Search") ({
-                            GlassIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", enabled = !accountBusy) { vm.cancelAccumulatedSeek(); vm.backBrowse() }
-                        }) else null,
-                    ) {
-
+                            else -> destination?.label ?: "Search"
+                        }, navigation = if (route.isNotEmpty() || vm.hasBrowseBack && tab != "Search") ({
+                            AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Back", enabled = !accountBusy) { vm.cancelAccumulatedSeek(); vm.backBrowse() }
+                        }) else null, ) {
+                        AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
                     }
                 },
-                snackbarHost = { GlassSnackbarHost(snackbar) },
+                snackbarHost = { AppSnackbarHost(snackbar) },
                 bottomBar = {
-                    Column(Modifier.drawBehind {
-                        if (!watch) drawRect(Brush.verticalGradient(listOf(Color.Transparent, edgeColor.copy(alpha = .75f)),
-                            startY = -24.dp.toPx(), endY = size.height), topLeft = Offset(0f, -24.dp.toPx()),
-                            size = androidx.compose.ui.geometry.Size(size.width, size.height + 24.dp.toPx()))
-                    }.navigationBarsPadding().imePadding()
-                        .graphicsLayer { alpha = if (watch) presentation.miniAlpha else 1f }
-                        .hiddenPlayerContent(watch || presentation.active || pip || fullscreen)) {
-                        if (presentation.mode != PlayerPresentation.CLOSED && playback.details != null && (!imeVisible || watch))
-                            MiniPlayer(vm, playback, presentation, ::restorePlayer, vm::togglePlay, ::closePlayer,
-                                gesturesEnabled = !pip && dialog.isEmpty() && sponsorEditor == null && !searchOpen && !accountBusy && saveSheet.video == null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link == null)
-                        if (!watch || presentation.active) {
-                            if (tab == "Search" && route.isEmpty()) GlassSurface(
-                                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) { Row(Modifier.padding(start = 4.dp, end = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                SearchField(searchDraft, { searchDraft = it }, "Search or paste a link", "main-search",
-                                    Modifier.weight(1f).focusRequester(searchFocus)) { submitGlobalSearch() }
-                                GlassInsetIconButton(onClick = { searchOpen = false; keyboard?.hide(); if (vm.hasBrowseBack) vm.backBrowse() else vm.selectTab(lastDiscover) }) {
-                                    GlassIcon(Icons.Default.Close, "Close search")
-                                }
-                            }
-                            } else if (!wideLayout) FloatingNavigation(destination, dockCompact, !accountBusy,
-                                Modifier.playerAnchor { presentation.navigationBounds = it }, ::selectDestination)
-                        }
+                    Column(Modifier.background(MaterialTheme.colorScheme.surfaceContainer)
+                        .hiddenPlayerContent(watch || presentation.active || pip || fullscreen || imeVisible)) {
+                        if (!imeVisible && presentation.mode != PlayerPresentation.CLOSED && playback.details != null)
+                            MiniPlayer(vm,playback,presentation,::restorePlayer,vm::togglePlay,::closePlayer,
+                                gesturesEnabled=!pip && dialog.isEmpty() && sponsorEditor==null && !searchOpen && !accountBusy && saveSheet.video==null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link==null)
+                        if (!wideLayout && !imeVisible) AppNavigation(destination,false,!accountBusy,
+                            Modifier.playerAnchor { presentation.navigationBounds=it },::selectDestination)
+                        else if (wideLayout && !imeVisible) Spacer(Modifier.navigationBarsPadding())
                     }
+
                 }
             ) { padding ->
-              CompositionLocalProvider(LocalContentBottomInset provides (padding.calculateBottomPadding() + 20.dp)) {
-                Box(Modifier.fillMaxSize().recordGlassScene(shellScene)) {
-                  // Content controls must not sample the layer that records them.
-                  // Only the sibling floating chrome uses the shell's live backdrop.
-                  CompositionLocalProvider(LocalGlassBackdrop provides environmentScene?.backdrop, LocalGlassScene provides environmentScene) {
+              CompositionLocalProvider(LocalContentBottomInset provides 20.dp) {
+                val bottom = PaddingValues(bottom = padding.calculateBottomPadding())
+                Box(Modifier.fillMaxSize().padding(bottom).consumeWindowInsets(bottom).semantics { testTagsAsResourceId=true }) {
+                  Box(Modifier.fillMaxSize()) {
                 if (route == "sign-in") CompositionLocalProvider(LocalContentBottomInset provides 20.dp) {
-                    // The form viewport ends above the dock and IME, so focus scrolling cannot put an input behind chrome.
-                    val bottom = PaddingValues(bottom = padding.calculateBottomPadding())
-                    SignInScreen(vm, Modifier.padding(bottom).consumeWindowInsets(bottom)
-                        .hiddenPlayerContent(watch || presentation.active || pip)) { vm.backBrowse() }
+                    // The shared viewport ends above navigation and the IME.
+                    SignInScreen(vm, Modifier.hiddenPlayerContent(watch || presentation.active || pip)) { vm.backBrowse() }
                 }
-                else BrowseGlassSurface(Modifier.fillMaxSize().hiddenPlayerContent(watch || presentation.active || pip),
-                    enabled = subscriptionFeed || channelPage || libraryPage || discoveryPage || searchPage, softEdge = true, toolbar = {
-                        if (libraryPage) LibraryToolbar(libraryTitle,
-                            large = route.isEmpty(), back = if (route.isEmpty()) null else ({ vm.cancelAccumulatedSeek(); vm.backBrowse() }),
-                            actions = {
-                                if (route.isEmpty()) GlassIconButton(Icons.Default.Settings, "Settings", Modifier.testTag("global-settings"), enabled = !accountBusy) { vm.settingsOpened(); settingsPage = "Settings" }
-                                else if (route == "playlists" && account != null) GlassIconButton(Icons.Default.Add, "New playlist", Modifier.testTag("playlist-create"), prominent = true) { dialog = "create" }
+                else BrowseAppSurface(Modifier.fillMaxSize().hiddenPlayerContent(watch || presentation.active || pip),
+                    enabled = subscriptionFeed || channelPage || libraryPage || discoveryPage || searchPage, toolbar = {
+                        if (libraryPage) LibraryToolbar(libraryTitle, back = if (route.isEmpty()) null else ({ vm.cancelAccumulatedSeek(); vm.backBrowse() }), actions = {
+                                AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
+                                if (route.isEmpty()) AppIconButton(Icons.Default.Settings, "Settings", Modifier.testTag("global-settings"), enabled = !accountBusy) { vm.settingsOpened(); settingsPage = "Settings" }
+                                else if (route == "playlists" && account != null) AppIconButton(Icons.Default.Add, "New playlist", Modifier.testTag("playlist-create"), prominent = true) { dialog = "create" }
                                 if (route == "history" && account != null) OverflowMenu("History actions", vm.api.context(), Modifier.testTag("history-actions")) { close ->
-                                    GlassMenuItem(text = { GlassLabel("Clear watch history") }, onClick = { close(); dialog = "clearHistory" })
+                                    DropdownMenuItem(text = { Text("Clear watch history") }, onClick = { close(); dialog = "clearHistory" })
                                 }
                             }, controls = {
                                 if (route == "playlists" && account != null) BrowseTabs(listOf("owned", "subscribed"), librarySection,
                                     { if (it == "owned") "My playlists" else "Subscribed" }, { "playlist-section-$it" }, select = vm::selectPlaylistLibrary)
                                 if (route == "history" && account != null) {
-                                    GlassSurface(Modifier.fillMaxWidth()) { Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    AppSurface(Modifier.fillMaxWidth()) { Row(Modifier.padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                                         SearchField(scopedSearch.draft, { vm.editSearch(it, true) }, "Search history by title or channel", "history-search", Modifier.weight(1f), enabled = state.history?.organized != false) { vm.submitSearch(true) }
-                                        if (scopedSearch.draft.isNotBlank() || scopedSearch.submitted.isNotBlank()) GlassInsetIconButton(vm::clearScopedSearch) { GlassIcon(Icons.Default.Close, "Clear search") }
+                                        if (scopedSearch.draft.isNotBlank() || scopedSearch.submitted.isNotBlank()) AppInsetIconButton(vm::clearScopedSearch) { Icon(Icons.Default.Close, "Clear search") }
                                     } }
                                 }
                             })
-                        else if (discoveryPage) LibraryToolbar("Discover", large = true, actions = {
-                            GlassIconButton(Icons.Default.Refresh, "Refresh $tab", Modifier.testTag("feed-refresh"), enabled = !state.loading, onClick = vm::refresh)
+                        else if (discoveryPage) LibraryToolbar(tab, actions = {
+                            AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
+                            AppIconButton(Icons.Default.Settings,"Settings",Modifier.testTag("global-settings")) { vm.settingsOpened(); settingsPage="Settings" }
+                            AppIconButton(Icons.Default.Refresh, "Refresh $tab", Modifier.testTag("feed-refresh"), enabled = !state.loading, onClick = vm::refresh)
                         }, controls = {
-                            LiquidSegments(listOf("Popular", "Trending"), tab, { it }, Modifier.fillMaxWidth().testTag("discover-feeds"),
-                                tag = { "discover-$it" }, select = vm::selectTab)
                             if (tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
                         })
-                        else if (searchPage) LibraryToolbar("Search", large = true, actions = {
-                            GlassIconButton(Icons.Default.Tune, "Search filters") { dialog = "filters" }
+                        else if (searchPage) LibraryToolbar("Search", back={ searchOpen=false; keyboard?.hide(); if(vm.hasBrowseBack) vm.backBrowse() else vm.selectTab("Popular") }, backLabel="Close search", actions = {
+                            AppIconButton(Icons.Default.Tune, "Search filters") { dialog = "filters" }
                         }, controls = {
+                            SearchField(searchDraft, {searchDraft=it}, "Search or paste a link", "main-search", Modifier.fillMaxWidth().focusRequester(searchFocus)) { submitGlobalSearch() }
                             BrowseTabs(SearchType.entries, searchType, { it.label }, { "search-type-${it.apiValue}" }, select = vm::setSearchType)
+                            val filterLabels=listOfNotNull(
+                                vm.sort.takeIf {it!="relevance" && searchType!=SearchType.CHANNELS}?.let {"Sort: $it"},
+                                vm.date.takeIf {it.isNotBlank() && searchType.videoFilters}?.let {"Uploaded: $it"},
+                                vm.durationFilter.takeIf {it.isNotBlank() && searchType.videoFilters}?.let {"Duration: $it"},
+                                searchVisibility.showMembers?.let {if(it) "Members shown" else "Members hidden"},
+                                "Blocked included".takeIf {searchVisibility.includeBlocked})
+                            if(filterLabels.isNotEmpty()) Text(filterLabels.joinToString(" · "),Modifier.testTag("search-filter-summary"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+
                         })
                         else if (subscriptionFeed) SubscriptionFeedToolbar(account != null, scopedSearch.draft, scopedSearch.submitted, state.loading,
                             { vm.editSearch(it, true) }, { vm.submitSearch(true) }, vm::clearScopedSearch, vm::refresh,
                             { navigate("Subscriptions", "subscription-channels") }, { dialog = "visibilityFilters" }) {
-                            OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
-                                GlassMenuItem(text = { GlassLabel("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
-                                GlassMenuItem(text = { GlassLabel("Export OPML") }, onClick = { close(); vm.openOpml() })
+                            AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
+                            AppIconButton(Icons.Default.Settings,"Settings",Modifier.testTag("global-settings")) { vm.settingsOpened(); settingsPage="Settings" }
+                            if(account!=null) OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
+                                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
+                                DropdownMenuItem(text = { Text("Export OPML") }, onClick = { close(); vm.openOpml() })
                             }
                         }
                         else if (channelPage) ChannelBrowseToolbar(channel, channelTab, channelVideoSort, channelPlaylistSort,
                             scopedSearch.draft, scopedSearch.submitted, state.loading, { vm.cancelAccumulatedSeek(); vm.backBrowse() }, vm::refresh,
                             { vm.editSearch(it, true) }, { vm.submitSearch(true) }, vm::clearScopedSearch, vm::selectChannelTab,
-                            vm::setChannelVideoSort, vm::setChannelPlaylistSort)
+                            vm::setChannelVideoSort, vm::setChannelPlaylistSort) { AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch) }
                     }) { browseModifier, browseTopInset ->
-                Column(browseModifier.padding(top = if (browseGlassPage) 0.dp else padding.calculateTopPadding())
-                    .then(if (libraryPage) Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 800.dp) else Modifier).fillMaxSize()) {
-                    if(offline && !browseGlassPage) GlassLabel("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
+                Column(browseModifier.padding(top = if (titledBrowsePage) 0.dp else padding.calculateTopPadding())
+                    .then(if (libraryPage) Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max = 800.dp) else Modifier.wrapContentWidth(Alignment.CenterHorizontally).widthIn(max=1200.dp)).fillMaxSize()) {
+                    if(offline && !titledBrowsePage) Text("Offline · showing saved results", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer).padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.labelMedium)
                     if (route == "downloads") DownloadedScreen(vm, browseList, browseTopInset) { id -> openPlayer(); vm.playDownload(id) }
                     else if (route.startsWith("post:")) PostDetailScreen(vm, postDetail, browseList,
                         { id -> navigate(tab, "channel:$id") }, ::openRichLink, { play(it) },
                         { list -> browsePlayer(); vm.openPlaylist(list) }, { signIn() }, { vm.backBrowse() })
                     else if (route == "subscription-channels") {
-                        if (account == null) BrowseGlassSurface(Modifier.fillMaxSize(), toolbar = {
+                        if (account == null) BrowseAppSurface(Modifier.fillMaxSize(), toolbar = {
                             BrowsePageTitle("Channels", back = { vm.backBrowse() })
                         }) { guestModifier, top -> Column(guestModifier.padding(top = top)) {
                             EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
@@ -479,7 +453,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             subscriptionList, { query -> vm.searchSubscriptionChannels(query); scope.launch { subscriptionList.scrollToItem(0) } }, vm::refreshSubscriptions,
                             { id -> navigate("Subscriptions", "channel:$id") },
                             { sort -> vm.sortSubscriptionChannels(sort, deviceContext); scope.launch { subscriptionList.scrollToItem(0) } },
-                            header = { BrowsePageTitle("Channels", back = { vm.cancelAccumulatedSeek(); vm.backBrowse() }) })
+                            header = { BrowsePageTitle("Channels", back = { vm.cancelAccumulatedSeek(); vm.backBrowse() }) },
+                            requestedSort = preferenceEdits["profile:subscriptionSort"]?.let { SubscriptionSort.saved(org.json.JSONObject(it.requested).getString("value")) },
+                            saveFeedback = { preferenceEdits["profile:subscriptionSort"]?.let { edit ->
+                                PreferenceSaveFeedback(edit.status,edit.error,{vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)})
+                            } })
                     }
                     else if (route in listOf("clips", "history", "playlists") && account == null) LazyColumn(Modifier.fillMaxSize(), state = browseList,
                         contentPadding = PaddingValues(top = browseTopInset, bottom = LocalContentBottomInset.current)) {
@@ -488,7 +466,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             if (route == "clips") Icons.Default.ContentCut else if (route == "history") Icons.Default.History else Icons.Default.VideoLibrary, "Sign in") { signIn() } }
                     }
                     else if (tab == "You" && route.isEmpty()) YouDashboard(account, vm.store.server, browseList, browseTopInset,
-                        { page -> navigate("You", page) }, { signIn() })
+                        { page -> if(page=="server") {vm.settingsOpened();settingsPage="Server"} else navigate("You", page) }, { signIn() })
                     else if (route == "playlists") PlaylistLibrary(vm, playlists, librarySection, state, browseList, browseTopInset,
                         { list -> browsePlayer(); vm.openPlaylist(list) }, { dialog = "create" }, { signIn() })
                     else if (subscriptionFeed && account == null) LazyColumn(Modifier.fillMaxSize(),
@@ -497,40 +475,43 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(top = browseTopInset, bottom = LocalContentBottomInset.current)) {
                         if (account != null && blocked.error != null && vm.contentSurface() in listOf(ContentSurface.DISCOVERY, ContentSurface.SEARCH)) item {
-                            Column(Modifier.padding(horizontal = Liquid.inset, vertical = 8.dp)) {
-                                GlassLabel(blocked.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                            Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 8.dp)) {
+                                Text(blocked.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                                 ActionRow("Manage / retry blocked channels") { settingsPage = "Blocked channels" }
                             }
                         }
-                        if (offline && browseGlassPage) item { GlassLabel("Offline · showing saved results", Modifier.padding(horizontal = Liquid.inset, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
-                        if (discoveryPage) item { GlassLabel(if (tab == "Trending") "Trending in ${prefs.region}" else "Popular across your instance",
-                            Modifier.padding(horizontal = Liquid.inset, vertical = 8.dp), style = MaterialTheme.typography.bodySmall,
+                        if (offline && titledBrowsePage) item { Text("Offline · showing saved results", Modifier.padding(horizontal = AppTokens.inset, vertical = 8.dp), style = MaterialTheme.typography.labelMedium) }
+                        if (discoveryPage) item { Text(if (tab == "Trending") "Trending in ${prefs.region}" else "Popular across your instance",
+                            Modifier.padding(horizontal = AppTokens.inset, vertical = 8.dp), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if (subscriptionFeed) {
                             if (subscriptions.isNotEmpty() && scopedSearch.submitted.isBlank()) item(key = "subscription-shortcuts") {
-                                androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = Liquid.inset), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = AppTokens.inset), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     items(subscriptions, key = { it.id }) { c -> SubscriptionChannelChip(c, vm.store.server, prefs.thinMode) { navigate("Subscriptions", "channel:${c.id}") } }
                                 }
                             }
-                            item(key = "subscription-heading") { SectionHeading(if (scopedSearch.submitted.isBlank()) "Latest uploads" else "Search results", Modifier.padding(horizontal = Liquid.inset),
+                            item(key = "subscription-controls") { SubscriptionFeedControls(account != null, scopedSearch.draft, scopedSearch.submitted,
+                                { vm.editSearch(it, true) }, { vm.submitSearch(true) }, vm::clearScopedSearch,
+                                { navigate("Subscriptions", "subscription-channels") }, { dialog = "visibilityFilters" }) }
+                            item(key = "subscription-heading") { SectionHeading(if (scopedSearch.submitted.isBlank()) "Latest uploads" else "Search results", Modifier.padding(horizontal = AppTokens.inset),
                                 detail = if (scopedSearch.submitted.isBlank()) "From the channels you follow" else null) }
                         }
                         if (route == "clips") item {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                GlassLabel("Most recent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                if (!state.loading && state.clips.isEmpty() && state.error == null) GlassLabel("Save a moment worth sharing. Open a video and choose More → Create clip.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text("Most recent", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                if (!state.loading && state.clips.isEmpty() && state.error == null) Text("Save a moment worth sharing. Open a video and choose More → Create clip.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
                         if (channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank() && !state.loading && state.clips.isEmpty() && state.error == null) item {
-                            GlassLabel("No clips yet. Clips made on videos from this channel will appear here.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("No clips yet. Clips made on videos from this channel will appear here.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (route.startsWith("hashtag:")) item { GlassLabel(state.title, Modifier.padding(16.dp), style = MaterialTheme.typography.headlineMedium) }
+                        if (route.startsWith("hashtag:")) item { Text(state.title, Modifier.padding(16.dp), style = MaterialTheme.typography.titleLarge) }
                         channel?.let { info -> item {
                             ChannelHeader(info, vm.store.server, prefs.thinMode, subscriptions.any { it.id == info.id }, actions = {
                                 OverflowMenu("Actions for channel ${info.name}", listOf(info.id, vm.api.context()), Modifier.testTag("channel-actions-${info.id}")) { close ->
-                                    GlassMenuItem(text = { GlassLabel("RSS") }, onClick = { close(); vm.openChannelRss(info) })
+                                    DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openChannelRss(info) })
                                     BlockChannelMenuItem(vm, info.id, info.name, { signIn() }, Modifier.testTag("channel-block-${info.id}"), close)
-                                    GlassMenuItem(text = { GlassLabel("Channel SponsorBlock settings") }, onClick = { close(); vm.openSponsorBlock(info.id) })
+                                    DropdownMenuItem(text = { Text("Channel SponsorBlock settings") }, onClick = { close(); vm.openSponsorBlock(info.id) })
                                 }
                             }, readDescription = { channelDescriptionOpen = true },
                                 subscriptionBusy = info.id in subscriptionChannels.busy,
@@ -540,13 +521,16 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 if (account == null) { vm.prepareChannelSubscription(info.id); signIn() } else vm.toggleSubscribe(info.id)
                             }
                             Box(Modifier.padding(horizontal = 16.dp)) { ChannelBlockingError(vm, info.id) }
+                            ChannelBrowseControls(info, channelTab, channelVideoSort, channelPlaylistSort, scopedSearch.draft, scopedSearch.submitted,
+                                { vm.editSearch(it, true) }, { vm.submitSearch(true) }, vm::clearScopedSearch, vm::selectChannelTab,
+                                vm::setChannelVideoSort, vm::setChannelPlaylistSort)
                         } }
                         playlist?.let { list -> item {
                             PlaylistHeader(vm, list, { openPlayer(); vm.play("", source = list.id, seed = list.seedVideoId) },
                                 { dialog = "edit" }, { dialog = "deletePlaylist" }, { signIn() })
                         } }
                         val generalSearch = tab == "Search" && route.isEmpty()
-                        if (generalSearch) items(vm.visibleSearchResults(state.searchResults), key = { "search:${it.key}" }) { result ->
+                        if (generalSearch) itemsIndexed(vm.visibleSearchResults(state.searchResults), key = { index,result -> "search:$index:${result.key}" },contentType={_,result -> result::class}) { _,result ->
                             when (result) {
                                 is SearchResult.VideoItem -> VideoCard(vm, result.video, vm.store.server, { play(result.video) },
                                     { id -> navigate(tab, "channel:$id") }, { signIn() },
@@ -572,13 +556,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (!generalSearch) items(state.channels, key = { "channel:${it.id}" }) { related ->
                             RelatedChannelCard(related, vm.store.server, prefs.thinMode) { navigate(tab, "channel:${related.id}") }
                         }
-                        if (route == "history" && state.history?.organized == false) item { GlassLabel("Update this server to enable organized history and history search.", Modifier.padding(Liquid.inset), style = MaterialTheme.typography.bodySmall) }
-                        if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { GlassLabel(state.history?.total?.let { DisplayFormats.inventory(it.toLong(), "video") } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge) } }
+                        if (route == "history" && state.history?.organized == false) item { Text("Update this server to enable organized history and history search.", Modifier.padding(AppTokens.inset), style = MaterialTheme.typography.bodySmall) }
+                        if (route == "history") item { Row(Modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) { Text(state.history?.total?.let { DisplayFormats.inventory(it.toLong(), "video") } ?: "Recently watched", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge) } }
                         val groups = if (generalSearch) emptyMap() else if (route == "history" && state.history?.organized == true) visibleVideos.groupBy { History.group(it.history?.watched, state.history?.today) } else mapOf(null to visibleVideos)
                         groups.forEach { (group, videos) ->
-                            if (group != null) item(key = "history-group-$group") { GlassLabel(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
-                            val rows = videos.chunked(if (wideLayout && (route.isEmpty() && PreferenceRules.isDiscovery(tab) || subscriptionFeed || channelPage && channelTab?.videoTab == true) && prefs.uiDensity != "compact") 2 else 1)
-                            items(rows, key = { row -> row.joinToString { it.id + it.indexId + (it.playlistIndex?.toString() ?: "") } }) { row ->
+                            if (group != null) item(key = "history-group-$group") { Text(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
+                            val rows = videos.chunked(if (route.isEmpty() && PreferenceRules.isDiscovery(tab) || subscriptionFeed || channelPage && channelTab?.videoTab == true) feedColumns else 1)
+                            itemsIndexed(rows, key={ index,row -> "row:$index:"+row.joinToString { it.id+":"+it.indexId+":"+(it.playlistIndex?.toString() ?: "") } },contentType={_,_->"video-row"}) { _,row ->
                               Row(Modifier.fillMaxWidth()) {
                                 row.forEach { video -> Box(Modifier.weight(1f)) { VideoCard(vm, video, vm.store.server, { play(video, playlist) }, { id -> navigate(tab, "channel:$id") }, { signIn() }, if (playlist?.let { list -> list.owned } == true || route == "history") ({
                                 val list = playlist
@@ -586,7 +570,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 else vm.removeHistory(video.id)
                             }) else null, audioPlay = { openPlayer(); vm.playVideo(video, playlist, audio = true) }, removalLabel = if (playlist != null) "Remove from playlist" else "Remove from history",
                                 avatarOwner = channel?.id.takeIf { route.startsWith("channel:") && channelTab?.videoTab == true }, libraryRow = libraryPage) } }
-                                if (row.size == 1 && wideLayout && (route.isEmpty() && PreferenceRules.isDiscovery(tab) || subscriptionFeed || channelPage && channelTab?.videoTab == true) && prefs.uiDensity != "compact") Spacer(Modifier.weight(1f))
+                                repeat(((if(route.isEmpty() && PreferenceRules.isDiscovery(tab) || subscriptionFeed || channelPage && channelTab?.videoTab==true) feedColumns else 1)-row.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
                               }
                             }
                         }
@@ -594,8 +578,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty() && state.searchResults.isEmpty()) LibraryActionButton("Configure server", Modifier.padding(horizontal = 16.dp)) { dialog = ""; settingsPage = "Server" } }
                         if (!state.loading && (if (generalSearch) vm.visibleSearchResults(state.searchResults).isEmpty() && state.searchResults.isNotEmpty() else visibleVideos.isEmpty() && state.videos.isNotEmpty())) item {
                             Column(Modifier.padding(16.dp)) {
-                                GlassLabel(if (generalSearch) "Results hidden by your visibility settings" else "Videos hidden by your visibility settings")
-                                GlassLabel("Change the filters or load another page to find visible videos.", style = MaterialTheme.typography.bodySmall)
+                                Text(if (generalSearch) "Results hidden by your visibility settings" else "Videos hidden by your visibility settings")
+                                Text("Change the filters or load another page to find visible videos.", style = MaterialTheme.typography.bodySmall)
                                 LibraryActionButton("Visibility controls") { if (vm.contentSurface() == ContentSurface.SEARCH) dialog = if (tab == "Subscriptions") "visibilityFilters" else "filters" else settingsPage = "Browsing" }
                             }
                         }
@@ -611,8 +595,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 }
               }
             }
-              if (wideLayout && !watch && !fullscreen && !pip) FloatingSidebar(destination, !accountBusy,
-                  Modifier.align(Alignment.TopStart).statusBarsPadding().padding(top = 14.dp), ::selectDestination)
+              if (wideLayout && !watch && !fullscreen && !pip && !imeVisible) AppNavigation(destination,true,!accountBusy,
+                  Modifier.align(Alignment.TopStart).fillMaxHeight(),::selectDestination)
               if (presentation.showsWatch && !pip) {
                   // Watch owns the whole window, independently of changing browse/mini chrome allocations.
                   Box(Modifier.fillMaxSize().graphicsLayer { alpha = presentation.watchAlpha }
@@ -625,6 +609,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             }
           }
             if (fullscreen && !pip && chapterPanel.open && chapters.isNotEmpty()) ChaptersSheet(chapters, playback, chapterPanel, vm::seekTo)
+            val contextChange by vm.preferenceContextChange.collectAsStateWithLifecycle()
+            if(contextChange!=null) AlertDialog(tonalElevation=3.dp,onDismissRequest={vm.preferenceContextChange.value=null},
+                title={Text("Discard unconfirmed preferences?")},text={Text("Pending and unsaved changes will be discarded when you change account or server.")},
+                confirmButton={TextButton(vm::continuePreferenceContextChange) {Text("Continue")}},
+                dismissButton={TextButton({vm.preferenceContextChange.value=null}) {Text("Stay")}},
+                containerColor=MaterialTheme.colorScheme.surfaceContainerHigh)
             LinkResolutionDialog(linkResolution, vm::retryLinkResolution,
                 { url -> openExternalContent(context, url) { vm.message.value = "No app could open this link." } }, vm::dismissLinkResolution)
             RssSheet(vm)
@@ -634,15 +624,16 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 (postComments.target as? CommentTarget.Post)?.let(vm::isPostCommentsSource) == true)
                 PostCommentsSheet(vm, postComments, { id -> vm.closePostComments(); navigate(tab, "channel:$id") }, ::openRichLink)
             when(dialog) {
+                "chatPreferences" -> ChatSettings(vm) { dialog="" }
                 "filters" -> FiltersDialog(vm, { dialog = "" })
                 "visibilityFilters" -> FiltersDialog(vm, { dialog = "" }, visibilityOnly = true)
                 "player" -> PlayerSettings(vm, playback, { dialog = "" }, activity::enterPip, activity.supportsPip())
-                "create", "edit" -> PlaylistDialog(if(dialog == "edit") playlist else null, { dialog = "" }) { title, privacy, description -> val editing = if (dialog == "edit") playlist else null; vm.action { if (editing != null) vm.api.editPlaylist(editing.id, title, privacy, description) else vm.api.createPlaylist(title, privacy); vm.refreshAccount(); vm.refresh() }; dialog = "" }
+                "create", "edit" -> PlaylistDialog(if(dialog == "edit") playlist else null, { dialog = "" }) { title, privacy, description -> val editing=if(dialog=="edit") playlist else null; val requestContext=vm.api.context(); if(editing!=null) vm.api.editPlaylist(editing.id,title,privacy,description) else vm.api.createPlaylist(title,privacy); if(vm.api.context()!=requestContext) throw kotlinx.coroutines.CancellationException("Account or instance changed"); vm.refreshAccount();vm.refresh();dialog="" }
                 "deletePlaylist", "clearHistory" -> LibraryConfirmation(if (dialog == "clearHistory") "Clear watch history?" else "Delete playlist?", { dialog = "" }, {
                     val clear = dialog == "clearHistory"; val id = playlist?.id
                     if (clear) vm.clearHistory() else vm.action { if (id != null) vm.api.deletePlaylist(id); vm.refreshAccount(); navigate("You") }
                     dialog = ""
-                }) { GlassLabel("This also changes your account on the website.") }
+                }) { Text("This also changes your account on the website.") }
             }
             val dearrow by vm.dearrowContribution.collectAsStateWithLifecycle()
             if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; signIn() }, dismiss = { vm.sponsorSettingsChannel.value = null })
@@ -661,7 +652,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
 @Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) {
     LibraryEmptyState(title, detail, Icons.Default.PlayCircleOutline, action.takeIf(String::isNotBlank), onClick)
 }
-@Composable private fun ErrorCard(message: String, retry: () -> Unit) { Card(Modifier.padding(16.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(16.dp)) { GlassLabel(message); LibraryControlScene { LibraryActionButton("Retry", onClick = retry) } } } }
+@Composable private fun ErrorCard(message: String, retry: () -> Unit) { Card(Modifier.padding(16.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(16.dp)) { Text(message); Box { LibraryActionButton("Retry", onClick = retry) } } } }
 internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
 internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
 @Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove", avatarOwner: String? = null,
@@ -683,23 +674,23 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
           val naturalHeight = if (prefs.thinMode) 64.dp else maxWidth * 9f / 16f
           val imageHeight = if (warning == null) naturalHeight else maxOf(naturalHeight,
               (if (warningCompact) 96.dp else 144.dp) * fontScale + if (indicator.watched) badgeInset else 0.dp)
-          Box(Modifier.fillMaxWidth().height(imageHeight).clip(Liquid.media).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
+          Box(Modifier.fillMaxWidth().height(imageHeight).clip(AppTokens.media).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
             if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = warningCompact,
                 topInset = if (indicator.watched) badgeInset else 0.dp, bottomInset = if (duration.isNotBlank()) badgeInset else 4.dp)
             else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), video.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             if (indicator.watched) {
-                GlassLabel("Watched", Modifier.align(Alignment.TopStart).padding(8.dp)
+                Text("Watched", Modifier.align(Alignment.TopStart).padding(8.dp)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
                     .testTag("video-watched-${video.id}"), color = Color.White,
                     style = MaterialTheme.typography.labelMedium.copy(shadow = PlayerTextShadow))
             }
-            if (duration.isNotBlank()) GlassLabel(duration, Modifier.align(Alignment.BottomEnd).padding(8.dp).padding(horizontal = 6.dp, vertical = 3.dp),
+            if (duration.isNotBlank()) Text(duration, Modifier.align(Alignment.BottomEnd).padding(8.dp).padding(horizontal = 6.dp, vertical = 3.dp),
                 color = Color.White, fontSize = 12.sp, style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow))
             indicator.bar?.let { fraction ->
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(4.dp)
                     .testTag("video-progress-${video.id}").semantics {
                         progressBarRangeInfo = ProgressBarRangeInfo(indicator.percent?.div(100f) ?: 1f, 0f..1f)
-                    }, color = MaterialTheme.colorScheme.primary, trackColor = GlassOptics.mediaPlate.copy(alpha = .3f), gapSize = 0.dp, drawStopIndicator = {})
+                    }, color = MaterialTheme.colorScheme.primary, trackColor = Color.Black.copy(alpha = .3f), gapSize = 0.dp, drawStopIndicator = {})
             }
           }
         }
@@ -711,8 +702,8 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                 if (video.membersOnly) MembersBadge(video.id)
                 DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, Modifier.clickable(onClick = play), maxLines = 2)
                 if (prefs.thinMode) {
-                    if (indicator.watched) GlassLabel("Watched", Modifier.testTag("video-watched-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                    indicator.percent?.let { GlassLabel("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
+                    if (indicator.watched) Text("Watched", Modifier.testTag("video-watched-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    indicator.percent?.let { Text("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary) }
                 }
                 if (video.author.isNotBlank() || video.channelId.isNotBlank()) ChannelAuthor(server, video.authorAvatar,
                     video.author.ifBlank { "Unknown channel" }, Avatars.show(prefs.thinMode, video.channelId, avatarOwner),
@@ -720,19 +711,19 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                     tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
                 VideoMetadataLine(video, Modifier.padding(top = 4.dp))
                 video.history?.let { history ->
-                    GlassLabel("Released: ${DisplayFormats.date(history.released).ifBlank { "Unknown date" }}", style = MaterialTheme.typography.bodySmall)
-                    GlassLabel("Watched: ${DisplayFormats.date(history.watched).ifBlank { "Unknown watch date" }}", style = MaterialTheme.typography.bodySmall)
-                    if (video.unavailable) GlassLabel("Video ID: ${video.id}", style = MaterialTheme.typography.bodySmall)
-                    if (video.duration <= 0) GlassLabel("Duration: Unknown", style = MaterialTheme.typography.bodySmall)
-                    else if (prefs.thinMode) GlassLabel("Duration: ${time(video.duration)}", style = MaterialTheme.typography.bodySmall)
+                    Text("Released: ${DisplayFormats.date(history.released).ifBlank { "Unknown date" }}", style = MaterialTheme.typography.bodySmall)
+                    Text("Watched: ${DisplayFormats.date(history.watched).ifBlank { "Unknown watch date" }}", style = MaterialTheme.typography.bodySmall)
+                    if (video.unavailable) Text("Video ID: ${video.id}", style = MaterialTheme.typography.bodySmall)
+                    if (video.duration <= 0) Text("Duration: Unknown", style = MaterialTheme.typography.bodySmall)
+                    else if (prefs.thinMode) Text("Duration: ${time(video.duration)}", style = MaterialTheme.typography.bodySmall)
                 }
             }
             VideoActionsMenu(vm, video, signIn, channel, audioPlay ?: { vm.playVideo(video, audio = true) }, remove, removalLabel,
                 removeFromPlaylist, removeFromPlaylistEnabled)
-            if(remove != null && !libraryRow) GlassInsetIconButton(onClick = remove) { GlassIcon(Icons.Default.RemoveCircleOutline, "Remove ${video.title}") }
+            if(remove != null && !libraryRow) AppInsetIconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${video.title}") }
         }
     }
-    val cardModifier = Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = if (compact) 8.dp else 12.dp)
+    val cardModifier = Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset, vertical = if (compact) 8.dp else 12.dp)
         .testTag("video-card-${video.id}").semantics { if (indicator.description.isNotEmpty()) stateDescription = indicator.description }
     if (compact && (!libraryRow || LocalDensity.current.fontScale <= 1.3f)) Row(cardModifier, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         thumbnail(Modifier.width(if (libraryRow) if (prefs.uiDensity == "compact") 80.dp else 112.dp else if (LocalDensity.current.fontScale > 1.3f) 96.dp else 128.dp))
@@ -745,7 +736,7 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
 
 @Composable
 private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: PlayerPresentationState,
-    open: () -> Unit, toggle: () -> Unit, close: () -> Unit, gesturesEnabled: Boolean) = DeferredPlayerGlass {
+    open: () -> Unit, toggle: () -> Unit, close: () -> Unit, gesturesEnabled: Boolean) {
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     val windowSize = androidx.compose.ui.platform.LocalWindowInfo.current.containerSize
@@ -754,23 +745,25 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     var origin by remember { mutableStateOf(Offset.Zero) }
     var width by remember { mutableFloatStateOf(1f) }
+    var transportWidth by remember(density.density) { mutableFloatStateOf(48*density.density) }
     val enabled = gesturesEnabled && !exploring && lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
     val dismissOffset = if (presentation.target == PlayerPresentation.CLOSED) presentation.dismissDirection * width * presentation.fraction else 0f
     val drag = presentation.dragHandler(density.density,
         kotlin.math.abs(presentation.miniBounds.top - presentation.watchBounds.top).coerceAtLeast(160 * density.density),
         width, vm::cancelAccumulatedSeek, close)
     val currentDrag by rememberUpdatedState(drag)
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).clipToBounds().hiddenPlayerContent(presentation.mode != PlayerPresentation.MINI || presentation.active)
+    Box(Modifier.fillMaxWidth().clipToBounds().hiddenPlayerContent(presentation.mode != PlayerPresentation.MINI || presentation.active)
         .layout { measurable, constraints ->
             val placeable = measurable.measure(constraints)
             layout(placeable.width, if (presentation.allocatesMini) placeable.height else 0) {
                 placeable.place(0, if (presentation.allocatesMini) 0 else -placeable.height)
             }
         }) {
-        GlassSurface(modifier = Modifier.graphicsLayer {
+        AppSurface(modifier = Modifier.graphicsLayer {
             translationX = dismissOffset
             alpha = presentation.miniAlpha
-        }, shape = Liquid.card) {
+        }, shape = RoundedCornerShape(0.dp), role = AppSurfaceRole.MINI_PLAYER) {
+            LinearProgressIndicator(progress={ if(playback.duration>0) (playback.position.toFloat()/playback.duration).coerceIn(0f,1f) else 0f },modifier=Modifier.fillMaxWidth().height(2.dp))
             Row(Modifier.fillMaxWidth().heightIn(min = 72.dp).testTag("mini-player")
                 .onGloballyPositioned { coordinates ->
                     origin = coordinates.positionInRoot()
@@ -782,7 +775,7 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         val down = awaitFirstDown(requireUnconsumed = false)
                         // Buttons keep their entire 48dp hit areas; title/background drags can cancel a click.
                         val onButtons = if (layoutDirection == androidx.compose.ui.unit.LayoutDirection.Ltr)
-                            down.position.x >= size.width - 96.dp.toPx() else down.position.x <= 96.dp.toPx()
+                            down.position.x >= size.width - transportWidth - 48.dp.toPx() else down.position.x <= transportWidth + 48.dp.toPx()
                         if (onButtons || presentation.active) return@awaitEachGesture
                         playerGesture(down, PlayerPresentation.MINI, currentDrag, position = { it + origin })
                     }
@@ -800,20 +793,33 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         onClickLabel = "Open player", onClick = open).testTag("mini-player-preview"))
                 Column(Modifier.weight(1f).clickable(enabled = presentation.mode == PlayerPresentation.MINI && !presentation.active,
                     onClickLabel = "Open player", onClick = open).padding(horizontal = 8.dp)) {
-                    if (playback.clip != null) GlassLabel(playback.clip.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (playback.clip != null) Text(playback.clip.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     else playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1) }
-                    GlassLabel(playback.details?.video?.author.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    when {
+                        playback.error != null -> Text("Playback failed",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
+                        playback.loading || playback.buffering -> Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
+                            CircularProgressIndicator(Modifier.size(16.dp),strokeWidth=2.dp)
+                            Text(if(playback.loading) "Loading" else "Buffering",style=MaterialTheme.typography.bodySmall)
+                        }
+                        else -> Text(playback.details?.video?.author.orEmpty(), maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
+                    }
                 }
                 val ended = playback.playerState == Player.STATE_ENDED
-                GlassInsetIconButton(onClick = toggle, enabled = playback.canPlay && presentation.mode == PlayerPresentation.MINI && !presentation.active, modifier = Modifier.size(48.dp)) {
-                    GlassIcon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
+                Box(Modifier.onGloballyPositioned { transportWidth=it.size.width.toFloat() }) {
+                if(playback.error!=null) TextButton(vm::retryPlayback,
+                    Modifier.heightIn(min=48.dp).testTag("mini-player-retry"),enabled=presentation.mode==PlayerPresentation.MINI && !presentation.active && !playback.loading) {Text("Retry")}
+                else AppInsetIconButton(onClick = toggle, enabled = playback.canPlay && presentation.mode == PlayerPresentation.MINI && !presentation.active, modifier = Modifier.size(48.dp)) {
+                    Icon(if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow,
                         if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play")
                 }
-                GlassInsetIconButton(onClick = close, enabled = presentation.mode == PlayerPresentation.MINI && !presentation.active, modifier = Modifier.size(48.dp)) { GlassIcon(Icons.Default.Close, "Close player") }
+                }
+                AppInsetIconButton(onClick = close, enabled = presentation.mode == PlayerPresentation.MINI && !presentation.active, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, "Close player") }
             }
         }
     }
 }
+private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
+
 @Composable private fun WatchScreen(vm: AppViewModel, playback: PlaybackState, modifier: Modifier,
     presentation: PlayerPresentationState, detailsList: androidx.compose.foundation.lazy.LazyListState,
     resize: WatchPlayerResizeState, chapterPanel: ChapterPanelState,
@@ -841,37 +847,47 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     val chapters = playback.chapters
     val commentsOpen = comments.open && prefs.showYoutubeComments && comments.videoId == playback.details?.video?.id
     val chatDocked = chat.open && chat.available && !chatAppearance.overlay
-    val drawerOpen = commentsOpen || chapterPanel.open || chatDocked
+    val queueOpen by vm.queueExpanded.collectAsStateWithLifecycle()
+    val drawerOpen = commentsOpen || chapterPanel.open || chatDocked || queueOpen
     WatchAmbientScene(modifier.fillMaxSize(), ambientPictureBounds(presentation.watchBounds, playback.geometry.ratio)) {
     BoxWithConstraints(Modifier.fillMaxSize().testTag("watch-content")
         .pointerInput(Unit) {
             // Consume otherwise unhandled touches so the revealed browse layer cannot receive watch-page taps.
             awaitEachGesture { awaitFirstDown().consume(); waitForUpOrCancellation()?.consume() }
         }) {
-        val sideBySide = maxWidth >= 840.dp
+        val sideBySide = maxWidth >= 840.dp && maxWidth * .62f >= 480.dp && maxWidth * .38f >= 320.dp
         val playerWidth = (if (sideBySide) maxWidth * .62f - 16.dp else maxWidth - 16.dp).value
-        val expandedHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false)
-        val compactHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f)
+        val expandedHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false).let { if(sideBySide) minOf(it,maxHeight.value*.6f) else it }
+        val compactHeight = minOf(expandedHeight,playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f))
         val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight > compactHeight && !drawerOpen)
-        val playerHeight = if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
-        val detailsContent: @Composable ColumnScope.() -> Unit = {
-            if (chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,
+        val playerHeight = if(sideBySide) (expandedHeight+(compactHeight-expandedHeight)*resize.progress).dp else if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
+        val supportingList = key(queue.token,queue.currentKey) { rememberLazyListState() }
+        val detailsContent: @Composable ColumnScope.(WatchPane) -> Unit = { pane ->
+            val tools=pane!=WatchPane.PRIMARY
+            val information=pane!=WatchPane.SUPPORTING
+            if (tools && queueOpen && sideBySide) Column(Modifier.weight(1f).fillMaxWidth()) {
+                LibraryToolbar("Playback queue", statusInset = false, actions = { AppIconButton(Icons.Default.Close, "Close playback queue") { vm.queueExpanded.value = false } })
+                PlaybackQueuePanel(vm, signIn, channel, fullHeight = true)
+            }
+            else if (tools && chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,
                 playback.seekable && !playback.loading && playback.error == null, chapterPanel::close, vm::seekTo,
                 Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp))
-            else if (chatDocked) ChatReplayPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), chatSettings)
-            else if (commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
-            else if (playback.clip != null) LazyColumn(Modifier.weight(1f).testTag("clip-details-list"), state = detailsList) {
+            else if (tools && chatDocked) ChatReplayPanel(vm, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), chatSettings)
+            else if (tools && commentsOpen) CommentsDrawer(vm, comments, Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), channel, ::openWatchLink)
+            else if (information && playback.clip != null) LazyColumn(Modifier.weight(1f).testTag("clip-details-list"), state = detailsList) {
                 item { ClipDetails(vm, playback.clip, closePlayer, channel) }
             }
-            else LazyColumn(Modifier.weight(1f).nestedScroll(scrollConnection).testTag("watch-details-list"), state = detailsList) {
-                playback.details?.let { details ->
+            else LazyColumn(Modifier.weight(1f).background(MaterialTheme.colorScheme.surface)
+                .then(if(information) Modifier.nestedScroll(scrollConnection) else Modifier)
+                .testTag(if(information) "watch-details-list" else "watch-supporting-list"), state = if(information) detailsList else supportingList) {
+                if(information) playback.details?.let { details ->
                     item(key = "watch:metadata") {
-                      WatchGlassScene(Modifier.fillMaxWidth().testTag("watch-metadata"), inheritAmbient = true) {
-                      Column(Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                      WatchContent(Modifier.fillMaxWidth().testTag("watch-metadata")) {
+                      Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
-                        val titleStyle = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, lineHeight = 26.sp)
-                        if (playback.downloadId != null) GlassLabel(details.video.title, style = titleStyle, fontWeight = FontWeight.SemiBold)
-                        else DeArrowTitle(vm, details.video, titleStyle, fontWeight = FontWeight.SemiBold)
+                        val titleStyle = MaterialTheme.typography.titleLarge
+                        if (playback.downloadId != null) Text(details.video.title, style = titleStyle)
+                        else DeArrowTitle(vm, details.video, titleStyle)
                         VideoNotices(details)
                         VideoMetadataLine(details.video, likes = details.likes)
                         if (playback.downloadId != null) DownloadChannelIdentity(details.video)
@@ -885,32 +901,43 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                                 subscriptionChecking = subscriptionChannels.loading,
                                 subscriptionError = subscriptionChannels.actionErrors[details.video.channelId] ?: subscriptionChannels.error.takeIf { !subscriptionChannels.loaded })
                         if (playback.downloadId == null) WatchPrimaryActions(vm, details, { add(details.video) }, signIn)
-                        blocked.error?.let { GlassLabel(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                        if (prefs.showYoutubeComments && playback.downloadId == null) CommentsEntry(comments) { chapterPanel.close(); vm.openComments() }
+                        blocked.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                        if (prefs.showYoutubeComments && playback.downloadId == null) CommentsEntry(comments) { chapterPanel.close(); vm.queueExpanded.value = false; vm.openComments() }
                         WatchDisclosureRow("Description", Icons.AutoMirrored.Filled.Notes,
                             modifier = Modifier.testTag("watch-description-toggle"), expanded = description,
                             actionLabel = if (description) "Hide description" else "Show description") { describe(!description) }
                         VideoDescription(details, queue.currentKey.orEmpty(), vm.store.server, description, ::openWatchLink)
-                        if (queue.current?.linkPlayback?.invalidEnd == true) GlassLabel("Invalid end boundary ignored.", style = MaterialTheme.typography.bodySmall)
+                        if (queue.current?.linkPlayback?.invalidEnd == true) Text("Invalid end boundary ignored.", style = MaterialTheme.typography.bodySmall)
                     } } }
                 }
-                if (queue.hasExplicitQueue) item(key = "watch:queue") { PlaybackQueuePanel(vm, signIn, channel) }
-                playback.details?.let { details ->
+                if (information && queue.hasExplicitQueue) item(key = "watch:queue") {
+                    ActionRow("Playback queue", Modifier.padding(horizontal = AppTokens.inset).testTag("playback-queue-header"),
+                        detail = queue.source?.title, icon = Icons.AutoMirrored.Filled.PlaylistPlay, actionLabel = "Open playback queue") {
+                        chapterPanel.close(); vm.closeComments(); vm.closeChat(); vm.queueExpanded.value = true
+                    }
+                }
+                if(pane!=WatchPane.PRIMARY && playback.clip==null) playback.details?.let { details ->
                     if (prefs.relatedVideos) {
-                        item(key = "watch:up-next") { GlassLabel("Up next", Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp)
+                        item(key = "watch:up-next") { Text("Up next", Modifier.padding(horizontal = AppTokens.inset, vertical = 20.dp)
                             .testTag("watch-up-next"), style = MaterialTheme.typography.titleMedium) }
-                        items(vm.visibleVideos(details.recommendations, ContentSurface.RECOMMENDATIONS, AiPageGroup.RECOMMENDATIONS, aiState), key = { it.id }) { VideoCard(vm, it, vm.store.server, { play(it) }, channel, signIn, aiGroup = AiPageGroup.RECOMMENDATIONS) }
+                        itemsIndexed(vm.visibleVideos(details.recommendations, ContentSurface.RECOMMENDATIONS, AiPageGroup.RECOMMENDATIONS, aiState), key = { index,video -> "recommendation:$index:${video.id}" },contentType={_,_->"video"}) { _,video -> VideoCard(vm, video, vm.store.server, { play(video) }, channel, signIn, aiGroup = AiPageGroup.RECOMMENDATIONS) }
                     }
                 }
             }
         }
+        if (queueOpen && !sideBySide) LibraryPanel("Playback queue", { vm.queueExpanded.value = false }, closeLabel = "Close playback queue") { body, _ ->
+            Box(body) { PlaybackQueuePanel(vm, signIn, channel, fullHeight = true) }
+        }
         if (sideBySide) Row(Modifier.fillMaxSize()) {
-            Box(Modifier.weight(.62f).fillMaxHeight().padding(8.dp).playerAnchor { presentation.watchBounds = it })
-            Column(Modifier.weight(.38f).fillMaxHeight(), content = detailsContent)
+            Column(Modifier.weight(.62f).fillMaxHeight()) {
+                Box(Modifier.fillMaxWidth().padding(horizontal=8.dp).height(playerHeight).playerAnchor { presentation.watchBounds = it })
+                detailsContent(WatchPane.PRIMARY)
+            }
+            Column(Modifier.weight(.38f).fillMaxHeight()) { detailsContent(WatchPane.SUPPORTING) }
         } else Column(Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp).height(playerHeight)
                 .playerAnchor { presentation.watchBounds = it })
-            detailsContent()
+            detailsContent(WatchPane.PHONE)
         }
     }
     }
@@ -921,35 +948,43 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
     val context = remember { vm.api.context() }
     val searchType by vm.searchType.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
+    val savedVisibility by vm.searchVisibility.collectAsStateWithLifecycle()
+    val edits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
+    val browse by vm.browse.collectAsStateWithLifecycle()
     var sort by remember { mutableStateOf(vm.sort) }
     var date by remember { mutableStateOf(vm.date) }
     var duration by remember { mutableStateOf(vm.durationFilter) }
-    var visibility by remember { mutableStateOf(vm.searchVisibility.value) }
-    LibraryPanel("Search filters", dismiss, closeLabel = "Cancel", actions = {
-        LibraryActionButton("Apply", prominent = true, onClick = {
-            if (vm.saveSearchVisibility(visibility, context)) {
-                vm.sort = sort; vm.date = date; vm.durationFilter = duration; vm.refresh(); dismiss()
-            }
-        })
-    }) { body, top ->
-        Column(body.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset,
+    val visibility=remember(savedVisibility,edits) {vm.requestedSearchVisibility()}
+    val edit=edits["profile:searchVisibility"]
+    fun refresh() { if(vm.api.context()==context) vm.refresh() }
+    LibraryPanel("Search filters", dismiss, closeLabel = "Close search filters") { body, top ->
+        Column(body.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset,
             top = top + 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!visibilityOnly) {
-                if (searchType != SearchType.CHANNELS) Choice("Sort", listOf("relevance", "views"), sort) { sort = it }
-                if (searchType.videoFilters) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { date = it }
-                if (searchType.videoFilters) Choice("Duration", listOf("", "short", "long"), duration) { duration = it }
+                if (searchType != SearchType.CHANNELS) Choice("Sort", listOf("relevance", "views"), sort) { if(it!=sort) {sort=it;vm.sort=it;refresh()} }
+                if (searchType.videoFilters) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { if(it!=date) {date=it;vm.date=it;refresh()} }
+                if (searchType.videoFilters) Choice("Duration", listOf("", "short", "long"), duration) { if(it!=duration) {duration=it;vm.durationFilter=it;refresh()} }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(visibility.showMembers ?: prefs.showMemberVideos, { visibility = visibility.copy(showMembers = it) }, modifier = Modifier.testTag("search-show-members"))
-                GlassLabel("Show members-only videos", Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("search-show-members")
+                .toggleable(visibility.showMembers ?: prefs.showMemberVideos,role=androidx.compose.ui.semantics.Role.Checkbox) {
+                    vm.saveSearchVisibility(visibility.copy(showMembers=it),context)
+                },verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(visibility.showMembers ?: prefs.showMemberVideos,null)
+                Text("Show members-only videos",Modifier.weight(1f))
             }
-            GlassLabel(if (visibility.showMembers == null) "Using browsing default" else "Search override saved on this device", style = MaterialTheme.typography.bodySmall)
+            Text(if (visibility.showMembers == null) "Using browsing default" else "Search override on this device", style = MaterialTheme.typography.bodySmall)
             ActionRow("Use browsing default", trailingIcon = Icons.Default.RestartAlt,
-                modifier = Modifier.testTag("search-members-reset")) { visibility = visibility.copy(showMembers = null) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(visibility.includeBlocked, { visibility = visibility.copy(includeBlocked = it) }, modifier = Modifier.testTag("search-include-blocked"))
-                GlassLabel("Include blocked channels", Modifier.weight(1f))
+                modifier = Modifier.testTag("search-members-reset")) { vm.saveSearchVisibility(visibility.copy(showMembers=null),context) }
+            Row(Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("search-include-blocked")
+                .toggleable(visibility.includeBlocked,role=androidx.compose.ui.semantics.Role.Checkbox) {
+                    vm.saveSearchVisibility(visibility.copy(includeBlocked=it),context)
+                },verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(visibility.includeBlocked,null)
+                Text("Include blocked channels",Modifier.weight(1f))
             }
+            PreferenceSaveFeedback(edit?.status,edit?.error,{vm.preferenceSaves.retry("profile:searchVisibility")},{vm.preferenceSaves.revert("profile:searchVisibility")})
+            Text(if(browse.loading) "Updating results…" else "Filters apply immediately",
+                Modifier.semantics { liveRegion=androidx.compose.ui.semantics.LiveRegionMode.Polite },style=MaterialTheme.typography.bodySmall)
         }
     }
 }

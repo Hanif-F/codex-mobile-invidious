@@ -334,10 +334,10 @@ class PlaybackVisibilitySmokeTest {
         compose.onNodeWithContentDescription("Close comments").performClick()
         ui { activity.model.insertQueue(Video("testvideo02", "Next video"), true) }
         until { activity.model.queue.value.items.size == 2 }
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
-        if (compose.onAllNodesWithTag("playback-queue-items").fetchSemanticsNodes().isEmpty())
-            compose.onNodeWithTag("playback-queue-header").performClick()
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue-header"))
+        compose.onNodeWithTag("playback-queue-header").performClick()
         compose.onNodeWithTag("playback-queue-items").performTouchInput { swipeDown() }
+        compose.onNodeWithContentDescription("Close playback queue").performClick()
         compose.onNodeWithTag("watch-content").assertExists()
         playerDrag(dy = 96f)
         compose.onNodeWithContentDescription("Pause").performClick(); until { !activity.model.playback.value.playWhenReady }
@@ -388,7 +388,7 @@ class PlaybackVisibilitySmokeTest {
         val occurrence = activity.model.queue.value.currentKey
         val selection = activity.model.playback.value.selection!!
         compose.navigateBack()
-        compose.onNodeWithTag("mini-player").assertExists().assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(80f))
+        compose.onNodeWithTag("mini-player").assertExists().assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(72f))
         ui {
             assertSame(controller, activity.model.controller.value)
             assertEquals(30_000L, controller.currentPosition); assertEquals(selection, controller.trackSelectionParameters)
@@ -453,7 +453,8 @@ class PlaybackVisibilitySmokeTest {
         awake(false)
         ui { assertTrue(activity.model.controller.value!!.playWhenReady) }
         foreground(); awake(true)
-        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
+        compose.navigateBack()
+        compose.selectFeed("You"); compose.openAppSettings()
         awake(false)
         ui { assertTrue(playerViews().isEmpty()) }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
@@ -498,7 +499,7 @@ class PlaybackVisibilitySmokeTest {
     @Test fun narrowLayoutsKeepActionsAndMiniPlayerAccessibleWithLargeTitles() {
         ui { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
         openVideo()
         ui { activity.model.controller.value!!.pause() }

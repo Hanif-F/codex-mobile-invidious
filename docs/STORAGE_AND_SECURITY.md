@@ -8,7 +8,7 @@ Paths describe Android sandbox locations, not host repository paths.
 
 | Store | Contents and lifetime |
 | --- | --- |
-| SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide colored-background/adaptive-control/ambient/transparency settings. |
+| SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide accent/ambient/transparency settings; dormant legacy colored-background/adaptive-control keys. |
 | AndroidKeyStore alias `mobivious.session` | AES key for session encryption; the key is not a checked-in file. |
 | `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions and visibility snapshots. |
 | `cacheDir/feeds/` | Selected successful feed/search response snapshots, hashed keys, bounded count/age/size. |
@@ -138,3 +138,17 @@ Repository secrets are local `.env`, `android/signing.properties`, keystore file
 and SDK settings; they are ignored by Git. The coverage map documents their
 roles without reading or reproducing their values. Signing identity must be
 preserved for compatible APK updates; see [Development](DEVELOPMENT.md).
+
+## Appearance migration and pending preference intent
+
+An unknown or absent `appearance.accentPreset` uses `blue`. An absent/invalid
+`appearance.ambientMode` uses false; explicit true and false are preserved. No
+account setting is written by device appearance migration. Legacy optical flags
+remain stored but have no rendering consumers.
+
+Unconfirmed preference requests live in the ViewModel, survive configuration
+recreation and page navigation, and are isolated by account/instance generation.
+They are not a process-death journal. Failed persistence retains confirmed durable
+values and the requested edit with Retry/Revert. Sign-out/server changes warn
+before discarding unconfirmed intent. Sensitive identity/account operations retain
+explicit submission.

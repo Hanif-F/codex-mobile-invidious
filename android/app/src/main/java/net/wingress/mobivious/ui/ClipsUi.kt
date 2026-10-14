@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -81,7 +80,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val warning = vm.aiDecision(clip.video, AiPageGroup.OTHER, aiState).warning
     Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
-        .padding(horizontal = Liquid.inset, vertical = 9.dp).testTag("clip-card-${clip.id}"),
+        .padding(horizontal = AppTokens.inset, vertical = 9.dp).testTag("clip-card-${clip.id}"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!prefs.thinMode || warning != null) BoxWithConstraints(Modifier.width(if (prefs.uiDensity == "compact" || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 80.dp else 112.dp)) {
           val imageHeight = if (warning == null) maxWidth * 9f / 16f else maxOf(maxWidth * 9f / 16f, 96.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale)
@@ -106,9 +105,9 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
         }
         OverflowMenu("Actions for clip ${clip.title}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
-            GlassMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip) { vm.message.value = "No app could share this clip." } })
-            GlassMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
-            if (clip.owned(vm.api.context())) GlassMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
+            DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip) { vm.message.value = "No app could share this clip." } })
+            DropdownMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
+            if (clip.owned(vm.api.context())) DropdownMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
         }
     }
 }
@@ -120,15 +119,15 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val prefs = queue.effective(savedPrefs)
     val details = queue.details?.takeIf { it.video.id == clip.video.id }
     val source = details?.video ?: clip.video
-    WatchGlassScene(Modifier.fillMaxWidth()) {
+    WatchContent(Modifier.fillMaxWidth()) {
     Column(Modifier.fillMaxWidth().padding(20.dp).testTag("clip-details"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape) {
                 Icon(Icons.Default.ContentCut, null, Modifier.padding(9.dp).size(20.dp), MaterialTheme.colorScheme.onPrimaryContainer)
             }
             Text("Clip", Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            if (clip.owned(vm.api.context())) GlassInsetIconButton(onClick = { vm.confirmDeleteClip(clip) }, Modifier.testTag("clip-delete")) { Icon(Icons.Default.DeleteOutline, "Delete clip") }
-            GlassInsetIconButton(onClick = close) { Icon(Icons.Default.Close, "Close clip") }
+            if (clip.owned(vm.api.context())) AppInsetIconButton(onClick = { vm.confirmDeleteClip(clip) }, Modifier.testTag("clip-delete")) { Icon(Icons.Default.DeleteOutline, "Delete clip") }
+            AppInsetIconButton(onClick = close) { Icon(Icons.Default.Close, "Close clip") }
         }
         if (clip.creator.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(36.dp)) {
@@ -182,7 +181,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val busy by vm.clipDeleteBusy.collectAsStateWithLifecycle()
     val error by vm.clipDeleteError.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    if (resolution.link != null) GlassAlertDialog(onDismissRequest = vm::dismissClipResolution,  icon = { Icon(Icons.Default.ContentCut, null) },
+    if (resolution.link != null) AlertDialog(tonalElevation=3.dp,onDismissRequest = vm::dismissClipResolution,  icon = { Icon(Icons.Default.ContentCut, null) },
         title = { Text(if (resolution.foreign) "Clip from another instance" else if (resolution.loading) "Opening clip" else "Clip unavailable") },
         text = { if (resolution.loading) CircularProgressIndicator() else Text(if (resolution.foreign) "This clip belongs to ${resolution.link!!.server}. Open it there to watch it." else resolution.error.orEmpty()) },
         confirmButton = { if (!resolution.loading) TextButton(onClick = {
@@ -203,14 +202,25 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val editor by vm.clipEditor.collectAsStateWithLifecycle()
     if (!editor.open || editor.context != vm.api.context()) return
     val context = LocalContext.current
-    LibraryPanel(if (editor.published == null) "Create clip" else "Your clip is ready", vm::closeClipEditor,
+    val original=remember(editor.occurrence) {Triple(editor.title,editor.startText,editor.endText)}
+    var discard by remember(editor.occurrence) {mutableStateOf(false)}
+    fun close() {
+        if(editor.busy) return
+        if(editor.published==null && Triple(editor.title,editor.startText,editor.endText)!=original) discard=true
+        else vm.closeClipEditor()
+    }
+    if(discard) AlertDialog(tonalElevation=3.dp,onDismissRequest={discard=false},title={Text("Discard this clip?")},
+        confirmButton={TextButton(vm::closeClipEditor) {Text("Discard")}},
+        dismissButton={TextButton({discard=false}) {Text("Keep editing")}},
+        containerColor=MaterialTheme.colorScheme.surfaceContainerHigh)
+    LibraryPanel(if (editor.published == null) "Create clip" else "Your clip is ready", ::close,
         enabled = !editor.busy, closeLabel = "Close clip editor", actions = {
             if (editor.published == null) LibraryActionButton(if (editor.busy) "Publishing…" else "Publish clip",
                 Modifier.testTag("clip-publish"), enabled = !editor.busy && editor.validation == null, prominent = true, onClick = vm::publishClip)
         }) { modifier, top ->
         Column(modifier.testTag("clip-editor").verticalScroll(rememberScrollState())
-            .padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            GlassSection {
+            .padding(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            AppSection {
 
                         ClipPreview(vm, editor)
                         if (editor.published == null) {
@@ -252,7 +262,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                                 LibraryActionButton("Watch clip", Modifier.testTag("clip-watch-published")) { vm.watchClip(clip) }
                             }
                         }
-            TextButton(onClick = vm::closeClipEditor, enabled = !editor.busy) { Text(if (editor.published == null) "Cancel" else "Done") }
+            TextButton(onClick = ::close, enabled = !editor.busy) { Text(if (editor.published == null) "Cancel" else "Done") }
 
             }
         }
@@ -390,8 +400,8 @@ private class StoryboardCrop(private val frame: StoryboardFrame) : Transformatio
                 })
             }) {
                 val left = size.width * startFraction; val right = size.width * endFraction
-                drawRect(GlassOptics.mediaPlate.copy(alpha = .58f), size = Size(left, size.height))
-                drawRect(GlassOptics.mediaPlate.copy(alpha = .58f), topLeft = Offset(right, 0f), size = Size(size.width - right, size.height))
+                drawRect(Color.Black.copy(alpha = .58f), size = Size(left, size.height))
+                drawRect(Color.Black.copy(alpha = .58f), topLeft = Offset(right, 0f), size = Size(size.width - right, size.height))
                 drawRect(primary, topLeft = Offset(left, 2.dp.toPx()), size = Size((right - left).coerceAtLeast(0f), size.height - 4.dp.toPx()), style = Stroke(3.dp.toPx()))
                 for (x in listOf(left, right)) {
                     drawLine(primary, Offset(x, 0f), Offset(x, size.height), 9.dp.toPx())

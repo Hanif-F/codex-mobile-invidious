@@ -9,7 +9,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.AccountPreferences
-import net.wingress.mobivious.ui.Liquid
+import net.wingress.mobivious.ui.AppTokens
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -89,7 +89,7 @@ class VisualFixesSmokeTest {
             capture("watch-restored-${if (dark) "dark" else "light"}")
             val screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
             val pixel = screenshot.getPixel(screenshot.width / 10, screenshot.height - 20)
-            val surface = if (dark) Liquid.dark.surface else Liquid.light.surface
+            val surface = if (dark) AppTokens.dark.surface else AppTokens.light.surface
             assertEquals(surface.red, android.graphics.Color.red(pixel) / 255f, .02f)
             assertEquals(surface.green, android.graphics.Color.green(pixel) / 255f, .02f)
             assertEquals(surface.blue, android.graphics.Color.blue(pixel) / 255f, .02f)
@@ -111,12 +111,14 @@ class VisualFixesSmokeTest {
         field.performTextInput("4:00:00")
         compose.waitForIdle()
         val input = field.fetchSemanticsNode().boundsInRoot
-        val dock = compose.onNodeWithContentDescription("You").fetchSemanticsNode().boundsInRoot
+        compose.onAllNodesWithTag("navigation-You").assertCountEquals(0)
+        val ime = ViewCompat.getRootWindowInsets(activity.window.decorView)!!.getInsets(WindowInsetsCompat.Type.ime()).bottom
+        val imeTop = activity.window.decorView.height - ime
         val viewport = compose.onNodeWithTag("sign-in-viewport").fetchSemanticsNode().boundsInRoot
-        val toolbar = compose.onNodeWithTag("browse-glass-toolbar").fetchSemanticsNode().boundsInRoot
-        val title = compose.onNode(hasText("Sign in") and hasAnyAncestor(hasTestTag("browse-glass-toolbar"))).fetchSemanticsNode().boundsInRoot
+        val toolbar = compose.onNodeWithTag("app-toolbar").fetchSemanticsNode().boundsInRoot
+        val title = compose.onNode(hasText("Sign in") and hasAnyAncestor(hasTestTag("app-toolbar"))).fetchSemanticsNode().boundsInRoot
         val status = ViewCompat.getRootWindowInsets(activity.window.decorView)!!.getInsets(WindowInsetsCompat.Type.statusBars()).top
-        assertTrue("Focused CAPTCHA is covered by navigation: $input vs $dock", input.bottom <= dock.top)
+        assertTrue("Focused CAPTCHA is covered by the keyboard: $input vs $imeTop", input.bottom <= imeTop)
         assertTrue("Form scroll viewport includes the pinned toolbar", viewport.top >= toolbar.bottom)
         assertTrue("Focused CAPTCHA is under the pinned toolbar", input.top >= viewport.top)
         assertTrue("Title was panned under the status bar", title.top >= status)

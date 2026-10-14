@@ -1,7 +1,6 @@
 package net.wingress.mobivious.ui
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Subscriptions
@@ -21,13 +20,19 @@ import net.wingress.mobivious.data.ChannelTab
 internal fun SubscriptionFeedToolbar(signedIn: Boolean, query: String, submitted: String, loading: Boolean,
     edit: (String) -> Unit, submit: () -> Unit, clear: () -> Unit, refresh: () -> Unit,
     channels: () -> Unit, visibility: () -> Unit, actions: @Composable RowScope.() -> Unit) {
-    BrowsePageTitle("Subscriptions", large = true, actions = {
+    BrowsePageTitle("Subscriptions", actions = {
+        AppIconButton(Icons.Default.Subscriptions, "Channels", Modifier.testTag("subscription-channels-shortcut"), onClick = channels)
         if (signedIn) {
-            GlassIconButton(Icons.Default.Refresh, "Refresh subscriptions", Modifier.testTag("subscription-refresh"), enabled = !loading, onClick = refresh)
-            actions()
+            AppIconButton(Icons.Default.Refresh, "Refresh subscriptions", Modifier.testTag("subscription-refresh"), enabled = !loading, onClick = refresh)
         }
+        actions()
     })
-    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset)) {
+}
+
+@Composable
+internal fun SubscriptionFeedControls(signedIn: Boolean, query: String, submitted: String,
+    edit: (String) -> Unit, submit: () -> Unit, clear: () -> Unit, channels: () -> Unit, visibility: () -> Unit) {
+    BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset)) {
         val stackSearch = maxWidth < 340.dp || LocalDensity.current.fontScale > 1.3f
         val channelsButton: @Composable () -> Unit = {
             LibraryActionButton("Channels", Modifier.testTag("subscription-channels-button"), Icons.Default.Subscriptions, prominent = true, onClick = channels)
@@ -35,15 +40,15 @@ internal fun SubscriptionFeedToolbar(signedIn: Boolean, query: String, submitted
         if (!signedIn) channelsButton()
         else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (stackSearch) {
-                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.fillMaxWidth(), glass = true, submit = submit)
+                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.fillMaxWidth(), submit = submit)
                 channelsButton()
             } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.weight(1f), glass = true, submit = submit)
+                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.weight(1f), submit = submit)
                 channelsButton()
             }
             if (query.isNotBlank() || submitted.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = clear) { Text("Clear search") }
-                if (submitted.isNotBlank()) GlassIconButton(Icons.Default.Tune, "Search visibility", onClick = visibility)
+                if (submitted.isNotBlank()) AppIconButton(Icons.Default.Tune, "Search visibility", onClick = visibility)
             }
         }
     }
@@ -53,12 +58,18 @@ internal fun SubscriptionFeedToolbar(signedIn: Boolean, query: String, submitted
 internal fun ChannelBrowseToolbar(channel: Channel?, tab: ChannelTab?, videoSort: ChannelSort, playlistSort: String,
     query: String, submitted: String, loading: Boolean, back: () -> Unit, refresh: () -> Unit,
     edit: (String) -> Unit, submit: () -> Unit, clear: () -> Unit, selectTab: (ChannelTab) -> Unit,
-    sortVideo: (ChannelSort) -> Unit, sortPlaylist: (String) -> Unit) {
+    sortVideo: (ChannelSort) -> Unit, sortPlaylist: (String) -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
     BrowsePageTitle(channel?.name ?: "Channel", back = back, actions = {
-        GlassIconButton(Icons.Default.Refresh, "Refresh channel", enabled = !loading, onClick = refresh)
+        actions()
+        AppIconButton(Icons.Default.Refresh, "Refresh channel", enabled = !loading, onClick = refresh)
     })
-    if (channel != null) Column(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        SearchField(query, edit, "Search this channel", "channel-search", Modifier.fillMaxWidth(), glass = true, submit = submit)
+}
+
+@Composable
+internal fun ChannelBrowseControls(channel: Channel?, tab: ChannelTab?, videoSort: ChannelSort, playlistSort: String,
+    query: String, submitted: String, edit: (String) -> Unit, submit: () -> Unit, clear: () -> Unit,
+    selectTab: (ChannelTab) -> Unit, sortVideo: (ChannelSort) -> Unit, sortPlaylist: (String) -> Unit) {
+    if (channel != null) Column(Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val compactRow = maxWidth >= 360.dp && LocalDensity.current.fontScale <= 1.3f
             val tabs: @Composable (Modifier) -> Unit = { modifier ->
@@ -78,6 +89,7 @@ internal fun ChannelBrowseToolbar(channel: Channel?, tab: ChannelTab?, videoSort
                 tabs(Modifier.weight(1f)); sorting()
             } else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { tabs(Modifier.fillMaxWidth()); sorting() }
         }
+        SearchField(query, edit, "Search this channel", "channel-search", Modifier.fillMaxWidth(), submit = submit)
         if (query.isNotBlank() || submitted.isNotBlank()) FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), itemVerticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = clear) { Text("Clear search") }
             if (submitted.isNotBlank()) Text("Results in ${channel.name}", style = MaterialTheme.typography.bodySmall)

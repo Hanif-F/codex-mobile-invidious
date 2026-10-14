@@ -12,7 +12,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
@@ -38,7 +37,7 @@ internal fun DeArrowTitle(vm: AppViewModel, video: Video, style: TextStyle, modi
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(if (original) video.title else replacement ?: video.title, modifier.weight(1f), style = style,
             maxLines = maxLines, fontWeight = fontWeight, overflow = TextOverflow.Ellipsis)
-        if (replacement != null && prefs.dearrowShowOriginal) GlassInsetIconButton(onClick = { original = !original },
+        if (replacement != null && prefs.dearrowShowOriginal) AppInsetIconButton(onClick = { original = !original },
             modifier = Modifier.semantics { stateDescription = if (original) "Original title" else "DeArrow title" }) {
             Icon(Icons.AutoMirrored.Filled.CompareArrows, if (original) "Show DeArrow title" else "Show original title", tint = MaterialTheme.colorScheme.primary)
         }
@@ -64,7 +63,7 @@ internal fun DeArrowIdentitySettings(vm: AppViewModel) {
             modifier = Modifier.fillMaxWidth().testTag("dearrow-private-id"))
         Text("Optional: import your existing private ID to share its contribution identity. This is not a public ID or license key. Leave blank to keep it. Your instance stores it encrypted.", style = MaterialTheme.typography.bodySmall)
         if (error != null) Text(error!!, color = MaterialTheme.colorScheme.error)
-        LibraryControlScene { LibraryActionButton(if (busy) "Importing…" else "Import private user ID", prominent = true,
+        Box { LibraryActionButton(if (busy) "Importing…" else "Import private user ID", prominent = true,
             enabled = !busy && DeArrowRules.validPrivateId(privateId), onClick = {
             val context = vm.api.context(); val submitted = privateId; busy = true; error = null
             scope.launch {
@@ -94,12 +93,12 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
     val ready = identity?.ready == true && !state.busy
     LibraryPanel("Suggest / vote on titles", vm::closeDeArrow, enabled = !state.busy,
         closeLabel = "Close DeArrow contributions") { body, top ->
-            LazyColumn(body.testTag("dearrow-contributions-list"), contentPadding = PaddingValues(start = Liquid.inset,
-                end = Liquid.inset, top = top + 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(body.testTag("dearrow-contributions-list"), contentPadding = PaddingValues(start = AppTokens.inset,
+                end = AppTokens.inset, top = top + 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 state.status?.let { text -> item { Text(text, Modifier.semantics { liveRegion = LiveRegionMode.Polite }) } }
                 if (state.review) {
-                    item { GlassSection { Text(state.draft.trim(), style = MaterialTheme.typography.titleMedium)
+                    item { AppSection { Text(state.draft.trim(), style = MaterialTheme.typography.titleMedium)
                     guidelines.indices.forEach { index ->
                         val (title, detail) = guidelines[index]
                         Row(Modifier.fillMaxWidth().testTag("dearrow-guideline-$index").toggleable(
@@ -112,7 +111,7 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
                     }
                     run {
                         Text("Check all four guidelines to submit.")
-                        LibraryControlScene { LibraryActionButton("Submit title", Modifier.fillMaxWidth(), enabled = ready && state.acknowledgements.size == 4, prominent = true) { vm.contributeDeArrow("submit") } }
+                        Box { LibraryActionButton("Submit title", Modifier.fillMaxWidth(), enabled = ready && state.acknowledgements.size == 4, prominent = true) { vm.contributeDeArrow("submit") } }
                         TextButton(enabled = !state.busy, onClick = { vm.reviewDeArrow(false) }) { Text("Back to editing") }
                     }
                     } }
@@ -122,17 +121,17 @@ internal fun DeArrowContributionSheet(vm: AppViewModel) {
                         val original = state.titles.firstOrNull { it.original }
                         DeArrowVoteRow(vm, playback.details?.video?.title.orEmpty(), original, true, ready && state.loaded)
                     }
-                    item { GlassSection {
+                    item { AppSection {
                         OutlinedTextField(state.draft, vm::editDeArrowDraft, label = { Text("Your suggested title") }, enabled = !state.busy, singleLine = true,
                             isError = state.draft.isNotBlank() && !DeArrowRules.validTitle(state.draft), supportingText = { Text("1–110 characters") },
                             modifier = Modifier.fillMaxWidth().testTag("dearrow-draft"))
-                        LibraryControlScene { LibraryActionButton("Review title", enabled = ready && DeArrowRules.validTitle(state.draft), prominent = true) { vm.reviewDeArrow(true) } }
+                        Box { LibraryActionButton("Review title", enabled = ready && DeArrowRules.validTitle(state.draft), prominent = true) { vm.reviewDeArrow(true) } }
                     } }
                     item { Text("Community titles", style = MaterialTheme.typography.titleMedium) }
                     val proposals = state.titles.filter { !it.original }
                     if (state.loaded && proposals.isEmpty()) item { Text("No community titles yet. Suggest the first one.") }
                     items(proposals, key = { it.uuid }) { item -> DeArrowVoteRow(vm, item.title.replace(">", ""), item, false, ready && state.loaded) }
-                    item { LibraryControlScene { LibraryActionButton("Refresh submissions", enabled = !state.busy, onClick = vm::refreshDeArrow) } }
+                    item { Box { LibraryActionButton("Refresh submissions", enabled = !state.busy, onClick = vm::refreshDeArrow) } }
                 }
                 item {
                     TextButton(onClick = { uri.openUri("https://wiki.sponsor.ajay.app/w/DeArrow/Guidelines") }) { Text("DeArrow guidelines") }
@@ -147,8 +146,8 @@ private fun DeArrowVoteRow(vm: AppViewModel, title: String, item: DeArrowSubmiss
     Column(Modifier.fillMaxWidth()) {
         Text(title)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            GlassInsetIconButton(enabled = enabled, onClick = { vm.contributeDeArrow("upvote", item, original) }) { Icon(Icons.Default.ThumbUp, "Upvote: $title") }
-            GlassInsetIconButton(enabled = enabled && DeArrowRules.canDownvote(item), onClick = { vm.contributeDeArrow("downvote", item, original) }) { Icon(Icons.Default.ThumbDown, "Downvote: $title") }
+            AppInsetIconButton(enabled = enabled, onClick = { vm.contributeDeArrow("upvote", item, original) }) { Icon(Icons.Default.ThumbUp, "Upvote: $title") }
+            AppInsetIconButton(enabled = enabled && DeArrowRules.canDownvote(item), onClick = { vm.contributeDeArrow("downvote", item, original) }) { Icon(Icons.Default.ThumbDown, "Downvote: $title") }
             if (item != null) Text("${item.votes} votes", style = MaterialTheme.typography.labelMedium)
         }
         if (item?.locked == true) Text("This title is locked.", style = MaterialTheme.typography.bodySmall)

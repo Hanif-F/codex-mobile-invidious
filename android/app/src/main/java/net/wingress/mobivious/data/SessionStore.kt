@@ -45,21 +45,16 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     /** Accessibility is local to the device, independent of the account and server. */
     val reduceTransparency = MutableStateFlow(prefs.getBoolean("accessibility.reduceTransparency", false))
     @Synchronized fun reduceTransparency(value: Boolean) {
-        if (persistence.edit(mapOf("accessibility.reduceTransparency" to value), emptySet())) reduceTransparency.value = value
+        checked(mapOf("accessibility.reduceTransparency" to value)); reduceTransparency.value = value
     }
     /** A visual device preference, shared by player settings and Appearance. */
-    val ambientMode = MutableStateFlow(prefs.getBoolean("appearance.ambientMode", true))
+    val ambientMode = MutableStateFlow((prefs.all["appearance.ambientMode"] as? Boolean) ?: false)
     @Synchronized fun ambientMode(value: Boolean) {
-        if (persistence.edit(mapOf("appearance.ambientMode" to value), emptySet())) ambientMode.value = value
+        checked(mapOf("appearance.ambientMode" to value)); ambientMode.value = value
     }
-    /** Immediate appearance choices are device-wide and opt-in. */
-    val coloredBackgrounds = MutableStateFlow(prefs.getBoolean("appearance.coloredBackgrounds", false))
-    @Synchronized fun coloredBackgrounds(value: Boolean) {
-        if (persistence.edit(mapOf("appearance.coloredBackgrounds" to value), emptySet())) coloredBackgrounds.value = value
-    }
-    val adaptiveControlColors = MutableStateFlow(prefs.getBoolean("appearance.adaptiveControlColors", false))
-    @Synchronized fun adaptiveControlColors(value: Boolean) {
-        if (persistence.edit(mapOf("appearance.adaptiveControlColors" to value), emptySet())) adaptiveControlColors.value = value
+    val accentPreset = MutableStateFlow(AccentPreset.saved(prefs.all["appearance.accentPreset"] as? String))
+    @Synchronized fun accentPreset(value: AccentPreset) {
+        checked(mapOf("appearance.accentPreset" to value.id)); accentPreset.value = value
     }
     val storageError = MutableStateFlow<String?>(null)
     private val persistence = SharedProfilePersistence(prefs) { storageError.value = it }

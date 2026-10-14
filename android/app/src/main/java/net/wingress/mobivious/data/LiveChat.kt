@@ -190,6 +190,13 @@ class ChatReplayController(private val scope: CoroutineScope, private val contex
         state.value = state.value.copy(timingOffsetMs = offset, timingLoading = false, timingError = null)
         selectPosition(); saveTiming()
     }
+    /** Preference consumers only adopt a delay once its persistence sink has confirmed it. */
+    fun confirmTiming(videoId: String, context: ApiContext, offset: Int) {
+        if(state.value.videoId!=videoId || state.value.context!=context) return
+        timingRevision++;timingRead?.cancel();timingLoaded=true;timingDirty=false
+        state.value=state.value.copy(timingOffsetMs=offset,timingLoading=false,timingSaving=false,timingError=null)
+        selectPosition();pump()
+    }
     private fun saveTiming() {
         val before = state.value; val revision = timingRevision
         state.value = before.copy(timingSaving = true, timingError = null)

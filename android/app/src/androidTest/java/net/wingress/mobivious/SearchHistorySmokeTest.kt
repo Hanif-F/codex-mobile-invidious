@@ -117,6 +117,7 @@ class SearchHistorySmokeTest {
         compose.onNodeWithText("Load more").performClick()
         until { !vm.browse.value.loading && vm.browse.value.end }
         assertEquals(21, vm.browse.value.videos.size)
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Clear search"))
         compose.onNodeWithText("Clear search").assertIsDisplayed()
         compose.onNodeWithText("Clear search").performClick()
         until { !vm.browse.value.loading && vm.scopedSearch.value.submitted.isEmpty() }

@@ -16,6 +16,7 @@ from urllib.parse import urlparse, parse_qs, unquote
 parser = argparse.ArgumentParser()
 parser.add_argument('--port', type=int, default=18080)
 parser.add_argument('--media-dir', type=Path, required=True)
+parser.add_argument('--performance', action='store_true', help='Use the deterministic large UI benchmark catalog')
 args = parser.parse_args()
 def rich_formats(manifest=None):
     ns = {'d': 'urn:mpeg:dash:schema:mpd:2011'}
@@ -135,6 +136,9 @@ def reset_ai():
 reset_ai()
 
 def browse_videos():
+    if state.get('performance'):
+        return [dict(video, videoId=f'perf{i:07d}', title=f'Benchmark video {i:03d}',
+                     videoThumbnails=[dict(quality='medium', url=f'/media/thumbnail.jpg?perf={i}&art={state.get("performanceArt", "warm")}')]) for i in range(120)]
     if state['visibilityVideos']:
         items = [video, visibility_member, visibility_other]
         if state['aiImages']: return [dict(item, videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg?ai=' + state['aiImages'] + '-' + item['videoId'])]) for item in items]
@@ -403,6 +407,7 @@ class Handler(BaseHTTPRequestHandler):
         elif p.endswith('/downloads') and p.startswith('/api/v1/videos/'):
             if state.get('downloadEndpointsMissing'): return self.respond(dict(error='Not found'), 404)
             metadata = dict(video, description='Downloaded fixture description', lengthSeconds=state.get('downloadDuration', 12))
+            if state.get('performance'): metadata.update(videoId=p.split('/')[4], title='Benchmark download')
             state['downloadRequests'].append(dict(kind='catalog', path=p))
             disabled = state.get('downloadDisabled', False)
             return self.respond(dict(video=metadata, allowed=not disabled, reason='Downloads are disabled by this instance.' if disabled else '', choices=[] if disabled else download_choices()))
@@ -418,6 +423,8 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
         elif p.startswith('/media/'):
             state['mediaRequests'] += 1
+            if state.get('mediaFail') and p.endswith('.mp4'):
+                return self.respond(dict(error='Fixture stream temporarily unavailable'),503)
             state['mediaPaths'].append(p)
             root = args.media_dir.resolve()
             file = (root / p.removeprefix('/media/')).resolve()
@@ -435,12 +442,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Accept-Ranges', 'bytes')
             if ranged: self.send_header('Content-Range', f'bytes {start}-{end}/{len(data)}')
             self.send_header('Content-Length', str(end - start + 1))
+            if state.get('performance') and file.suffix in ('.jpg', '.png'): self.send_header('Cache-Control', 'public, max-age=86400')
             self.send_header('Content-Type', {'.mp4':'video/mp4', '.m4a':'audio/mp4', '.webm':'video/webm', '.mpd':'application/dash+xml', '.m3u8':'application/vnd.apple.mpegurl', '.vtt':'text/vtt', '.jpg':'image/jpeg'}.get(file.suffix, 'application/octet-stream'))
             self.end_headers()
             try:
                 if parse_qs(url.query).get('slow') == ['1']:
+                    interval = .5 if state.get('performance') else .1
                     for offset in range(start, end + 1, 8192):
-                        self.wfile.write(data[offset:min(offset + 8192, end + 1)]); self.wfile.flush(); time.sleep(.1)
+                        self.wfile.write(data[offset:min(offset + 8192, end + 1)]); self.wfile.flush(); time.sleep(interval)
                 else: self.wfile.write(data[start:end + 1])
             except (BrokenPipeError, ConnectionResetError):
                 pass
@@ -493,6 +502,16 @@ class Handler(BaseHTTPRequestHandler):
             if state['visibilityVideos']:
                 state['visibilityReads'].append(dict(path=p, query=parse_qs(url.query), authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
             items = browse_videos()
+            if state.get('performance'):
+                if p == '/api/v1/trending':
+                    items = [dict(item, title=f'{item["title"]} · {event["type"] or "instance"} {event["region"] or "all"}') for item in items]
+                page = int(parse_qs(url.query).get('page', ['1'])[0])
+                if p == '/api/v1/search' and state.get('performanceMixed'):
+                    items = [entry for i, item in enumerate(items) for entry in (item,
+                        dict(type='channel',authorId='UC'+f'{i:022d}',author=f'Benchmark creator {i:03d}'),
+                        dict(type='playlist',playlistId=f'PLperf{i:04d}',title=f'Benchmark playlist {i:03d}',videoCount=120))]
+                limit = 30 if state.get('performancePagination') else len(items)
+                items = items[(page-1)*limit:page*limit]
             if p == '/api/v1/search' and state['hiddenFirstPage']:
                 items = {1: [visibility_member], 2: [video]}.get(int(parse_qs(url.query).get('page', ['1'])[0]), [])
             self.respond(items)
@@ -519,11 +538,12 @@ class Handler(BaseHTTPRequestHandler):
             tag = unquote(p.rsplit('/', 1)[-1]); page = int(parse_qs(urlparse(self.path).query).get('page', ['1'])[0])
             state['hashtagRequests'].append(dict(tag=tag, page=page, authorized=self.headers.get('Authorization') is not None))
             return self.respond(dict(results=[dict(video, videoId='hashvid%04d' % i, title='Hashtag video ' + str(i)) for i in range(60)] if page == 1 else [recommended]))
-        elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03', '/api/v1/videos/othervideo1', '/api/v1/videos/membervid01'):
+        elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03', '/api/v1/videos/othervideo1', '/api/v1/videos/membervid01') or state.get('performance') and re.fullmatch(r'/api/v1/videos/perf\d{7}', p):
             if state.get('videoFailNext'):
                 state['videoFailNext'] = False
                 return self.respond(dict(error='Fixture video temporarily unavailable'), 503)
             selected = video if p.endswith('testvideo01') else dict(recommended, videoId=p.rsplit('/', 1)[-1])
+            if state.get('performance'): selected = dict(video, videoId=p.rsplit('/', 1)[-1], title='Benchmark playing video')
             if p.endswith('othervideo1'): selected = visibility_other
             if p.endswith('membervid01'): selected = visibility_member
             codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
@@ -546,7 +566,7 @@ class Handler(BaseHTTPRequestHandler):
                               adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
-                                                 if state['duplicateRecommendations'] else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
+                                                 if state['duplicateRecommendations'] else browse_videos() if state.get('performance') else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
                               liveNow=state['liveNow'], isMember=state['memberCurrent'], liveChatReplay=state['chatReplay']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]
@@ -703,6 +723,26 @@ class Handler(BaseHTTPRequestHandler):
         if not p.startswith('/test/'):
             state['allRequests'].append(dict(method=self.command, path=self.path))
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if p == '/test/performance':
+            if not args.performance: return self.respond(dict(error='Performance fixture is not enabled'), 404)
+            state.update(performance=True, discoveryCategories=False, discoveryDistinct=False,
+                         searchMixed=False, searchTest=False, stream='mp4', failPreferences=False, preferencesRequests=[],
+                         performancePagination=data.get('pagination', False), performanceMixed=data.get('mixed', False),
+                         downloadSlow=data.get('downloads', False), performancePatchDelay=500 if data.get('saving') else 0,
+                         performanceFailPatchNext=data.get('saving', False),
+                         performanceArt=str(time.time_ns()) if data.get('cold') else 'warm')
+            prefs.update(default_prefs)
+            prefs.update(max_results=150, dark_mode='light', ui_density=data.get('density', 'balanced'),
+                         thin_mode=data.get('thin', False), autoplay=True, save_player_pos=False, continue_autoplay=False, video_loop=False)
+            prefs['continue'] = False
+            state['positions'] = {}; state['position'] = 0
+            state['subscriptionChannels'] = [dict(authorId='UC' + f'{i:022d}', author=f'Benchmark creator {i:03d}') for i in range(80)]
+            state['historyEntries'] = [dict(video_id=v['videoId'], title=v['title'], channel_name=v['author'],
+                channel_id=v['authorId'], length_seconds=120, latest_watched='2026-10-04') for v in browse_videos()]
+            state['watched'] = [v['video_id'] for v in state['historyEntries']]
+            state['playlists'] = [dict(playlistId=f'IVperf{i:04d}', title=f'Benchmark playlist {i:03d}',
+                privacy='private', videoCount=120, videos=browse_videos()) for i in range(80)]
+            return self.respond(dict(revision='ui-overhaul-v2', videos=120, creators=80, playlists=80))
         if p == '/test/clips':
             state['clipsEnabled'] = True
             state['channelTabs'] = ['videos', 'playlists', 'clips', 'posts', 'channels']
@@ -733,7 +773,10 @@ class Handler(BaseHTTPRequestHandler):
         elif p == '/test/reset':
             state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
-                         originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
+                         originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,
+                         downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='',
+                         downloadEndpointsMissing=False, downloadDuration=12, allRequests=[], performance=False,
+                         performancePatchDelay=0, performanceFailPatchNext=False, mediaFail=False)
             prefs.clear()
             prefs.update(default_prefs)
             reset_sponsorblock()
@@ -839,6 +882,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/stream':
             state['stream'] = data['type']
+            state['mediaFail'] = bool(data.get('mediaFail',False))
             state['videoFailNext'] = bool(data.get('failNext', False))
             if 'duplicateRecommendations' in data: state['duplicateRecommendations'] = bool(data['duplicateRecommendations'])
             return self.respond({})
@@ -940,6 +984,10 @@ class Handler(BaseHTTPRequestHandler):
             state['chatTimingRequests'].append(dict(method='PUT', video=id, offsetMs=offset))
             return self.respond(dict(offsetMs=offset))
         elif p == '/api/v1/auth/preferences':
+            if state.get('performancePatchDelay'): time.sleep(state['performancePatchDelay']/1000)
+            if state.get('performanceFailPatchNext'):
+                state['performanceFailPatchNext'] = False
+                return self.respond(dict(error='Fixture settings could not be saved'), 503)
             if state['failPreferences']: return self.respond(dict(error='Fixture settings could not be saved'), 503)
             for key, value in data.items():
                 if key in ('sponsorblock_modes', 'sponsorblock_colors'): prefs[key].update(value)

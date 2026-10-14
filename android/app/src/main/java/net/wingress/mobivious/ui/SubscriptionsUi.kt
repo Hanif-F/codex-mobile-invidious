@@ -23,28 +23,30 @@ import net.wingress.mobivious.data.DisplayFormats
 @Composable
 internal fun SubscriptionChannelsScreen(state: SubscriptionChannelsState, server: String, thinMode: Boolean,
     listState: LazyListState, search: (String) -> Unit, refresh: () -> Unit, open: (String) -> Unit,
-    sort: (SubscriptionSort) -> Unit = {}, header: @Composable () -> Unit = {}) {
+    sort: (SubscriptionSort) -> Unit = {}, header: @Composable () -> Unit = {},
+    requestedSort: SubscriptionSort? = null, saveFeedback: @Composable () -> Unit = {}) {
     val matches = remember(state) { state.matches }
-    BrowseGlassSurface(Modifier.fillMaxSize().testTag("subscription-channel-screen"), toolbar = {
+    BrowseAppSurface(Modifier.fillMaxSize().testTag("subscription-channel-screen"), toolbar = {
         header()
-        Column(Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier.widthIn(max = 800.dp).fillMaxWidth().padding(horizontal = AppTokens.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SearchField(state.query, search, "Search channels", "subscription-channel-search", Modifier.weight(1f), glass = true) {}
-                GlassIconButton(Icons.Default.Refresh, "Refresh channels", enabled = !state.loading, onClick = refresh)
+                SearchField(state.query, search, "Search channels", "subscription-channel-search", Modifier.weight(1f)) {}
+                AppIconButton(Icons.Default.Refresh, "Refresh channels", enabled = !state.loading, onClick = refresh)
             }
             FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
                 itemVerticalAlignment = Alignment.CenterVertically) {
-                BrowseSortMenu(SubscriptionSort.entries, state.effectiveSort, { it.label }, Modifier.testTag("subscription-sort"),
+                BrowseSortMenu(SubscriptionSort.entries, requestedSort ?: state.effectiveSort, { it.label }, Modifier.testTag("subscription-sort"),
                     optionTag = { "subscription-sort-option-${it.key}" }, available = { state.unavailableReason == null || it == SubscriptionSort.ALPHABETICAL }, select = sort)
                 Text(DisplayFormats.inventory(matches.size.toLong(), "channel"), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("subscription-channel-count"))
                 if (state.query.isNotEmpty()) TextButton(onClick = { search("") }) { Text("Clear search") }
             }
+            saveFeedback()
         }
     }) { contentModifier, topInset ->
         Box(contentModifier, contentAlignment = Alignment.TopCenter) {
             LazyColumn(Modifier.widthIn(max = 800.dp).fillMaxSize().testTag("subscription-channel-list"), state = listState,
-                contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = LocalContentBottomInset.current)) {
+                contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = topInset, bottom = LocalContentBottomInset.current)) {
                 val help = state.unavailableReason ?: if (state.effectiveSort == SubscriptionSort.RELEVANCE)
                     "Based on the last 90 days of viewing, boosted by unwatched uploads from the last 7 days." else null
                 help?.let { item(key = "sort-help") { Text(it, Modifier.padding(vertical = 12.dp).testTag("subscription-sort-help"),

@@ -6,6 +6,9 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
@@ -14,7 +17,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
@@ -32,7 +34,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 
-/** White, lightweight chrome. Video decoding surfaces are never sampled for glass. */
+
 @Composable
 internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, fullscreen: Boolean,
     settingsEnabled: Boolean, onPlay: () -> Unit, onSettings: () -> Unit,
@@ -55,6 +57,14 @@ internal fun PlayerControlsLayout(playback: PlaybackState, positionMs: Long, ful
             maxHeight / 2 + size / 2 <= maxHeight - occupiedBottom - 1.dp
         val centerSize = if (centerFits(64.dp)) 64.dp else 48.dp
         val centered = centerFits(centerSize)
+        if(showControls) {
+            val fade=with(density) {96.dp.toPx()}
+            Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().height(headerHeight+96.dp)
+                .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha=.72f),Color.Black.copy(alpha=.72f),Color.Transparent),
+                    startY=with(density){headerHeight.toPx()},endY=with(density){headerHeight.toPx()}+fade)))
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(footerHeight+96.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent,Color.Black.copy(alpha=.72f)),endY=fade)))
+        }
         Column(Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
             AnimatedVisibility(showControls && !sharedHeader, enter = fadeIn(tween(160)), exit = fadeOut(tween(160))) {
                 PlayerControlHeader(playback, fullscreen, settingsEnabled, onSettings,
@@ -192,17 +202,14 @@ internal fun PlayerControlHeader(playback: PlaybackState, fullscreen: Boolean, s
 @Composable
 private fun PlayerIconButton(icon: ImageVector, description: String, modifier: Modifier = Modifier,
     enabled: Boolean = true, contentOffset: Dp = 0.dp, onClick: () -> Unit) {
-    GlassInsetIconButton(onClick, modifier.size(48.dp), enabled = enabled) {
+    AppInsetIconButton(onClick, modifier.size(48.dp), enabled = enabled) {
         Box(Modifier.offset(y = contentOffset)) { PlayerIcon(icon, description, enabled = enabled) }
     }
 }
 
 @Composable
 internal fun PlayerIcon(icon: ImageVector, description: String?, size: Dp = 24.dp, enabled: Boolean = true) {
-    Box(Modifier.size(size)) {
-        Icon(icon, null, Modifier.fillMaxSize().offset(y = 1.dp).blur(2.dp), tint = Color.Black.copy(alpha = .65f))
-        Icon(icon, description, Modifier.fillMaxSize(), tint = Color.White.copy(alpha = if (enabled) 1f else .38f))
-    }
+    Icon(icon,description,Modifier.size(size),tint=Color.White.copy(alpha=if(enabled) 1f else .38f))
 }
 
 @Composable
@@ -222,7 +229,7 @@ internal fun PlayerPlayControl(playback: PlaybackState, modifier: Modifier = Mod
     val ended = playback.playerState == Player.STATE_ENDED
     val icon = if (ended) Icons.Default.Replay else if (playback.playWhenReady) Icons.Default.Pause else Icons.Default.PlayArrow
     val description = if (ended) "Replay" else if (playback.playWhenReady) "Pause" else "Play"
-    GlassInsetIconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.testTag("player-play-pause")) {
+    AppInsetIconButton(onClick = play, enabled = playback.canPlay, modifier = modifier.background(Color.Black.copy(alpha=.72f),RoundedCornerShape(12.dp)).testTag("player-play-pause")) {
         PlayerIcon(icon, description, size = 36.dp, enabled = playback.canPlay)
         if (playback.buffering) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Buffering" },
             color = Color.White, strokeWidth = 2.dp)

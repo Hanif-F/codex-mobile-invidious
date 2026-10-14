@@ -2,11 +2,15 @@
 
 [Documentation index](README.md) · [Storage ownership](STORAGE_AND_SECURITY.md)
 
-Open **You → Settings gear**. Most category pages edit a draft and require Save;
-Cancel leaves saved settings intact. Failed saves keep the draft for retry.
-Untouched drafts follow refreshed website preferences. Changed fields are patched
-against the baseline, rather than replacing unrelated settings. Context checks
-prevent saving a draft into a different account or instance.
+Preferences save automatically from **Settings**, available from every browse root.
+Choices save immediately, sliders on release, and valid text after 500ms, blur,
+Done, page exit or backgrounding. Fields retain pending, invalid or failed input
+with Retry/Revert; the Settings root links to changes needing attention. Sparse
+patches preserve unrelated website fields. A ViewModel-owned revisioned pipeline
+serializes writers and rejects stale account/instance context. Account/security,
+identity import, destructive operations and entity editors retain explicit submit
+buttons. [Implementation evidence](ui-ux-implementation-2026-10-13/README.md)
+records current verification limits.
 
 **Shared** below means website/account settings when signed in and local
 instance-specific guest settings where supported. **Profile-local** means saved
@@ -41,12 +45,11 @@ Defaults do not create tracks missing from the manifest or unsupported by the de
 | UI / model | Wire or local key | Default | Behavior / scope |
 | --- | --- | --- | --- |
 | Color mode / `darkMode` | `dark_mode` | empty / System | Empty, `light`, `dark`. Shared. |
-| Colored backgrounds | `appearance.coloredBackgrounds` | false | Device-wide, immediate; enables blue/teal/purple page gradients. Off uses neutral light/dark page surfaces. |
-| Adaptive control colors | `appearance.adaptiveControlColors` | false | Device-wide, immediate; lets glass controls switch light/dark style based on the backdrop. Off follows Color mode while retaining contrast tint. |
+| Accent preset | `appearance.accentPreset` | `blue` | Device-wide; blue, teal, green, violet, amber, rose. Unknown IDs use blue. |
 | List density / `uiDensity` | `ui_density` | `balanced` | Comfortable (`balanced`) or `compact`. Shared. |
 | Hide thumbnails / `thinMode` | `thin_mode` | false | Text-focused video lists, also suppresses ordinary creator artwork surfaces. Shared. |
-| Ambient mode | `appearance.ambientMode` | true | Device-wide, immediate; player toggle shares the same value. |
-| Reduce transparency | `accessibility.reduceTransparency` | false | Device-wide, immediate opaque material fallback; ambient lighting is paused. |
+| Ambient mode | `appearance.ambientMode` | false when absent | Device-wide, immediate; player toggle shares the same value. |
+| Reduce transparency | `accessibility.reduceTransparency` | false | Device-wide; pauses optional ambient lighting. All interface surfaces are already opaque. |
 | Show members-only / `showMemberVideos` | `show_member_videos` | false | Visibility only; grants no access. Shared. |
 | Homepage / `defaultHome` | `default_home` | `Popular` | Empty=Search, Popular, Trending, Subscriptions, Playlists (You library). Guests choose Search/Popular/Trending. |
 | Region | `region` | `US` | Two uppercase letters; picker uses the fixed content-region catalog. Shared. |
@@ -57,16 +60,15 @@ Defaults do not create tracks missing from the manifest or unsupported by the de
 | Search members override | local search `showMembers` | null | null inherits current shared preference; true/false explicitly override it. Profile-local. |
 | Search include blocked | local search `includeBlocked` | false | Profile-local search visibility exception. |
 
-Colored backgrounds and Adaptive control colors appear directly after Color mode.
-Both start off when their device keys are absent, including existing installations.
-They save without pressing Save and remain independent of account/instance changes.
-Colored backgrounds does not change thumbnails, banners, artwork washes, accent
-colors or the separate Ambient mode preference. Media-overlay controls retain
-their consistently light treatment over video.
+Accent selection does not change neutral surface roles or server Color mode.
+Ambient migration preserves explicit true/false values and treats only an absent
+or invalid key as off. Legacy Colored backgrounds and Adaptive control colors keys
+remain dormant; neither changes the new interface. Player controls retain white
+foregrounds over local black scrims.
 
 `feed_menu` is retained in the account JSON for website compatibility (default
 Popular, Trending, Subscriptions, Playlists). It does not reconfigure the native
-fixed Discover/Subscriptions/You/Search shell. Unknown homepage values resolve
+fixed Popular/Trending/Subscriptions/You shell. Unknown homepage values resolve
 to Popular. Launching signed-out into account-only destinations falls back safely.
 
 ## Subscriptions and history/library

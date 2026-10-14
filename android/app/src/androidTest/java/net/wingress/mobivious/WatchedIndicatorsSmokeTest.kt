@@ -135,7 +135,8 @@ class WatchedIndicatorsSmokeTest {
         command("watched", """{"watched":["$first","$second"],"positions":{"$first":40}}""")
         login(); until { first in activity.model.watched.value.watched }
         navigate("You", "history"); card(first)
-        compose.onNodeWithContentDescription("Remove A quiet moment · playback fixture").performClick()
+        compose.onNodeWithTag("video-actions-$first").performClick()
+        compose.onNodeWithText("Remove from history").performClick()
         until { first !in activity.model.watched.value.watched && !activity.model.browse.value.loading }
         assertEquals(40L, activity.model.watched.value.positions[first])
         navigate("Popular"); watched(first).assertDoesNotExist(); progress(first).assertExists()

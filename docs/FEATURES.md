@@ -18,11 +18,11 @@ Native account flows and several enhancements need the fork's server extensions;
 
 ## Navigation and discovery
 
-The phone dock has Discover, Subscriptions and You, plus Search. A sidebar replaces
-it on wide screens. **Discover** has independent Popular and Trending views;
-switching between them preserves their positions during the session. Trending
-offers **Livestreams** and **Gaming** and a country picker searchable by localized
-country name or code. Refresh reloads the chosen feed.
+Phones use four direct labeled destinations: **Popular, Trending, Subscriptions,
+You**. A rail replaces bottom navigation from 600dp window width. Each root keeps
+its stack and scroll position; reselecting a root scrolls to the top without a
+refresh. Search opens a transient top field and returns to its origin. The
+full-width opaque mini-player sits immediately above navigation.
 
 Search accepts words or a supported URL. Submit through the keyboard, physical
 Enter or search action. Results preserve the server's ordering and may contain
@@ -115,8 +115,8 @@ minimizing suspends replay requests while playback continues.
 
 Use the chat menu for settings and overlay adjustment. Choose a docked panel or
 movable/resizable overlay; Done saves overlay geometry and Cancel discards the
-adjustment. Appearance saves immediately on this device. **Save** applies
-timestamps, user/word filters and per-video delay. Users can be channel IDs or
+adjustment. Appearance, timestamps, user/word filters and per-video delay save
+automatically, with Retry/Revert for failed changes. Users can be channel IDs or
 `@handles`, and words can include `/RE2 patterns/`, separated by whitespace.
 Positive delay shows messages later; allowed delay is ±3,600 seconds. Invalid
 new regex is rejected; unsupported imported regex is reported and skipped.
@@ -191,15 +191,14 @@ tracks to H.264/AAC. Device capability failures are reported. See
 
 Light, Dark or System appearance, Comfortable/Compact lists, hidden thumbnails,
 default homepage, playback defaults and browsing filters are configurable.
-Colored backgrounds and Adaptive control colors are independent Appearance
-switches, both off by default and saved immediately on the device. Pages default
-to neutral surfaces; glass controls follow Color mode while retaining readable
-contrast. Enabling the switches restores page gradients and backdrop-driven
-light/dark control switching respectively.
-Reduce transparency replaces glass with solid controls. Ambient mode projects
-sampled video colors into the expanded watch background; its device-wide toggle
-is available in Appearance and player settings. It pauses under its accessibility,
-power, motion and presentation gates.
+Six device-wide accent presets accompany exact light/dark neutral Material 3
+surfaces. Preferences save automatically, with field-level pending/error feedback,
+Retry and Revert. Legacy Colored backgrounds and Adaptive control colors have no
+interface effect. Reduce transparency pauses optional ambient lighting. Ambient
+mode defaults off only when its key is absent; explicit saved choices survive.
+It illuminates the watch background from bounded decoder samples, while metadata
+and tools stay opaque. Appearance and player settings share its device-wide toggle;
+accessibility, power, motion and presentation gates suppress its work.
 
 Channel blocking hides discovery and recommendation content and, unless overridden,
 search results. It preserves deliberate library/channel access. A brief Undo is

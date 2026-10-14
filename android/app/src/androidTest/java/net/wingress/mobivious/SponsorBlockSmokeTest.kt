@@ -55,7 +55,12 @@ class SponsorBlockSmokeTest {
         compose.runOnUiThread { activity.model.store.guestDeArrow(AccountPreferences(sponsorBlock = settings)); activity.model.refreshSharedSettings() }
     }
     private fun seek(position: Long) { compose.runOnUiThread { activity.model.seekTo(position) } }
-    private fun saveSheet() { compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() } }
+    private fun saveSheet() {
+        compose.runOnUiThread {activity.model.flushPreferenceEdits()}
+        until {activity.model.preferenceSaves.edits.value.isEmpty()}
+        compose.onNodeWithContentDescription("Close SponsorBlock settings").performClick()
+        until {compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty()}
+    }
     private fun screenshot(name: String) {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         automation.executeShellCommand("mkdir -p /data/local/tmp/mobivious-sponsorblock-screenshots").let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { s -> s.readBytes() } }
@@ -69,14 +74,15 @@ class SponsorBlockSmokeTest {
         compose.onNode(isToggleable() and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
         val color = compose.onNode(hasSetTextAction() and hasText("Sponsor color (#RRGGBB)"))
         color.performScrollTo().performTextReplacement("bad")
-        compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).assertIsNotEnabled()
+        until {activity.model.preferenceSaves.edits.value.values.any {it.status==net.wingress.mobivious.ui.PreferenceSaveStatus.INVALID}}
+        assertNotEquals("bad",activity.model.preferences.value.sponsorBlock.colors[SponsorBlockCategory.SPONSOR])
         color.performTextReplacement("#123456")
         screenshot("guest-colors")
         saveSheet()
         assertTrue(activity.model.store.guestDeArrow().sponsorBlock.enabled)
         // Fullscreen SponsorBlock returns to the Settings screen.
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         compose.onNodeWithTag("mini-player-preview").performClick()
         until { activity.model.sponsorBlock.value.segments.size == 1 }
         assertFalse(fixture().getBoolean("sponsorAuthorized"))
@@ -121,7 +127,7 @@ class SponsorBlockSmokeTest {
         command("sponsorblock", """{"sponsorblock_enabled":true,"sponsorblock_channel_overrides":{"$id":{"name":"Mobivious Studio","enabled":false,"modes":{}}},"sponsorSegments":[{"id":"a","category":"sponsor","start":10,"end":20}]}""")
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.preferences.value.sponsorBlock.channels.containsKey(id) && activity.model.tab == "You" }
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
         compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
         compose.onAllNodes(hasText("Mobivious Studio") and hasClickAction() and hasAnyAncestor(hasTestTag("watch-details-list"))).onFirst().performScrollTo().performClick()
@@ -129,17 +135,15 @@ class SponsorBlockSmokeTest {
         compose.onNodeWithTag("channel-actions-$id").performScrollTo().performClick()
         compose.onNodeWithText("Channel SponsorBlock settings").performClick()
         compose.onNodeWithTag("sponsor-channel-enabled").assert(hasText("Disabled")).performClick()
-        compose.onNodeWithText("Enabled").performClick()
         command("sponsorblock", """{"failPreferences":true}""")
-        compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
-        until { compose.onAllNodesWithTag("sponsorblock-save-error").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Enabled").performClick()
+        until {activity.model.preferenceSaves.edits.value.values.any {it.error!=null}}
         compose.onNodeWithTag("sponsor-channel-enabled").assert(hasText("Enabled"))
         assertFalse(activity.model.preferences.value.sponsorBlock.channels[id]!!.enabled!!)
         command("sponsorblock", """{"failPreferences":false}""")
-        compose.onNode(hasText("Save") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
+        compose.onNodeWithText("Retry").performClick()
         until { activity.model.preferences.value.sponsorBlock.channels[id]?.enabled == true }
         until { activity.model.sponsorBlock.value.segments.size == 1 }
-        compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("sponsorblock-sheet"))).performClick()
         compose.onNodeWithText("Reset to global").performClick()
         until { id !in activity.model.preferences.value.sponsorBlock.channels }
         screenshot("channel-manager")

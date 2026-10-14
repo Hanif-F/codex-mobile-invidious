@@ -48,10 +48,12 @@ class QueueLibrarySmokeTest {
         waitFor { !activity.model.queue.value.loading && activity.model.playback.value.playing }
     }
     private fun finishCurrent() { ui { activity.model.seekTo(119_700) } }
-    private fun showQueue() {
+    private fun showQueue(open: Boolean = true) {
+        if (activity.model.queueExpanded.value) return
         waitFor { compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
         if (compose.onAllNodesWithTag("watch-details-list").fetchSemanticsNodes().isEmpty()) compose.onNodeWithTag("mini-player-preview").performClick()
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue-header"))
+        if (open) compose.onNodeWithTag("playback-queue-header").performClick()
     }
     private fun recreateActivity() {
         val old = activity
@@ -77,12 +79,12 @@ class QueueLibrarySmokeTest {
         compose.onNodeWithTag("watch-actions").performScrollTo()
         compose.onNodeWithText("Playback queue").assertDoesNotExist()
         ui { activity.model.insertQueue(Video("testvideo02", "Manual next"), true) }
-        waitFor { activity.model.queue.value.hasExplicitQueue && activity.model.queueExpanded.value }
+        waitFor { activity.model.queue.value.hasExplicitQueue }
         showQueue()
         compose.onNodeWithTag("playback-queue-items").assertExists()
         compose.onNodeWithTag("queue-occurrence-${activity.model.queue.value.currentKey}").assertIsSelected()
         screenshot("manual-expanded")
-        compose.onNodeWithTag("playback-queue-header").performClick()
+        compose.onNodeWithContentDescription("Close playback queue").performClick()
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
         ui { activity.model.nextQueue(1) }
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
@@ -90,7 +92,7 @@ class QueueLibrarySmokeTest {
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
         compose.navigateBack()
         compose.onNodeWithTag("mini-player-preview").performClick()
-        showQueue()
+        showQueue(false)
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
         ui { activity.model.togglePlay() }
         waitFor { !activity.model.playback.value.playWhenReady }
@@ -98,20 +100,20 @@ class QueueLibrarySmokeTest {
         compose.onNodeWithTag("playback-queue").assertDoesNotExist()
         compose.onNodeWithContentDescription("Playback queue").assertDoesNotExist()
         compose.onNodeWithContentDescription("Exit full screen").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick) { it() }
-        showQueue()
+        showQueue(false)
         assertFalse(activity.model.queueExpanded.value)
         recreateActivity()
         assertFalse(activity.model.queueExpanded.value)
         showQueue()
-        compose.onNodeWithTag("playback-queue-header").performClick()
         compose.onNodeWithTag("queue-occurrence-${activity.model.queue.value.currentKey}").assertIsSelected()
+        compose.onNodeWithContentDescription("Close playback queue").performClick()
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-up-next"))
         compose.onNodeWithTag("watch-up-next").assertIsDisplayed()
         ui { activity.model.play("testvideo01") }
         waitFor { !activity.model.queue.value.hasExplicitQueue && activity.model.playback.value.playing }
         compose.onNodeWithTag("playback-queue").assertDoesNotExist()
         playSource()
-        assertTrue(activity.model.queueExpanded.value)
+        assertFalse(activity.model.queueExpanded.value)
         showQueue()
         screenshot("playlist-expanded")
     }
@@ -170,12 +172,12 @@ class QueueLibrarySmokeTest {
         waitFor { activity.model.queue.value.source?.id == "PLfixture" && activity.model.playback.value.playing }
         val token = activity.model.queue.value.token
         showQueue()
-        compose.onNodeWithTag("playback-queue-header").performClick()
+        compose.onNodeWithContentDescription("Close playback queue").performClick()
         recreateActivity()
         waitFor { activity.model.playback.value.details != null }
         assertEquals(token, activity.model.queue.value.token)
         assertFalse(activity.model.queueExpanded.value)
-        showQueue()
+        showQueue(false)
         compose.onNodeWithTag("playback-queue-items").assertDoesNotExist()
     }
     @Test fun guestSaveSignInCreateAndRetryKeepsCreatedPlaylist() {
@@ -227,7 +229,7 @@ class QueueLibrarySmokeTest {
         playSource("IVqueue")
         val key = activity.model.queue.value.currentKey!!
         waitFor { activity.model.playlists.value.any { it.id == "IVqueue" && it.owned } }
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        showQueue()
         compose.onNode(hasTestTag("video-actions-testvideo01") and hasAnyAncestor(hasTestTag("queue-occurrence-$key"))).performScrollTo().performClick()
         compose.onNodeWithText("Remove from playlist").assertExists()
         compose.onNodeWithText("Remove from queue").performClick()
@@ -257,7 +259,7 @@ class QueueLibrarySmokeTest {
         assertNull(activity.model.queue.value.sourceError)
         assertFalse(activity.model.queue.value.sourceComplete)
         ui { activity.model.repeatQueue(QueueRepeat.ALL) }
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        showQueue()
         compose.onNodeWithTag("queue-repeat-ALL").assertIsNotEnabled()
         finishCurrent()
         waitFor { activity.model.queue.value.current?.video?.id == "testvideo02" && activity.model.playback.value.playing }
@@ -270,7 +272,7 @@ class QueueLibrarySmokeTest {
         finishCurrent()
         waitFor { activity.model.queue.value.currentKey == key && activity.model.playback.value.position < 3000 && activity.model.playback.value.playing }
         waitFor { activity.model.playlists.value.any { it.id == "IVqueue" && it.owned } }
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        showQueue()
         compose.onNode(hasTestTag("video-actions-testvideo01") and hasAnyAncestor(hasTestTag("queue-occurrence-$key"))).performScrollTo().performClick()
         compose.onNodeWithText("Remove from queue").assertExists()
         compose.onNodeWithText("Remove from playlist").performClick()

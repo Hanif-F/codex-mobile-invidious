@@ -67,7 +67,7 @@ class AccountNavigationSmokeTest {
     }
 
     private fun openAuthentication() {
-        compose.onNodeWithTag("navigation-You").performClick()
+        compose.selectFeed("You")
         compose.onNodeWithText("Sign in").performClick()
         compose.onNodeWithTag("sign-in-screen").assertExists()
     }
@@ -124,8 +124,11 @@ class AccountNavigationSmokeTest {
         assertEquals("a distinct generated signup password", fieldText("account-password"))
         assertEquals("a distinct generated signup password", fieldText("account-confirm-password"))
         until { compose.onAllNodes(hasTestTag("account-auth-submit") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
-        until { vm.account.value?.username == "GeneratedViewer" && vm.route.isEmpty() }
+        compose.onNodeWithTag("account-auth-submit").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        captureWatchScreenshot("autofill-signup-before-submit")
+        compose.onNodeWithTag("account-auth-submit").performClick()
+        try { until { vm.account.value?.username == "GeneratedViewer" && vm.route.isEmpty() } }
+        catch (failure: Throwable) { captureWatchScreenshot("autofill-signup-failure");throw failure }
         compose.onNodeWithTag("sign-in-screen").assertDoesNotExist()
     }
 
@@ -185,8 +188,8 @@ class AccountNavigationSmokeTest {
         }
     }
 
-    @Test fun discoverDockGuestSettingsAndBottomSearchCancellationAndReturn() {
-        listOf("Discover", "Subscriptions", "You").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
+    @Test fun fourRootsGuestSettingsAndSearchCancellationAndReturn() {
+        listOf("Popular", "Trending", "Subscriptions", "You").forEach { compose.onNodeWithTag("navigation-$it").assertExists() }
         compose.onNodeWithTag("main-search").assertDoesNotExist()
         val original = vm.browse.value
         compose.openGlobalSearch()
@@ -203,21 +206,24 @@ class AccountNavigationSmokeTest {
         compose.onNodeWithContentDescription("Search filters").assertExists()
         compose.onNodeWithContentDescription("Close search").performClick()
         until { vm.tab == "Popular" }; assertEquals(original.videos, vm.browse.value.videos)
-        compose.onNodeWithTag("navigation-You").performClick()
+        compose.selectFeed("You")
         compose.openAppSettings()
         compose.onNodeWithTag("settings-root").assertExists()
         back(); compose.onNodeWithTag("you-guest").assertExists()
     }
 
     @Test fun contextualSignupReturnsToLibraryAndCredentialChangesRetainSignIn() {
-        compose.onNodeWithTag("navigation-You").performClick()
+        compose.selectFeed("You")
         compose.onNodeWithText("Sign in").performClick()
         compose.onNodeWithText("Create account").performClick()
         compose.onNodeWithTag("account-username").performTextInput("NewViewer")
         compose.onNodeWithTag("account-password").performTextInput("an uncommon signup password")
         compose.onNodeWithTag("account-confirm-password").performTextInput("an uncommon signup password")
-        compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
-        until { vm.account.value != null && vm.tab == "You" }
+        compose.onNodeWithTag("account-auth-submit").performScrollTo().assertIsDisplayed().assertIsEnabled()
+        captureWatchScreenshot("signup-before-submit")
+        compose.onNodeWithTag("account-auth-submit").performClick()
+        try { until { vm.account.value != null && vm.tab == "You" } }
+        catch (failure: Throwable) { captureWatchScreenshot("signup-failure");throw failure }
         compose.openAppSettings()
         compose.onNodeWithText("Account", substring = false).performClick()
         compose.onNodeWithText("Change username").performClick()

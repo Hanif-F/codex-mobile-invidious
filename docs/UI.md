@@ -1,195 +1,113 @@
 # UI, rendering and accessibility
 
-[Documentation index](README.md) · [Extended design rationale](LIQUID_GLASS.md)
+[Documentation index](README.md) · [Approved design](ui-ux-overhaul-2026-10-13/DESIGN_SYSTEM.md) · [Implementation evidence](ui-ux-implementation-2026-10-13/README.md)
+
+This guide describes the opaque Material 3 implementation in the working tree.
+Verification status and remaining acceptance work belong to the implementation
+report. Earlier glass specifications and reports remain historical references.
 
 ## Shell and screen ownership
 
-`MobiviousApp` composes the browse shell, watch host, settings, dialogs and panels.
-`LiquidNavigation` maps internal tabs to Discover, Subscriptions, You and Search.
-Phones use a floating dock with a separate Search circle; widths ≥840dp use a
-204dp sidebar. Search uses a bottom input above the IME and restores its origin.
-Settings belongs to You; expanded watch hides global navigation. A mini-player
-floats above the dock while browsing.
+`MobiviousApp` owns browsing, watch presentation, settings and modal tools.
+`AppScaffold` defines four direct roots: **Popular, Trending, Subscriptions, You**.
+Available window width selects bottom navigation below 600dp and a labeled rail
+from 600dp. Navigation remains visible during browse scrolling. Search is a
+transient top field with clear, keyboard submission and Back/Close; its origin,
+loaded results and scroll position remain available. Opening a child keeps its
+originating root selected. Each root retains its own stack and list position.
+Reselecting a root scrolls to the top without refreshing; reselecting from its
+child returns to that root.
 
-Lists preserve raw data and transform it for display. Comfortable feeds use
-large artwork, compact feeds use rows and thin mode removes thumbnails. Wide
-comfortable discovery/subscription/channel feeds use columns; the subscription
-directory remains centered, one column, at most 800dp. You launchers use two
-columns from 600dp with ordinary text sizing. Library/settings content is centered
-up to 800dp. Large text can stack controls or hide visible dock labels while
-retaining accessible names.
+The opaque mini-player spans the content width immediately above navigation. Its
+minimum height is 72dp with independent 48dp play/pause and close targets. The IME
+hides navigation and mini-player presentation while playback continues. Scaffold,
+top bars and dialogs own their insets once. `BrowseAppSurface` places a pinned,
+opaque toolbar above the list; no content recording or optical mask is involved.
 
-`BrowseGlassSurface` measures floating toolbar height in the same layout pass,
-then sets content top padding. Bottom insets account for system bars, navigation,
-mini-player and keyboard. Settings/form Save remains outside scrolling content
-and above relevant insets. Dialog/menu state is keyed to identity/context so old
-actions do not remain attached to a new account or row.
+Comfortable feeds use fitted artwork; compact feeds use rows; thin mode removes
+ordinary thumbnails. Wide comfortable feeds use columns of at least 280dp.
+Feed content caps at 1200dp; library/settings lists at 800dp; account/server forms
+at 600dp. Insets are 16dp on compact windows and 24dp otherwise. You uses continuous
+library rows in the order Playlists, History, My Clips, Downloads, following
+identity and guest sign-in guidance. Subscription creator shortcuts precede
+Channels/scoped search and uploads. Channel banner/identity precede tabs, sorting,
+scoped search and results.
 
-## Materials and reusable components
+`AppWindowLayout` observes WindowManager folding features. An opaque separating
+hinge selects the larger contiguous pane. Watch stacks unless an expanded window
+can provide at least 480dp for the player and 320dp for its supporting pane.
+Root-coordinate anchors keep the existing decoder attached while presentation
+moves between embedded, mini, fullscreen and PiP modes.
 
-`LiquidDesign` defines light/dark palettes, typography, shapes and 20dp main
-insets. `GlassMaterial` owns the renderer and optical tokens. Control, section
-and media-overlay roles share directional highlights, restrained reflection and
-concentric clipping; prominence changes emphasis. Shell/browse/watch modifier
-facades delegate to this renderer. Backdrop remains pinned to 1.0.6, on API 33+.
+## Theme and components
 
-Ordinary/prominent control tint is .14/.20 in dark appearance and .20/.26 in light;
-section tint is .20/.28. Refractive controls use 12dp depth/18dp displacement;
-sections use 18dp/20dp, with depth clamped to half the smaller dimension. The
-background alone is magnified by 1.035 before depth-enabled refraction, with no
-backdrop blur or chromatic aberration. Glyphs and icons remain sharp. Page surfaces
-default to neutral #F5F5F5 in light appearance and #121212 in dark appearance.
-The device-wide Colored backgrounds preference enables the existing broad blue,
-teal and violet pools. Its composition policy covers visible environments,
-background-only recordings and overlay fallbacks; disabled environments have
-exact solid-color contrast bounds. Artwork and the existing bounded ambient
-palette supply media environments. Stationary screens have no ornamental loops.
+`AppTheme` supplies exact light/dark neutral Material 3 roles, standard typography
+and shape sizes. Six device-wide accent presets have stable IDs: blue (default),
+teal, green, violet, amber and rose. Unknown IDs resolve to blue. Color mode keeps
+its existing account/guest scope; artwork never changes theme roles. Neutral
+surfaces remain opaque in both appearances, including menus and dialogs.
 
-Settings root categories and related preference groups, account forms, playlist/
-clip/RSS editors, player/chat settings, download choices and community tools share
-section surfaces. Interior rows have quiet state fills, dividers and editing
-boundaries; they do not stack independent glass. Content lists remain continuous.
-`ActionControlsUi`, `LibraryGlassUi` and `WatchGlassUi` share these primitives.
+`AppComponents`, `AppLayout`, `BrowseComponents`, `LibraryComponents` and
+`WatchComponents` use native Material components and shared surface roles.
+Sections use surface-container-low; controls, menus and tooltips use appropriate
+opaque container roles; the mini-player uses surface-container. Navigation uses
+primary-container selection. Focus, selected state, disabled state, errors,
+progress and ripple remain native. There is no Backdrop dependency, window
+PixelCopy crop, shader, refraction, scene recording or backdrop polarity system.
+Legacy Colored backgrounds and Adaptive control colors values remain dormant in
+storage and have no UI effect.
 
-`GlassScene` separates background-only section sources from page-content sources
-for sibling floating chrome. Recorded children inherit the independent background
-scene, never the page recording containing themselves. Header reading environments
-mask scrolled glyphs across their complete measured height, including wrapped
-2× titles; the trailing edge fades that same environment. Toolbar controls remain
-clear and transmit the page. `GlassWindowBackdrop` gives menus, alert dialogs and
-tooltips native-resolution crops from their originating Window using PixelCopy.
-Each overlay records those pixels locally; graphics layers never cross windows.
-Screen-coordinate alignment includes source-window offsets and clips crops to its
-DecorView. Captures follow parent redraw/geometry changes, capped at four per
-second while resumed, with two reusable crops, one request in flight and stale
-callback rejection. Settled overlays do not poll. Capture failure, software drawing
-and Reduce transparency use the readable solid fallback. Full-page panels continue
-to record their own content. Video controls, player settings and the mini-player
-use the internal deferred-player profile, retaining their prior optics and
-palette-based popup backgrounds; surrounding watch-page glass uses refraction.
+## Saving and editing
 
-`GlassContentColors` supplies actual primary/secondary/icon colors through
-`GlassForeground`. Foreground and material polarity default to the resolved app
-Color mode. The device-wide Adaptive control colors preference enables atomic
-backdrop-driven polarity changes with hysteresis. Theme and preference changes
-reset polarity immediately without relocating content or discarding control state.
-Both device preferences are provided before any glass scenes are created.
-Labels, icons
-and menu slots paint only their content, with no rectangular
-backing, circular backing or inherited text halo. Readability comes from the
-continuous surrounding glass material: its tint increases only when the
-foreground needs more contrast over detailed artwork. Secondary/help text uses the
-same foreground contract. Errors retain semantic hues; selection retains markers
-and state descriptions, and disabled/busy controls remain distinguishable.
+Preferences save automatically. Choices commit immediately, sliders commit on
+release, and valid text commits after 500ms, blur, Done, page exit or backgrounding.
+`PreferenceSaveController` owns confirmed/requested values, revisions, pending,
+invalid and failed states. Unsent changes to one key coalesce. The actual sink
+serializes writes and applies sparse patches against current confirmed settings.
+Older responses cannot erase newer intent. Context changes discard obsolete work.
+Invalid text remains editable and never enters a request.
 
-Changing Compose scenes share a GPU-downsampled 24×48 color grid. Sampling is
-conflated, limited to one update per 250ms, resumed-lifecycle/hardware gated, and
-stops without redraws. The first sample waits for the source recording to finish.
-The small graphics layer and scratch buffer are reused; no full-window bitmap or
-per-control readback is allocated. Active Watch reuses generated ambient palette
-statistics instead of adding another pixel readback. Hidden shell chrome does not
-sample. Unavailable statistics retain stable colors with a conservative shared
-material tint.
+Field feedback provides Retry/Revert, and the Settings root links to pages with
+outstanding changes. Leaving a page keeps its pending/error state. Account/server
+changes warn before discarding unconfirmed edits. Passwords, identities, tokens,
+playlist/clip creation and edits, destructive actions, exports and chat overlay
+geometry retain explicit submission and appropriate dismissal confirmations.
 
-Arbitrary artwork receives a conservative shared material tint: a coarse grid
-cannot rule out a narrow bright band between samples. Generated environments
-instead use analytic channel bounds from the light pools' actual peak opacity
-and painting order. These bounds remain valid where pools overlap and avoid
-unnecessary tint on the designed Settings and library backgrounds.
+## Watch and ambient lighting
 
-Press/focus illumination observes the existing semantic interaction source and
-press position. Small controls deform by at most 2%, broad surfaces by 1%, with
-at most 2dp lift through Backdrop's `layerBlock`; thin inset controls share feedback
-without another material. Dock, tabs and segments spring toward measured selection
-positions. Reduced motion suppresses deformation; system animation scale governs
-transitions. Reduce transparency and software rendering use readable solid plates
-and skip contrast readback. These are accessibility fallbacks, not the dark default.
+Watch metadata and tools use opaque neutral surfaces. Native white player controls
+sit on local black scrims at 72% opacity, with fades limited to 96dp. Save,
+Download, Share and More have visible labels and tooltips; large text wraps action
+rows or stacks icon/label without shrinking type. Queue opens as a full-height
+phone sheet or wide supporting pane. Comments, chapters, queue and docked chat
+are mutually exclusive; closing a tool preserves playback and occurrence identity.
 
-Player chrome uses white icons and glyph shadows without circular plates, borders
-or edge washes, preserving measured rails and separate ≥48dp targets. Every video
-player has solid black backing and a black native loading shutter, including watch,
-mini-player and fullscreen letterbox areas. It never records the decoder.
-Save/Download/Share/More retain labels and long-press tooltips; narrow
-layouts compact time/chapter labels while preserving full semantic descriptions.
+Ambient mode is the only optional color lighting. An absent key means off;
+explicit saved true/false values survive migration. It uses bounded 32×18 samples
+from the existing decoder surface at most every 250ms. Off, hidden playback, PiP,
+audio-only, reduced motion, power saving, software drawing and Reduce transparency
+suppress its work. Ambient colors never tint metadata, controls or popup surfaces.
+The sampler is independent of ordinary UI rendering and does not create a decoder.
 
-## Video and motion
+## Accessibility and verification
 
-Media3 PlayerView uses a decoding SurfaceView with fit geometry and Compose surface
-synchronization. `PlayerPresentationHost` retains service/controller ownership
-through mini/watch/fullscreen transitions. `VideoGeometry` binds dimensions and
-pixel ratio to a media ID; unknown geometry uses 16:9 until decoded dimensions
-arrive. Portrait embedded height is capped by available viewport and can shrink
-through nested scrolling; comments use the compact height. New occurrences reset
-resize state. Fullscreen orientation and PiP use decoded shape.
+Controls keep at least 48dp targets, semantic roles, names, state and focus.
+Visible navigation labels remain available at large text. Responsive layouts use
+window width and measured text rather than model/orientation assumptions. RTL,
+keyboard, large text, recreation, inset changes and decoder ownership are covered
+by focused device tests; the implementation report records which runs pass and
+which still need review. Theme unit tests check all twelve appearance/accent
+combinations for opaque roles and text/boundary contrast.
 
-Gesture distance/velocity is density-independent. Mini horizontal dismissal,
-watch downward collapse and fullscreen return have deliberate axis/threshold
-rules. Claimed drags cannot fall through into taps/seeks. Controls and scrollable
-panels retain gesture priority. System reduced motion is observed by Compose
-animations; touch exploration suppresses gesture-only interactions and dock
-compaction. Android's fullscreen top-edge system gesture is left unconsumed.
+Use [Testing](TESTING.md) for functional, screenshot, accessibility and benchmark
+runners. Emulator diagnostics are the acceptance hardware for this task by the
+user's explicit instruction; they do not establish physical-phone performance.
 
-## Ambient mode
-
-The device-wide toggle defaults on and is shared by Appearance and player
-settings. `PlayerPresentationHost` gates it on controller/frame availability,
-hardware acceleration, motion/power policy, video track/presentation and
-transparency settings. Sampling is limited to active expanded watch presentation;
-PiP, mini, hidden/background/settings/editor states do not run continuous sampling.
-
-`AmbientFrameSampler` uses PixelCopy from the SurfaceView into a **32×18** bitmap.
-`AmbientCaptureGate` permits one in-flight copy, limits requests to one per **250
-ms**, invalidates late callbacks when source/context changes and backs off **1
-second** after failure. Cancellation does not recycle a bitmap still owned by a
-pending copy; disposal waits for its callback. Paused frames can sample once after
-render/seek readiness instead of looping indefinitely.
-
-`AmbientPalette` averages a **3×3** spatial grid and modestly boosts color
-separation. Only nine integer colors enter Compose state; full frames stay within
-the sampler and are not saved/transmitted. Colors animate over 600 ms. Generated
-radial light is recorded separately from consuming glass and the decoder. It
-follows fitted picture bounds instead of letterbox bars and uses bounded luminance
-with lower light-theme opacity to retain supporting-text contrast. Reduce
-transparency, disabled animator duration and power-save mode pause the effect.
-When ambient colors are unavailable or disabled, the expanded watch canvas and
-metadata use flat theme surface color, with no thumbnail fallback or decorative wash.
-
-## Rich content and imagery
-
-`CommentsUi` parses supported rich text into native annotations for formatting,
-links, timestamps/hashtags and emoji spans, with plain-text fallback. It executes
-no web scripts. Video description/information, channel description and community
-posts reuse native link resolution. Gallery failures retain navigation and Close.
-Avatar handling reads existing metadata without adding creator lookup requests,
-proxies supported image hosts and handles Unicode initials conservatively.
-Channel headers keep their banner and avatar above a flat theme surface; their
-glass controls sample that plain background rather than an enlarged banner.
-MetadataUi and DisplayFormats share date/count precision rules across cards.
-
-## Panels and accessibility
-
-Comments/replies, chapters and chat use independent target state. Opening one
-watch discussion tool closes incompatible panels. Back closes an active inner
-panel/thread before leaving watch/fullscreen. Chat presentation visibility is
-separate from its open preference so mini/PiP/background can suspend fetching
-and reopen at current playback. Overlay adjustment has explicit Done/Cancel and
-accessible movement/resizing actions; playback chrome stays above ordinary chat.
-
-Controls expose content descriptions, selected/expanded/progress state, roles,
-heading semantics and alternatives to gestures. Stable test tags identify inputs,
-rows, panels and transport controls. Presentation tests cover narrow/large-text,
-wide, light/dark, opaque and reduced-motion variants. Android XML resources supply
-launch theme/system-bar colors, adaptive/monochrome launcher icons, backup rules,
-RSS sharing paths and the separate TextureView clip preview. UI copy is currently
-primarily literal English Kotlin text; locale-aware country/date/number formatting
-does not imply a fully translated string-resource system.
-
-The native `PlayerView` uses transparent caption/window backgrounds, including
-cues with embedded background spans. Caption font/typeface preferences are
-retained, with a glyph shadow when no edge is requested. Native clip-preview
-controls use a transparent scrim and slate footer/settings popup through
-`media_colors.xml`; video backing and loading shutters use black. Thumbnail durations, watched
-labels and clip badges have transparent backgrounds.
-
-Modal bottom sheets use transparent container fills, so their drag-handle region
-does not introduce a separate dark band above the shared glass content.
+Search filters apply each valid choice immediately, keep the query and reset
+pagination. Active filters remain summarized beside results. Outstanding search,
+chat, Trending and channel-directory choices link to their actual controls from
+the Settings status section. Chat timestamps are independent of the validated
+user/word filter group; stale callbacks carry their originating context/video and
+cannot edit a different session. Download details open in a local opaque sheet.
+Wide watch keeps information below the picture in its primary pane, with tools
+or recommendations in the supporting pane.

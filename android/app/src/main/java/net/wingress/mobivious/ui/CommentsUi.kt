@@ -17,9 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -131,14 +128,14 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
         color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
         Column(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (thread != null) GlassInsetIconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
+                if (thread != null) AppInsetIconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
                 else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
                 Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
                 if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
-                GlassInsetIconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
+                AppInsetIconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
             }
             if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CommentSort.entries.forEach { sort -> FilterChip(selected = state.sort == sort,
+                CommentSort.entries.forEach { sort -> AppFilterChip(selected = state.sort == sort,
                     onClick = { changeSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
             }
             HorizontalDivider()
@@ -149,7 +146,7 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
 
 @Composable
 private fun WatchCommentSort(selected: CommentSort, changeSort: (CommentSort) -> Unit) {
-    LiquidSegments(CommentSort.entries, selected, { it.label }, Modifier.padding(horizontal = 16.dp),
+    AppSegments(CommentSort.entries, selected, { it.label }, Modifier.padding(horizontal = 16.dp),
         tag = { "comments-sort-${it.apiValue}" }, select = changeSort)
 }
 

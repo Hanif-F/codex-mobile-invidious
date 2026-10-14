@@ -6,6 +6,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.ChannelTab
+import net.wingress.mobivious.data.ChannelSort
+import net.wingress.mobivious.data.Account
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -95,12 +97,55 @@ class ChannelSmokeTest {
         until { activity.model.browse.value.end }
         assertEquals(listOf("streamvid01", "streamvid02"), activity.model.browse.value.videos.map { it.id })
         choose(ChannelTab.VIDEOS)
-        assertEquals(listOf("testvideo01"), activity.model.browse.value.videos.map { it.id })
+        assertEquals(listOf("testvideo01", "testvideo02"), activity.model.browse.value.videos.map { it.id })
+        assertEquals(2,activity.model.browse.value.page)
+        choose(ChannelTab.STREAMS)
+        assertEquals(listOf("streamvid01", "streamvid02"), activity.model.browse.value.videos.map { it.id })
         val pages = requests().filter { it.getString("tab") != "metadata" }
-        assertEquals(listOf("videos", "videos", "streams", "streams", "videos"), pages.map { it.getString("tab") })
-        assertEquals(listOf(null, "videos+/page=2%&", null, "streams+/page=2%&", null), pages.map { if (it.isNull("continuation")) null else it.getString("continuation") })
+        assertEquals(listOf("videos", "videos", "streams", "streams"), pages.map { it.getString("tab") })
+        assertEquals(listOf(null, "videos+/page=2%&", null, "streams+/page=2%&"), pages.map { if (it.isNull("continuation")) null else it.getString("continuation") })
     }
 
+    @Test fun channelTabsRetainTheirSortLoadedPagesAndVisiblePositionWithinTheAccount() {
+        openChannel()
+        compose.runOnUiThread {activity.model.setChannelVideoSort(ChannelSort.POPULAR)}
+        until {!activity.model.browse.value.loading}
+        loadMore();until {activity.model.browse.value.end}
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-testvideo02"))
+        compose.waitForIdle();val videos=activity.model.browse.value.position
+        assertTrue(videos.index>0 || videos.offset>0)
+        compose.runOnUiThread {activity.model.selectChannelTab(ChannelTab.STREAMS)}
+        until {!activity.model.browse.value.loading && activity.model.channelTab.value==ChannelTab.STREAMS}
+        assertEquals(ChannelSort.POPULAR,activity.model.channelVideoSort.value)
+        compose.runOnUiThread {activity.model.setChannelVideoSort(ChannelSort.OLDEST)}
+        until {!activity.model.browse.value.loading}
+        loadMore();until {activity.model.browse.value.end}
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-streamvid02"))
+        compose.waitForIdle();val streams=activity.model.browse.value.position
+        val requestsBefore=requests().size
+        compose.runOnUiThread {activity.model.selectChannelTab(ChannelTab.VIDEOS)}
+        compose.waitForIdle()
+        assertEquals(ChannelSort.POPULAR,activity.model.channelVideoSort.value)
+        assertEquals(videos,activity.model.browse.value.position)
+        assertEquals(2,activity.model.browse.value.page)
+        compose.onNodeWithTag("video-card-testvideo02").assertIsDisplayed()
+        compose.runOnUiThread {activity.model.selectChannelTab(ChannelTab.STREAMS)}
+        compose.waitForIdle()
+        assertEquals(ChannelSort.OLDEST,activity.model.channelVideoSort.value)
+        assertEquals(streams,activity.model.browse.value.position)
+        assertEquals(2,activity.model.browse.value.page)
+        compose.onNodeWithTag("video-card-streamvid02").assertIsDisplayed()
+        assertEquals(requestsBefore,requests().size)
+        compose.runOnUiThread {activity.model.store.save(Account("fixture-token","Different account",Long.MAX_VALUE,activity.model.store.server))}
+        until {activity.model.account.value!=null && !activity.model.browse.value.loading}
+        compose.runOnUiThread {activity.model.navigate("Popular","channel:UCaaaaaaaaaaaaaaaaaaaaaa")}
+        until {activity.model.channel.value!=null && !activity.model.browse.value.loading}
+        compose.runOnUiThread {activity.model.selectChannelTab(ChannelTab.STREAMS)}
+        until {activity.model.channelTab.value==ChannelTab.STREAMS && !activity.model.browse.value.loading}
+        assertEquals(ChannelSort.NEWEST,activity.model.channelVideoSort.value)
+        assertEquals(1,activity.model.browse.value.page)
+        compose.runOnUiThread {activity.model.store.save(null)}
+    }
     @Test fun fullDescriptionUsesLoadedMetadataAndClosesWhenLeavingTheChannel() {
         val description = (1..30).joinToString("\n\n") { "Channel description paragraph $it." } + "\n\nFinal channel line."
         command(JSONObject().put("channelDescription", description).toString())

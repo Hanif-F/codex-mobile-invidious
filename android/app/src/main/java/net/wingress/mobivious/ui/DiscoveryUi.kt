@@ -1,10 +1,8 @@
 package net.wingress.mobivious.ui
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,7 +33,7 @@ private fun RegionPicker(selected: String, dismiss: () -> Unit, change: (String)
     var query by rememberSaveable { mutableStateOf("") }
     val codes = remember(query, locale) { ContentRegions.choices(query, locale) }
     LibraryPanel("Trending region", dismiss, closeLabel = "Cancel") { body, top ->
-        LazyColumn(body.testTag("region-picker"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset,
+        LazyColumn(body.testTag("region-picker"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset,
             top = top + 16.dp, bottom = 24.dp)) {
             item { OutlinedTextField(query, { query = it }, label = { Text("Search countries or codes") }, singleLine = true,
                 modifier = Modifier.fillMaxWidth().testTag("region-search")) }
@@ -55,16 +53,20 @@ private fun RegionPicker(selected: String, dismiss: () -> Unit, change: (String)
 
 @Composable
 internal fun TrendingControls(vm: AppViewModel, region: String) {
-    val category by vm.trendingCategory.collectAsStateWithLifecycle()
-    val busy by vm.trendingRegionBusy.collectAsStateWithLifecycle()
-    val error by vm.trendingRegionError.collectAsStateWithLifecycle()
+    val confirmedCategory by vm.trendingCategory.collectAsStateWithLifecycle()
+    val edits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
+    val category = TrendingCategory.saved(vm.localPreferenceValue("profile:trendingCategory",confirmedCategory.apiValue) as String)
+    val categoryEdit = edits["profile:trendingCategory"]
+    val edit=edits["region"]
+    val requestedRegion=edit?.let { org.json.JSONObject(it.requested).getString("region") } ?: region
     val locale = LocalConfiguration.current.locales[0]
     var regionOpen by rememberSaveable { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         BrowseTabs(TrendingCategory.entries, category, { it.label }, { "trending-${it.apiValue}" }, select = vm::selectTrendingCategory)
-        LibraryActionButton(ContentRegions.label(region, locale), Modifier.testTag("trending-region"), enabled = !busy, icon = Icons.Default.ExpandMore) { regionOpen = true }
-        if (regionOpen) RegionPicker(region, { regionOpen = false }) { regionOpen = false; vm.selectTrendingRegion(it) }
-        if (busy) Text("Saving region…", style = MaterialTheme.typography.bodySmall)
-        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("trending-region-error")) }
+        PreferenceSaveFeedback(categoryEdit?.status,categoryEdit?.error,{vm.preferenceSaves.retry("profile:trendingCategory")},{vm.preferenceSaves.revert("profile:trendingCategory")})
+        LibraryActionButton(ContentRegions.label(requestedRegion, locale), Modifier.testTag("trending-region"), icon = Icons.Default.ExpandMore) { regionOpen = true }
+        if (regionOpen) RegionPicker(requestedRegion, { regionOpen = false }) { regionOpen = false; vm.selectTrendingRegion(it) }
+        PreferenceSaveFeedback(edit?.status,edit?.error,{vm.preferenceSaves.retry("region")},{vm.preferenceSaves.revert("region")},
+            modifier=if(edit?.status in listOf(PreferenceSaveStatus.FAILED,PreferenceSaveStatus.INVALID)) Modifier.testTag("trending-region-error") else Modifier)
     }
 }

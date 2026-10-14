@@ -12,7 +12,7 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.SessionStore
-import net.wingress.mobivious.ui.liquidColorScheme
+import net.wingress.mobivious.ui.appColorScheme
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -45,7 +45,10 @@ class AmbientModeSmokeTest {
         ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>()
             .firstOrNull()?.let { activity = it }
     }
+    private var originalSize: String? = null
+    private fun viewport(width: Int, height: Int=800) { shell("wm size ${width*2}x${height*2}"); shell("wm density 320") }
     @Before fun launch() {
+        originalSize = Regex("Override size: (\\d+x\\d+)").find(shell("wm size"))?.groupValues?.get(1)
         command("reset")
         animator = shell("settings get global animator_duration_scale")
         originalDensity = Regex("Override density: (\\d+)").find(shell("wm density"))?.groupValues?.get(1)
@@ -75,12 +78,19 @@ class AmbientModeSmokeTest {
             vm.store.guestDeArrow(AccountPreferences()); vm.switchServer(originalServer); activity.finishAndRemoveTask()
         }
         shell(if (animator == "null") "settings delete global animator_duration_scale" else "settings put global animator_duration_scale $animator")
+        shell("wm size ${originalSize ?: "reset"}")
         shell("wm density ${originalDensity ?: "reset"}")
         shell("settings put system font_scale $originalFontScale")
     }
     private fun background(): Color {
-        val pixels = compose.onNodeWithTag("watch-ambient-background").captureToImage().toPixelMap()
-        return pixels[pixels.width / 2, pixels.height / 2]
+        val ambient = compose.onNodeWithTag("watch-ambient-background")
+        val bounds = ambient.fetchSemanticsNode().boundsInRoot
+        val picture = compose.onNodeWithTag("player-surface").fetchSemanticsNode().boundsInRoot
+        val pixels = ambient.captureToImage().toPixelMap()
+        // Metadata is deliberately opaque. Read the exposed lighting beside the
+        // picture, clear of both the decoder surface and recommendation artwork.
+        val y = (picture.bottom - bounds.top - 3).toInt().coerceIn(0,pixels.height-1)
+        return pixels[1,y]
     }
     private fun expectColor(red: Boolean) {
         until {
@@ -108,7 +118,7 @@ class AmbientModeSmokeTest {
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         val metadata = compose.onNodeWithTag("watch-metadata").captureToImage().toPixelMap()
         for (y in listOf(1, metadata.height / 2, metadata.height - 2)) {
-            val surface = liquidColorScheme(false, vm.store.coloredBackgrounds.value).surface
+            val surface = appColorScheme(false).surface
             assertEquals(surface.red, metadata[1, y].red, .01f)
             assertEquals(surface.green, metadata[1, y].green, .01f)
             assertEquals(surface.blue, metadata[1, y].blue, .01f)
@@ -221,12 +231,12 @@ class AmbientModeSmokeTest {
 
     @Test fun wideAndLargeTextWatchLayoutsAndCommentsRetainTheirReadingSurfaces() {
         expectColor(true)
-        shell("wm density 200")
+        viewport(960,700)
         until { currentActivity(); activity.resources.configuration.screenWidthDp >= 840 }
         compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()
         until { compose.onAllNodesWithTag("watch-ambient-background").fetchSemanticsNodes().isNotEmpty() }
         captureWatchScreenshot("ambient-live-wide")
-        shell("wm density 640")
+        viewport(320)
         shell("settings put system font_scale 2.0")
         until { currentActivity(); activity.resources.configuration.screenWidthDp <= 360 && activity.resources.configuration.fontScale >= 2f }
         compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()

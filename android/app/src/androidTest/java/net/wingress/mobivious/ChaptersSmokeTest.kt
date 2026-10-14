@@ -198,7 +198,7 @@ class ChaptersSmokeTest {
         command("sponsorblock", """{"liveNow":true}""")
         incoming("/watch?v=testvideo01&autoplay=0"); ready()
         assertTrue(activity.model.playback.value.details!!.video.live)
-        captureWatchScreenshot("watch-glass-live")
+        captureWatchScreenshot("watch-native-live")
         compose.onNodeWithTag("player-chapter-title").assertDoesNotExist()
         compose.onNodeWithTag("chapters-entry").assertDoesNotExist()
         assertEquals(0, fixture().getJSONArray("chapterAssetRequests").length())
@@ -223,10 +223,10 @@ class ChaptersSmokeTest {
         val bounds = android.graphics.Rect()
         until { automation.windows.firstOrNull { it.root?.packageName?.toString() == instrumentation.targetContext.packageName }
             ?.let { it.getBoundsInScreen(bounds); !bounds.isEmpty } == true }
-        captureWatchScreenshot("watch-glass-pip")
+        captureWatchScreenshot("watch-native-pip")
         android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(
             "input tap ${bounds.centerX()} ${bounds.centerY()} ")).use { it.readBytes() }
-        captureWatchScreenshot("watch-glass-pip-menu")
+        captureWatchScreenshot("watch-native-pip-menu")
         until {
             fun expand(node: android.view.accessibility.AccessibilityNodeInfo): Boolean {
                 val label = "${node.text?.toString().orEmpty()} ${node.contentDescription?.toString().orEmpty()}".lowercase()

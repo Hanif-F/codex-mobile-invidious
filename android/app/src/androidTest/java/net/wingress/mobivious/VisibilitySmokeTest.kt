@@ -56,7 +56,7 @@ class VisibilitySmokeTest {
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun manager() {
-        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
+        compose.selectFeed("You"); compose.openAppSettings()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Blocked channels", substring = false).performClick()
         compose.onNodeWithTag("blocked-channel-manager").assertIsDisplayed()
@@ -76,13 +76,13 @@ class VisibilitySmokeTest {
 
     @Test fun guestBrowsingSettingAndBadgesCoverCompactTextOnlyLayouts() {
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
-        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
+        compose.selectFeed("You"); compose.openAppSettings()
         compose.onNodeWithText("Browsing", substring = false).performClick()
         compose.onNodeWithText("Show members-only videos", substring = false).performClick()
-        compose.onNodeWithTag("settings-save").performClick()
+        compose.finishAutomaticPreferencePage()
         until { activity.model.preferences.value.showMemberVideos }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-membervid01"))
         compose.onNodeWithTag("video-members-membervid01", useUnmergedTree = true).assertIsDisplayed()
         save(activity.model.preferences.value.copy(thinMode = true, uiDensity = "compact", darkMode = "dark"))
@@ -101,14 +101,16 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
         compose.onNodeWithContentDescription("Search filters").performClick()
         compose.onNodeWithTag("search-show-members").performClick()
-        compose.onNodeWithText("Apply").performClick()
         until { activity.model.searchVisibility.value.showMembers == true && !activity.model.browse.value.loading }
+        compose.onAllNodesWithText("Apply").assertCountEquals(0)
+        compose.onNodeWithContentDescription("Close search filters").performClick()
         compose.onNodeWithTag("video-card-membervid01").assertExists()
         assertFalse(activity.model.preferences.value.showMemberVideos)
         compose.onNodeWithContentDescription("Search filters").performClick()
         compose.onNodeWithTag("search-members-reset").performClick()
-        compose.onNodeWithText("Apply").performClick()
         until { activity.model.searchVisibility.value.showMembers == null && !activity.model.browse.value.loading }
+        compose.onAllNodesWithText("Apply").assertCountEquals(0)
+        compose.onNodeWithContentDescription("Close search filters").performClick()
         compose.onNodeWithTag("video-card-membervid01").assertDoesNotExist()
         assertNull(activity.model.store.searchVisibility(activity.model.api.context()).showMembers)
         assertFalse(fixture().getJSONArray("visibilityReads").getJSONObject(0).getBoolean("authorized"))
@@ -123,8 +125,9 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("video-card-testvideo01").assertDoesNotExist()
         compose.onNodeWithContentDescription("Search filters").performClick()
         compose.onNodeWithTag("search-include-blocked").performClick()
-        compose.onNodeWithText("Apply").performClick()
         until { activity.model.searchVisibility.value.includeBlocked && !activity.model.browse.value.loading }
+        compose.onAllNodesWithText("Apply").assertCountEquals(0)
+        compose.onNodeWithContentDescription("Close search filters").performClick()
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
         navigate("Subscriptions")
         compose.onNodeWithTag("video-card-testvideo01").assertExists()

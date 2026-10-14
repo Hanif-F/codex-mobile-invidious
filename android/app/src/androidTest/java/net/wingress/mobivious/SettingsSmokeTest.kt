@@ -11,7 +11,8 @@ import androidx.test.runner.lifecycle.Stage
 import java.net.URL
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.SessionStore
-import net.wingress.mobivious.ui.GlassContentColors
+import net.wingress.mobivious.ui.appColorScheme
+import net.wingress.mobivious.data.AccentPreset
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -22,8 +23,6 @@ import org.junit.runner.RunWith
 class SettingsSmokeTest {
     @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
-    private var originalColored = false
-    private var originalAdaptive = false
     private fun until(condition: () -> Boolean) = compose.waitUntil(30_000, condition)
     private fun command(path: String, body: String = "{}") {
         (URL("http://127.0.0.1:18080/test/$path").openConnection() as java.net.HttpURLConnection).apply {
@@ -36,102 +35,89 @@ class SettingsSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
-            originalColored = activity.model.store.coloredBackgrounds.value
-            originalAdaptive = activity.model.store.adaptiveControlColors.value
-            activity.model.store.coloredBackgrounds(false); activity.model.store.adaptiveControlColors(false)
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
-            activity.model.store.coloredBackgrounds(originalColored); activity.model.store.adaptiveControlColors(originalAdaptive)
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
         }
     }
-    private fun open(page: String) { compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings(); compose.onNodeWithText(page).performScrollTo().performClick() }
+    private fun open(page: String) { compose.selectFeed("You"); compose.openAppSettings(); compose.onNodeWithText(page).performScrollTo().performClick() }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
-    private fun save(page: String) { compose.onNodeWithTag("settings-save").performClick(); until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }; compose.onNodeWithContentDescription("Back from Settings").performClick() }
-
-    @Test fun appearanceSwitchesSaveImmediatelyAndSurviveRecreationWithoutSavingDraft() {
-        open("Appearance")
-        compose.onNodeWithText("Colored backgrounds").assertIsOff()
-        compose.onNodeWithText("Adaptive control colors").assertIsOff()
-        val sharedBefore = activity.model.preferences.value
-        toggle("Colored backgrounds"); toggle("Adaptive control colors")
-        assertEquals(sharedBefore, activity.model.preferences.value)
-        assertTrue(SessionStore(activity).coloredBackgrounds.value)
-        assertTrue(SessionStore(activity).adaptiveControlColors.value)
-        compose.runOnUiThread { activity.recreate() }
-        until { var ready = false; compose.runOnUiThread {
-            ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== activity }
-        }; ready }
-        compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
-        compose.onNodeWithText("Colored backgrounds").performScrollTo().assertIsOn()
-        compose.onNodeWithText("Adaptive control colors").performScrollTo().assertIsOn()
-        toggle("Colored backgrounds")
-        compose.onNodeWithText("Colored backgrounds").assertIsOff()
-        compose.onNodeWithText("Adaptive control colors").assertIsOn()
-        compose.onNodeWithText("Cancel").performClick()
+    private fun save(page: String) {
+        until {activity.model.preferenceSaves.edits.value.isEmpty()}
+        compose.onNodeWithContentDescription("Back from $page").performClick()
+        compose.onNodeWithTag("settings-root").assertExists()
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
-        until { activity.model.account.value != null && !activity.model.accountBusy.value }
-        assertFalse(activity.model.store.coloredBackgrounds.value)
-        assertTrue(activity.model.store.adaptiveControlColors.value)
-        open("Appearance")
-        compose.onNodeWithText("Colored backgrounds").assertIsOff()
-        compose.onNodeWithText("Adaptive control colors").assertIsOn()
-        captureWatchScreenshot("appearance-settings-defaults-and-switches")
     }
-
-    @Test(timeout = 60_000) fun fixedGlassFollowsSystemColorModeWhenSystemAppearanceChanges() {
-        val manager = activity.getSystemService(UiModeManager::class.java)
-        val originalMode = manager.nightMode
-        val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
-        open("Appearance")
-        automation.adoptShellPermissionIdentity()
+    private fun recreate() {
+        val previous=activity;compose.runOnUiThread {activity.recreate()}
+        until {var ready=false;compose.runOnUiThread {ready=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any {it is MainActivity && it!==previous}};ready}
+        compose.runOnUiThread {activity=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single()}
+    }
+    @Test fun outstandingChatValidationLinksToTheActualControlsAndReverts() {
+        compose.runOnUiThread {
+            val model=activity.model
+            model.requestChatPreferences(model.preferences.value.chat.copy(words="/(?=invalid)/"),debounce=false)
+        }
+        until { activity.model.preferenceSaves.edits.value["chat_filters"]?.status == net.wingress.mobivious.ui.PreferenceSaveStatus.INVALID }
+        compose.selectFeed("You"); compose.openAppSettings()
+        compose.onNodeWithTag("preference-status-Chat settings").performClick()
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
+        compose.onNodeWithTag("chat-words").assertTextContains("/(?=invalid)/")
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasText("Revert to saved"))
+        compose.onNode(hasText("Revert to saved") and hasAnyAncestor(hasTestTag("chat-settings-list"))).performClick()
+        until { activity.model.preferenceSaves.edits.value.isEmpty() }
+        compose.onNodeWithContentDescription("Close chat settings").performClick()
+        compose.onNodeWithTag("preference-status-Chat settings").assertDoesNotExist()
+        assertEquals("",activity.model.preferences.value.chat.words)
+    }
+    @Test fun deviceAccentAndAmbientSaveImmediatelyAndSurviveRecreationAndAccountChange() {
+        val previous=activity.model.store.accentPreset.value
+        val previousAmbient=activity.model.store.ambientMode.value
         try {
-            for (dark in listOf(true, false, true)) {
-                val previous = activity
-                val previousDark = activity.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-                compose.runOnUiThread { manager.setNightMode(if (dark) UiModeManager.MODE_NIGHT_YES else UiModeManager.MODE_NIGHT_NO) }
-                // Wait for the replacement activity before asking Compose for nodes.
-                // Querying the disposed root during recreation can stall Espresso.
+            open("Appearance")
+            compose.onNodeWithTag("accent-teal").performScrollTo().performClick()
+            assertEquals(AccentPreset.TEAL,SessionStore(activity).accentPreset.value)
+            recreate()
+            compose.onNodeWithTag("accent-teal").performScrollTo().assertIsSelected()
+            save("Appearance")
+            compose.runOnUiThread {activity.model.action {activity.model.login("Fixture","transient-password")}}
+            until {activity.model.account.value!=null && !activity.model.accountBusy.value}
+            assertEquals(AccentPreset.TEAL,activity.model.store.accentPreset.value)
+            assertEquals(previousAmbient,activity.model.store.ambientMode.value)
+            open("Appearance");compose.onAllNodesWithText("Colored backgrounds").assertCountEquals(0)
+            compose.onAllNodesWithText("Adaptive control colors").assertCountEquals(0)
+        } finally {compose.runOnUiThread {activity.model.store.accentPreset(previous)}}
+    }
+    @Test(timeout=90_000) fun systemAppearanceChangesPreserveAutomaticPreferencePage() {
+        val manager=activity.getSystemService(UiModeManager::class.java)
+        val original=manager.nightMode
+        val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
+        open("Appearance");automation.adoptShellPermissionIdentity()
+        try {
+            for(dark in listOf(true,false,true)) {
+                compose.runOnUiThread {manager.setNightMode(if(dark) UiModeManager.MODE_NIGHT_YES else UiModeManager.MODE_NIGHT_NO)}
                 until {
-                    var ready = false
-                    compose.runOnUiThread {
-                        val resumed = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
-                            .filterIsInstance<MainActivity>().firstOrNull()
-                        if (resumed != null && (previousDark == dark || resumed !== previous)) {
-                            activity = resumed
-                            ready = (resumed.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES) == dark
-                        }
-                    }
-                    ready
+                    var matches=false
+                    compose.runOnUiThread {val current=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().firstOrNull()
+                        if(current!=null) {activity=current;matches=(current.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK==Configuration.UI_MODE_NIGHT_YES)==dark}}
+                    matches
                 }
-                val expected = if (dark) GlassContentColors.light.primary else GlassContentColors.dark.primary
-                until {
-                    val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                    if (compose.onAllNodesWithText("Colored backgrounds").fetchSemanticsNodes().isEmpty()) false else {
-                        compose.onNodeWithText("Colored backgrounds").performSemanticsAction(
-                        androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
-                        layouts.singleOrNull()?.layoutInput?.style?.color == expected
-                    }
-                }
-                compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
-                assertEquals("", activity.model.preferences.value.darkMode)
-                compose.onNodeWithText("Adaptive control colors").assertIsOff()
+                compose.onNodeWithText("Color mode").assertExists()
+                assertEquals("",activity.model.preferences.value.darkMode)
+                compose.onAllNodesWithTag("settings-save").assertCountEquals(0)
             }
         } finally {
-            compose.runOnUiThread { manager.setNightMode(originalMode) }
-            automation.dropShellPermissionIdentity()
+            compose.runOnUiThread {manager.setNightMode(original)};automation.dropShellPermissionIdentity()
             compose.waitForIdle()
-            compose.runOnUiThread { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>()
-                .firstOrNull()?.let { activity = it } }
+            compose.runOnUiThread {ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().firstOrNull()?.let {activity=it}}
         }
     }
 
-    @Test fun fullScreenNavigationAndDraftSurviveRecreation() {
+    @Test fun fullScreenNavigationAndAutomaticChangesSurviveRecreation() {
         open("Browsing")
         compose.onAllNodes(isDialog()).assertCountEquals(0)
         toggle("Show related videos")
@@ -140,7 +126,7 @@ class SettingsSmokeTest {
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
         save("Browsing")
         assertFalse(activity.model.store.guestDeArrow().relatedVideos)
-        compose.onNodeWithTag("navigation-You").performClick(); compose.openAppSettings()
+        compose.selectFeed("You"); compose.openAppSettings()
         compose.onNodeWithText("Playback").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Back from Playback").performClick()
         compose.onNodeWithTag("settings-root").assertExists()
@@ -152,7 +138,7 @@ class SettingsSmokeTest {
         open("Playback"); toggle("Autoplay opened videos"); toggle("Audio only by default"); save("Playback")
         open("History & library"); toggle("Remember playback position"); save("History & library")
         compose.runOnUiThread { activity.model.store.position("testvideo01", 35) }
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.details != null && activity.model.playback.value.duration > 0 }
         assertFalse(activity.model.playback.value.playWhenReady)
@@ -162,16 +148,22 @@ class SettingsSmokeTest {
         assertFalse((0 until events.length()).any { events.getJSONObject(it).optString("path") == "/api/v1/auth/preferences" })
     }
 
-    @Test fun failedSharedSaveKeepsDraftAndRetryPreservesOtherPreferences() {
+    @Test fun failedAutomaticSaveKeepsRequestedValueAcrossNavigationRecreationAndRetry() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
-        open("Browsing"); toggle("Show related videos"); compose.onNodeWithText("Show related videos").assertIsOff()
+        open("Browsing")
         command("sponsorblock", """{"failPreferences":true}""")
-        compose.onNodeWithTag("settings-save").assertIsEnabled().performClick()
-        until { compose.onAllNodesWithTag("settings-save-error").fetchSemanticsNodes().isNotEmpty() || compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
-        assertTrue("Missing save error: account=" + activity.model.account.value?.username + ", related=" + activity.model.preferences.value.relatedVideos + ", fixture=" + state().getJSONObject("preferences") + ", events=" + state().getJSONArray("events"), compose.onAllNodesWithTag("settings-save-error").fetchSemanticsNodes().isNotEmpty())
-        compose.onNodeWithContentDescription("Back from Browsing").assertExists()
+        toggle("Show related videos")
+        compose.onNodeWithText("Show related videos").assertIsOff()
+        until {activity.model.preferenceSaves.edits.value["related_videos"]?.error!=null}
+        assertTrue(activity.model.preferences.value.relatedVideos)
+        compose.onNodeWithContentDescription("Back from Browsing").performClick()
+        compose.onNodeWithTag("preference-save-status").assertExists()
+        compose.onNodeWithTag("preference-status-Browsing").performScrollTo().performClick()
+        recreate()
+        compose.onNodeWithText("Show related videos").performScrollTo().assertIsOff()
         command("sponsorblock", """{"failPreferences":false}""")
+        compose.onNodeWithText("Retry").performScrollTo().performClick()
         save("Browsing")
         val prefs = state().getJSONObject("preferences")
         assertFalse(prefs.getBoolean("related_videos")); assertEquals("preserved", prefs.getString("unrelated_setting"))

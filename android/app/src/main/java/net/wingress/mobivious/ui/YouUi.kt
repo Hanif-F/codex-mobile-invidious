@@ -1,8 +1,6 @@
 package net.wingress.mobivious.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -15,14 +13,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -31,62 +25,38 @@ import net.wingress.mobivious.data.Playlist
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 @Composable
-internal fun YouIdentity(account: Account?, server: String) {
+internal fun YouIdentity(account: Account?, server: String, openServer: () -> Unit) {
+    val host=server.toHttpUrlOrNull()?.host ?: server
     Row(Modifier.fillMaxWidth().testTag("you-identity").padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
         Box(Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.primaryContainer), contentAlignment = Alignment.Center) {
-            if (account == null) GlassIcon(Icons.Default.PersonOutline, null, Modifier.size(32.dp), MaterialTheme.colorScheme.primary)
-            else GlassLabel(account.username.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            if (account == null) Icon(Icons.Default.PersonOutline, null, Modifier.size(32.dp), MaterialTheme.colorScheme.primary)
+            else Text(account.username.take(2).uppercase(), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            GlassLabel(account?.username ?: "Your personal space", style = MaterialTheme.typography.headlineSmall)
-            GlassLabel(server.toHttpUrlOrNull()?.host ?: server, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(account?.username ?: "Guest", style = MaterialTheme.typography.titleLarge)
+            TextButton(openServer,Modifier.heightIn(min=48.dp).testTag("you-instance")
+                .semantics {contentDescription="Server settings for $host"}) {Text(host,style=MaterialTheme.typography.bodyMedium)}
         }
     }
 }
 
 @Composable
 internal fun LibraryDestinations(navigate: (String) -> Unit) {
-    LibraryControlScene(Modifier.fillMaxWidth()) {
-        BoxWithConstraints(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
-            val destinations = listOf(
-                Triple("Playlists", "Collections you keep", Icons.Default.VideoLibrary),
-                Triple("My Clips", "Moments you’ve shared", Icons.Default.ContentCut),
-                Triple("History", "Pick up where you left off", Icons.Default.History),
-                Triple("Downloads", "Watch and listen offline", Icons.Default.DownloadDone))
-            val routes = listOf("playlists", "clips", "history", "downloads")
-            val columns = if (maxWidth >= 600.dp && LocalDensity.current.fontScale <= 1.3f) 2 else 1
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                destinations.indices.chunked(columns).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                        row.forEach { i -> val (title, detail, icon) = destinations[i]
-                            LibraryDestination(title, detail, icon, Modifier.weight(1f).testTag("you-${routes[i]}")) { navigate(routes[i]) }
-                        }
-                    }
-                }
-            }
+    Surface(Modifier.fillMaxWidth(),shape=MaterialTheme.shapes.large,color=MaterialTheme.colorScheme.surfaceContainerLow) {
+    CompositionLocalProvider(LocalInsideAppSection provides true) {
+    Column(Modifier.fillMaxWidth()) {
+        listOf(
+            Triple("Playlists","Collections you keep",Icons.Default.VideoLibrary),
+            Triple("History","Pick up where you left off",Icons.Default.History),
+            Triple("My Clips","Moments you’ve shared",Icons.Default.ContentCut),
+            Triple("Downloads","Watch and listen offline",Icons.Default.DownloadDone)
+        ).forEachIndexed { i, (title, detail, icon) ->
+            val route=listOf("playlists","history","clips","downloads")[i]
+            ActionRow(title,Modifier.testTag("you-$route"),detail,icon) { navigate(route) }
         }
     }
-}
-
-@Composable
-private fun LibraryDestination(title: String, detail: String, icon: ImageVector, modifier: Modifier, action: () -> Unit) {
-    var bounds by remember { mutableStateOf(Rect.Zero) }
-    val foreground = rememberGlassContentColors(bounds)
-    val interaction = remember { MutableInteractionSource() }
-    val feedback = rememberGlassInteraction(interaction)
-    GlassForeground(foreground) {
-
-    Row(modifier.onGloballyPositioned { bounds = it.boundsInRoot() }.glassMaterial(Liquid.card, interaction = feedback).clickable(interactionSource = interaction, indication = null, role = Role.Button, onClick = action).heightIn(min = 80.dp).padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        GlassIcon(icon, null, Modifier.size(28.dp), MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            GlassLabel(title, style = MaterialTheme.typography.titleMedium)
-            GlassLabel(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        GlassIcon(Icons.Default.ChevronRight, null, Modifier.size(20.dp), MaterialTheme.colorScheme.onSurfaceVariant)
     }
-
     }
 }
 
@@ -94,21 +64,21 @@ private fun LibraryDestination(title: String, detail: String, icon: ImageVector,
 internal fun YouDashboard(account: Account?, server: String, state: LazyListState, top: Dp,
     navigate: (String) -> Unit, signIn: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize().testTag(if (account == null) "you-guest" else "you-library-list"), state = state,
-        contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = LocalContentBottomInset.current),
+        contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = LocalContentBottomInset.current),
         verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { YouIdentity(account, server) }
-        item { GlassLabel("Your library", style = MaterialTheme.typography.titleLarge) }
-        item { LibraryDestinations(navigate) }
+        item { YouIdentity(account, server) {navigate("server")} }
         if (account == null) item {
-            LibraryControlScene(Modifier.fillMaxWidth()) {
+            Box(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    GlassLabel("Your videos, together", style = MaterialTheme.typography.headlineSmall)
-                    GlassLabel("Sign in to keep your playlists, history, and clips together. Downloads stay on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("Your videos, together", style = MaterialTheme.typography.titleLarge)
+                    Text("Sign in to keep your playlists, history, and clips together. Downloads stay on this device.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     LibraryActionButton("Sign in", Modifier.testTag("you-sign-in"), Icons.AutoMirrored.Filled.Login, prominent = true, onClick = signIn)
-                    GlassLabel("No Google account needed. Create an account when your instance allows it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("No Google account needed. Create an account when your instance allows it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
+        item { Text("Your library", style = MaterialTheme.typography.titleMedium) }
+        item { LibraryDestinations(navigate) }
     }
 }
 
@@ -119,9 +89,13 @@ internal fun PlaylistLibrary(vm: AppViewModel, playlists: List<Playlist>, sectio
     LazyColumn(Modifier.fillMaxSize().testTag("playlist-library-list"), state = list,
         contentPadding = PaddingValues(top = top, bottom = LocalContentBottomInset.current)) {
         item { SectionHeading(if (section == "owned") "My playlists (${visible.size})" else "Subscribed playlists (${visible.size})",
-            Modifier.padding(horizontal = Liquid.inset, vertical = 12.dp)) }
+            Modifier.padding(horizontal = AppTokens.inset, vertical = 12.dp)) }
+        if(section=="owned" && visible.isNotEmpty()) item {
+            LibraryActionButton("New playlist",Modifier.padding(horizontal=AppTokens.inset).testTag("playlist-create-primary"),
+                Icons.Default.Add,prominent=true,onClick=create)
+        }
         items(visible, key = { it.id }) { playlist -> PlaylistCard(vm, playlist, { open(playlist) }, signIn) }
-        if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(Liquid.inset)) }
+        if (state.loading) item { LinearProgressIndicator(Modifier.fillMaxWidth().padding(AppTokens.inset)) }
         state.error?.let { error -> item { LibraryEmptyState("Couldn’t load playlists", error, Icons.Default.CloudOff, "Retry", vm::refresh) } }
         if (!state.loading && state.error == null && visible.isEmpty()) item {
             LibraryEmptyState(if (section == "owned") "Make room for your favorites" else "Follow a collection",

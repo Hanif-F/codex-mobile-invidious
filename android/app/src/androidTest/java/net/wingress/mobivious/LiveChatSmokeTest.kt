@@ -99,7 +99,7 @@ class LiveChatSmokeTest {
         compose.onNodeWithTag("chat-words").performTextReplacement(words)
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-timing"))
         compose.onNodeWithTag("chat-timing").performTextReplacement(timing)
-        compose.onNodeWithTag("chat-settings-save").performClick()
+        compose.flushChatPreferenceFields()
     }
     @Before fun launch() {
         command("reset"); command("chat"); command("chapters")
@@ -157,15 +157,15 @@ class LiveChatSmokeTest {
         ui { activity.onBackPressedDispatcher.onBackPressed() }
         reacquire(); until { compose.onAllNodesWithContentDescription("Full screen").fetchSemanticsNodes().isNotEmpty() }
     }
-    @Test fun settingsKeepDraftsAndFixedSaveWhileLayoutAndAppearanceSaveImmediately() {
+    @Test fun settingsAutomaticallySaveTextAndAppearanceWithoutASaveFooter() {
         incoming(); ready(); chat(); settings()
-        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close chat settings").assertIsDisplayed()
         compose.onNodeWithTag("chat-side-width").performSemanticsAction(SemanticsActions.SetProgress) { assertTrue(it(.1f)) }
-        assertEquals(.1f, activity.model.store.chatAppearance().besideFraction)
+        until { activity.model.store.chatAppearance().besideFraction == .1f }
         screenshot("settings-docked")
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
         compose.onNodeWithTag("chat-words").performTextReplacement("draft-word")
-        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close chat settings").assertIsDisplayed()
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-layout-overlay"))
         compose.onNodeWithTag("chat-layout-overlay").performClick()
         compose.onNodeWithTag("chat-settings-sheet").assertExists()
@@ -176,16 +176,16 @@ class LiveChatSmokeTest {
         screenshot("settings-overlay")
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-channel-ids"))
         compose.onNodeWithTag("chat-channel-ids").assertIsOff().performClick()
-        assertFalse(activity.model.store.chatAppearance().hideUserIds)
+        until { !activity.model.store.chatAppearance().hideUserIds }
         compose.onNodeWithTag("chat-timestamps").performClick()
-        assertTrue(activity.model.preferences.value.chat.timestamps)
+        until { !activity.model.preferences.value.chat.timestamps }
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
         compose.onNodeWithTag("chat-words").assertTextContains("draft-word")
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-timing"))
         compose.onNodeWithTag("chat-timing").performClick()
-        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close chat settings").assertIsDisplayed()
         screenshot("settings-keyboard")
-        compose.onNodeWithTag("chat-settings-save").performClick()
+        compose.flushChatPreferenceFields()
         until { !activity.model.preferences.value.chat.timestamps && activity.model.preferences.value.chat.words == "draft-word" }
         assertEquals(0, fixture().getJSONArray("chatPreferenceWrites").length())
         compose.onNodeWithContentDescription("Close chat settings").performClick()
@@ -218,7 +218,7 @@ class LiveChatSmokeTest {
             assertTrue(layouts.single().lineCount > 1)
             assertFalse(layouts.single().didOverflowWidth)
             screenshot("ten-percent-$theme")
-            settings(); compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+            settings(); compose.onNodeWithContentDescription("Close chat settings").assertIsDisplayed()
             compose.onNodeWithContentDescription("Close chat settings").performClick()
         }
         compose.onNodeWithTag("chat-menu").performClick()
@@ -311,12 +311,13 @@ class LiveChatSmokeTest {
     @Test fun signedInFiltersAndTimingUseDedicatedApisAndSaveFailuresRetry() {
         account(); incoming(); ready(); chat(); settings()
         command("chat", """{"chatSaveFail":true}"""); saveFiltersAndTiming("spam", "-1.5")
-        compose.onNodeWithText("Chat settings could not be saved").assertExists()
-        compose.onNodeWithTag("chat-settings-save").assertIsDisplayed()
+        assertTrue(compose.onAllNodesWithText("Chat settings could not be saved").fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithContentDescription("Close chat settings").assertIsDisplayed()
         compose.onNodeWithTag("chat-timing").assertTextContains("-1.5")
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
         compose.onNodeWithTag("chat-words").assertTextContains("spam")
-        command("chat", """{"chatSaveFail":false}"""); compose.onNodeWithTag("chat-settings-save").performClick()
+        command("chat", """{"chatSaveFail":false}""")
+        ui { activity.model.preferenceSaves.edits.value.keys.toList().forEach(activity.model.preferenceSaves::retry) }
         until { activity.model.chatReplay.value.timingOffsetMs == -1500 && !activity.model.chatReplay.value.timingSaving }
         val saved = fixture(); assertEquals(-1500, saved.getJSONObject("chatTimings").getInt("testvideo01"))
         val patch = saved.getJSONArray("chatPreferenceWrites").getJSONObject(0)
@@ -337,7 +338,7 @@ class LiveChatSmokeTest {
         settings(); saveFiltersAndTiming("", "2")
         until { !activity.model.chatReplay.value.timingSaving && activity.model.chatReplay.value.timingOffsetMs == 2000 }
         assertEquals(2000, fixture().getJSONObject("chatTimings").getInt("testvideo01"))
-        compose.onNodeWithTag("chat-timing").assertTextContains("2")
+        compose.onNodeWithTag("chat-timing").assertTextContains("2.0")
     }
     @Test fun chaptersAndCommentsReplaceChatAndTheSameVideoNewOccurrenceStartsClosed() {
         incoming(); ready(); chat()
@@ -421,6 +422,37 @@ class LiveChatSmokeTest {
             foreground(); until { activity.model.chatReplay.value.visible && activity.model.chatReplay.value.messages.any { it.offsetMs >= 75_000 } }
             compose.onNodeWithTag("chat-panel").assertExists(); assertEquals(occurrence, activity.model.queue.value.currentKey)
         } finally { ui { activity.model.store.pip = oldPip } }
+    }
+
+    @Test fun invalidFilterTextDoesNotBlockAnIndependentTimestampChoice() {
+        incoming(); ready(); chat(); settings()
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
+        compose.onNodeWithTag("chat-words").performTextReplacement("/(?=private)/")
+        until { activity.model.preferenceSaves.edits.value["chat_filters"]?.status == net.wingress.mobivious.ui.PreferenceSaveStatus.INVALID }
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-timestamps"))
+        compose.onNodeWithTag("chat-timestamps").performClick()
+        until { !activity.model.preferences.value.chat.timestamps }
+        assertEquals("",activity.model.store.guestDeArrow().chat.words)
+        compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
+        compose.onNodeWithTag("chat-words").assertTextContains("/(?=private)/")
+        assertEquals(0,fixture().getJSONArray("chatPreferenceWrites").length())
+    }
+    @Test fun staleChatCallbacksCannotWriteIntoAnotherVideoOrAccount() {
+        account(); incoming(); ready(); chat()
+        val old=activity.model.chatReplay.value
+        val oldContext=activity.model.api.context()
+        incoming("testvideo02"); ready()
+        until { activity.model.chatReplay.value.videoId == "testvideo02" }
+        val writes=fixture().getJSONArray("chatTimingRequests").length()
+        ui { activity.model.requestChatTiming("7",debounce=false,videoId=old.videoId,context=oldContext) }
+        assertEquals(writes,fixture().getJSONArray("chatTimingRequests").length())
+        assertTrue(activity.model.preferenceSaves.edits.value.keys.none { it.startsWith("chat_delay:") })
+        ui { activity.model.store.save(null) }
+        until { activity.model.account.value==null && activity.model.preferenceSaves.edits.value.isEmpty() }
+        ui { activity.model.requestChatPreferences(ChatPreferences(words="private from old account"),context=oldContext) }
+        assertTrue(activity.model.preferenceSaves.edits.value.isEmpty())
+        assertEquals("",activity.model.store.guestDeArrow().chat.words)
+        assertEquals(0,fixture().getJSONArray("chatPreferenceWrites").length())
     }
     private fun foreground() {
         android.util.Log.i("ChatTest", shell("am start --windowingMode 1 -n net.wingress.mobivious.debug/net.wingress.mobivious.MainActivity -a android.intent.action.MAIN -c android.intent.category.LAUNCHER --activity-new-task").decodeToString())

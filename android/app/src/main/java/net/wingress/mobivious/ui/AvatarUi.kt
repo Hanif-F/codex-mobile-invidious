@@ -125,10 +125,10 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
     subscriptionBusy: Boolean = false, subscriptionKnown: Boolean = true, subscriptionChecking: Boolean = false,
     subscriptionError: String? = null, subscribe: () -> Unit) {
     var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
-    BrowseArtworkSurface(null, plainBackground = true) {
-        Column(Modifier.fillMaxWidth().testTag("channel-header").padding(Liquid.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Box {
+        Column(Modifier.fillMaxWidth().testTag("channel-header").padding(AppTokens.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
-                AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(Liquid.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
+                AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(AppTokens.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
             }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val identity: @Composable () -> Unit = {
@@ -167,7 +167,7 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
 @Composable
 internal fun SubscriptionChannelChip(channel: Channel, server: String, thinMode: Boolean, open: () -> Unit) {
     val width = (if (thinMode) 112.dp else 88.dp) * LocalDensity.current.fontScale.coerceIn(1f, 2f)
-    Column(Modifier.width(width).clip(Liquid.media)
+    Column(Modifier.width(width).clip(AppTokens.media)
         .clickable(role = Role.Button, onClickLabel = "Open ${channel.name}'s channel", onClick = open)
         .heightIn(min = 48.dp).padding(horizontal = 4.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {

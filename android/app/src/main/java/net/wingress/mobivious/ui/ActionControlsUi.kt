@@ -17,17 +17,12 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 
-/** Popups receive pixels from their originating window and own the refracting layer. */
+
 @Composable
-internal fun GlassDropdownMenu(expanded: Boolean, dismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    val palette = originatingGlassPalette()
-    val source = rememberGlassWindowSource()
-    DropdownMenu(expanded, dismiss, shape = Liquid.card, containerColor = Color.Transparent,
-        tonalElevation = 0.dp, shadowElevation = 0.dp) {
-        CompositionLocalProvider(LocalGlassEnvironmentPalette provides palette) {
-            GlassOverlayScene(source) { GlassSection(Modifier.widthIn(min = 200.dp)) { content() } }
-        }
-    }
+internal fun AppDropdownMenu(expanded: Boolean, dismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    DropdownMenu(expanded, dismiss, shape=MaterialTheme.shapes.medium,
+        containerColor=MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation=0.dp,shadowElevation=3.dp,content=content)
 }
 
 /** Reset open menus when their entity/account changes; callers close before dispatching actions. */
@@ -36,8 +31,8 @@ internal fun OverflowMenu(description: String, resetKey: Any?, modifier: Modifie
     content: @Composable (close: () -> Unit) -> Unit) {
     var expanded by remember(resetKey) { mutableStateOf(false) }
     Box {
-        GlassIconButton(Icons.Default.MoreVert, description, modifier) { expanded = true }
-        GlassDropdownMenu(expanded, { expanded = false }) { content { expanded = false } }
+        AppIconButton(Icons.Default.MoreVert, description, modifier) { expanded = true }
+        AppDropdownMenu(expanded, { expanded = false }) { content { expanded = false } }
     }
 }
 
@@ -45,22 +40,22 @@ internal fun OverflowMenu(description: String, resetKey: Any?, modifier: Modifie
 internal fun ActionRow(title: String, modifier: Modifier = Modifier, detail: String? = null,
     icon: ImageVector? = null, trailingIcon: ImageVector = Icons.Default.ChevronRight,
     enabled: Boolean = true, actionLabel: String = title, trailingRotation: Float = 0f, onClick: () -> Unit) {
-    val inside = LocalInsideGlassSection.current
+    val inside = LocalInsideAppSection.current
     val interaction = remember { MutableInteractionSource() }
     val row: @Composable () -> Unit = {
     val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f)
-    ListItem(headlineContent = { GlassLabel(title, color = color) },
-        supportingContent = detail?.let { { GlassLabel(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f)) } },
-        leadingContent = icon?.let { { GlassIcon(it, null, tint = color) } },
-        trailingContent = { GlassIcon(trailingIcon, null, Modifier.rotate(trailingRotation), tint = color) },
+    ListItem(headlineContent = { Text(title, color = color) },
+        supportingContent = detail?.let { { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f)) } },
+        leadingContent = icon?.let { { Icon(it, null, tint = color) } },
+        trailingContent = { Icon(trailingIcon, null, Modifier.rotate(trailingRotation), tint = color) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-        modifier = modifier.fillMaxWidth().clip(Liquid.shapes.small).heightIn(min = 64.dp)
-            .glassItemFeedback(interaction).clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClickLabel = actionLabel, onClick = onClick))
+        modifier = modifier.fillMaxWidth().clip(AppTokens.shapes.small).heightIn(min = 64.dp)
+            .appItemFeedback(interaction).clickable(interactionSource = interaction, indication = null, enabled = enabled, role = Role.Button, onClickLabel = actionLabel, onClick = onClick))
     }
     if (inside) {
         row()
         HorizontalDivider(color = LocalContentColor.current.copy(alpha = .10f))
-    } else GlassSurface(Modifier.fillMaxWidth().padding(vertical = 3.dp), Liquid.card, role = GlassMaterialRole.Section) { row() }
+    } else AppSurface(Modifier.fillMaxWidth().padding(vertical = 3.dp), AppTokens.card, role = AppSurfaceRole.SECTION) { row() }
 }
 
 /** A field-like row keeps the setting label and its current value visible. */
@@ -72,10 +67,10 @@ internal fun DropdownChoiceRow(label: String, choices: List<Pair<String, String>
     Box {
         ActionRow(label, modifier = modifier, detail = choices.firstOrNull { it.first == selected }?.second ?: selected,
             trailingIcon = Icons.Default.ArrowDropDown, enabled = enabled, actionLabel = "Choose $label") { expanded = true }
-        GlassDropdownMenu(expanded && enabled, { expanded = false }) {
+        AppDropdownMenu(expanded && enabled, { expanded = false }) {
             choices.forEach { (value, name) ->
-                GlassMenuItem(text = { GlassLabel(name) }, modifier = Modifier.semantics { this.selected = value == selected },
-                    leadingIcon = { if (value == selected) GlassIcon(Icons.Default.Check, null) },
+                DropdownMenuItem(text = { Text(name) }, modifier = Modifier.semantics { this.selected = value == selected },
+                    leadingIcon = { if (value == selected) Icon(Icons.Default.Check, null) },
                     onClick = { expanded = false; change(value) })
             }
         }

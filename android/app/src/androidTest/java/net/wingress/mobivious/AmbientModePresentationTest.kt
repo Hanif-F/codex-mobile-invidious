@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import androidx.compose.material3.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,27 +27,26 @@ import org.junit.runner.RunWith
 class AmbientModePresentationTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun videoColorsReachTheBackgroundAndGlassWithoutLosingTextContrast() {
+    @Test fun videoColorsReachLightingWhileControlsRemainOpaque() {
         var dark by mutableStateOf(true)
         var opaque by mutableStateOf(false)
         lateinit var state: WatchAmbientState
-        var actual = GlassContentColors.light
-        var scene: GlassScene? = null
+        var actual = AppContentColors.light
+
         compose.setContent {
             state = remember { WatchAmbientState().apply { enabled = true; show(AmbientPalette(List(9) { 0xFFFF0000.toInt() })) } }
             DisposableEffect(state) { onDispose { state.close() } }
             WatchAmbientAnimation(state)
-            MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light, typography = Liquid.typography) {
+            MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light, typography = AppTokens.typography) {
                 val density = LocalDensity.current.density
                 CompositionLocalProvider(LocalWatchAmbient provides state, LocalReduceTransparency provides opaque) {
                     WatchAmbientScene(Modifier.width(320.dp).height(640.dp).testTag("ambient-scene"),
                         Rect(8 * density, 0f, 312 * density, 180 * density)) {
-                        scene = LocalGlassScene.current
                         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
                             Spacer(Modifier.height(200.dp))
-                            GlassSurface(Modifier.fillMaxWidth().height(72.dp).testTag("ambient-glass")) {
-                                actual = LocalGlassContentColors.current
-                                GlassLabel("Glass", Modifier.align(Alignment.Center).testTag("ambient-label"), color = actual.secondary)
+                            AppSurface(Modifier.fillMaxWidth().height(72.dp).testTag("ambient-controls")) {
+                                actual = LocalAppContentColors.current
+                                Text("Material", Modifier.align(Alignment.Center).testTag("ambient-label"), color = actual.secondary)
                             }
                         }
                     }
@@ -62,14 +62,14 @@ class AmbientModePresentationTest {
             compose.runOnIdle { state.show(AmbientPalette(List(9) { 0xFFFF0000.toInt() })) }
             compose.mainClock.advanceTimeBy(800)
             val redBackground = sample("watch-ambient-background")
-            val redGlass = sample("ambient-glass")
+            val redControls = sample("ambient-controls")
             captureWatchScreenshot("ambient-${if (isDark) "dark" else "light"}-red")
             compose.runOnIdle { state.show(AmbientPalette(List(9) { 0xFF0000FF.toInt() })) }
             compose.mainClock.advanceTimeBy(800)
             val blueBackground = sample("watch-ambient-background")
-            val blueGlass = sample("ambient-glass")
+            val blueControls = sample("ambient-controls")
             assertTrue("Background follows video colors", difference(redBackground, blueBackground) > .06f)
-            assertTrue("Glass follows video colors", difference(redGlass, blueGlass) > .025f)
+            assertTrue("Controls remain independent of video colors", difference(redControls,blueControls)<.01f)
             captureWatchScreenshot("ambient-${if (isDark) "dark" else "light"}-blue")
             for (source in listOf(0xFFFFFFFF.toInt(), 0xFF000000.toInt(), 0xFF00FF00.toInt())) {
                 compose.runOnIdle { state.show(AmbientPalette(List(9) { source })) }
@@ -79,17 +79,16 @@ class AmbientModePresentationTest {
                 val background = label[label.width / 2, 1]
                 val contrast = (maxOf(foreground.luminance(), background.luminance()) + .05f) /
                     (minOf(foreground.luminance(), background.luminance()) + .05f)
-                assertTrue("Glass contrast $contrast dark=$isDark source=$source", contrast >= 4.5f)
+                assertTrue("Control contrast $contrast dark=$isDark source=$source", contrast >= 4.5f)
             }
         }
-        assertEquals("Generated ambient palettes must not add Compose readback", 0, scene!!.captures)
         compose.runOnIdle { opaque = true }
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         compose.runOnIdle { opaque = false; state.enabled = false }
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         for (night in listOf(true, false)) {
             compose.runOnIdle { dark = night }
-            val expected = if (night) Liquid.dark.surface else Liquid.light.surface
+            val expected = if (night) AppTokens.dark.surface else AppTokens.light.surface
             val pixels = compose.onNodeWithTag("ambient-scene").captureToImage().toPixelMap()
             for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
                 assertEquals(expected.red, pixels[1, y].red, .01f)
@@ -101,4 +100,21 @@ class AmbientModePresentationTest {
 
     private fun difference(a: Color, b: Color) = kotlin.math.abs(a.red - b.red) +
         kotlin.math.abs(a.green - b.green) + kotlin.math.abs(a.blue - b.blue)
+    @Test fun disabledAmbientDoesNotAnimateARetainedPalette() {
+        compose.mainClock.autoAdvance = false
+        lateinit var state: WatchAmbientState
+        compose.setContent {
+            state = remember { WatchAmbientState().apply { show(AmbientPalette(List(9) { 0xFFFF0000.toInt() })) } }
+            DisposableEffect(state) { onDispose { state.close() } }
+            WatchAmbientAnimation(state)
+        }
+        compose.mainClock.advanceTimeBy(1000)
+        compose.runOnIdle {
+            state.colors.forEach { assertEquals(Color.Transparent,it.value); assertFalse(it.isRunning) }
+            state.enabled = true
+        }
+        compose.mainClock.advanceTimeBy(1000)
+        compose.runOnIdle { state.colors.forEach { assertEquals(1f,it.value.red,.01f); assertEquals(1f,it.value.alpha,.01f) } }
+    }
+
 }

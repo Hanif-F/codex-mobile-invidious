@@ -8,7 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.ui.AvatarImageLoader
-import net.wingress.mobivious.ui.Liquid
+import net.wingress.mobivious.ui.AppTokens
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -85,8 +85,10 @@ class AvatarsSmokeTest {
         }
         val before = state().getJSONArray("avatarRequests").length()
         compose.runOnUiThread { activity.model.insertQueue(activity.model.playback.value.details!!.recommendations.first(), false) }
-        until { activity.model.queue.value.hasExplicitQueue && activity.model.queueExpanded.value }
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        until { activity.model.queue.value.hasExplicitQueue }
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue-header"))
+        compose.onNodeWithTag("playback-queue-header").performClick()
+        until { activity.model.queueExpanded.value }
         compose.onNodeWithTag("playback-queue-items").performScrollToNode(hasTestTag("queue-occurrence-${activity.model.queue.value.currentKey}"))
         compose.onAllNodes(hasTestTag("video-avatar-testvideo01") and hasAnyAncestor(hasTestTag("playback-queue-items")), true).assertCountEquals(1)
         compose.waitForIdle()
@@ -112,7 +114,7 @@ class AvatarsSmokeTest {
                 if (banner && !thin) compose.onNodeWithTag("channel-banner").assertExists()
                 else compose.onNodeWithTag("channel-banner").assertDoesNotExist()
                 val pixels = compose.onNodeWithTag("channel-header").captureToImage().toPixelMap()
-                val expected = if (night) Liquid.dark.surface else Liquid.light.surface
+                val expected = if (night) AppTokens.dark.surface else AppTokens.light.surface
                 for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
                     assertEquals(expected.red, pixels[1, y].red, .01f)
                     assertEquals(expected.green, pixels[1, y].green, .01f)

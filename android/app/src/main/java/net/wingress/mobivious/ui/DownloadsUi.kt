@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import net.wingress.mobivious.data.*
@@ -50,14 +49,14 @@ internal fun DownloadDialog(vm: AppViewModel) {
         LibraryActionButton("Download", Modifier.testTag("download-confirm"), enabled = catalog?.allowed == true && state.selection.hasMedia && !state.busy,
             prominent = true, onClick = vm::confirmDownload)
     }) { modifier, top ->
-            LazyColumn(modifier.testTag("download-dialog"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            LazyColumn(modifier.testTag("download-dialog"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Text(state.video?.title.orEmpty()); Text("Choose at least one video or audio track. Captions are optional.", style = MaterialTheme.typography.bodySmall) }
                 if (state.loading || state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error); TextButton(onClick = { state.video?.let(vm::openDownload) }) { Text("Retry") } } }
                 if (catalog != null && !catalog.allowed) item { Text(catalog.reason) }
                 if (catalog?.allowed == true) {
                     listOf(DownloadKind.VIDEO, DownloadKind.AUDIO).forEach { kind ->
-                        item { GlassSection { Text(if (kind == DownloadKind.VIDEO) "Video" else "Audio", style = MaterialTheme.typography.titleMedium)
+                        item { AppSection { Text(if (kind == DownloadKind.VIDEO) "Video" else "Audio", style = MaterialTheme.typography.titleMedium)
                         val selected = if (kind == DownloadKind.VIDEO) state.selection.video else state.selection.audio
                         fun pick(key: String?) { vm.selectDownload(if (kind == DownloadKind.VIDEO) state.selection.copy(video = key) else state.selection.copy(audio = key)) }
                         run {
@@ -72,7 +71,7 @@ internal fun DownloadDialog(vm: AppViewModel) {
                         }
                         } }
                     }
-                    if (catalog.choices.any { it.kind == DownloadKind.CAPTION }) item { GlassSection { Text("Captions", style = MaterialTheme.typography.titleMedium)
+                    if (catalog.choices.any { it.kind == DownloadKind.CAPTION }) item { AppSection { Text("Captions", style = MaterialTheme.typography.titleMedium)
                     catalog.choices.filter { it.kind == DownloadKind.CAPTION }.forEach { choice ->
                         fun toggle() = vm.selectDownload(state.selection.copy(captions = if (choice.key in state.selection.captions) state.selection.captions - choice.key else state.selection.captions + choice.key))
                         Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { toggle() }.testTag("download-choice-${choice.key}"), verticalAlignment = Alignment.CenterVertically) {
@@ -125,7 +124,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
             .putExtra(Intent.EXTRA_TITLE, "$name-${record.id.take(8)}${asset?.choice?.language?.takeIf(String::isNotBlank)?.let { "-$it" }.orEmpty()}.$extension"))
     }
     LaunchedEffect(Unit) { vm.downloads.refresh() }
-    LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(Modifier.fillMaxSize().testTag("downloads-page"), state = list, contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = LocalContentBottomInset.current), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Saved on this device · ${DisplayFormats.inventory(records.size.toLong(), "download")}", style = MaterialTheme.typography.bodySmall) }
         error?.let { item { Text(it, color = MaterialTheme.colorScheme.error); TextButton(onClick = vm.downloads::refresh) { Text("Retry") } } }
         if (export.phase.isNotBlank()) item {
@@ -146,7 +145,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                     }
                 }
                 if (!prefs.thinMode) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.width(if (prefs.uiDensity == "compact") 80.dp else 112.dp).aspectRatio(16f / 9f).clip(Liquid.media), contentAlignment = Alignment.Center) {
+                    Box(Modifier.width(if (prefs.uiDensity == "compact") 80.dp else 112.dp).aspectRatio(16f / 9f).clip(AppTokens.media), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.OndemandVideo, null)
                         if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     }
@@ -157,19 +156,28 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                 Text("$status · ${DisplayFormats.bytes(record.bytes)}${if (record.total > 0) " / ${DisplayFormats.bytes(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (record.active) { if (record.total > 0) LinearProgressIndicator(progress = { (record.bytes.toFloat() / record.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 incomplete.firstOrNull { it.error.isNotBlank() }?.let { Text(it.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                BrowseArtworkSurface(null) {
+                Box {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
                         LibraryActionButton("Play", Modifier.testTag("download-play-${record.id}"), Icons.Default.PlayArrow, enabled = record.playable, prominent = true) { play(record.id) }
                         if (record.active) TextButton(onClick = { vm.cancelDownload(record.id) }) { Text("Cancel") }
                         if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L }) TextButton(onClick = { vm.retryDownload(record.id) }) { Text("Retry") }
-                        TextButton(onClick = { details = !details }, modifier = Modifier.testTag("download-details-${record.id}")) { Text(if (details) "Hide details" else "Details") }
+                        TextButton(onClick = { details = !details }, modifier = Modifier.testTag("download-details-${record.id}")) { Text("Details") }
                         OverflowMenu("Actions for download ${video.title}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->
-                            GlassMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
-                            GlassMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
+                            DropdownMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
+                            DropdownMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
                         }
                     }
                 }
-                if (details) record.assets.filterNot { it.artwork }.forEach { asset -> Text(choiceLabel(asset.choice), style = MaterialTheme.typography.bodySmall) }
+                if (details) LibraryPanel("Download details",{details=false},closeLabel="Close download details") { body, _ ->
+                    LazyColumn(body.testTag("download-details-sheet"),contentPadding=PaddingValues(AppTokens.inset),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                        item {Text(video.title,style=MaterialTheme.typography.titleLarge);Text(status,style=MaterialTheme.typography.bodyMedium)}
+                        items(record.assets.filterNot {it.artwork},key={it.choice.key},contentType={"download-asset"}) { asset ->
+                            Column {Text(choiceLabel(asset.choice),style=MaterialTheme.typography.bodyLarge)
+                                Text(DisplayFormats.bytes(asset.bytes),style=MaterialTheme.typography.bodySmall)
+                                asset.error.takeIf {it.isNotBlank()}?.let {Text(it,color=MaterialTheme.colorScheme.error)} }
+                        }
+                    }
+                }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
             }
         }
@@ -181,8 +189,8 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
     }
     records.firstOrNull { it.id == exporting }?.let { record ->
         LibraryPanel("Save to files", { exporting = null }) { modifier, top ->
-            Column(modifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                GlassSection {
+            Column(modifier.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AppSection {
                 Text(record.details.video.title, style = MaterialTheme.typography.titleMedium)
                 TextButton(onClick = { save(record, null) }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (record.assets.count { it.media } == 2) "Combined video and audio" else "Media file") }
                 record.assets.filter { it.choice.kind == DownloadKind.CAPTION && it.status == DownloadStatus.COMPLETE }.forEach { asset -> TextButton(onClick = { save(record, asset) }) { Text("Caption: ${asset.choice.label}") } }

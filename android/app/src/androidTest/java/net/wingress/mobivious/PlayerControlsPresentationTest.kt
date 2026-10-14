@@ -162,7 +162,7 @@ class PlayerControlsPresentationTest {
         compose.onNodeWithTag("player-chat").assertDoesNotExist()
     }
 
-    @Test fun playerIconsAndEdgesExposeThePictureWithoutLosingTouchTargets() {
+    @Test fun playerScrimsKeepWhiteControlsLegibleWithoutLosingTouchTargets() {
         height.intValue = 320
         playback.value = playback.value.copy(details = playback.value.details!!.copy(liveChatReplay = true))
         var opaque by mutableStateOf(false)
@@ -182,14 +182,12 @@ class PlayerControlsPresentationTest {
                 control.assertWidthIsAtLeast(48.dp).assertHeightIsAtLeast(48.dp)
                 val pixels = control.captureToImage().toPixelMap()
                 val color = pixels[(pixels.width * .1f).toInt(), pixels.height / 2]
-                assertEquals(expected.red, color.red, .01f)
-                assertEquals(expected.green, color.green, .01f)
-                assertEquals(expected.blue, color.blue, .01f)
+                assertTrue("Player controls need a dark local scrim", color.red < expected.red * .35f && color.green < expected.green * .35f && color.blue < expected.blue * .35f)
             }
             val pixels = compose.onNodeWithTag("controls-surface").captureToImage().toPixelMap()
             for (y in listOf(1, pixels.height - 2)) {
-                assertEquals(expected.red, pixels[pixels.width / 2, y].red, .01f)
-                assertEquals(expected.blue, pixels[pixels.width / 2, y].blue, .01f)
+                assertTrue(pixels[pixels.width / 2,y].red < expected.red * .35f)
+                assertTrue(pixels[pixels.width / 2,y].blue < expected.blue * .35f)
             }
         }
         captureWatchScreenshot("player-background-icons-only")

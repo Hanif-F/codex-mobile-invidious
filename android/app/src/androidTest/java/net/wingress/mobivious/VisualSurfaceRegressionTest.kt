@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import androidx.compose.material3.*
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Path
@@ -35,18 +36,18 @@ class VisualSurfaceRegressionTest {
     @Test fun artworkAvailabilityPreservesAnOpenControlMenu() {
         var artwork by mutableStateOf<String?>(null)
         compose.setContent {
-            MaterialTheme(colorScheme = Liquid.light) {
-                GlassBackgroundScene(Modifier.fillMaxSize()) {
-                    BrowseArtworkSurface(artwork) {
+            MaterialTheme(colorScheme = AppTokens.light) {
+                AppBackground(Modifier.fillMaxSize()) {
+                    Box {
                         OverflowMenu("Artwork actions", "stable-artwork") { close ->
-                            GlassMenuItem(text = { Text("Retained choice") }, onClick = close)
+                            DropdownMenuItem(text = { Text("Retained choice") }, onClick = close)
                         }
                     }
                 }
             }
         }
         compose.onNodeWithContentDescription("Artwork actions").performClick()
-        for (source in listOf("file:///missing-glass-regression.png", null)) {
+        for (source in listOf("file:///missing-ui-regression.png", null)) {
             compose.runOnIdle { artwork = source }
             compose.waitForIdle()
             compose.onNodeWithText("Retained choice").assertIsDisplayed()
@@ -55,10 +56,10 @@ class VisualSurfaceRegressionTest {
 
     @Test fun roundedActionsLeaveTheContrastingContainerVisibleAtTheirCorners() {
         var dark by mutableStateOf(false)
-        compose.setContent { MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light) {
+        compose.setContent { MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light) {
             Box(Modifier.size(240.dp, 120.dp).background(Color.Magenta).testTag("container"), contentAlignment = Alignment.Center) {
-                BrowseArtworkSurface(null) {
-                    LibraryControlScene { LibraryActionButton("Retry", Modifier.width(160.dp).testTag("retry"), onClick = {}) }
+                Box {
+                    Box { LibraryActionButton("Retry", Modifier.width(160.dp).testTag("retry"), onClick = {}) }
                 }
             }
         } }
@@ -79,9 +80,9 @@ class VisualSurfaceRegressionTest {
     @Test fun wrappedToolbarTitleMasksScrollingGlyphsAndReservesMeasuredInsets() {
         var dark by mutableStateOf(false)
         var underlay by mutableStateOf(Color.Magenta)
-        compose.setContent { MaterialTheme(colorScheme = if (dark) Liquid.dark else Liquid.light, typography = Liquid.typography) {
+        compose.setContent { MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light, typography = AppTokens.typography) {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
-                BrowseGlassSurface(Modifier.width(320.dp).height(700.dp), softEdge = true,
+                BrowseAppSurface(Modifier.width(320.dp).height(700.dp),
                     toolbar = { LibraryToolbar("History & library", back = {}, statusInset = false) }) { body, top ->
                     Box(body.background(underlay)) {
                         Text("MMMM Background letters WWWW", Modifier.padding(top = 70.dp), style = MaterialTheme.typography.displayLarge)
@@ -94,7 +95,7 @@ class VisualSurfaceRegressionTest {
             compose.runOnIdle { dark = appearance; underlay = Color.Magenta }
             compose.waitForIdle()
             Thread.sleep(600)
-            val header = compose.onNodeWithTag("browse-glass-toolbar")
+            val header = compose.onNodeWithTag("app-toolbar")
             val bounds = header.fetchSemanticsNode().boundsInRoot
             val title = compose.onNodeWithText("History & library")
             val titleBounds = title.fetchSemanticsNode().boundsInRoot
@@ -103,8 +104,8 @@ class VisualSurfaceRegressionTest {
             assertTrue("Body must reserve the complete measured toolbar", compose.onNodeWithTag("first-row").fetchSemanticsNode().boundsInRoot.top >= bounds.bottom)
             val pixels = header.captureToImage().toPixelMap()
             val background = pixels[pixels.width - 3, (titleBounds.center.y - bounds.top).toInt()]
-            val foreground = (if (appearance) Liquid.dark else Liquid.light).onSurface
-            assertTrue("Title contrast must remain >= 4.5", glassContrast(foreground, background) >= 4.5f)
+            val foreground = (if (appearance) AppTokens.dark else AppTokens.light).onSurface
+            assertTrue("Title contrast must remain >= 4.5", colorContrast(foreground, background) >= 4.5f)
             val buttonBefore = compose.onNodeWithTag("library-toolbar-back").captureToImage().toPixelMap()
             compose.runOnIdle { underlay = Color.Cyan }
             Thread.sleep(700)
@@ -117,7 +118,7 @@ class VisualSurfaceRegressionTest {
             val sampleY = (buttonBefore.height * .2f).toInt()
             val a = buttonBefore[sampleX, sampleY]; val b = buttonAfter[sampleX, sampleY]
             captureWatchScreenshot("overhaul-title-diagnostic-${if (appearance) "dark" else "light"}")
-            assertTrue("Chrome must still transmit the page recording: dark=$appearance before=$a after=$b", kotlin.math.abs(a.red - b.red) + kotlin.math.abs(a.green - b.green) > .2f)
+            assertEquals("Opaque chrome must ignore the scrolling artwork", a, b)
             captureWatchScreenshot("overhaul-wrapped-toolbar-${if (appearance) "dark" else "light"}")
         }
     }
@@ -156,8 +157,8 @@ class VisualSurfaceRegressionTest {
     }
 
     @Test fun multipartToolbarPlacesControlsBelowTheSafeTitle() {
-        compose.setContent { MaterialTheme(colorScheme = Liquid.light, typography = Liquid.typography) {
-            BrowseGlassSurface(Modifier.width(320.dp).height(700.dp), toolbar = {
+        compose.setContent { MaterialTheme(colorScheme = AppTokens.light, typography = AppTokens.typography) {
+            BrowseAppSurface(Modifier.width(320.dp).height(700.dp), toolbar = {
                 BrowsePageTitle("Channel", back = {})
                 Box(Modifier.fillMaxWidth().height(56.dp).testTag("channel-search"))
                 Box(Modifier.fillMaxWidth().height(48.dp).testTag("channel-tabs"))
@@ -166,7 +167,7 @@ class VisualSurfaceRegressionTest {
         val title = compose.onNodeWithText("Channel").fetchSemanticsNode().boundsInRoot
         val search = compose.onNodeWithTag("channel-search").fetchSemanticsNode().boundsInRoot
         val tabs = compose.onNodeWithTag("channel-tabs").fetchSemanticsNode().boundsInRoot
-        val header = compose.onNodeWithTag("browse-glass-toolbar").fetchSemanticsNode().boundsInRoot
+        val header = compose.onNodeWithTag("app-toolbar").fetchSemanticsNode().boundsInRoot
         assertTrue("Search covers the title", search.top >= title.bottom)
         assertTrue("Tabs cover search", tabs.top >= search.bottom)
         assertTrue("Toolbar backdrop excludes controls", header.bottom >= tabs.bottom)

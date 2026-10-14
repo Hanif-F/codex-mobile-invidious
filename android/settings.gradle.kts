@@ -5,3 +5,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Mobivious"
 include(":app")
+include(":macrobenchmark")

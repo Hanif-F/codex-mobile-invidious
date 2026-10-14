@@ -112,7 +112,8 @@ class PlaybackQueuePresentationTest {
         compose.onNodeWithText("Retry queue").performClick()
         assertEquals(1, retried); assertEquals(1, more)
         compose.runOnIdle { state.value = state.value.copy(loading = false, error = null, sourceError = null, sourceComplete = false); expanded.value = true }
-        compose.onNodeWithTag("outer").performScrollToNode(hasText("Load more queue items"))
+        compose.onNodeWithTag("outer").performScrollToNode(hasTestTag("playback-queue-items"))
+        compose.onNodeWithTag("playback-queue-items").performScrollToNode(hasText("Load more queue items"))
         compose.onNodeWithText("Load more queue items").performClick()
         assertEquals(2, more)
     }

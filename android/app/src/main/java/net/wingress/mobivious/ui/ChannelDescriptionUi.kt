@@ -3,11 +3,9 @@ package net.wingress.mobivious.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -22,12 +20,12 @@ internal fun ChannelDescriptionSheet(channel: Channel, server: String = "", link
     val maxHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     ModalBottomSheet(onDismissRequest = dismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp,
-        containerColor = androidx.compose.ui.graphics.Color.Transparent) {
-        BrowseGlassSurface(Modifier.fillMaxWidth().height(maxHeight).testTag("channel-description-sheet"), toolbar = {
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+        BrowseAppSurface(Modifier.fillMaxWidth().height(maxHeight).testTag("channel-description-sheet"), toolbar = {
             BrowsePanelToolbar("Channel description", "Close channel description", dismiss, channel.name)
         }) { contentModifier, topInset ->
             Column(contentModifier.verticalScroll(rememberScrollState()).testTag("channel-description-scroll")
-                .padding(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = 24.dp)) {
+                .padding(start = AppTokens.inset, end = AppTokens.inset, top = topInset, bottom = 24.dp)) {
                 RichCommentText(Comment(channel.name, channel.description, "", 0, id = "channel:${channel.id}", html = channel.descriptionHtml),
                     server, "", link, collapsedLines = Int.MAX_VALUE, tag = "channel-description-text")
             }

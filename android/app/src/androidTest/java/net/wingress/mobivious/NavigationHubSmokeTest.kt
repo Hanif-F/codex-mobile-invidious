@@ -51,7 +51,7 @@ class NavigationHubSmokeTest {
         compose.waitForIdle()
     }
     private fun tab(name: String) {
-        if (name in listOf("Popular", "Trending")) compose.selectDiscoveryFeed(name) else compose.onNodeWithTag("navigation-$name").performClick()
+        if (name in listOf("Popular", "Trending")) compose.selectFeed(name) else compose.onNodeWithTag("navigation-$name").performClick()
         until { vm.tab == name && vm.route.isEmpty() && !vm.browse.value.loading }
         compose.waitForIdle()
     }
@@ -100,8 +100,14 @@ class NavigationHubSmokeTest {
         tab("Trending")
         assertEquals(trending.position, vm.browse.value.position)
         compose.openAppSettings()
-        back(); tab("Trending")
-        assertEquals(trending.position, vm.browse.value.position)
+        back()
+        assertEquals(trending.position,vm.browse.value.position)
+        val requests=fixture().getJSONArray("discoveryRequests").length()
+        tab("Trending")
+        assertEquals(CommentPosition(),vm.browse.value.position)
+        assertEquals(requests,fixture().getJSONArray("discoveryRequests").length())
+        compose.onNodeWithTag("browse-video-list").performScrollToIndex(trending.position.index)
+        compose.waitForIdle()
         compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
         compose.onNodeWithTag("main-search").performImeAction()
@@ -308,7 +314,7 @@ class NavigationHubSmokeTest {
             screenshot("you-landscape-large-text")
             tab("Trending")
             compose.onNodeWithTag("feed-refresh").assertIsDisplayed()
-            compose.onNodeWithTag("discover-Trending").assertIsSelected()
+            compose.onNodeWithTag("navigation-Trending").assertIsSelected()
             screenshot("trending-landscape-large-text")
         } finally {
             shell(if (font == "null") "settings delete system font_scale" else "settings put system font_scale $font")

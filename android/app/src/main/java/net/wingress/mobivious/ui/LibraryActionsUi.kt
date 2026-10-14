@@ -20,17 +20,17 @@ internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit
     removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true) {
     val account by vm.account.collectAsStateWithLifecycle()
     OverflowMenu("Actions for ${video.title}", listOf(video, ApiContext(vm.store.server, account)), Modifier.testTag("video-actions-${video.id}")) { close ->
-        GlassMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
-        GlassMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
-        GlassMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
-        GlassMenuItem(text = { Text("Play next") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
-        GlassMenuItem(text = { Text("Add to queue") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })
+        DropdownMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
+        DropdownMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
+        DropdownMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
+        DropdownMenuItem(text = { Text("Play next") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
+        DropdownMenuItem(text = { Text("Add to queue") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })
         if (ContentVisibility.validChannel(video.channelId)) {
-            GlassMenuItem(text = { Text("Open channel") }, onClick = { close(); channel(video.channelId) })
+            DropdownMenuItem(text = { Text("Open channel") }, onClick = { close(); channel(video.channelId) })
             BlockChannelMenuItem(vm, video.channelId, video.author, signIn, close = close)
         }
-        if (remove != null) GlassMenuItem(text = { Text(removalLabel) }, onClick = { close(); remove() })
-        if (removeFromPlaylist != null) GlassMenuItem(text = { Text("Remove from playlist") }, enabled = removeFromPlaylistEnabled,
+        if (remove != null) DropdownMenuItem(text = { Text(removalLabel) }, onClick = { close(); remove() })
+        if (removeFromPlaylist != null) DropdownMenuItem(text = { Text("Remove from playlist") }, enabled = removeFromPlaylistEnabled,
             onClick = { close(); removeFromPlaylist() })
     }
 }
@@ -42,8 +42,17 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val enabled = !state.busy && !state.loading
-    LibraryPanel("Save to playlist", vm::dismissSave, enabled = !state.busy) { modifier, top ->
-        LazyColumn(modifier.testTag("save-playlist-sheet"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    var discard by remember { mutableStateOf(false) }
+    fun close() {
+        if (state.busy) return
+        if (state.created == null && (state.title.isNotBlank() || state.privacy != "private")) discard = true else vm.dismissSave()
+    }
+    if (discard) AlertDialog(tonalElevation=3.dp,onDismissRequest = { discard = false }, title = { Text("Discard playlist draft?") },
+        text = { Text("The new playlist has not been created.") },
+        confirmButton = { TextButton({ discard = false; vm.dismissSave() }) { Text("Discard") } },
+        dismissButton = { TextButton({ discard = false }) { Text("Keep editing") } })
+    LibraryPanel("Save to playlist", ::close, enabled = !state.busy) { modifier, top ->
+        LazyColumn(modifier.testTag("save-playlist-sheet"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             item { Text(state.video?.title.orEmpty(), style = MaterialTheme.typography.titleMedium) }
             if (account == null) item { Text("Sign in to save this video."); LibraryActionButton("Sign in", prominent = true, onClick = signIn) }
             else {
@@ -58,20 +67,20 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
                         enabled = enabled, actionLabel = "Save to ${list.title}") { vm.saveVideo(list) }
                 }
                 item { LibraryActionButton("Reload playlists", enabled = enabled, onClick = vm::loadSaveLists); HorizontalDivider() }
-                item { GlassSection {
+                item { AppSection {
                     Text("Create and save", style = MaterialTheme.typography.titleMedium)
                     OutlinedTextField(state.title, { vm.editSave(it, state.privacy) }, label = { Text("Playlist title") }, singleLine = true, enabled = enabled && state.created == null,
                         modifier = Modifier.fillMaxWidth().testTag("save-playlist-title"))
-                    LibraryControlScene(Modifier.padding(vertical = 8.dp)) {
+                    Box(Modifier.padding(vertical = 8.dp)) {
                         BrowseTabs(listOf("private", "unlisted", "public"), state.privacy,
                             { it.replaceFirstChar { c -> c.uppercase() } }, { "save-privacy-$it" },
                             enabled = enabled && state.created == null, select = { vm.editSave(state.title, it) })
                     }
-                    BrowseArtworkSurface(null) { LibraryActionButton("Create and save", Modifier.testTag("create-and-save"), enabled = enabled && state.title.isNotBlank() && state.created == null,
+                    Box { LibraryActionButton("Create and save", Modifier.testTag("create-and-save"), enabled = enabled && state.title.isNotBlank() && state.created == null,
                         prominent = true) { vm.saveVideo() } }
                 } }
             }
-            item { TextButton(onClick = vm::dismissSave, enabled = !state.busy) { Text("Cancel") } }
+            item { TextButton(onClick = ::close, enabled = !state.busy) { Text("Cancel") } }
         }
     }
 }

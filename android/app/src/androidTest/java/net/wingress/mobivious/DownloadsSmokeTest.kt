@@ -70,6 +70,21 @@ class DownloadsSmokeTest {
         until { var ready = false; compose.runOnUiThread { ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== old } }; ready }
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
     }
+    @Test fun savedDownloadDetailsUseALocalOpaqueSheetAndKeepTheEntry() {
+        val id=create(DownloadSelection(audio="aes")); ready(id)
+        command("downloads", """{"downloadDisabled":true}""")
+        val requests=state().getJSONArray("downloadRequests").length()
+        compose.runOnUiThread { activity.model.navigate("You","downloads",rememberOrigin=true) }
+        compose.onNodeWithTag("download-details-$id").performScrollTo().performClick()
+        compose.onNodeWithTag("download-details-sheet").assertIsDisplayed()
+        compose.onNodeWithText("Downloaded").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close download details").performClick()
+        compose.onNodeWithTag("download-entry-$id").assertIsDisplayed()
+        assertEquals(requests,state().getJSONArray("downloadRequests").length())
+        assertTrue(app.downloads.find(id)!!.playable)
+        captureWatchScreenshot("download-details-local-return")
+    }
+
     @Test fun downloadsOverAnHourUseAnHourTimestamp() {
         command("downloads", """{"downloadDuration":3661}""")
         val id = create(DownloadSelection(audio = "aes")); ready(id)
@@ -136,7 +151,7 @@ class DownloadsSmokeTest {
             compose.runOnUiThread { activity.model.refreshBuffer() }
             until { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.position == 2000L }
             assertEquals(1.5f, activity.model.playback.value.speed)
-            captureWatchScreenshot("watch-glass-offline")
+            captureWatchScreenshot("watch-native-offline")
             compose.onNodeWithTag("player-surface").performClick()
             compose.onNodeWithContentDescription("Full screen").performClick()
             until { activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }

@@ -4,16 +4,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -50,10 +48,10 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().clickable(onClick = open).testTag("playlist-card-${list.id}")
-            .padding(horizontal = if (embedded) 0.dp else Liquid.inset, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            .padding(horizontal = if (embedded) 0.dp else AppTokens.inset, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
-                    Modifier.size(if (prefs.uiDensity == "compact") 80.dp else 112.dp, if (prefs.uiDensity == "compact") 45.dp else 63.dp).clip(Liquid.media), contentScale = ContentScale.Crop)
+                    Modifier.size(if (prefs.uiDensity == "compact") 80.dp else 112.dp, if (prefs.uiDensity == "compact") 45.dp else 63.dp).clip(AppTokens.media), contentScale = ContentScale.Crop)
                 Column(Modifier.weight(1f)) {
                     Text(list.title, fontWeight = FontWeight.SemiBold)
                     Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
@@ -66,8 +64,8 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
             if (!embedded) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .5f))
         }
     }
-    if (embedded) LibraryControlScene { content() }
-    else BrowseArtworkSurface(null, content = content)
+    if (embedded) Box { content() }
+    else Box {content()}
 }
 
 @Composable
@@ -76,10 +74,10 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
     val library by vm.playlists.collectAsStateWithLifecycle()
     val owned = list.owned || library.any { it.id == list.id && it.owned }
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
-    WatchGlassScene(Modifier.fillMaxWidth(), artwork = list.thumbnail.takeIf { !prefs.thinMode && it.isNotBlank() }?.let { resolved(vm.store.server, it) }) {
-    Column(Modifier.padding(horizontal = Liquid.inset, vertical = 20.dp).testTag("playlist-header"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    WatchContent(Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 20.dp).testTag("playlist-header"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
-            Modifier.fillMaxWidth().heightIn(max = 260.dp).aspectRatio(16f / 9f).clip(Liquid.media), contentScale = ContentScale.Crop)
+            Modifier.fillMaxWidth().heightIn(max = 260.dp).aspectRatio(16f / 9f).clip(AppTokens.media), contentScale = ContentScale.Crop)
         Text(list.title, style = MaterialTheme.typography.headlineMedium)
         Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -90,10 +88,10 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
             LibraryActionButton("Play", icon = Icons.Default.PlayArrow, prominent = true, onClick = play)
             PlaylistSubscriptionButton(vm, list, signIn)
             OverflowMenu("Actions for playlist ${list.title}", listOf(list, vm.api.context(), owned), Modifier.size(48.dp).testTag("playlist-actions-${list.id}")) { close ->
-                GlassMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
+                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
                 if (owned) {
-                    GlassMenuItem(text = { Text("Edit playlist") }, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
-                    GlassMenuItem(text = { Text("Delete playlist") }, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
+                    DropdownMenuItem(text = { Text("Edit playlist") }, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
+                    DropdownMenuItem(text = { Text("Delete playlist") }, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
                 }
             }
         }
@@ -102,25 +100,43 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
 }
 
 @Composable
-internal fun PlaylistDialog(playlist: Playlist?, dismiss: () -> Unit, save: (String, String, String) -> Unit) {
+internal fun PlaylistDialog(playlist: Playlist?, dismiss: () -> Unit, save: suspend (String, String, String) -> Unit) {
     var title by rememberSaveable(playlist?.id) { mutableStateOf(playlist?.title ?: "") }
     var privacy by rememberSaveable(playlist?.id) { mutableStateOf(playlist?.privacy ?: "private") }
     var description by rememberSaveable(playlist?.id) { mutableStateOf(playlist?.description ?: "") }
-    LibraryPanel(if (playlist == null) "New playlist" else "Edit playlist", dismiss, actions = {
-        LibraryActionButton("Save", Modifier.testTag("playlist-form-save"), enabled = title.isNotBlank(), prominent = true) { save(title.trim(), privacy, description) }
+    var busy by remember {mutableStateOf(false)}
+    var error by remember {mutableStateOf<String?>(null)}
+    var discard by remember {mutableStateOf(false)}
+    val scope=rememberCoroutineScope()
+    val edited=title!=(playlist?.title ?: "") || privacy!=(playlist?.privacy ?: "private") || description!=(playlist?.description ?: "")
+    fun close() {if(!busy) {if(edited) discard=true else dismiss()}}
+    LibraryPanel(if (playlist == null) "New playlist" else "Edit playlist", ::close, enabled=!busy, actions = {
+        LibraryActionButton(if(busy) "Saving…" else if(playlist==null) "Create" else "Save",Modifier.testTag("playlist-form-save"),enabled=!busy && title.isNotBlank(),prominent=true) {
+            busy=true;error=null
+            scope.launch {try {save(title.trim(),privacy,description)}
+                catch(e: kotlinx.coroutines.CancellationException) {throw e}
+                catch(e: Exception) {error=e.message ?: "Could not save this playlist. Try again."}
+                finally {busy=false}}
+        }
     }) { modifier, top ->
-        Column(modifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-            GlassSection {
+        Column(modifier.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            AppSection {
 
             OutlinedTextField(title, { title = it.take(150) }, label = { Text("Title") }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("playlist-form-title"))
             Text("Privacy", style = MaterialTheme.typography.titleMedium)
-            BrowseArtworkSurface(null) { BrowseTabs(listOf("private", "unlisted", "public"), privacy, { it.replaceFirstChar(Char::uppercase) }, { "playlist-privacy-$it" }, select = { privacy = it }) }
+            Box { BrowseTabs(listOf("private", "unlisted", "public"), privacy, { it.replaceFirstChar(Char::uppercase) }, { "playlist-privacy-$it" }, select = { privacy = it }) }
             if (playlist != null) OutlinedTextField(description, { description = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth())
-            TextButton(onClick = dismiss) { Text("Cancel") }
+            if(busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            error?.let {Text(it,color=MaterialTheme.colorScheme.error)}
+            TextButton(onClick=::close,enabled=!busy) {Text("Cancel")}
 
             }
         }
     }
+    if(discard) AlertDialog(tonalElevation=3.dp,onDismissRequest={discard=false},title={Text("Discard playlist changes?")},
+        confirmButton={TextButton(dismiss) {Text("Discard")}},dismissButton={TextButton({discard=false}) {Text("Keep editing")}},
+        containerColor=MaterialTheme.colorScheme.surfaceContainerHigh)
+
 }
 
 @Composable

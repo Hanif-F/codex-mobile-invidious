@@ -58,7 +58,7 @@ class DownloadRepository(private val context: Context) {
     private fun address(server: String, raw: String): String {
         val base = requireNotNull(server.toHttpUrlOrNull())
         val url = requireNotNull(base.resolve(raw))
-        require(url.username.isEmpty() && url.password.isEmpty() && (url.isHttps || BuildConfig.DEBUG && url.host in listOf("localhost", "127.0.0.1", "10.0.2.2"))) { "Invalid download address." }
+        require(url.username.isEmpty() && url.password.isEmpty() && (url.isHttps || BuildConfig.ALLOW_FIXTURE_HTTP && url.host in listOf("localhost", "127.0.0.1", "10.0.2.2"))) { "Invalid download address." }
         require(url.host == base.host && url.port == base.port && url.scheme == base.scheme) { "Downloads must use the originating instance." }
         return url.toString()
     }

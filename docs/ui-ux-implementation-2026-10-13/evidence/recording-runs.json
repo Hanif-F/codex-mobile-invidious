@@ -1,0 +1,37 @@
+[
+  {
+    "label": "native-swangle-duration-3",
+    "video": ".tools/ui-ux-overhaul/performance/native-swangle-duration-3/emulator-5554/20261014T030530Z/recordings/mobivious-recording-20261014t030530z-29674-popular.mp4",
+    "durationSeconds": 8.6067,
+    "sourceDrift": [],
+    "runExitCode": 0
+  },
+  {
+    "label": "native-final-navigation-video-2",
+    "video": ".tools/ui-ux-overhaul/performance/native-final-navigation-video-2/emulator-5554/20261014T032421Z/recordings/mobivious-recording-20261014t032421z-18359-navigation.mp4",
+    "durationSeconds": 16.381444,
+    "sourceDrift": [],
+    "runExitCode": 0
+  },
+  {
+    "label": "native-final-settingssaving-video-2",
+    "video": ".tools/ui-ux-overhaul/performance/native-final-settingssaving-video-2/emulator-5554/20261014T032914Z/recordings/mobivious-recording-20261014t032914z-5738-settings-saving.mp4",
+    "durationSeconds": 4.120233,
+    "sourceDrift": [],
+    "runExitCode": 0
+  },
+  {
+    "label": "native-final-playlists-video-2",
+    "video": ".tools/ui-ux-overhaul/performance/native-final-playlists-video-2/emulator-5554/20261014T033002Z/recordings/mobivious-recording-20261014t033002z-15769-playlists.mp4",
+    "durationSeconds": 8.541056,
+    "sourceDrift": [],
+    "runExitCode": 0
+  },
+  {
+    "label": "native-final-watch-video-2",
+    "video": ".tools/ui-ux-overhaul/performance/native-final-watch-video-2/emulator-5554/20261014T033047Z/recordings/mobivious-recording-20261014t033047z-18160-watch.mp4",
+    "durationSeconds": 8.034267,
+    "sourceDrift": [],
+    "runExitCode": 0
+  }
+]

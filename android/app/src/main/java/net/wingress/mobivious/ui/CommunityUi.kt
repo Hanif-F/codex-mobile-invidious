@@ -37,7 +37,7 @@ import net.wingress.mobivious.data.*
 
 @Composable
 internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Boolean, open: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset)) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset)) {
         ListItem(headlineContent = { Text(channel.name, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
             supportingContent = {
                 Column {
@@ -49,7 +49,7 @@ internal fun RelatedChannelCard(channel: Channel, server: String, thinMode: Bool
             },
             leadingContent = if (thinMode) null else ({ ChannelAvatar(server, channel.image, channel.name, 40.dp, "related-avatar-${channel.id}") }),
             trailingContent = { if (channel.verified) Icon(Icons.Default.Verified, "Verified channel", tint = MaterialTheme.colorScheme.primary) },
-            colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
             modifier = Modifier.heightIn(min = 80.dp).testTag("related-channel-${channel.id}")
                 .clickable(enabled = ContentVisibility.validChannel(channel.id), role = androidx.compose.ui.semantics.Role.Button,
                     onClickLabel = "Open ${channel.name}'s channel", onClick = open))
@@ -63,7 +63,7 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, comments: 
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val body = post.comment
-    Card(Modifier.fillMaxWidth().padding(horizontal = Liquid.inset, vertical = 8.dp).testTag("post-${post.key}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+    Card(Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset, vertical = 8.dp).testTag("post-${post.key}"), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ChannelAuthor(vm.store.server, body.avatar, body.author, !prefs.thinMode, size = 40.dp,
                 tag = "post-avatar-${post.key}", onClick = body.authorId.takeIf(ContentVisibility::validChannel)?.let { { channel(it) } })
@@ -82,7 +82,8 @@ internal fun CommunityPostCard(vm: AppViewModel, post: CommunityPost, comments: 
                 is PostAttachment.Poll -> {
                     Text(if (attachment.quiz) "Quiz" else "Poll", style = MaterialTheme.typography.titleSmall)
                     attachment.choices.forEachIndexed { index, choice ->
-                        OutlinedCard(Modifier.fillMaxWidth().testTag("post-choice-${post.key}-$index")) {
+                        OutlinedCard(Modifier.fillMaxWidth().testTag("post-choice-${post.key}-$index"),
+                            border=androidx.compose.foundation.BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
                             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Text(choice.text)
                                 choice.image?.let { PostGallery(listOf(it), vm.store.server, "post-choice-image-${post.key}-$index") }
@@ -125,12 +126,12 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
                 Text(DisplayFormats.compact(post.comment.likes), style = MaterialTheme.typography.labelMedium)
             }
             Spacer(Modifier.weight(1f))
-            GlassInsetIconButton(onClick = share, enabled = validId,
+            AppInsetIconButton(onClick = share, enabled = validId,
                 modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp).testTag("post-share-${post.key}")) {
                 Icon(Icons.Default.Share, "Share post")
             }
         }
-        LibraryControlScene { LibraryActionButton(post.commentCount?.let { "Comments (${DisplayFormats.compact(it)})" } ?: "Comments",
+        Box { LibraryActionButton(post.commentCount?.let { "Comments (${DisplayFormats.compact(it)})" } ?: "Comments",
             Modifier.fillMaxWidth().testTag("post-comments-${post.key}"), icon = Icons.Default.ChatBubbleOutline,
             enabled = validId && ContentVisibility.validChannel(post.channelId), onClick = comments) }
     }
@@ -139,7 +140,7 @@ internal fun PostActions(post: CommunityPost, comments: () -> Unit, share: () ->
 @Composable
 internal fun PostDetailScreen(vm: AppViewModel, state: PostDetailState, list: LazyListState, channel: (String) -> Unit,
     link: (String) -> Unit, play: (Video) -> Unit, playlist: (Playlist) -> Unit, signIn: () -> Unit, back: () -> Unit = {}) {
-    BrowseGlassSurface(Modifier.fillMaxSize(), softEdge = true, toolbar = { LibraryToolbar("Post", back = back) }) { body, top ->
+    BrowseAppSurface(Modifier.fillMaxSize(), toolbar = { LibraryToolbar("Post", back = back) }) { body, top ->
     LazyColumn(body.testTag("post-detail"), state = list, contentPadding = PaddingValues(top = top, bottom = LocalContentBottomInset.current)) {
         state.post?.let { post ->
             item {
@@ -172,7 +173,7 @@ internal fun PostCommentsSheet(vm: AppViewModel, state: CommentsState, channel: 
             // Platform dismissal may already have hidden the sheet; returning from replies keeps it open.
             scope.launch { sheetState.show() }
         } else vm.closePostComments()
-    }, sheetState = sheetState, sheetMaxWidth = 640.dp, containerColor = androidx.compose.ui.graphics.Color.Transparent) {
+    }, sheetState = sheetState, sheetMaxWidth = 640.dp, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
         BackHandler(state.threadKey != null) { vm.backPostComments() }
         CommentsPanel(state, prefs.thinMode, Modifier.fillMaxWidth().height(height).testTag("post-comments-sheet"),
             vm::closePostComments, { vm.backPostComments() }, vm::sortPostComments, vm::loadPostComments,
@@ -198,9 +199,9 @@ internal fun PostGallery(images: List<PostImage>, server: String, tag: String) {
         val largePager = rememberPagerState(initialPage = pager.currentPage) { images.size }
         Surface(Modifier.fillMaxSize().testTag("post-image-viewer")) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-                BrowseGlassSurface(Modifier.fillMaxSize(), softEdge = true, toolbar = {
+                BrowseAppSurface(Modifier.fillMaxSize(), toolbar = {
                     LibraryToolbar("Image ${largePager.currentPage + 1} of ${images.size}", statusInset = false, actions = {
-                        GlassIconButton(Icons.Default.Close, "Close image") { viewer = false }
+                        AppIconButton(Icons.Default.Close, "Close image") { viewer = false }
                     })
                 }) { body, top ->
                     HorizontalPager(largePager, body.padding(top = top)) { index ->

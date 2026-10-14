@@ -152,7 +152,7 @@ class PlayerFeedbackPresentationTest {
         compose.onNodeWithTag("sponsorblock-prompt").assertDoesNotExist()
     }
 
-    @Test fun seekHasNoBackdropAndSponsorHonorsReduceTransparency() {
+    @Test fun seekKeepsPictureVisibleAndSponsorHasALegibleLocalScrim() {
         compose.setContent { Content() }
         for ((background, night, reduce) in listOf(
             Triple(Color.White, false, false), Triple(Color.Black, true, false), Triple(Color.White, true, true))) {
@@ -161,8 +161,8 @@ class PlayerFeedbackPresentationTest {
                 sponsor.value = SponsorBlockPlayback(active = segment)
             }
             val plate = compose.onNodeWithTag("sponsorblock-actions").captureToImage().toPixelMap()
-            val expected = if (reduce) GlassOptics.mediaPlate.red else GlassOptics.mediaPlate.copy(alpha = GlassOptics.mediaTint).compositeOver(background).red
-            assertEquals(expected, plate[plate.width / 2, plate.height / 2].red, .03f)
+            val sample = plate[plate.width / 2, plate.height / 2]
+            assertTrue("Sponsor actions need a dark scrim in every appearance", sample.red <= .3f && sample.green <= .3f && sample.blue <= .3f)
             captureWatchScreenshot("player-feedback-pill-${if (night) "dark" else "light"}-${if (reduce) "opaque" else "transparent"}")
             for (offset in listOf(-10_000L, 30_000L)) {
                 compose.runOnIdle { seek.value = offset }

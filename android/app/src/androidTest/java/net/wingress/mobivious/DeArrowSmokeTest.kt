@@ -46,10 +46,10 @@ class DeArrowSmokeTest {
     private fun settings() { compose.openAppSettings(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
     private fun save() {
-        compose.onNodeWithTag("settings-save").performClick()
+        compose.finishAutomaticPreferencePage()
         until { compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         if (activity.model.playback.value.details != null)
             compose.onNodeWithTag("mini-player-preview").performClick()
     }
@@ -61,7 +61,7 @@ class DeArrowSmokeTest {
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
         until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" }
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     private fun openVideo(title: String) { compose.onNodeWithText(title).performClick(); until(40_000) { activity.model.playback.value.playing } }
@@ -102,11 +102,11 @@ class DeArrowSmokeTest {
         compose.onNode(hasContentDescription("Search") and hasAnyAncestor(hasSetTextAction()), useUnmergedTree = true).performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNodeWithContentDescription("Close search").performClick()
-        compose.onNodeWithTag("navigation-Subscriptions").performClick()
+        compose.selectFeed("Subscriptions")
         until { activity.model.browse.value.videos.isNotEmpty() }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         compose.onNode(hasText("Mobivious Studio") and hasAnyAncestor(hasTestTag("video-card-testvideo01"))).performClick()
         until { activity.model.channel.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
-        compose.onNodeWithTag("navigation-You").performClick()
+        compose.selectFeed("You")
         compose.onNodeWithTag("you-playlists").performClick()
         until { compose.onAllNodesWithText("DeArrow fixture playlist").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("DeArrow fixture playlist").performClick()
@@ -128,7 +128,7 @@ class DeArrowSmokeTest {
         compose.onNodeWithText("Another calm scene").assertExists()
         compose.navigateBack()
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 } // playlist card and mini-player
-        compose.onNodeWithTag("navigation-You").performClick(); compose.onNodeWithTag("you-history").performClick()
+        compose.selectFeed("You"); compose.onNodeWithTag("you-history").performClick()
         until { activity.model.browse.value.videos.isNotEmpty() }
         until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().size == 2 }
         val watchedAfter = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }
@@ -170,9 +170,14 @@ class DeArrowSmokeTest {
         compose.onNodeWithContentDescription("Close DeArrow contributions").performClick()
         settings()
         compose.onNodeWithTag("dearrow-private-id").performScrollTo().performTextInput("c".repeat(64))
-        compose.onNodeWithText("Import private user ID").performScrollTo().performClick()
-        until { activity.model.dearrowIdentity.value?.configured == true && compose.onAllNodesWithText("Importing…").fetchSemanticsNodes().isEmpty() }
-        assertEquals("", compose.onNodeWithTag("dearrow-private-id").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        captureWatchScreenshot("identity-import-ime")
+        compose.onNodeWithText("Import private user ID").performScrollTo()
+        captureWatchScreenshot("identity-import-before-submit")
+        compose.onNodeWithText("Import private user ID").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("Import private user ID").performClick()
+        try { until { activity.model.dearrowIdentity.value?.configured == true && compose.onNodeWithTag("dearrow-private-id").fetchSemanticsNode().config[SemanticsProperties.EditableText].text.isEmpty() } }
+        catch (failure: Throwable) {captureWatchScreenshot("identity-import-failure");throw failure}
+        assertEquals("",compose.onNodeWithTag("dearrow-private-id").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         assertFalse(state().toString().contains("c".repeat(64)))
         compose.onNodeWithContentDescription("Back from DeArrow").performClick(); compose.onNodeWithContentDescription("Back from Settings").performClick()
         command("dearrow", """{"originalMode":"missing"}""")

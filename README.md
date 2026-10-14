@@ -38,7 +38,7 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 ### Browse and discover
 
-- Discover with independent Popular and Trending feeds; choose Livestreams or Gaming and search
+- Direct Popular and Trending destinations; choose Livestreams or Gaming and search
   for a Trending country by name or code.
 - Search videos, channels and playlists together, or choose a specific result
   type; open channel results directly in the app.
@@ -63,8 +63,8 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Channel subscriptions, a subscription feed and a searchable channel directory
   sorted by Relevance, Latest upload, Most watched or A–Z, with upload and viewing
   details. The choice is saved on this device for each instance.
-- A **You** dashboard for your identity and dedicated Playlists, My Clips, History
-  and Downloads pages, with floating Liquid Glass controls. Playlists separates
+- A **You** dashboard for your identity and dedicated Playlists, History, My Clips
+  and Downloads pages, with opaque Material 3 controls. Playlists separates
   owned and subscribed collections; watch history supports scoped search. Account
   management lives in **Settings → Account**.
 - Watched indicators and saved playback positions.
@@ -89,12 +89,12 @@ An `OK` result confirms the APK matches the supplied checksum.
 
 ### Make it yours
 
-- Liquid Glass navigation with light, dark or system appearance; Reduce transparency
-  for solid controls, compact lists and optional hidden thumbnails.
-- Ambient mode casts live video colors behind the expanded watch view and its glass
-  controls. Enabled by default; toggle it in player settings or Appearance.
-- Choose your launch homepage; retain your place in Popular and Trending within
-  Discover, Subscriptions, and You.
+- Four direct destinations with light, dark or system appearance and six accent
+  presets; compact lists and optional hidden thumbnails.
+- Optional ambient lighting behind the expanded watch view. An absent saved choice
+  defaults off; existing explicit choices are preserved.
+- Choose your launch homepage; retain your place and child screens independently
+  in Popular, Trending, Subscriptions and You.
 - Playback defaults, browsing and feed preferences, and channel blocking.
 - **SponsorBlock:** optional segment skipping, category controls and channel overrides.
 - **DeArrow:** optional community titles, an original-title toggle and title contributions.
@@ -154,8 +154,8 @@ through the player chat button. Replay follows playback and
 seeks, with compact docked and movable/resizable overlay modes. The side panel
 can use 10–70% of the screen. Use the chat menu to open settings or choose
 **Adjust overlay**; attached handles move and resize the panel, with Done and
-Cancel controls. Appearance saves immediately; **Save** applies timestamps,
-user/word/RE2 regex filters, and a per-video chat delay. Positive delay values
+Cancel controls. Appearance, timestamps, user/word/RE2 regex filters and per-video chat delay save
+automatically, with Retry/Revert for failed changes. Positive delay values
 show messages later. Signed-in timestamps, filters and delays sync with
 Invidious, while appearance stays on the device. Guests save settings per instance.
 Deploy the sibling native token-scope update and renew sign-in for account chat
@@ -185,8 +185,11 @@ whether you are contributing directly or working with an AI coding agent.
 Debug builds appear as **Mobivious Preview** and install separately from the
 release app for local review.
 
-- [Design language](docs/LIQUID_GLASS.md) — Apple references, navigation, material
-  rendering and accessibility.
+- [Next UI/UX overhaul](docs/ui-ux-overhaul-2026-10-13/README.md) — approved opaque
+  Android design, complete screen/flow specifications and implementation/verification
+  handoff. See the [implementation report](docs/ui-ux-implementation-2026-10-13/README.md) for current verification and remaining acceptance.
+- [Historical Liquid Glass design](docs/LIQUID_GLASS.md) — rationale for the
+  previous UI, superseded by the opaque Android overhaul.
 - [Developer guide](docs/DEVELOPMENT.md) — repository orientation, prerequisites,
   builds, tests, signing, releases and upstream maintenance.
 - [Deployment guide](deploy/README.md) — install and update the server.

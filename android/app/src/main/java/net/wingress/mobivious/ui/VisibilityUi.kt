@@ -23,7 +23,7 @@ internal fun BlockChannelMenuItem(vm: AppViewModel, id: String, name: String, si
     val state by vm.blocked.collectAsStateWithLifecycle()
     val context = state.context ?: vm.api.context()
     if (!ContentVisibility.validChannel(id)) return
-    GlassMenuItem(text = { Text(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel") },
+    DropdownMenuItem(text = { Text(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel") },
         onClick = { close(); vm.toggleBlocked(id, name, context) }, enabled = id !in state.busy,
         modifier = modifier)
 }
@@ -42,24 +42,24 @@ internal fun BlockedChannelsScreen(vm: AppViewModel, modifier: Modifier, signIn:
     val context = state.context ?: vm.api.context()
     LaunchedEffect(vm.api.context()) { vm.refreshBlockedChannels() }
     LazyColumn(modifier.fillMaxSize().testTag("blocked-channel-manager"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { GlassSection {
+        item { AppSection {
             Text("Blocked channels are hidden from discovery, search and recommendations. Subscriptions, history, playlists and direct links remain accessible.")
             if (account == null) Text("Blocked channels are saved for guests on this device and instance.")
         } }
         run {
-            item { LibraryControlScene { LibraryActionButton("Refresh blocked channels", enabled = !state.loading, onClick = vm::refreshBlockedChannels) } }
+            item { Box { LibraryActionButton("Refresh blocked channels", enabled = !state.loading, onClick = vm::refreshBlockedChannels) } }
             if (state.loading) item { CircularProgressIndicator() }
             state.error?.let { error -> item {
                 Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("blocked-refresh-error"))
                 if (!state.loaded) Text("Your blocked channels could not be loaded. Some blocked content may be visible.")
-                LibraryControlScene { LibraryActionButton("Retry", onClick = vm::refreshBlockedChannels) }
+                Box { LibraryActionButton("Retry", onClick = vm::refreshBlockedChannels) }
             } }
             if (state.loaded && state.channels.isEmpty() && !state.loading) item { Text("No blocked channels") }
             items(state.channels, key = { it.id }) { channel ->
-                GlassSection {
+                AppSection {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { openChannel(channel.id) }) { Text(channel.name) }
-                        LibraryControlScene { LibraryActionButton(if (channel.id in state.busy) "Unblocking…" else "Unblock",
+                        Box { LibraryActionButton(if (channel.id in state.busy) "Unblocking…" else "Unblock",
                             Modifier.testTag("unblock-${channel.id}"), enabled = channel.id !in state.busy) { vm.toggleBlocked(channel.id, channel.name, context) } }
                     }
                     state.actionErrors[channel.id]?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("blocked-action-error-${channel.id}")) }

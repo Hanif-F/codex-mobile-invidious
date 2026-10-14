@@ -1,5 +1,10 @@
 # Liquid Glass design language
 
+**Superseded for future design on 13 October 2026** by the
+[complete opaque Android UI/UX overhaul](ui-ux-overhaul-2026-10-13/README.md).
+The rationale below describes the previous design and currently implemented
+source; it does not instruct agents to retain or extend glass in the new overhaul.
+
 See the [documentation index](README.md) and [UI implementation reference](UI.md)
 for the current system, including ambient frame sampling and its lifecycle gates.
 
@@ -254,7 +259,7 @@ use neutral contrast plates and do not sample the decoder as a glass backdrop.
 Ambient mode separately uses bounded PixelCopy requests to reduce ready video
 frames to nine spatial colors; only generated lighting is recorded for ambient
 glass. Sampling is restricted to the resumed expanded watch view and respects
-power, motion and transparency settings. See [ambient mode](UI.md#ambient-mode).
+power, motion and transparency settings. See [ambient mode](UI.md#watch-and-ambient-lighting).
 This preserves fullscreen, PiP, background playback and aspect ratios. Chat overlays
 sit below playback chrome so they cannot intercept fullscreen and seek controls.
 Overlay adjustment temporarily hides playback chrome so drag handles stay usable.

@@ -523,6 +523,35 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `failedHistoryMutationsLeaveIndicatorsIntactAndFailedPositionKeepsLocalFallback`
 - `failedDeviceClearPreservesProgressAndCanRetryWithoutStoppingObservers`
 
+### AppThemeTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/ui/AppThemeTest.kt) — All twelve palettes: exact opaque neutral roles and enabled text/control-boundary contrast.
+
+- `everyEnabledTextAndBoundaryRolePassesInAllTwelvePalettes`
+- `accentsNeverChangeNeutralSurfacesAndUnknownIdsResolveBlue`
+
+### AppWindowLayoutTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/ui/AppWindowLayoutTest.kt) — Contiguous viewport selection around vertical/horizontal occluding hinges and resized windows.
+
+- `verticalHingeUsesLargerContiguousPane`
+- `horizontalHingeAndResizedWindowsStayClear`
+- `FlatWindowUsesWholeViewport`
+- `keyboardCanMoveAnOccludedEditorToTheClearPane`
+- `ordinaryWindowsKeepTheirExistingImeInsetOwner`
+
+### PreferenceSaveControllerTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/ui/PreferenceSaveControllerTest.kt) — Automatic-save ordering, newer intent preservation, debounce, retry/revert and context isolation.
+
+- `slowResponseNeverOverwritesNewerIntentAndIndependentFieldsRemainOrdered`
+- `failuresKeepIntentRetryUsesLatestAndRevertDoesNotWrite`
+- `invalidTextNeverReachesSinkAndBlurOrBackgroundFlushesValidDebounce`
+- `contextSwitchDiscardsSensitiveIntentsAndLateResultsCannotPublish`
+- `returningToConfirmedValueWhileAnOlderWriteRunsStillRestoresIt`
+- `anOlderFailureCannotTurnTheNewerQueuedValueIntoAnError`
+- `revertingInvalidOrUnsentTextDoesNotSendItDuringLifecycleFlush`
+
 ## Android device tests
 
 ### AccountNavigationSmokeTest
@@ -535,7 +564,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `delayedAccountPreferencesKeepThePageOpenedWhileTheyLoad`
 - `delayedAccountPreferencesApplyDefaultHomeWithoutNavigation`
 - `delayedAccountPreferencesKeepExplicitDiscoveryAndPlayback`
-- `discoverDockGuestSettingsAndBottomSearchCancellationAndReturn`
+- `fourRootsGuestSettingsAndSearchCancellationAndReturn`
 - `contextualSignupReturnsToLibraryAndCredentialChangesRetainSignIn`
 - `sessionsTokenCreationAndDeletionConfirmation`
 - `realPortraitAndOtherShapesUpdateSizingFullscreenAndPipWithoutRestart`
@@ -567,7 +596,8 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AmbientModePresentationTest.kt) — Ambient Mode Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
-- `videoColorsReachTheBackgroundAndGlassWithoutLosingTextContrast`
+- `videoColorsReachLightingWhileControlsRemainOpaque`
+- `disabledAmbientDoesNotAnimateARetainedPalette`
 
 ### AmbientModeSmokeTest
 
@@ -577,6 +607,26 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `liveColorPhasesAndSystemAnimationPreferenceAreObserved`
 - `playerBackingAndNativeShutterStayBlackAcrossWatchAndFullscreen`
 - `wideAndLargeTextWatchLayoutsAndCommentsRetainTheirReadingSurfaces`
+
+### AppControlPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppControlPresentationTest.kt) — Native control target, semantics, state and surface presentation scenarios. Exact cases appear in the test catalog.
+
+- `subscriptionStateAndExplicitActionRemainClearWithLargeText`
+- `settingsToolbarAndSegmentedControlsFitNarrowLargeTextAndKeepRowsReachable`
+
+### AppFoundationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppFoundationTest.kt) — Native caption window transparency and dialog Back/cancel behavior. Exact cases appear in the test catalog.
+
+- `nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans`
+- `pressCancellationAndRapidRepetitionKeepOneSemanticAction`
+
+### AppNavigationTestActions
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppNavigationTestActions.kt) — Shared native root/search navigation, automatic-save flush and viewport test actions. Exact cases appear in the test catalog.
+
+Test support/helper file; no declared `@Test` methods.
 
 ### AppSmokeTest
 
@@ -589,14 +639,35 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `hlsExplicitResumeCaptionsAndAudioOnly`
 - `accountBrowsingAndServicePlayback`
 
-### AppearancePresentationTest
+### AppThemePresentationTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppearancePresentationTest.kt) — Device appearance defaults/persistence, neutral and colored recordings including overlay fallbacks, fixed/adaptive foreground contrast, media policy and open-menu/focused-draft preservation.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppThemePresentationTest.kt) — Twelve appearance/accent galleries, retained edit/menu state and local preference migration. Exact cases appear in the test catalog.
 
-- `preferencesDefaultOffAndPersistAcrossStoresAndContexts`
-- `backgroundSettingsReachPagesOverlayFallbacksAndGeneratedRecordings`
-- `foregroundsFollowThemeUnlessAdaptiveAndKeepContrastOverChangingArtwork`
-- `appearanceChangesPreserveOpenMenusAndFocusedFieldDrafts`
+- `twelvePalettesRenderOpaqueComponentsAndKeepMenusAndFocusedEdits`
+- `appearanceMigrationRespectsExplicitAmbientAndIgnoresDormantGlassKeys`
+
+### AppUiSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppUiSmokeTest.kt) — Integrated opaque browse, watch, tools and account return journeys. Exact cases appear in the test catalog.
+
+- `directFeedsAndTopSearchPreserveTheirOrigin`
+- `youOwnsGuestSettingsAndOpaqueAccessibilityMode`
+- `opaqueSurfacesKeepActionsReachableAcrossLightAndDarkPages`
+- `systemAppearanceUsesNeutralSurfacesAndHonorsAnExplicitLightChoice`
+- `watchPreservesFourAspectRatiosAndPlaybackThroughMiniSearchAndSettings`
+- `wideRailAndLargeTextRemainReachable`
+- `systemReducedMotionKeepsNavigationAndMinimizationUsable`
+- `guestTitleContributionReturnsToWatchAfterSignInCancellation`
+- `miniPlayerExposesRetryAfterARealStreamFailureWithoutLosingItsOccurrence`
+- `watchActionsPanelsAndFullscreenRemainUsableAcrossAppearances`
+- `watchNarrowLargeTextAndWideLayoutsKeepActionsReachable`
+
+### AppWindowPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppWindowPresentationTest.kt) — Physical usable-pane bounds in LTR/RTL and native opaque control drawing on a software Canvas in both appearances. Exact methods appear in the test catalog.
+
+- `usablePaneKeepsPhysicalBoundsWhenLayoutDirectionChanges`
+- `nativeControlsDrawIntoASoftwareCanvasInBothAppearances`
 
 ### AvatarsPresentationTest
 
@@ -632,6 +703,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 - `shortsHideEpochDatesAndUnknownDurationsWithoutDetailRequests`
 - `channelNavigationSwitchingAndIndependentPagination`
+- `channelTabsRetainTheirSortLoadedPagesAndVisiblePositionWithinTheAccount`
 - `fullDescriptionUsesLoadedMetadataAndClosesWhenLeavingTheChannel`
 - `streamsOnlyChannelsOpenOnStreamsAndRetryPreservesTheSelection`
 - `delayedPagesCannotReplaceTheSelectedTabOrAppendToAnotherChannelRoute`
@@ -751,13 +823,6 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `recreationRetainsOverridesAndSuccessorsKeepOnlyCarriedOptions`
 - `sourceOnlyLinksApplyOptionsAndBoundsToTheFirstOccurrence`
 
-### DarkGlassPresentationTest
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DarkGlassPresentationTest.kt) — Dark Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.
-
-- `materialsRemainVisibleInBothAppearancesAndOpaqueMode`
-- `neutralPalettePreservesTextActionAndStatusContrast`
-
 ### DeArrowSmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DeArrowSmokeTest.kt) — De Arrow Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -795,7 +860,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DiscoverySearchSmokeTest.kt) — Discovery Search Smoke declared scenarios; exact cases are enumerated in the test catalog.
 
 - `trendingControlsSaveGuestRegionCategoryAndRestoreAcrossTabsAndRecreation`
-- `settingsCountryPickerKeepsDraftUntilSaveAndCancelDiscardsIt`
+- `settingsCountryPickerSavesAutomaticallyAndRetainsConfirmedRegion`
 - `failedAccountRegionSaveRetainsPreviousSelectionAndCanRetry`
 - `mixedSearchPreservesOrderChannelBackScrollRecreationAndRetry`
 - `searchTypesUseCorrectFiltersAndKeepVideoChoices`
@@ -817,6 +882,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during accepted video conversion. Run on a physical device or fixed emulator."
 
+- `savedDownloadDetailsUseALocalOpaqueSheetAndKeepTheEntry`
 - `downloadsOverAnHourUseAnHourTimestamp`
 - `dialogRequiresMediaPreservesSelectionAndCreatesDuplicates`
 - `allModesAndCaptionsDecodeOfflineWithoutMediaOrMetadataRequests`
@@ -828,36 +894,6 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `combinedExportHasBothTracksAndDecliningConversionStartsNoExport`
 - `acceptedVideoConversionPreservesResolutionFrameRateAndBothTracks`
 
-### GlassControlPresentationTest
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/GlassControlPresentationTest.kt) — Glass Control Presentation declared scenarios; exact cases are enumerated in the test catalog.
-
-- `subscriptionStateAndExplicitActionRemainClearWithLargeText`
-- `settingsToolbarAndSegmentedControlsFitNarrowLargeTextAndKeepRowsReachable`
-
-### GlassFoundationTest
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/GlassFoundationTest.kt) — Hardware sampling, foreground adaptation, shared-material contrast, transparent content pixel checks, native captions, fallback policy and interaction cancellation.
-
-- `nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans`
-- `labelsIconsAndMenuSlotsNeverPaintTheirOwnBackgrounds`
-- `generatedEnvironmentsKeepReadableLabelsWithoutAdditionalBacking`
-- `navigationLabelsRemainReadableOverNarrowArtworkBands`
-- `sceneDownsamplesChangesAndStopsWhenSettled`
-- `nestedPageRecordingPreservesForegroundsAndCornerTransparency`
-- `softwareAndReducedTransparencyUseReadablePlatesWithoutReadback`
-- `pressCancellationAndRapidRepetitionKeepOneSemanticAction`
-
-### GlassRefractionTest
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/GlassRefractionTest.kt) — Sharp-feature refraction, foreground geometry, real dialog pixel transmission, invalidation/idle/disposal and clipped source-window crop coordinates.
-
-- `sharpStripesBendAcrossControlSectionAndCircularGlass`
-- `refractionLeavesForegroundGlyphsUndistortedAndPlayerProfileFrozen`
-- `dialogCopiesActualOriginatingPixelsRefreshesAndStopsWhenDismissed`
-- `reducedTransparencyAndDeferredPlayerSkipWindowReadback`
-- `captureGeometryIncludesInsetsAndClipsAtSourceEdges`
-
 ### HomeSubscriptionsSmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/HomeSubscriptionsSmokeTest.kt) — Home Subscriptions Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -868,42 +904,21 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `directoryGuestPromptAndLateReadsCannotExposeFormerAccountChannels`
 - `guestWatchActionsHavePrimaryControlsAndMoreWithoutImplicitQueue`
 
-### LibraryGlassJourneyTest
+### LibraryJourneyTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LibraryGlassJourneyTest.kt) — Library Glass Journey declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LibraryJourneyTest.kt) — Library dashboard, playlist, history and downloads journeys across appearance and text sizes. Exact cases appear in the test catalog.
 
-- `libraryPagesAndEditorsKeepPlaybackAndTheirGlassControls`
+- `libraryPagesAndEditorsKeepPlaybackAndTheirOpaqueControls`
 - `downloadProgressFailuresDetailsAndOfflinePlaybackRemainActionable`
 
-### LibraryGlassPresentationTest
+### LibraryPresentationTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LibraryGlassPresentationTest.kt) — Library Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LibraryPresentationTest.kt) — Continuous library rows, explicit editor actions, accessibility and responsive toolbars. Exact cases appear in the test catalog.
 
 - `narrowLargeTextDashboardKeepsEveryDestinationReachableInBothAppearances`
-- `wideDashboardUsesTwoColumnsAndGuestDownloadsRemainAvailable`
-- `floatingToolbarLeavesFirstAndLastRowsAccessibleAtLargeText`
+- `wideDashboardKeepsLibraryRowsInOrderAndGuestDownloadsAvailable`
+- `opaqueToolbarLeavesFirstAndLastRowsAccessibleAtLargeText`
 - `playlistFormKeepsSaveAvailableAndPreservesPrivacyAndTrimmedTitle`
-
-### LiquidNavigationTestActions
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiquidNavigationTestActions.kt) — Reusable accessible shell navigation actions for connected tests.
-
-Test support/helper file; no declared `@Test` methods.
-
-### LiquidRedesignSmokeTest
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiquidRedesignSmokeTest.kt) — Liquid Redesign Smoke declared scenarios; exact cases are enumerated in the test catalog.
-
-- `discoverFeedsAndBottomSearchPreserveTheirOrigin`
-- `youOwnsGuestSettingsAndOpaqueAccessibilityMode`
-- `transparentGlassKeepsActionsReachableAcrossLightAndDarkPages`
-- `systemAppearanceUsesDarkGlassAndHonorsAnExplicitLightChoice`
-- `watchPreservesFourAspectRatiosAndPlaybackThroughMiniSearchAndSettings`
-- `wideSidebarAndLargeTextRemainReachable`
-- `systemReducedMotionKeepsNavigationAndMinimizationUsable`
-- `guestTitleContributionReturnsToWatchAfterSignInCancellation`
-- `watchGlassActionsPanelsAndFullscreenRemainUsableAcrossAppearances`
-- `watchGlassNarrowLargeTextAndWideLayoutsKeepActionsReachable`
 
 ### LiveChatSmokeTest
 
@@ -913,7 +928,7 @@ Test support/helper file; no declared `@Test` methods.
 - `failedReplayRetriesItsOffsetWhilePlaybackRemainsUsable`
 - `unavailableReplayAndUnsupportedVideoDoNotBreakPlayback`
 - `fullscreenDocksBesideAndBackClosesChatBeforeLeavingFullscreen`
-- `settingsKeepDraftsAndFixedSaveWhileLayoutAndAppearanceSaveImmediately`
+- `settingsAutomaticallySaveTextAndAppearanceWithoutASaveFooter`
 - `tenPercentDockWrapsLongUnicodeMessagesAndKeepsMenuActionsReachable`
 - `overlayDraftSurvivesRotationAndRecreationAndBackCancelsWithoutClosingChat`
 - `overlayDragAndResizeSaveCancelWithoutSeekingOrMinimizing`
@@ -927,6 +942,8 @@ Test support/helper file; no declared `@Test` methods.
 - `portraitFullscreenDocksBelowAndKeepsTheDecodedVideoAspect`
 - `guestAndAccountSettingsStayIsolatedAndAppearanceStaysLocal`
 - `pipAndBackgroundSuspendRequestsAndRestoreAtTheCurrentPosition`
+- `invalidFilterTextDoesNotBlockAnIndependentTimestampChoice`
+- `staleChatCallbacksCannotWriteIntoAnotherVideoOrAccount`
 
 ### MetadataPresentationTest
 
@@ -948,6 +965,12 @@ Test support/helper file; no declared `@Test` methods.
 - `regionChangesDuringSearchOrChildNavigationReloadTheReturningFeed`
 - `playlistSegmentsKeepTheirOwnPositionsAcrossDetailsAndGlobalSearch`
 - `libraryAndFeedPresentationAdaptToThemesLargeTextNarrowAndLandscapeScreens`
+
+### OpaqueSurfacesPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/OpaqueSurfacesPresentationTest.kt) — Opaque controls and panels remain independent of scrolling artwork and backgrounds. Exact cases appear in the test catalog.
+
+- `ordinarySurfacesRemainOpaqueOverChangingScenery`
 
 ### PlaybackQueuePresentationTest
 
@@ -984,7 +1007,7 @@ Test support/helper file; no declared `@Test` methods.
 
 - `measuredChromeKeepsTransportCenteredOrInHeaderAboveFullWidthSeeking`
 - `noSeekButtonsAndChatStaysToTheLeftOfSettings`
-- `playerIconsAndEdgesExposeThePictureWithoutLosingTouchTargets`
+- `playerScrimsKeepWhiteControlsLegibleWithoutLosingTouchTargets`
 - `multiHourTimestampCompactsAtLargeFontsWithoutLosingChapterOrSeeking`
 - `loadingAndRetryRemainInsideTheRailInShallowVideo`
 - `chapterTracksScrubbingAndSupportsClickAndKeyboardWithoutDisplacingSettings`
@@ -997,7 +1020,7 @@ Test support/helper file; no declared `@Test` methods.
 
 - `compactActionsStayAtBottomLeftAndClearTheTimelineAndOtherControls`
 - `skipAndCloseRemainAccessibleAndConfirmationIsCompact`
-- `seekHasNoBackdropAndSponsorHonorsReduceTransparency`
+- `seekKeepsPictureVisibleAndSponsorHasALegibleLocalScrim`
 
 ### PlaylistRssSmokeTest
 
@@ -1029,16 +1052,13 @@ Test support/helper file; no declared `@Test` methods.
 - `pictureInPictureKeepsServiceOwnedAdvancement`
 - `blockUndoAndAccountChangeInvalidateOldUndoAndQueue`
 
-### RemainingGlassJourneyTest
+### ResponsiveShellSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/RemainingGlassJourneyTest.kt) — Remaining Glass Journey declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ResponsiveShellSmokeTest.kt) — Real emulator window widths 320/360/448/600/840/1200dp and font scales 1/1.3/2 in both appearances; visible root labels, non-overlapping targets and bar/rail layout. Exact methods appear in the test catalog.
 
-- `settingsFormsMenusAndAuthenticationStayReachable`
-- `everySettingsCategorySharesGlassAndKeepsItsFooterReachable`
-- `accountManagementUsesQuietFormsAndExplicitConfirmations`
-- `subscriptionMenuPendingFailureAndRetryNeverMisrepresentMembership`
-- `guestSubscribeCompletesAfterSignInAndReturnsToTheCreator`
-- `canceledSubscribeSignInDoesNotChangeALaterAccount`
+- `fourRootsKeepLabelsTargetsAndReadingBoundsAcrossWindowAndFontMatrix`
+- `keyboardTabAndEnterNavigateAndSubmitSearchExactlyOnce`
+- `authenticationFieldsAndSubmitRemainReachableAtNarrowLargeTextAndWideSizes`
 
 ### SearchHistorySmokeTest
 
@@ -1054,6 +1074,17 @@ Test support/helper file; no declared `@Test` methods.
 - `delayedSearchCannotReplaceNewChannelTabOrAccount`
 - `historyPaginationReloadsWhenServerCalendarDayChanges`
 
+### SecondaryScreensJourneyTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SecondaryScreensJourneyTest.kt) — Settings, account, community and other secondary-screen interaction coverage. Exact cases appear in the test catalog.
+
+- `settingsFormsMenusAndAuthenticationStayReachable`
+- `everySettingsCategoryUsesOpaqueSurfacesAndKeepsControlsReachable`
+- `accountManagementUsesQuietFormsAndExplicitConfirmations`
+- `subscriptionMenuPendingFailureAndRetryNeverMisrepresentMembership`
+- `guestSubscribeCompletesAfterSignInAndReturnsToTheCreator`
+- `canceledSubscribeSignInDoesNotChangeALaterAccount`
+
 ### ServiceComposeRule
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ServiceComposeRule.kt) — Service-aware Compose/device setup and cleanup support.
@@ -1064,11 +1095,12 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Settings drafts and shared-save failures, playback/codec settings, immediate device appearance saves, recreation/account isolation and System color-mode updates.
 
-- `appearanceSwitchesSaveImmediatelyAndSurviveRecreationWithoutSavingDraft`
-- `fixedGlassFollowsSystemColorModeWhenSystemAppearanceChanges`
-- `fullScreenNavigationAndDraftSurviveRecreation`
+- `outstandingChatValidationLinksToTheActualControlsAndReverts`
+- `deviceAccentAndAmbientSaveImmediatelyAndSurviveRecreationAndAccountChange`
+- `systemAppearanceChangesPreserveAutomaticPreferencePage`
+- `fullScreenNavigationAndAutomaticChangesSurviveRecreation`
 - `guestPlaybackDefaultsAndLocalResumeReachPlayer`
-- `failedSharedSaveKeepsDraftAndRetryPreservesOtherPreferences`
+- `failedAutomaticSaveKeepsRequestedValueAcrossNavigationRecreationAndRetry`
 - `codecSettingPrecedesQualityAndSyncsInBothDirections`
 
 ### SponsorBlockSmokeTest
@@ -1094,20 +1126,20 @@ Test support/helper file; no declared `@Test` methods.
 - `accumulationFreezesPlayingVideoAndCompetingActionsCancel`
 - `fullscreenAndPipEntryCancelAccumulation`
 
-### SubscriptionGlassJourneyTest
+### SubscriptionJourneyTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionGlassJourneyTest.kt) — Subscription Glass Journey declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionJourneyTest.kt) — Subscription feed/directory, channel and related tool navigation journeys. Exact cases appear in the test catalog.
 
 - `feedDirectoryAndCreatorSheetsRetainPlaybackAndTheirOrigin`
 - `darkOpaqueFeedAndExportsRetainAccessibleControls`
 - `wideFeedsUseTwoColumnsAndReducedMotionPreservesNavigation`
 
-### SubscriptionGlassPresentationTest
+### SubscriptionPresentationTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionGlassPresentationTest.kt) — Subscription Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionPresentationTest.kt) — Subscription/channel hierarchy, scoped search, native controls and large-text layout. Exact cases appear in the test catalog.
 
 - `narrowLargeTextFeedReflowsAndKeepsItsContentBelowChrome`
-- `directoryLastRowAndCountStayAccessibleWithLargeTextAndOpaqueGlass`
+- `directoryLastRowAndCountStayAccessibleWithLargeTextAndOpaqueSurfaces`
 - `channelTabsScrollAndSortMenusKeepTheirSelectedSemantics`
 
 ### SubscriptionSortingSmokeTest
@@ -1169,18 +1201,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/WatchCommentsPresentationTest.kt) — Watch Comments Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
-- `floatingGlassLeavesFirstCommentReadableAndKeepsSortAndRepliesWorking`
-
-### WatchGlassPresentationTest
-
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/WatchGlassPresentationTest.kt) — Watch Glass Presentation declared scenarios; exact cases are enumerated in the test catalog.
-
-- `expandedWatchFallbackIsFlatBeforeAmbientArrivesAndAfterItIsDisabled`
-- `arrivingAmbientPalettePreservesAnOpenMenu`
-- `actionsKeepCircularButtonsWithVisibleLabelsAndDisabledDownloads`
-- `narrowLargeTextKeepsActionLabelsWhole`
-- `disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode`
-- `longPressShowsTheActionTooltipWithoutActivatingTheButton`
+- `opaquePanelLeavesFirstCommentReadableAndKeepsSortAndRepliesWorking`
 
 ### WatchPlayerResizePresentationTest
 
@@ -1190,6 +1211,17 @@ Test support/helper file; no declared `@Test` methods.
 - `shortPageStaysCompactAfterItsListStopsScrollingAndFlingCanExpandIt`
 - `commentsMinimizationAndRecreationKeepProgressButANewOccurrenceResetsIt`
 - `smallLandscapePlayerDoesNotConsumeScrollingForAnInvisibleResize`
+
+### WatchPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/WatchPresentationTest.kt) — Watch action labels, tooltips, targets, disclosure states and large-text behavior. Exact cases appear in the test catalog.
+
+- `expandedWatchFallbackIsFlatBeforeAmbientArrivesAndAfterItIsDisabled`
+- `arrivingAmbientPalettePreservesAnOpenMenu`
+- `actionsKeepVisibleLabelsAndDisabledDownloads`
+- `narrowLargeTextKeepsActionLabelsWhole`
+- `disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode`
+- `longPressShowsTheActionTooltipWithoutActivatingTheButton`
 
 ### WatchedIndicatorsSmokeTest
 
@@ -1202,4 +1234,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **710 declared test methods** (including ignored tests).
+Inventory total: **722 declared test methods** (including ignored tests).

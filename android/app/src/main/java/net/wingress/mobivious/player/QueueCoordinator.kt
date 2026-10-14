@@ -224,7 +224,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             else try { app.api.position(entry.video.id, context) } catch (e: CancellationException) { throw e } catch (_: Exception) { app.store.position(entry.video.id, context) }
         check(token, context)
         val base = context.server.toHttpUrlOrNull()!!
-        fun resolve(url: String) = base.resolve(url)?.takeIf { it.isHttps || net.wingress.mobivious.BuildConfig.DEBUG && it.host in listOf("10.0.2.2", "127.0.0.1", "localhost") }?.toString().orEmpty()
+        fun resolve(url: String) = base.resolve(url)?.takeIf { it.isHttps || net.wingress.mobivious.BuildConfig.ALLOW_FIXTURE_HTTP && it.host in listOf("10.0.2.2", "127.0.0.1", "localhost") }?.toString().orEmpty()
         val raw = details.hls.ifBlank { details.dash }.ifBlank { details.fallback }
         val stream = resolve(raw).ifBlank { if (details.dash.isNotBlank() || !details.video.live) app.api.url("api/manifest/dash/id/${entry.video.id}", mapOf("local" to prefs.local.toString())).toString() else "" }
         require(details.upcoming != true || details.video.live) { details.notice.ifBlank { "This video is upcoming. Retry when it starts." } }

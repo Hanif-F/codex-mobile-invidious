@@ -6,6 +6,11 @@ For current behavior and implementation references, start with the
 [complete documentation index](README.md). It includes architecture, all feature
 workflows, settings and API contracts, subsystem guides, and source/test catalogs.
 
+For the next complete UI/UX redesign, follow the
+[opaque Android overhaul handoff](ui-ux-overhaul-2026-10-13/README.md). It supersedes
+Liquid Glass design instructions. Track verification and remaining acceptance in
+the [implementation report](ui-ux-implementation-2026-10-13/README.md).
+
 This guide covers building, testing and maintaining Mobivious for human and AI
 contributors. Commands run from this repository's root unless shown otherwise.
 
@@ -86,7 +91,7 @@ a dependency update.
 | OkHttp / MockWebServer | 4.12.0; application HTTP / JVM contract fixtures. |
 | Coil Compose | 2.7.0; images and caching. |
 | Coroutines Android | 1.10.2; asynchronous work and state flows. |
-| Backdrop | 1.0.6; glass rendering. |
+| WindowManager | 1.5.1; opaque fold/hinge layout policy. |
 | RE2/J | 1.8; bounded-complexity chat regex matching. |
 | JUnit / JVM JSON | 4.13.2 / 20251224. |
 | Android test JUnit / runner / Espresso | 1.3.0 / 1.7.0 / 3.7.0. |

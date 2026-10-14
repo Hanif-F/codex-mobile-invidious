@@ -96,7 +96,7 @@ class AiFilterSmokeTest {
     @Test fun guestCanEditWhilePausedSaveEnableAndPauseWithoutLosingChoices() {
         assertEquals(0, fixture().getJSONArray("aiRequests").length())
         settings(); choose(AiPageGroup.FEEDS, AiListKind.BLOCKLIST, "Hide videos")
-        compose.onNodeWithTag("settings-save").performClick()
+        compose.finishAutomaticPreferencePage()
         until { vm.preferences.value.aiFilter.saved(AiListKind.BLOCKLIST, AiPageGroup.FEEDS) == AiAction.HIDE }
         assertFalse(vm.preferences.value.aiFilter.enabled)
         assertEquals(0, fixture().getJSONArray("aiRequests").length())
@@ -105,7 +105,7 @@ class AiFilterSmokeTest {
         compose.onNodeWithTag("settings-list").performScrollToIndex(0)
         compose.onNodeWithText("Enable AI Channel Filter").performClick()
         screenshot("settings-enabled")
-        compose.onNodeWithTag("settings-save").performClick()
+        compose.finishAutomaticPreferencePage()
         until { vm.preferences.value.aiFilter.enabled }
         compose.onNodeWithContentDescription("Back from Settings").performClick()
         // Settings is opened from You; feed-only actions request classifications when a feed is shown.
@@ -163,8 +163,8 @@ class AiFilterSmokeTest {
         until { !vm.queue.value.loading && vm.queue.value.items.size == 3 }
         assertEquals(listOf("A", "B", "C"), vm.queue.value.items.map { it.video.indexId })
         compose.onNodeWithTag("mini-player-preview").performClick()
-        ui { vm.queueExpanded.value = true }
-        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue"))
+        compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("playback-queue-header"))
+        compose.onNodeWithTag("playback-queue-header").performClick()
         compose.onAllNodes(hasTestTag("ai-thumbnail-blocklist") and hasAnyAncestor(hasTestTag("playback-queue")), useUnmergedTree = true).assertCountEquals(3)
         screenshot("queue-warnings")
         ui { vm.selectQueue(vm.queue.value.items[1].key) }
@@ -195,10 +195,10 @@ class AiFilterSmokeTest {
         ui { vm.action { vm.login("AiViewer", "fixture-password") } }
         until { vm.account.value != null && vm.tab == "You" && !vm.browse.value.loading }
         command("ai", """{"aiStale":["warnlist"]}""")
-        settings(); choose(AiPageGroup.OTHER, AiListKind.WARNLIST, "Replace thumbnails")
         command("sponsorblock", """{"failPreferences":true}""")
-        compose.onNodeWithTag("settings-save").performClick()
-        compose.onNodeWithTag("settings-save-error").assertExists()
+        settings(); choose(AiPageGroup.OTHER,AiListKind.WARNLIST,"Replace thumbnails")
+        until {vm.preferenceSaves.edits.value.values.any {it.error!=null}}
+        compose.onNodeWithText("Retry").assertExists()
         assertEquals(AiAction.OFF, vm.preferences.value.aiFilter.saved(AiListKind.WARNLIST, AiPageGroup.OTHER))
         compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("ai-list-details"))
         compose.onNodeWithTag("ai-list-details").performClick()
@@ -206,7 +206,8 @@ class AiFilterSmokeTest {
         compose.onNodeWithTag("ai-status-warnlist").assertTextContains("Stale", substring = true)
         screenshot("list-status-stale")
         command("sponsorblock", """{"failPreferences":false}""")
-        compose.onNodeWithTag("settings-save").performClick()
+        compose.onNodeWithText("Retry").performScrollTo().performClick()
+        compose.finishAutomaticPreferencePage()
         until { vm.preferences.value.aiFilter.saved(AiListKind.WARNLIST, AiPageGroup.OTHER) == AiAction.REPLACE }
         assertFalse(vm.preferences.value.aiFilter.enabled)
     }

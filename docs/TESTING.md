@@ -61,20 +61,21 @@ scripts/test-android.sh \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
 ```
 
-`ServiceComposeRule.kt` and `LiquidNavigationTestActions.kt` provide device setup/
+`ServiceComposeRule.kt` and `AppNavigationTestActions.kt` provide device setup/
 cleanup and navigation helpers. Fixture `/test/*` controls reset scenario state,
 inject delays/failures/visibility/metadata, and expose captured requests. They are
 local test contracts, not production app endpoints. The fixture server supplies
 account/queue/search/community/chat/clip/optional-tool responses and Range/slow/
 failed media transfers without real accounts or upstream YouTube calls.
 
-`AppearancePresentationTest` checks absent-key defaults, device persistence,
-neutral/colored page and fallback recordings, fixed/adaptive foreground contrast
-over changing artwork, opaque fallbacks, media-overlay colors and preservation of
-open menus/focused field drafts. `SettingsSmokeTest`
+`AppThemePresentationTest` checks appearance migration, twelve palette galleries,
+opaque components and preservation of open menus/focused field drafts.
+`AppThemeTest` checks enabled text and control-boundary contrast numerically;
+`AppWindowPresentationTest` covers RTL pane placement and software drawing.
+`SettingsSmokeTest`
 also exercises immediate saving without a shared draft, activity recreation,
-account changes and System appearance updates. Tests requiring the older automatic
-polarity behavior explicitly provide `LocalAdaptiveControlColors = true`.
+account changes and System appearance updates. Dormant optical keys are migration
+fixtures and have no rendering effect.
 
 Standalone checks:
 
@@ -154,3 +155,58 @@ source/date context in the documentation index when behavior/version changes.
 
 Historical visual logs/media stay in their dated collections. Avoid rewriting
 old test counts as current status; add new evidence or clear superseding notes.
+
+## Opaque UI performance diagnostics
+
+`scripts/test-ui-performance.sh --list` lists deterministic release-like journeys.
+Run with `ANDROID_SERIAL=emulator-5554 scripts/test-ui-performance.sh --label opaque
+--journey popular` (one shell command). The separate `.benchmark` package is
+profileable, non-debuggable and debug-signed; release security/optimization remain
+unchanged. Only loopback fixture HTTP is enabled. The runner owns its fixture and
+reverse mapping, and preserves source/APK fingerprints, configuration, raw JSON,
+per-iteration traces and exit status under `.tools/ui-ux-overhaul/performance/`.
+
+Every timing uses Full compilation and ten iterations. Fixture account/origin are
+configured through ordinary UI; account preference reads must finish before
+measurement. Warm/cold artwork, density, pagination, mixed search, watch ambient
+and navigation have distinct scenarios. Use `scripts/summarize-ui-performance.py
+RAW_JSON --output SUMMARY_JSON` to compute the median of per-iteration P50/P90/P95/
+P99 CPU/overrun values and positive-overrun fractions without pooling frames or
+silently removing outliers. Timing is separate from normal-speed visual recordings.
+
+Scrolling injects ordinary touch events across 70% of the scrollable viewport for
+400ms, six forward and six reverse swipes with 100ms gaps. UI Automator 2.4's
+step-based swipe waits for display frames, so a step count cannot define duration.
+The harness schedules by elapsed time, retains each gesture's event duration and
+injection completion time in additional test output, and rejects measured event
+durations outside 400–475ms. The runner rejects missing gesture provenance.
+
+Use `--record --journey navigation` with a fresh label for a separate normal-speed
+video. Recording mode performs ordinary UI interactions without Macrobenchmark
+timing; run-specific filenames and `ffprobe` checks prevent stale or empty videos
+from being reported. Do not record during a timing run.
+
+`searchPagination` exercises real pagination because Popular is a single-page
+API. `trendingChanges` waits for the selected category/country's returned content;
+`settingsSaving` confirms delayed/failing toggle and speed changes. Downloads
+queues three slow fixture transfers. Warm scrolling primes artwork outside the
+measured region; cold-artwork runs use fresh URL identities. Historical adapters
+map existing ordinary controls and record their original source commit alongside
+the exact adapted source archive/diff. Unavailable newer features remain explicit
+N/A entries.
+
+This task uses emulator acceptance by user instruction. Emulator results cannot
+be described as physical-device smoothness. Preserve failed runs and inherited
+failures separately from successful acceptance evidence. If the emulator is lost,
+stop development/testing while attempting recovery; if recovery fails, wait for
+the user to restart it.
+
+The documentation inventory reflects existing files in the working tree, including
+untracked additions and excluding locally deleted tracked files before a commit.
+
+The screen audit is tracked in [Screen acceptance](ui-ux-implementation-2026-10-13/SCREEN_ACCEPTANCE.md).
+Search visibility choices apply while their sheet stays open and reset pagination;
+chat timestamps save independently of invalid filter text. Context-bound chat
+callbacks reject edits from another video/account. Download details are a local
+opaque sheet. `captureWatchScreenshot` validates each saved PNG header so a path
+or capture failure cannot silently count as screenshot evidence.

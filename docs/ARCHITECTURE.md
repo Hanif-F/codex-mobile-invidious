@@ -50,7 +50,7 @@ the activity creates an `AndroidViewModel`, which drives Compose with StateFlows
 
 Versions and prerequisites are recorded in [Development](DEVELOPMENT.md). The
 main libraries are Compose Material3, Media3 ExoPlayer/session/UI/Transformer,
-OkHttp, Coil, coroutines, Backdrop and RE2/J. JUnit, MockWebServer and Android
+OkHttp, Coil, coroutines, WindowManager and RE2/J. JUnit, MockWebServer and Android
 Compose tests supply validation. All dependency versions are pinned in Gradle.
 
 ## Startup and lifetime
@@ -115,8 +115,8 @@ from request generation and bearer token identity; see [Storage](STORAGE_AND_SEC
 ## Browsing and navigation
 
 Internal tabs are `Popular`, `Trending`, `Subscriptions`, `You`, with `Search`
-as a transient destination. The shell presents Discover (Popular/Trending),
-Subscriptions, You and a separate Search control. Route strings include
+as a transient destination. The shell presents four labeled destinations in a
+bottom bar or rail, with Search in the top app bar. Route strings include
 `channel:<id>`, `playlist:<id>`, `post:<id>`, `hashtag:<tag>`, `subscription-channels`,
 `playlists`, `history`, `clips`, `downloads` and `sign-in`. Settings pages are
 selected by UI page names, not by a persistent route graph.
@@ -126,6 +126,11 @@ search draft/submission, playlist segment, preferences and position. Independent
 tab snapshots and return stacks preserve the user's origin after search, details
 or sign-in. Changed browsing preferences invalidate affected snapshots. Account
 and instance changes clear account-sensitive navigation state.
+
+Channel tabs retain their loaded pages, sort and position in a bounded set of
+24 session snapshots. A first visit inherits the current channel sort; subsequent
+visits restore that tab's own choice. Scoped-search returns keep the unfiltered
+origin, and account/instance generation changes clear these snapshots.
 
 Pagination operates on raw source rows, before membership/block/AI filtering.
 Video merge identity includes `(videoId, indexId, playlistIndex)` so playlist
@@ -143,3 +148,18 @@ Cached results are available for selected GET endpoints on eligible failures;
 they are not a mutation queue or a guarantee of offline streaming. Explicit
 downloads provide offline media. [Troubleshooting](TROUBLESHOOTING.md) describes
 recovery and the distinction between server, token, device and decoder failures.
+
+## Opaque UI and automatic preference intents
+
+`AppTheme` owns fixed neutral roles and six device accent presets. Native Material
+components replace all optical rendering; `WatchAmbient` alone samples bounded
+video colors when explicitly enabled. `AppScaffold` defines four roots and rail
+breakpoints; `AppWindowLayout` selects a contiguous pane around an occluding hinge.
+
+`PreferenceSaveController` lives in `AppViewModel`. It retains confirmed/requested
+values, per-key revisions and pending/invalid/error states across navigation and
+recreation. A single worker coalesces unsent same-key edits; the sink uses the
+shared preference mutex and sparse patches against current confirmed data. Text
+has a 500ms debounce with lifecycle flush. Account/server generation changes
+invalidate queued work. Entity/security operations keep explicit submit semantics.
+See [UI](UI.md), [Settings](SETTINGS.md) and the [acceptance report](ui-ux-implementation-2026-10-13/README.md).

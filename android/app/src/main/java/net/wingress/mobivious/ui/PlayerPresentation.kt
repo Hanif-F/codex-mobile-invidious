@@ -152,6 +152,7 @@ internal fun PlayerPresentationHost(
 ) {
     val density = LocalDensity.current
     val windowSize = LocalWindowInfo.current.containerSize
+    val usablePane = rememberUsableWindowPane()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val lifecycleState by lifecycle.currentStateFlow.collectAsState()
     val replay by vm.chatReplay.collectAsStateWithLifecycle()
@@ -178,12 +179,12 @@ internal fun PlayerPresentationHost(
     DisposableEffect(state) { onDispose { state.cancelMotion() } }
     CompositionLocalProvider(LocalWatchAmbient provides ambient) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        content { chatSettings = true }
-        val full = Rect(0f, 0f, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
+        AppUsablePane(usablePane) { content { chatSettings = true } }
+        val full = if (pip) Rect(0f, 0f, constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat()) else usablePane
         fun bounds(mode: PlayerPresentation): Rect = when (mode) {
             PlayerPresentation.FULLSCREEN -> if (!docked) full else if (full.width > full.height)
-                Rect(0f, 0f, full.width * (1f - appearance.besideFraction), full.height)
-                else Rect(0f, 0f, full.width, full.height * (1f - appearance.belowFraction))
+                Rect(full.left, full.top, full.left + full.width * (1f - appearance.besideFraction), full.bottom)
+                else Rect(full.left, full.top, full.right, full.top + full.height * (1f - appearance.belowFraction))
             PlayerPresentation.WATCH -> state.watchBounds.takeUnless { it.isEmpty } ?: full
             else -> state.miniBounds.takeUnless { it.isEmpty } ?: Rect(8 * density.density,
                 state.navigationBounds.top - 72 * density.density, 120 * density.density, state.navigationBounds.top - 9 * density.density)
@@ -199,7 +200,7 @@ internal fun PlayerPresentationHost(
             val drag = state.dragHandler(density.density, abs(bounds(PlayerPresentation.MINI).top - bounds(PlayerPresentation.WATCH).top)
                 .coerceAtLeast(160 * density.density), full.width, vm::cancelAccumulatedSeek, close)
             VideoPlayer(vm, playback, controller,
-                Modifier.offset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
+                Modifier.absoluteOffset { IntOffset(rect.left.roundToInt(), rect.top.roundToInt()) }
                     .size(with(density) { rect.width.toDp() }, with(density) { rect.height.toDp() })
                     .clip(RoundedCornerShape(if (pip || state.fullscreen) 0.dp else (8 + 8 * state.watchAlpha).dp)),
                 fullscreen = state.fullscreen, controls = !pip && state.watch, settingsOpen = modal,
@@ -224,7 +225,7 @@ internal fun PlayerPresentationHost(
                 })
             if (chatVisible && replay.open && !state.active && !appearance.overlay && state.fullscreen) {
                     val side = full.width > full.height
-                    ChatReplayPanel(vm, Modifier.offset { IntOffset(if (side) rect.right.roundToInt() else 0, if (side) 0 else rect.bottom.roundToInt()) }
+                    ChatReplayPanel(vm, Modifier.absoluteOffset { IntOffset(if (side) rect.right.roundToInt() else full.left.roundToInt(), if (side) full.top.roundToInt() else rect.bottom.roundToInt()) }
                         .size(with(density) { (if (side) full.width - rect.width else full.width).toDp() },
                             with(density) { (if (side) full.height else full.height - rect.height).toDp() }), { chatSettings = true })
             }

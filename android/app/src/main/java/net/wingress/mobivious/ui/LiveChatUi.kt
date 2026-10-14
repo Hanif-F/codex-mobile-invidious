@@ -1,10 +1,14 @@
 package net.wingress.mobivious.ui
 
+import kotlinx.coroutines.launch
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -16,13 +20,12 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
@@ -39,9 +42,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.launch
 import net.wingress.mobivious.data.*
 import org.json.JSONObject
 import kotlin.math.roundToInt
@@ -134,26 +135,26 @@ import kotlin.math.roundToInt
             if (!compact) Text("Chat replay", Modifier.weight(1f).semantics { heading() },
                 style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Box {
-                GlassInsetIconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
+                AppInsetIconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
                     Icon(Icons.Default.MoreVert, "Chat menu")
                 }
-                GlassDropdownMenu(expanded = menu, dismiss = { menu = false }) {
-                    GlassMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
+                AppDropdownMenu(expanded = menu, dismiss = { menu = false }) {
+                    DropdownMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
                         onClick = { menu = false; settings() }, modifier = Modifier.testTag("chat-settings"))
-                    if (adjustOverlay != null) GlassMenuItem(text = { Text("Adjust overlay") },
+                    if (adjustOverlay != null) DropdownMenuItem(text = { Text("Adjust overlay") },
                         leadingIcon = { Icon(Icons.Default.OpenInFull, null) }, onClick = { menu = false; adjustOverlay() },
                         modifier = Modifier.testTag("chat-overlay-edit"))
-                    GlassMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
+                    DropdownMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
                         onClick = { menu = false; close() }, modifier = Modifier.testTag("chat-menu-close"))
                 }
             }
-            if (!compact) GlassInsetIconButton(onClick = close, modifier = Modifier.size(48.dp).testTag("chat-close")) {
+            if (!compact) AppInsetIconButton(onClick = close, modifier = Modifier.size(48.dp).testTag("chat-close")) {
                 Icon(Icons.Default.Close, "Close chat replay")
             }
         }
     }
     }
-    if (watchStyle) GlassSurface(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), shape = Liquid.card) { header() }
+    if (watchStyle) AppSurface(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), shape = AppTokens.card) { header() }
     else Box(Modifier.background(MaterialTheme.colorScheme.surfaceContainer)) { header() }
 }
 
@@ -175,8 +176,11 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
     val editorContext = remember(editor) { vm.api.context() }
     var editing by editor.editing
     var draft by editor.draft
+    var geometrySaving by remember(editor) { mutableStateOf(false) }
+    var geometryError by remember(editor) { mutableStateOf<String?>(null) }
+    val geometryScope = rememberCoroutineScope()
     val currentDraft by rememberUpdatedState(draft)
-    BackHandler(editing) { editing = false }
+    BackHandler(editing && !geometrySaving) { editing = false }
     BoxWithConstraints(modifier) {
         val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
         val heightPx = constraints.maxHeight.toFloat().coerceAtLeast(1f)
@@ -215,16 +219,25 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
         }
         ChatReplayPanel(vm, geometry.testTag("chat-overlay").border(if (editing) 2.dp else 1.dp,
             if (editing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp)),
-            settings, overlay = true, adjustOverlay = { draft = clamp(appearance); editing = true },
+            settings, overlay = true, adjustOverlay = { geometryError=null; draft = clamp(appearance); editing = true },
             editorHeader = if (editing) ({
-                BoxWithConstraints(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
+                Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)) {
+                geometryError?.let { Text(it,Modifier.padding(8.dp),color=MaterialTheme.colorScheme.error) }
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val narrow = maxWidth < 144.dp
                     @Composable fun controls() {
-                        GlassInsetIconButton(onClick = { editing = false }, modifier = Modifier.size(48.dp).testTag("chat-overlay-cancel")) {
+                        AppInsetIconButton(onClick = { editing = false }, enabled = !geometrySaving, modifier = Modifier.size(48.dp).testTag("chat-overlay-cancel")) {
                             Icon(Icons.Default.Close, "Cancel overlay adjustment")
                         }
-                        GlassInsetIconButton(onClick = { if (vm.setChatAppearance(clamp(draft), editorContext)) editing = false },
-                            modifier = Modifier.size(48.dp).testTag("chat-overlay-save")) { Icon(Icons.Default.Check, "Done adjusting overlay") }
+                        AppInsetIconButton(onClick = {
+                            val submitted = clamp(draft); geometrySaving=true; geometryError=null
+                            geometryScope.launch {
+                                try { vm.saveChatGeometry(submitted,editorContext); editing=false }
+                                catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                                catch (e: Exception) { geometryError=e.message ?: "Could not save the overlay. Try Done again." }
+                                finally { geometrySaving=false }
+                            }
+                        }, enabled = !geometrySaving, modifier = Modifier.size(48.dp).testTag("chat-overlay-save")) { Icon(Icons.Default.Check, "Done adjusting overlay") }
                     }
                     if (narrow) Column {
                         Box(move.fillMaxWidth().height(48.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.DragIndicator, null) }
@@ -233,6 +246,7 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                         Box(move.weight(1f).height(48.dp), contentAlignment = Alignment.Center) { Icon(Icons.Default.DragIndicator, null) }
                         controls()
                     }
+                }
                 }
             }) else null,
             editorFooter = if (editing) ({
@@ -247,53 +261,32 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable internal fun ChatSettings(vm: AppViewModel, dismiss: () -> Unit) {
     val state by vm.chatReplay.collectAsStateWithLifecycle()
-    val appearance by vm.chatAppearance.collectAsStateWithLifecycle()
+    val savedAppearance by vm.chatAppearance.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val ctx = vm.api.context()
-    val scope = rememberCoroutineScope()
-    var before by remember(state.occurrence, ctx) { mutableStateOf(prefs.chat) }
-    var timestamps by rememberSaveable(state.occurrence, ctx) { mutableStateOf(prefs.chat.timestamps) }
-    var users by rememberSaveable(state.occurrence, ctx) { mutableStateOf(prefs.chat.users) }
-    var words by rememberSaveable(state.occurrence, ctx) { mutableStateOf(prefs.chat.words) }
-    var timing by rememberSaveable(state.occurrence, ctx) { mutableStateOf((state.timingOffsetMs / 1000.0).toString()) }
-    var beforeTiming by rememberSaveable(state.occurrence, ctx) { mutableIntStateOf(state.timingOffsetMs) }
-    var error by rememberSaveable { mutableStateOf<String?>(null) }
-    var saving by remember { mutableStateOf(false) }
-    LaunchedEffect(prefs.chat) {
-        // A delayed account read updates untouched fields while keeping the user's draft.
-        if (timestamps == before.timestamps) timestamps = prefs.chat.timestamps
-        if (users == before.users) users = prefs.chat.users
-        if (words == before.words) words = prefs.chat.words
-        before = prefs.chat
+    val edits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
+    val appearance = remember(savedAppearance, edits) { vm.requestedChatAppearance() }
+    val filterEdit=edits["chat_filters"]
+    val timestampEdit=edits["chat_timestamps"]
+    val filters=remember(prefs.chat,edits) {
+        val json=prefs.chat.json()
+        listOf("chat_filters","chat_timestamps").forEach { key -> edits[key]?.let { edit ->
+            val patch=org.json.JSONObject(edit.requested);patch.keys().forEach { json.put(it,patch.get(it)) }
+        } }
+        ChatPreferences.parse(json)
     }
-    LaunchedEffect(state.timingOffsetMs) {
-        if (timing == (beforeTiming / 1000.0).toString()) timing = (state.timingOffsetMs / 1000.0).toString()
-        beforeTiming = state.timingOffsetMs
-    }
-    val busy = saving || state.timingSaving
-    fun save() {
-        val offset = timing.toDoubleOrNull()?.takeIf { it.isFinite() && it in -3600.0..3600.0 }?.let { (it * 1000).roundToInt() }
-        if (offset == null) { error = "Enter a chat delay between −3600 and 3600 seconds."; return }
-        val value = ChatPreferences(timestamps, users, words)
-        try { ChatFilters.validateChanges(value, before) } catch (e: IllegalArgumentException) { error = e.message; return }
-        saving = true; error = null
-        scope.launch {
-            try {
-                vm.saveChatPreferences(value, before, ctx); before = value
-                if (offset != state.timingOffsetMs || state.timingLoading) vm.chatTiming(offset)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error = e.message ?: "Chat settings could not be saved." }
-            finally { saving = false }
-        }
-    }
-    LibraryPanel("Chat settings", dismiss, enabled = !busy, closeLabel = "Close chat settings") { body, top ->
+    val delayKey="chat_delay:${state.videoId}"
+    val delayEdit=edits[delayKey]
+    val timing=delayEdit?.let { org.json.JSONObject(it.requested).optString("text") } ?: (state.timingOffsetMs/1000.0).toString()
+    DisposableEffect(ctx,state.occurrence) { onDispose { vm.leavePreferencePage("Chat settings") } }
+    LibraryPanel("Chat settings", dismiss, closeLabel = "Close chat settings") { body, top ->
         Column(body.testTag("chat-settings-sheet")) {
             LazyColumn(Modifier.weight(1f).testTag("chat-settings-list"),
-                contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset, top = top + 8.dp, bottom = 16.dp),
+                contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top + 8.dp, bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { GlassSection {
+                item { AppSection {
                     Text("Chat layout", style = MaterialTheme.typography.labelLarge)
-                    LibraryControlScene { LiquidSegments(listOf(false, true), appearance.overlay,
+                    Box { AppSegments(listOf(false, true), appearance.overlay,
                         { if (it) "Overlay" else "Docked" }, Modifier.fillMaxWidth(),
                         tag = { "chat-layout-${if (it) "overlay" else "docked"}" }) { vm.setChatAppearance(appearance.copy(overlay = it), ctx) } }
                     Text("Appearance saves automatically.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -311,32 +304,42 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
                 run { ChatSwitch("Show channel IDs", "chat-channel-ids", !appearance.hideUserIds) {
                     vm.setChatAppearance(appearance.copy(hideUserIds = !it), ctx) } }
                 } }
-                item { GlassSection {
-                run { ChatSwitch("Show timestamps", "chat-timestamps", timestamps, enabled = !busy) { timestamps = it; error = null } }
-                run { OutlinedTextField(users, { users = it; error = null }, label = { Text("Blocked users") },
-                    supportingText = { Text("Channel IDs or @handles, separated by spaces.") }, enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("chat-users")) }
-                run { OutlinedTextField(words, { words = it; error = null }, label = { Text("Blocked words") },
-                    supportingText = { Text("For example: spam /pattern/. Separate entries with spaces.") }, enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("chat-words")) }
+                item { AppSection {
+                run { ChatSwitch("Show timestamps","chat-timestamps",filters.timestamps) {
+                    vm.requestChatPreferences(filters.copy(timestamps=it),before=filters,context=ctx)
                 } }
-                item { GlassSection {
-                run { OutlinedTextField(timing, { timing = it; error = null }, label = { Text("Chat delay (seconds)") }, singleLine = true,
-                    supportingText = { Text("Positive values show messages later; negative values show them earlier.") }, enabled = !busy,
-                    modifier = Modifier.fillMaxWidth().testTag("chat-timing")) }
+                PreferenceSaveFeedback(timestampEdit?.status,timestampEdit?.error,{vm.preferenceSaves.retry("chat_timestamps")},{vm.preferenceSaves.revert("chat_timestamps")})
+                OutlinedTextField(filters.users,{vm.requestChatPreferences(filters.copy(users=it),before=filters,debounce=true,context=ctx)},
+                    label={Text("Blocked users")},supportingText={Text("Channel IDs or @handles, separated by spaces.")},
+                    isError=filterEdit?.status==PreferenceSaveStatus.INVALID,
+                    keyboardOptions=KeyboardOptions(imeAction=androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions=androidx.compose.foundation.text.KeyboardActions(onDone={vm.preferenceSaves.flush("chat_filters")}),
+                    modifier=Modifier.fillMaxWidth().testTag("chat-users").onFocusChanged { if(!it.isFocused) vm.preferenceSaves.flush("chat_filters") })
+                OutlinedTextField(filters.words,{vm.requestChatPreferences(filters.copy(words=it),before=filters,debounce=true,context=ctx)},
+                    label={Text("Blocked words")},supportingText={Text("For example: spam /pattern/. Separate entries with spaces.")},
+                    isError=filterEdit?.status==PreferenceSaveStatus.INVALID,
+                    keyboardOptions=KeyboardOptions(imeAction=androidx.compose.ui.text.input.ImeAction.Done),
+                    keyboardActions=androidx.compose.foundation.text.KeyboardActions(onDone={vm.preferenceSaves.flush("chat_filters")}),
+                    modifier=Modifier.fillMaxWidth().testTag("chat-words").onFocusChanged { if(!it.isFocused) vm.preferenceSaves.flush("chat_filters") })
+                PreferenceSaveFeedback(filterEdit?.status,filterEdit?.error,{vm.preferenceSaves.retry("chat_filters")},{vm.preferenceSaves.revert("chat_filters")})
+                } }
+                item { AppSection {
+                    OutlinedTextField(timing,{vm.requestChatTiming(it,videoId=state.videoId,context=ctx)},label={Text("Chat delay (seconds)")},singleLine=true,
+                        supportingText={Text(if(state.open || delayEdit!=null) "Positive values show messages later; negative values show them earlier." else "Open chat replay to adjust this video’s delay.")},
+                        enabled=state.videoId.isNotBlank() && (state.open || delayEdit!=null),
+                        isError=delayEdit?.status==PreferenceSaveStatus.INVALID,
+                        keyboardOptions=KeyboardOptions(imeAction=androidx.compose.ui.text.input.ImeAction.Done,keyboardType=KeyboardType.Decimal),
+                        keyboardActions=androidx.compose.foundation.text.KeyboardActions(onDone={vm.preferenceSaves.flush(delayKey)}),
+                        modifier=Modifier.fillMaxWidth().testTag("chat-timing").onFocusChanged { if(!it.isFocused) vm.preferenceSaves.flush(delayKey) })
+                    PreferenceSaveFeedback(delayEdit?.status,delayEdit?.error,{vm.preferenceSaves.retry(delayKey)},{vm.preferenceSaves.revert(delayKey)})
+                    state.timingError?.let { Text(it,color=MaterialTheme.colorScheme.error)
+                        TextButton(vm::retryChatTiming) {Text("Retry delay sync")} }
+                } }
+                edits.values.filter { it.key.startsWith("profile:chat.") }.forEach { edit -> item(key = edit.key) {
+                    Text("Chat ${edit.key.substringAfter("profile:chat.")}", style = MaterialTheme.typography.labelLarge)
+                    PreferenceSaveFeedback(edit.status,edit.error,{vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)})
                 } }
                 state.filterWarning?.let { warning -> item { Text(warning, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) } }
-            }
-            HorizontalDivider()
-            Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("chat-settings-footer")) {
-                state.timingError?.let { message ->
-                    Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    TextButton(onClick = vm::retryChatTiming, enabled = !busy, modifier = Modifier.testTag("chat-timing-retry")) { Text("Retry delay sync") }
-                }
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("chat-settings-error")) }
-                Text("Save timestamps, blocked users and words, and chat delay.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                LibraryControlScene { LibraryActionButton(if (busy) "Saving…" else "Save", Modifier.fillMaxWidth().testTag("chat-settings-save"),
-                    enabled = !busy, prominent = true, onClick = ::save) }
             }
         }
     }
@@ -355,6 +358,8 @@ internal class ChatOverlayEditor(appearance: ChatAppearance, adjusting: Boolean 
             Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
             Text(display, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        Slider(value.coerceIn(range), change, valueRange = range, modifier = Modifier.testTag(tag).semantics { contentDescription = label })
+        var requested by remember(value) { mutableFloatStateOf(value) }
+        Slider(requested.coerceIn(range),{requested=it},onValueChangeFinished={change(requested)},
+            valueRange=range,modifier=Modifier.testTag(tag).semantics {contentDescription=label})
     }
 }

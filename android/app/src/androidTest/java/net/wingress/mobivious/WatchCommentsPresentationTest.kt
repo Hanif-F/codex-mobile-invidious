@@ -21,7 +21,7 @@ import org.junit.runner.RunWith
 class WatchCommentsPresentationTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun floatingGlassLeavesFirstCommentReadableAndKeepsSortAndRepliesWorking() {
+    @Test fun opaquePanelLeavesFirstCommentReadableAndKeepsSortAndRepliesWorking() {
         val dark = mutableStateOf(false)
         val opaque = mutableStateOf(false)
         val scale = mutableFloatStateOf(1f)
@@ -30,7 +30,7 @@ class WatchCommentsPresentationTest {
         val items = (0..19).map { Comment("Studio $it", "A readable comment.", "Today", 12,
             id = "$it", replyCount = 2, replyContinuation = "replies:$it") }
         compose.setContent {
-            MaterialTheme(colorScheme = if (dark.value) Liquid.dark else Liquid.light, typography = Liquid.typography) {
+            MaterialTheme(colorScheme = if (dark.value) AppTokens.dark else AppTokens.light, typography = AppTokens.typography) {
                 CompositionLocalProvider(LocalReduceTransparency provides opaque.value,
                     LocalDensity provides Density(LocalDensity.current.density, scale.floatValue)) {
                     CommentsPanel(CommentsState(target = CommentTarget.Video("abcdefghijk"), open = true,

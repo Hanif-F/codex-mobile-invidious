@@ -51,11 +51,12 @@ class HomeSubscriptionsSmokeTest {
         until { activity.model.account.value != null && activity.model.subscriptionChannels.value.loaded && activity.model.dearrowIdentity.value != null }
     }
     private fun subscriptions() {
-        compose.onNodeWithTag("navigation-Subscriptions").performClick()
+        compose.selectFeed("Subscriptions")
         until { activity.model.route.isEmpty() && activity.model.tab == "Subscriptions" && !activity.model.browse.value.loading }
     }
     private fun directory() {
-        compose.onNodeWithTag("subscription-channels-button").performClick()
+        val tag = if(compose.onAllNodesWithTag("subscription-channels-shortcut").fetchSemanticsNodes().isNotEmpty()) "subscription-channels-shortcut" else "subscription-channels-button"
+        compose.onNodeWithTag(tag).performClick()
         until { activity.model.route == "subscription-channels" && !activity.model.subscriptionChannels.value.loading }
     }
     private fun back() {
@@ -86,24 +87,24 @@ class HomeSubscriptionsSmokeTest {
             activity.model.refreshSharedSettings(); activity.model.openDefaultHome()
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.firstOrNull()?.title == "trending discovery fixture" }
-        compose.onNodeWithTag("discover-Trending").assertIsSelected()
+        compose.onNodeWithTag("navigation-Trending").assertIsSelected()
         command("""{"discoveryDelayNext":1800}""")
-        compose.selectDiscoveryFeed("Popular")
-        compose.onNodeWithTag("discover-Popular").assertIsSelected()
-        compose.onNodeWithTag("discover-Trending").assertIsNotSelected()
+        compose.selectFeed("Popular")
+        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        compose.onNodeWithTag("navigation-Trending").assertIsNotSelected()
         until { fixture().getJSONArray("discoveryRequests").let { array -> (0 until array.length()).any { !array.getJSONObject(it).getBoolean("completed") } } }
         assertTrue(activity.model.browse.value.loading)
-        compose.selectDiscoveryFeed("Trending")
+        compose.selectFeed("Trending")
         until { !activity.model.browse.value.loading }
-        compose.onNodeWithTag("discover-Trending").assertIsSelected()
+        compose.onNodeWithTag("navigation-Trending").assertIsSelected()
         until { fixture().getJSONArray("discoveryRequests").let { array -> (0 until array.length()).all { array.getJSONObject(it).getBoolean("completed") } } }
         assertEquals("trending discovery fixture", activity.model.browse.value.videos.single().title)
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         until { !activity.model.browse.value.loading }
         compose.onNodeWithContentDescription("Search").performClick()
-        compose.selectDiscoveryFeed("Popular")
-        compose.onNodeWithTag("discover-Popular").assertIsSelected()
-        recreate(); compose.onNodeWithTag("discover-Popular").assertIsSelected()
+        compose.selectFeed("Popular")
+        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        recreate(); compose.onNodeWithTag("navigation-Popular").assertIsSelected()
         screenshot("home-selection")
     }
 
@@ -114,7 +115,8 @@ class HomeSubscriptionsSmokeTest {
         command("""{"indicatorVideos":true}""", "watched")
         login(); subscriptions()
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Live indicator fixture"))
-        compose.onNodeWithTag("subscription-channels-button").assertIsDisplayed()
+        compose.waitForIdle()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
         directory()
         compose.onNodeWithText("Channel 00").assertIsDisplayed()
         val requests = fixture().getJSONArray("subscriptionRequests").length()
@@ -139,8 +141,11 @@ class HomeSubscriptionsSmokeTest {
         compose.onNodeWithText("Channel 00").assertIsDisplayed()
         screenshot("channel-directory")
         compose.navigateBack()
-        compose.onNodeWithTag("subscription-channels-button").assertIsDisplayed()
-        compose.onNodeWithTag("subscription-search").assertExists()
+        compose.onNodeWithTag("subscription-channels-shortcut").assertIsDisplayed()
+        compose.waitForIdle()
+        compose.onNodeWithText("Live indicator fixture").assertIsDisplayed()
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("subscription-search"))
+        compose.onNodeWithTag("subscription-search").assertIsDisplayed()
     }
 
     @Test fun directoryKeepsChannelsOnRefreshFailureRetriesAndReflectsUnsubscribe() {

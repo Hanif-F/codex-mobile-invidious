@@ -26,7 +26,7 @@ def inventory():
         cwd=ROOT, check=True, capture_output=True,
     )
     return {
-        p for p in result.stdout.decode().split('\0') if p and
+        p for p in result.stdout.decode().split('\0') if p and (ROOT / p).is_file() and
         (p.startswith(('android/', 'scripts/', 'deploy/')) or p in EXTRA)
     }
 
@@ -63,7 +63,10 @@ def source_catalog(files):
         '| Location | Role |', '| --- | --- |',
         '| [README](../../README.md) | Installation, overview and links into the current guides. |',
         '| [Development](../DEVELOPMENT.md) | Prerequisites, wrapper builds, signing, release publishing and upstream maintenance. |',
-        '| [Liquid Glass](../LIQUID_GLASS.md) | Extended design references and presentation rationale. |',
+        '| [UI](../UI.md) | Current opaque Material components, four-root navigation, responsive layouts and player presentation. |',
+        '| [UI overhaul specification](../ui-ux-overhaul-2026-10-13/README.md) | Approved screen contracts, design roles, migration and verification requirements. |',
+        '| [UI implementation evidence](../ui-ux-implementation-2026-10-13/README.md) | Current functional results, accessibility review, performance evidence and open acceptance gates. |',
+        '| [Liquid Glass](../LIQUID_GLASS.md) | Superseded optical design references, retained for historical context. |',
         '| [Overhaul baseline](../liquid-glass-overhaul-2026-10-13/README.md) | Immutable pre-implementation images, provenance and approved brief. |',
         '| [Overhaul implementation](../liquid-glass-implementation-2026-10-13/README.md) | App-wide material changes, emulator acceptance, screenshots, normal-speed recordings and frame timing. |',
         '| [Feature parity](../../FEATURE_PARITY.md) | Dated web/native capability comparison, with exclusions and server requirements. |',

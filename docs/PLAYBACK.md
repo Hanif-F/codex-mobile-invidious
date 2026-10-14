@@ -171,7 +171,7 @@ are purged, and replacement IDs update existing rows. The displayed window holds
 up to 120 messages, with independent Earlier messages/Follow playback behavior.
 Timing reads/writes use their own revisions and errors so a late read cannot undo
 a newly saved delay. [Settings](SETTINGS.md#chat-replay-settings) describes filters
-and appearance; [UI](UI.md#panels-and-accessibility) describes panel visibility.
+and appearance; [UI](UI.md#accessibility-and-verification) describes panel visibility.
 
 ## Gestures, presentation and power
 
@@ -208,6 +208,6 @@ segments are non-fatal. Clips/downloads bypass segment work.
 
 Ambient lighting is UI-owned and does not control playback. It samples a tiny
 frame into nine colors under bounded lifecycle/presentation/power gates; no frame
-is stored in application state or sent to a server. See [UI](UI.md#ambient-mode).
+is stored in application state or sent to a server. See [UI](UI.md#watch-and-ambient-lighting).
 The clip editor uses a separate preview player with carefully scoped lifetime,
 described in [Library](LIBRARY.md#clips).

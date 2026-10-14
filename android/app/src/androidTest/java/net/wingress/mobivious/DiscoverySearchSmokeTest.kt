@@ -49,9 +49,13 @@ class DiscoverySearchSmokeTest {
         command("""{"searchMixed":true,"discoveryCategories":true}""")
     }
     @After fun close() {
-        if (::activity.isInitialized) compose.runOnUiThread {
-            vm.closePlayer(); vm.store.clearVisibilitySnapshot(vm.api.context()); vm.store.save(null)
-            vm.store.clearVisibilitySnapshot(vm.api.context()); activity.finishAndRemoveTask()
+        if (::activity.isInitialized) {
+            compose.runOnUiThread { vm.blocked.value.channels.forEach { vm.toggleBlocked(it.id, it.name) } }
+            until { vm.blocked.value.ids.isEmpty() }
+            compose.runOnUiThread {
+                vm.closePlayer(); vm.store.clearVisibilitySnapshot(vm.api.context()); vm.store.save(null)
+                vm.store.clearVisibilitySnapshot(vm.api.context()); activity.finishAndRemoveTask()
+            }
         }
     }
     private fun back() { compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }; compose.waitForIdle() }
@@ -84,38 +88,38 @@ class DiscoverySearchSmokeTest {
     }
 
     @Test fun trendingControlsSaveGuestRegionCategoryAndRestoreAcrossTabsAndRecreation() {
-        compose.selectDiscoveryFeed("Trending")
+        compose.selectFeed("Trending")
         until { !vm.browse.value.loading && vm.browse.value.videos.firstOrNull()?.title == "trending livestreams US" }
         compose.onNodeWithTag("trending-livestreams").assertIsSelected()
         compose.onNodeWithTag("trending-gaming").performClick()
         until { !vm.browse.value.loading && vm.browse.value.videos.firstOrNull()?.title == "trending gaming US" }
         country("trending-region", "Indonesia", "ID")
-        until { vm.preferences.value.region == "ID" && !vm.browse.value.loading && !vm.trendingRegionBusy.value }
+        until { vm.preferences.value.region == "ID" && !vm.browse.value.loading && vm.preferenceSaves.edits.value["region"] == null }
         assertEquals("trending gaming ID", vm.browse.value.videos.single().title)
         assertEquals("ID", vm.store.guestDeArrow().region)
         assertEquals(TrendingCategory.GAMING, vm.store.trendingCategory(vm.api.context()))
         screenshot("trending-gaming-id")
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         until { !vm.browse.value.loading && vm.tab == "Popular" }
         compose.runOnUiThread { vm.refresh() }; until { !vm.browse.value.loading }
         val popular = discoveries().last { it.getString("kind") == "popular" }
         assertTrue(popular.isNull("region")); assertTrue(popular.isNull("type"))
-        compose.selectDiscoveryFeed("Trending"); until { !vm.browse.value.loading }
+        compose.selectFeed("Trending"); until { !vm.browse.value.loading }
         recreate(); compose.onNodeWithTag("trending-gaming").assertIsSelected()
         assertEquals("trending gaming ID", vm.browse.value.videos.single().title)
     }
 
-    @Test fun settingsCountryPickerKeepsDraftUntilSaveAndCancelDiscardsIt() {
+    @Test fun settingsCountryPickerSavesAutomaticallyAndRetainsConfirmedRegion() {
         fun open() {
             compose.openAppSettings(); compose.onNodeWithText("Browsing").performClick()
             compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("settings-region"))
         }
-        open(); country("settings-region", "Japan", "JP")
-        assertEquals("US", vm.preferences.value.region); assertEquals("US", vm.store.guestDeArrow().region)
-        compose.onNodeWithText("Cancel").performClick(); back()
-        open(); country("settings-region", "JP", "JP"); compose.onNodeWithTag("settings-save").performClick()
+        open();country("settings-region","Japan","JP")
+        until {vm.preferences.value.region=="JP" && vm.store.guestDeArrow().region=="JP"}
+        compose.onNodeWithContentDescription("Back from Browsing").performClick();back()
+        open();country("settings-region","JP","JP");compose.finishAutomaticPreferencePage()
         until { vm.preferences.value.region == "JP" && compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }
-        back(); compose.selectDiscoveryFeed("Trending"); until { !vm.browse.value.loading }
+        back(); compose.selectFeed("Trending"); until { !vm.browse.value.loading }
         assertEquals("trending livestreams JP", vm.browse.value.videos.single().title)
         compose.onNodeWithTag("trending-region").performClick()
         compose.onNodeWithTag("region-search").performTextReplacement("Indonesia")
@@ -129,11 +133,11 @@ class DiscoverySearchSmokeTest {
         compose.runOnUiThread { vm.navigate("Trending") }; until { !vm.browse.value.loading }
         command("""{"failPreferences":true}""")
         country("trending-region", "ID", "ID")
-        until { !vm.trendingRegionBusy.value && vm.trendingRegionError.value != null }
+        until { vm.preferenceSaves.edits.value["region"]?.status == net.wingress.mobivious.ui.PreferenceSaveStatus.FAILED }
         assertEquals("US", vm.preferences.value.region); assertEquals("trending livestreams US", vm.browse.value.videos.single().title)
         compose.onNodeWithTag("trending-region-error").assertExists()
-        command("""{"failPreferences":false}"""); country("trending-region", "ID", "ID")
-        until { vm.preferences.value.region == "ID" && !vm.browse.value.loading && !vm.trendingRegionBusy.value }
+        command("""{"failPreferences":false}"""); compose.onNodeWithText("Retry").performClick()
+        until { vm.preferences.value.region == "ID" && !vm.browse.value.loading && vm.preferenceSaves.edits.value["region"] == null }
         assertEquals("ID", fixture().getJSONObject("preferences").getString("region"))
         assertEquals("preserved", fixture().getJSONObject("preferences").getString("unrelated_setting"))
     }
@@ -173,7 +177,7 @@ class DiscoverySearchSmokeTest {
         assertTrue(channels.isNull("date")); assertTrue(channels.isNull("duration"))
         compose.onNodeWithContentDescription("Search filters").performClick()
         compose.onNodeWithText("Uploaded").assertDoesNotExist(); compose.onNodeWithText("Duration").assertDoesNotExist()
-        compose.onNodeWithContentDescription("Cancel").performClick(); screenshot("channel-search")
+        compose.onNodeWithContentDescription("Close search filters").performClick(); screenshot("channel-search")
         compose.onNodeWithTag("search-type-video").performClick(); until { !vm.browse.value.loading && vm.searchType.value == SearchType.VIDEOS }
         val videos = requests().last(); assertEquals("week", videos.getJSONArray("date").getString(0)); assertEquals("short", videos.getJSONArray("duration").getString(0))
         assertEquals("views", videos.getString("sort"))
@@ -191,7 +195,26 @@ class DiscoverySearchSmokeTest {
         compose.onNodeWithText("Load more").performClick(); until { !vm.browse.value.loading && vm.browse.value.page == 2 }
         compose.onNodeWithTag("related-channel-UC" + "c".repeat(22)).assertExists()
         compose.runOnUiThread { vm.saveSearchVisibility(SearchVisibility(true, true)) }
-        assertEquals(4, vm.visibleSearchResults(vm.browse.value.searchResults).size)
+        until { vm.searchVisibility.value==SearchVisibility(true,true) && !vm.browse.value.loading }
+        compose.waitForIdle() // Let the filter's list-position reset finish before the next user scroll.
+        assertEquals(1,vm.browse.value.page)
+        assertEquals(3,vm.visibleSearchResults(vm.browse.value.searchResults).size)
+        assertEquals("hidden-mixed",vm.query)
+        until { vm.message.value == null } // The temporary block Undo snackbar overlays the last row.
+        compose.onNodeWithTag("browse-video-list").performScrollToNode(hasText("Load more"))
+        val loadMore = compose.onNodeWithText("Load more").assertIsDisplayed()
+        val buttonBounds = loadMore.fetchSemanticsNode().boundsInRoot
+        val listBounds = compose.onNodeWithTag("browse-video-list").fetchSemanticsNode().boundsInRoot
+        val navigation = compose.onNodeWithTag("navigation-Popular").fetchSemanticsNode().boundsInRoot
+        assertTrue("Browse viewport extends behind navigation",listBounds.bottom <= navigation.top + 1f)
+        screenshot("visibility-pagination-before-click")
+        loadMore.performClick()
+        try { until { vm.browse.value.page==2 && !vm.browse.value.loading } }
+        catch (failure: Throwable) {
+            screenshot("visibility-pagination-failure")
+            throw AssertionError("Visibility pagination: button=$buttonBounds, list=$listBounds, tab=${vm.tab}, route=${vm.route}, state=${vm.browse.value}, requests=${requests()}", failure)
+        }
+        assertEquals(4,vm.visibleSearchResults(vm.browse.value.searchResults).size)
         compose.runOnUiThread { vm.toggleBlocked(channel, "Blocked creator") }; until { vm.blocked.value.ids.isEmpty() }
     }
 
@@ -224,13 +247,13 @@ class DiscoverySearchSmokeTest {
     }
 
     @Test fun controlsAndMixedCardsRemainReachableOnCompactDisplays() {
-        compose.selectDiscoveryFeed("Trending"); until { !vm.browse.value.loading }
+        compose.selectFeed("Trending"); until { !vm.browse.value.loading }
         compose.onNodeWithTag("trending-gaming").performClick(); until { !vm.browse.value.loading }
         screenshot("layout-trending")
         compose.onNodeWithTag("trending-region").performClick()
         compose.onNodeWithTag("region-search").performTextReplacement("ID")
         screenshot("layout-picker"); compose.onNodeWithTag("region-ID").performClick()
-        until { !vm.trendingRegionBusy.value && !vm.browse.value.loading }
+        until { vm.preferenceSaves.edits.value["region"] == null && !vm.browse.value.loading }
         search()
         for (tag in listOf("video-card-testvideo01", "related-channel-$channel", "playlist-card-PLlive")) {
             compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag(tag))

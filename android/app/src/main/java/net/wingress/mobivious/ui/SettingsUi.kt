@@ -5,9 +5,10 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,24 +22,37 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import net.wingress.mobivious.BuildConfig
 import net.wingress.mobivious.data.*
-import org.json.JSONObject
 
 internal val LocalSettingsTopInset = staticCompositionLocalOf { 0.dp }
+private val LocalPreferenceFeedback = staticCompositionLocalOf<@Composable (String) -> Unit> { {} }
+private val settingsPreferenceKeys = mapOf(
+    "Color mode" to "dark_mode", "Video list density" to "ui_density", "Hide thumbnails" to "thin_mode",
+    "Autoplay opened videos" to "autoplay", "Next recommendation" to "continue", "Autoplay next video" to "continue_autoplay",
+    "Loop videos by default" to "video_loop", "Audio only by default" to "listen", "Proxy video streams" to "local",
+    "Default speed" to "speed", "Preferred video codec" to "video_codec", "Default quality" to "quality_dash",
+    "Caption priority 1" to "captions", "Caption priority 2" to "captions", "Caption priority 3" to "captions",
+    "Default homepage" to "default_home", "Trending region" to "region", "Show related videos" to "related_videos",
+    "Expand descriptions by default" to "extend_desc", "Show YouTube comments" to "comments",
+    "Show members-only videos" to "show_member_videos", "Videos per page" to "max_results", "Feed sorting" to "sort",
+    "Latest video from each channel" to "latest_only", "Unwatched videos only" to "unseen_only",
+    "Pending notifications only" to "notifications_only", "Watch history" to "watch_history",
+    "Remember playback position" to "save_player_pos", "Default playlist" to "default_playlist",
+    "Replace video titles with DeArrow" to "dearrow_enabled", "Show original titles using the DeArrow icon" to "dearrow_show_original",
+    "Enable AI Channel Filter" to "ai_filter_enabled"
+)
 
 @Composable
-internal fun settingsPadding(horizontal: Dp = Liquid.inset) = PaddingValues(start = horizontal, end = horizontal, top = LocalSettingsTopInset.current + 16.dp, bottom = 32.dp)
+internal fun settingsPadding(horizontal: Dp = AppTokens.inset) = PaddingValues(start = horizontal, end = horizontal, top = LocalSettingsTopInset.current + 16.dp, bottom = 32.dp)
 
 @Composable
 internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -> Unit, back: () -> Unit, signIn: () -> Unit, openChannel: (String) -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
+    val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
     val context = vm.api.context()
     val accountBusy by vm.accountBusy.collectAsStateWithLifecycle()
     var previousContext by remember { mutableStateOf(context) }
@@ -52,36 +66,45 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
         return
     }
     BackHandler { if (!saving && !accountBusy) back() }
-    BrowseGlassSurface(Modifier.fillMaxSize().imePadding(), softEdge = true, toolbar = {
-        LibraryToolbar(page, large = page == "Settings", back = back,
-            backLabel = "Back from $page", backEnabled = !saving && !accountBusy)
+    BrowseAppSurface(Modifier.fillMaxSize().imePadding(), toolbar = {
+        LibraryToolbar(page, back = back, backLabel = "Back from $page", backEnabled = !saving && !accountBusy)
     }) { body, top ->
         Box(body, contentAlignment = Alignment.TopCenter) {
           CompositionLocalProvider(LocalSettingsTopInset provides top) {
-            val content = Modifier.widthIn(max = 800.dp).fillMaxSize()
+            val content = Modifier.widthIn(max = if (page in accountSettingsPages || page == "Server") 600.dp else 800.dp).fillMaxSize()
             key(page, context) {
                 when (page) {
                     "Settings" -> LazyColumn(content.testTag("settings-root"), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (preferenceEdits.isNotEmpty()) item { AppSection(Modifier.testTag("preference-save-status")) {
+                            Text("Preference changes", style = MaterialTheme.typography.titleMedium)
+                            preferenceEdits.values.groupBy { it.page }.forEach { (affected, fields) ->
+                                ActionRow(affected, modifier=Modifier.testTag("preference-status-$affected"), detail=if(fields.any { it.status in listOf(PreferenceSaveStatus.FAILED,PreferenceSaveStatus.INVALID) })
+                                    "Changes need attention" else "Saving…") { navigate(affected) }
+                                fields.filter { it.status in listOf(PreferenceSaveStatus.FAILED,PreferenceSaveStatus.INVALID) }.forEach { edit ->
+                                    PreferenceSaveFeedback(edit.status,edit.error,{vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)})
+                                }
+                            }
+                        } }
                         item { Text(account?.let { "Signed in as ${it.username}" } ?: "Preferences for this device and instance", Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                        item { GlassSection {
+                        item { AppSection {
                             SectionHeading("Your account")
                             SettingsLink("Account", "Sign-in, credentials, sessions and API tokens", Icons.Default.AccountCircle, navigate)
                         } }
-                        item { GlassSection {
+                        item { AppSection {
                             SectionHeading("Preferences")
                             SettingsLink("Playback", "Speed, quality, audio and captions", Icons.Default.PlayCircle, navigate)
-                            SettingsLink("Appearance", "Color mode, background effects and video list layout", Icons.Default.Palette, navigate)
+                            SettingsLink("Appearance", "Color mode, accents, ambient light and video list layout", Icons.Default.Palette, navigate)
                             SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate)
                             SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate)
                             SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate)
                         } }
-                        item { GlassSection {
+                        item { AppSection {
                             SectionHeading("Community tools")
                             SettingsLink("SponsorBlock", "Segment skipping, colors and channel overrides", Icons.Default.SkipNext, navigate)
                             SettingsLink("DeArrow", "Community titles and contribution identity", Icons.Default.Title, navigate)
                             SettingsLink("AI channel filter", "AiSList warnings and video filtering", Icons.Default.FilterAlt, navigate)
                         } }
-                        item { GlassSection {
+                        item { AppSection {
                             SectionHeading("Connection & app")
                             SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate)
                             SettingsLink("About", "Version and community data", Icons.Default.Info, navigate)
@@ -91,7 +114,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                     "About" -> AboutSettingsScreen(content)
                     "Blocked channels" -> BlockedChannelsScreen(vm, content, signIn, openChannel)
                     in accountSettingsPages -> AccountSettingsContent(vm, page, content, navigate, signIn)
-                    else -> PreferenceSettingsScreen(vm, page, prefs, content, back, signIn, navigate) { saving = it }
+                    else -> PreferenceSettingsScreen(vm, page, prefs, content, back, signIn, navigate)
                 }
             }
           }
@@ -105,42 +128,45 @@ private fun SettingsLink(title: String, detail: String, icon: ImageVector, navig
 }
 
 @Composable
-private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: AccountPreferences, modifier: Modifier, back: () -> Unit, signIn: () -> Unit, navigate: (String) -> Unit, onBusy: (Boolean) -> Unit) {
+private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: AccountPreferences, modifier: Modifier, back: () -> Unit, signIn: () -> Unit, navigate: (String) -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val context = remember { vm.api.context() }
-    var baseline by rememberSaveable { mutableStateOf(prefs.json().toString()) }
-    var draft by rememberSaveable { mutableStateOf(baseline) }
-    var busy by remember { mutableStateOf(false) }
-    var error by rememberSaveable { mutableStateOf<String?>(null) }
-    var background by rememberSaveable { mutableStateOf(vm.store.background) }
-    var pip by rememberSaveable { mutableStateOf(vm.store.pip) }
+    val edits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
+    val busy = false
+    val background = vm.localPreferenceValue("profile:background",vm.store.background) as Boolean
+    val pip = vm.localPreferenceValue("profile:pip",vm.store.pip) as Boolean
     val scope = rememberCoroutineScope()
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     LaunchedEffect(page, context) { if (page == "AI channel filter") vm.aiFilter.refreshStatus() }
-    val value = AccountPreferences.parse(JSONObject(draft))
-    val edited = draft != baseline
-    LaunchedEffect(prefs) { if (draft == baseline && !busy) { baseline = prefs.json().toString(); draft = baseline } }
-    fun update(next: AccountPreferences) { draft = next.json().toString(); error = null }
-    val accountOnly = page == "Subscriptions"
-    val valid = (!accountOnly || account != null) && (page != "Browsing" || Regex("[A-Z]{2}").matches(value.region)) && (page != "Subscriptions" || value.maxResults in 1..1500)
-    val density = LocalDensity.current
-    var footerHeight by remember { mutableStateOf(100.dp) }
+    DisposableEffect(page, context) { onDispose { vm.leavePreferencePage(page) } }
+    val value = remember(prefs, edits) { vm.preferenceValues() }
+    fun update(next: AccountPreferences) { vm.requestPreferences(next, value, page, context) }
+    CompositionLocalProvider(LocalPreferenceFeedback provides { label ->
+        val key = when(label) {
+            "Background playback" -> "profile:background"; "Picture in picture" -> "profile:pip"
+            "Ambient mode" -> "device:ambient"; "Reduce transparency" -> "device:reduceTransparency"
+            else -> settingsPreferenceKeys[label]
+        }
+        val edit = edits[key]
+        if (edit != null) PreferenceSaveFeedback(edit.status, edit.error,
+            { vm.preferenceSaves.retry(edit.key) }, { vm.preferenceSaves.revert(edit.key) })
+    }) {
     Box(modifier.fillMaxSize().testTag("settings-category")) {
-        LazyColumn(Modifier.fillMaxSize().padding(bottom = footerHeight).testTag("settings-list"), contentPadding = PaddingValues(start = Liquid.inset, end = Liquid.inset,
+        LazyColumn(Modifier.fillMaxSize().testTag("settings-list"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset,
             top = LocalSettingsTopInset.current + 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { GlassSection { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            item { AppSection { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             when (page) {
                 "AI channel filter" -> {
-                    item { GlassSection {
+                    item { AppSection {
                         Column(Modifier.testTag("ai-filter-master")) {
                             SettingsToggle("Enable AI Channel Filter", "Pause filtering and warnings without clearing your choices", value.aiFilter.enabled, !busy) { update(value.copy(aiFilter = value.aiFilter.copy(enabled = it))) }
                         }
-                        if (!value.aiFilter.enabled) Text("Filtering is paused. Edit the actions, then enable the filter and Save to apply them.", style = MaterialTheme.typography.bodySmall)
+                        if (!value.aiFilter.enabled) Text("Filtering is paused. Edit the actions, then enable the filter to apply them.", style = MaterialTheme.typography.bodySmall)
                         Text("AiSList is a community classification of channels. Blocklist means high confidence; Warnlist means moderate confidence. Classifications may be incorrect. Invidious does not perform automatic AI detection.", style = MaterialTheme.typography.bodySmall)
                         aiState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("ai-status-error")) }
                     } }
-                    AiPageGroup.entries.forEach { group -> item { GlassSection {
+                    AiPageGroup.entries.forEach { group -> item { AppSection {
                         SettingsHeading(group.label)
                         Text(when (group) {
                             AiPageGroup.FEEDS -> "Videos in Popular and Trending."
@@ -152,13 +178,16 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                             Box(Modifier.testTag("ai-choice-${kind.wire}-${group.wire}")) {
                                 SettingsChoice(kind.label, AiAction.entries.filter { group != AiPageGroup.OTHER || it != AiAction.HIDE }.map { it.wire to it.label },
                                     value.aiFilter.saved(kind, group).wire, !busy) { update(value.copy(aiFilter = value.aiFilter.withAction(kind, group, AiAction.parse(it, group)))) }
+                                val actionEdit=edits["ai_${kind.wire}_${group.wire}_action"]
+                                PreferenceSaveFeedback(actionEdit?.status,actionEdit?.error,
+                                    {actionEdit?.let {vm.preferenceSaves.retry(it.key)}},{actionEdit?.let {vm.preferenceSaves.revert(it.key)}})
                             }
                         }
                     } } }
-                    item { GlassSection { AiListDetails(aiState) { scope.launch { vm.aiFilter.refreshStatus() } } } }
+                    item { AppSection { AiListDetails(aiState) { scope.launch { vm.aiFilter.refreshStatus() } } } }
                 }
                 "Playback" -> {
-                    item { GlassSection {
+                    item { AppSection {
                         SettingsHeading("Playback defaults")
                         SettingsToggle("Autoplay opened videos", "Start playing when you open a video", value.autoplay, !busy) { update(value.copy(autoplay = it)) }
                         SettingsToggle("Next recommendation", "Select the next eligible recommendation when a standalone video ends", value.continueNext, !busy) { update(value.copy(continueNext = it)) }
@@ -171,13 +200,13 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash, !busy) { update(value.copy(qualityDash = it)) }
                         Text("Playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
                     } }
-                    item { GlassSection {
+                    item { AppSection {
                         SettingsHeading("On this device")
-                        SettingsToggle("Background playback", "Keep playing when the app is in the background", background, !busy) { if (vm.setBackground(it, context)) background = it }
-                        SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip, !busy) { if (vm.setPip(it, context)) pip = it }
+                        SettingsToggle("Background playback", "Keep playing when the app is in the background", background, !busy) { vm.setBackground(it, context) }
+                        SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip, !busy) { vm.setPip(it, context) }
                         Text("These two options save immediately for this account or guest on this device.", style = MaterialTheme.typography.bodySmall)
                     } }
-                    item { GlassSection {
+                    item { AppSection {
                         SettingsHeading("Caption language priority")
                         Text("Use the first available language. Set all priorities to None to start with captions off.", style = MaterialTheme.typography.bodySmall)
                         repeat(3) { index ->
@@ -188,36 +217,46 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         }
                     } }
                 }
-                "Appearance" -> item { GlassSection {
+                "Appearance" -> item { AppSection {
                     SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode, !busy) { update(value.copy(darkMode = it)) }
-                    val coloredBackgrounds by vm.store.coloredBackgrounds.collectAsStateWithLifecycle()
-                    val adaptiveControlColors by vm.store.adaptiveControlColors.collectAsStateWithLifecycle()
-                    SettingsToggle("Colored backgrounds", "Add colored gradients behind app pages. Saves on this device immediately.",
-                        coloredBackgrounds, true) { vm.store.coloredBackgrounds(it) }
-                    SettingsToggle("Adaptive control colors", "Let glass controls switch between light and dark to suit the backdrop. When off, controls follow Color mode. Saves on this device immediately.",
-                        adaptiveControlColors, true) { vm.store.adaptiveControlColors(it) }
-                    val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
-                    val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
+                    val savedAccent by vm.store.accentPreset.collectAsStateWithLifecycle()
+                    val accent = AccentPreset.saved(vm.localPreferenceValue("device:accent",savedAccent.id) as String)
+                    Text("Accent", style = MaterialTheme.typography.titleMedium)
+                    AccentPreset.entries.forEach { preset ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                            .selectable(accent == preset, role = Role.RadioButton, onClick = { vm.requestLocalPreference("device:accent","Appearance",savedAccent.id,preset.id) })
+                            .testTag("accent-${preset.id}"), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.padding(12.dp).size(24.dp).background(androidx.compose.ui.graphics.Color(preset.light[0]), androidx.compose.foundation.shape.CircleShape))
+                            Text(preset.label, Modifier.weight(1f))
+                            RadioButton(accent == preset, null)
+                        }
+                    }
+                    edits["device:accent"]?.let { edit -> PreferenceSaveFeedback(edit.status,edit.error,{vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)}) }
+                    val savedAmbient by vm.store.ambientMode.collectAsStateWithLifecycle()
+                    val ambientMode = vm.localPreferenceValue("device:ambient",savedAmbient) as Boolean
+                    val savedTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
+                    val reduceTransparency = vm.localPreferenceValue("device:reduceTransparency",savedTransparency) as Boolean
                     SettingsToggle("Ambient mode", if (reduceTransparency) "Paused while Reduce transparency is on. Your choice is saved on this device."
                         else "Let video colors illuminate the expanded watch view. Saves on this device immediately.",
-                        ambientMode, true) { vm.store.ambientMode(it) }
+                        ambientMode, true) { vm.requestAmbientMode(it) }
                     SettingsChoice("Video list density", listOf("balanced" to "Comfortable", "compact" to "Compact"), value.uiDensity, !busy) { update(value.copy(uiDensity = it)) }
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode, !busy) { update(value.copy(thinMode = it)) }
                     SettingsHeading("Accessibility")
-                    SettingsToggle("Reduce transparency", "Use solid controls for stronger contrast. Saves on this device immediately.", reduceTransparency, !busy) { vm.store.reduceTransparency(it) }
+                    SettingsToggle("Reduce transparency", "Suppress optional ambient lighting. The interface already uses solid surfaces. Saves on this device immediately.", reduceTransparency, !busy) { vm.requestLocalPreference("device:reduceTransparency","Appearance",savedTransparency,it) }
                 } }
                 "Browsing" -> {
-                    item { GlassSection {
+                    item { AppSection {
                         SettingsToggle("Show members-only videos", "Include members-only content in video lists. This does not grant membership access.", value.showMemberVideos, !busy) { update(value.copy(showMemberVideos = it)) }
                         SettingsLink("Blocked channels", "Manage channels hidden from discovery and recommendations", Icons.Default.Block, navigate)
                     } }
-                    item { GlassSection {
+                    item { AppSection {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
                         SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
-                        Text("Choose where the app opens. Popular and Trending live in Discover; Subscriptions and You remain in navigation. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
+                        Text("Choose where the app opens. Popular, Trending, Subscriptions and You have independent destinations. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
                         RegionChoice(value.region, !busy, "settings-region") { update(value.copy(region = it)) }
+                        LocalPreferenceFeedback.current("Trending region")
                     } }
-                    item { GlassSection {
+                    item { AppSection {
                         SettingsHeading("Video pages")
                         SettingsToggle("Show related videos", "Display recommendations below the video", value.relatedVideos, !busy) { update(value.copy(relatedVideos = it)) }
                         SettingsToggle("Expand descriptions by default", "Show the full description when opening a video", value.extendDescription, !busy) { update(value.copy(extendDescription = it)) }
@@ -228,8 +267,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     } }
                 }
                 "Subscriptions" -> {
-                    if (account == null) item { GlassSection { LibraryEmptyState("Your subscription feed", "Sign in to change your subscription feed.", Icons.Default.Subscriptions, "Sign in", signIn) } }
-                    else item { GlassSection {
+                    if (account == null) item { AppSection { LibraryEmptyState("Your subscription feed", "Sign in to change your subscription feed.", Icons.Default.Subscriptions, "Sign in", signIn) } }
+                    else item { AppSection {
                         SettingsChoice("Videos per page", (listOf(10, 20, 30, 40, 60, 100, 200, 500, 1000, 1500) + value.maxResults).distinct().sorted().map { it.toString() to it.toString() }, value.maxResults.toString(), !busy) { update(value.copy(maxResults = it.toInt())) }
                         SettingsChoice("Feed sorting", PreferenceRules.feedSorts.zip(listOf("Newest first", "Oldest first", "Title A–Z", "Title Z–A", "Channel A–Z", "Channel Z–A")), value.feedSort, !busy) { update(value.copy(feedSort = it)) }
                         SettingsToggle("Latest video from each channel", "Show one video per subscribed channel", value.latestOnly, !busy) { update(value.copy(latestOnly = it)) }
@@ -238,7 +277,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         Text("This filters the feed; it does not enable Android alerts. Page size also applies to watch history.", style = MaterialTheme.typography.bodySmall)
                     } }
                 }
-                "History & library" -> item { GlassSection {
+                "History & library" -> item { AppSection {
                     if (account != null) SettingsToggle("Watch history", "Record played videos in your shared account history", value.watchHistory, !busy) { update(value.copy(watchHistory = it)) }
                     else Text("Sign in to keep a shared watch history.", style = MaterialTheme.typography.bodyMedium)
                     SettingsToggle("Remember playback position", if (account != null) "Resume across Android and the website" else "Resume videos on this device", value.savePosition, !busy) { update(value.copy(savePosition = it)) }
@@ -248,34 +287,16 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     }
                 } }
                 "DeArrow" -> {
-                    item { GlassSection {
+                    item { AppSection {
                         SettingsToggle("Replace video titles with DeArrow", "Use community titles throughout browsing and playback", value.dearrowEnabled, !busy) { update(value.copy(dearrowEnabled = it)) }
                         SettingsToggle("Show original titles using the DeArrow icon", "Keep original titles available on each video", value.dearrowShowOriginal, !busy) { update(value.copy(dearrowShowOriginal = it)) }
                     } }
-                    if (account != null) item { GlassSection { DeArrowIdentitySettings(vm) } }
-                    item { GlassSection { CommunityDataLinks() } }
+                    if (account != null) item { AppSection { DeArrowIdentitySettings(vm) } }
+                    item { AppSection { CommunityDataLinks() } }
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().testTag("settings-footer")
-            .onSizeChanged { footerHeight = with(density) { it.height.toDp() } }
-            .navigationBarsPadding().padding(horizontal = Liquid.inset, vertical = 12.dp)) {
-            error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp).testTag("settings-save-error")) }
-            LibraryControlScene {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = back, enabled = !busy) { Text("Cancel") }
-                    LibraryActionButton(if (busy) "Saving…" else "Save", Modifier.testTag("settings-save"), enabled = !busy && valid, prominent = true, onClick = {
-                        busy = true; onBusy(true); error = null
-                        scope.launch {
-                            try { vm.savePreferences(value, AccountPreferences.parse(JSONObject(baseline)), context); back() }
-                            catch (e: CancellationException) { throw e }
-                            catch (e: Exception) { error = e.message ?: "Could not save settings. Your changes are still here." }
-                            finally { busy = false; onBusy(false) }
-                        }
-                    })
-                }
-            }
-        }
+    }
     }
 }
 
@@ -307,43 +328,62 @@ private fun AiListDetails(state: AiFilterState, refresh: () -> Unit) {
 @Composable
 private fun SettingsToggle(label: String, detail: String, value: Boolean, enabled: Boolean, update: (Boolean) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
-    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).glassItemFeedback(interaction)
+    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).appItemFeedback(interaction)
         .toggleable(value, interactionSource = interaction, indication = null, enabled = enabled, role = Role.Switch, onValueChange = update).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f).padding(end = 12.dp)) { Text(label, style = MaterialTheme.typography.bodyLarge); Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Switch(value, null, enabled = enabled)
     }
-    HorizontalDivider(color = LocalContentColor.current.copy(alpha = .10f))
+    LocalPreferenceFeedback.current(label)
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 }
 
 @Composable
 private fun SettingsChoice(label: String, choices: List<Pair<String, String>>, selected: String, enabled: Boolean, update: (String) -> Unit) {
-    DropdownChoiceRow(label, choices, selected, enabled = enabled, change = update)
+    Column {
+        DropdownChoiceRow(label, choices, selected, enabled = enabled, change = update)
+        LocalPreferenceFeedback.current(label)
+    }
 }
 
 @Composable
 private fun ServerSettingsScreen(vm: AppViewModel, modifier: Modifier, back: () -> Unit) {
     var address by rememberSaveable { mutableStateOf(vm.store.server) }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
+    var candidate by rememberSaveable {mutableStateOf<String?>(null)}
     LazyColumn(modifier.fillMaxSize().imePadding(), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { GlassSection {
+        item { AppSection {
             Text("Your app and website share the same server and account. Changing servers signs you out.")
             OutlinedTextField(address, { address = it; error = null }, label = { Text("HTTPS address") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri), modifier = Modifier.fillMaxWidth(), isError = error != null)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            LibraryActionButton("Connect", prominent = true) { try { vm.switchServer(InvidiousApi.normalizeServer(address, BuildConfig.DEBUG)); back() } catch (e: Exception) { error = e.message } }
+            LibraryActionButton("Connect", prominent=true) {
+                try {
+                    val normalized=InvidiousApi.normalizeServer(address,BuildConfig.ALLOW_FIXTURE_HTTP)
+                    if(normalized==vm.store.server) back() else candidate=normalized
+                } catch(e: Exception) {error=e.message}
+            }
         } }
     }
+    if(candidate!=null) AlertDialog(tonalElevation=3.dp,onDismissRequest={candidate=null},title={Text("Change server?")},
+        text={Text("Connect to $candidate? This signs you out and closes playback. Unconfirmed preference changes will be discarded. Downloads stay on this device.")},
+        confirmButton={TextButton({
+            val target=candidate ?: return@TextButton
+            try { vm.preferenceSaves.discard();vm.switchServer(target);candidate=null;back() }
+            catch(e: Exception) {candidate=null;error=e.message}
+        }) {Text("Connect")}},dismissButton={TextButton({candidate=null}) {Text("Stay")}},
+        containerColor=MaterialTheme.colorScheme.surfaceContainerHigh)
+
 }
 
 @Composable
 private fun AboutSettingsScreen(modifier: Modifier) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = settingsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        item { GlassSection { Text("Mobivious ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall); Text("Powered by Invidious & Companion", Modifier.padding(top = 8.dp)) } }
-        item { GlassSection { CommunityDataLinks() } }
-        item { GlassSection {
+        item { AppSection { Text("Mobivious ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.headlineSmall); Text("Powered by Invidious & Companion", Modifier.padding(top = 8.dp)) } }
+        item { AppSection { CommunityDataLinks() } }
+        item { AppSection {
             val uri = LocalUriHandler.current
             Text("Open source", style = MaterialTheme.typography.titleMedium)
-            Text("Glass rendering uses Backdrop 1.0.6 by Kyant, licensed under Apache 2.0.", style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { uri.openUri("https://github.com/Kyant0/AndroidLiquidGlass") }) { Text("Backdrop source & license") }
+            Text("Mobivious is open source.", style = MaterialTheme.typography.bodyMedium)
+            TextButton(onClick = { uri.openUri("https://github.com/Hanif-F/codex-mobile-invidious") }) { Text("App source & license") }
         } }
     }
 }

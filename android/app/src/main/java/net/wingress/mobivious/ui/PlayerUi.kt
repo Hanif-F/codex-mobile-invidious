@@ -12,8 +12,6 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
@@ -76,7 +74,7 @@ internal fun VideoPlayer(
     onFullscreen: () -> Unit, onSettings: () -> Unit, onChapters: () -> Unit,
     onChat: (() -> Unit)? = null, onVideoSurfaceChanged: (android.view.SurfaceView?) -> Unit = {},
     pictureOverlay: @Composable BoxScope.() -> Unit = {},
-) = DeferredPlayerGlass {
+) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
@@ -272,19 +270,19 @@ internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -
         Column(Modifier.testTag("sponsorblock-prompt"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Preserve the actions if a very short picture cannot fit the passive confirmation too.
             if (showNotice) {
-                Text(sponsor.notice, Modifier.widthIn(max = 280.dp).mediaGlass(CircleShape)
+                Text(sponsor.notice, Modifier.widthIn(max = 280.dp).playerScrim(CircleShape)
                     .padding(horizontal = 12.dp, vertical = 6.dp).testTag("sponsorblock-notice")
                     .semantics { liveRegion = LiveRegionMode.Polite }, color = Color.White,
                     style = noticeStyle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (active != null) {
-                Row(Modifier.mediaGlass(CircleShape).testTag("sponsorblock-actions"),
+                Row(Modifier.playerScrim(CircleShape).testTag("sponsorblock-actions"),
                     verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { skip(active.id) }, modifier = Modifier.heightIn(min = 48.dp)
                         .testTag("sponsorblock-skip").semantics { contentDescription = "Skip ${active.category.label}" }) {
                         Text("Skip", color = Color.White, maxLines = 1)
                     }
-                    GlassInsetIconButton(onClick = { dismiss(active.id) }, modifier = Modifier.size(48.dp)) {
+                    AppInsetIconButton(onClick = { dismiss(active.id) }, modifier = Modifier.size(48.dp)) {
                         Icon(Icons.Default.Close, "Dismiss SponsorBlock segment", Modifier.size(20.dp), tint = Color.White)
                     }
                 }
@@ -296,7 +294,7 @@ internal fun PlayerSponsorPrompt(sponsor: SponsorBlockPlayback, skip: (String) -
 @Composable
 internal fun PlayerSeekSponsorLabels(labels: List<String>, modifier: Modifier = Modifier) {
     if (labels.isEmpty()) return
-    Text(labels.joinToString(", "), modifier.mediaGlass().padding(horizontal = 10.dp, vertical = 4.dp).testTag("player-seek-sponsor-labels"),
+    Text(labels.joinToString(", "), modifier.playerScrim().padding(horizontal = 10.dp, vertical = 4.dp).testTag("player-seek-sponsor-labels"),
         color = Color.White, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
 }
 
@@ -314,9 +312,11 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) = DeferredPlayerGlass {
+internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
-    val ambientMode by vm.store.ambientMode.collectAsStateWithLifecycle()
+    val savedAmbient by vm.store.ambientMode.collectAsStateWithLifecycle()
+    val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
+    val ambientMode = remember(savedAmbient, preferenceEdits) { vm.localPreferenceValue("device:ambient",savedAmbient) as Boolean }
     val reduceTransparency by vm.store.reduceTransparency.collectAsStateWithLifecycle()
     val formats = playback.details?.formats.orEmpty()
     val video = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_VIDEO, formats)
@@ -334,15 +334,15 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     // Handle system Back in the sheet's dialog before the watch screen's handler.
     fun back() { if (page == "Player settings") dismiss() else page = "Player settings" }
     ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheetState, sheetMaxWidth = 640.dp,
-        containerColor = Color.Transparent) {
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
         BackHandler { back() }
-        WatchGlassScene(Modifier.fillMaxWidth()) {
+        WatchContent(Modifier.fillMaxWidth()) {
           Column(Modifier.fillMaxWidth().heightIn(max = sheetHeight)) {
             WatchPanelToolbar(page, "Close player settings", dismiss, Icons.Default.Settings,
                 backLabel = "Back to player settings", back = if (page != "Player settings") ({ page = "Player settings" }) else null)
             Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
                 .testTag("player-settings-list").padding(horizontal = 12.dp, vertical = 12.dp)) {
-              GlassSection {
+              AppSection {
                 if (page == "Player settings") {
                     run { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
                     run { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
@@ -350,7 +350,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
                     run {
                         Row(Modifier.fillMaxWidth().testTag("player-ambient-mode")
-                            .toggleable(ambientMode, role = Role.Switch, onValueChange = vm.store::ambientMode)
+                            .toggleable(ambientMode, role = Role.Switch, onValueChange = vm::requestAmbientMode)
                             .semantics { contentDescription = "Ambient mode" }.padding(horizontal = 24.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -360,6 +360,8 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                             }
                             Switch(checked = ambientMode, onCheckedChange = null)
                         }
+                        preferenceEdits["device:ambient"]?.let { edit -> PreferenceSaveFeedback(edit.status,edit.error,
+                            {vm.preferenceSaves.retry(edit.key)},{vm.preferenceSaves.revert(edit.key)}) }
                     }
                     run {
                         Row(Modifier.fillMaxWidth().clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {

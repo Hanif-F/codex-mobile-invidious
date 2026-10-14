@@ -25,11 +25,13 @@ class AppSmokeTest {
     @get:Rule val compose = createServiceComposeRule()
     private lateinit var activity: MainActivity
     @Before fun launchActivity() {
+        command("reset")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
+            (activity.application as MobiviousApplication).cache.clear()
             activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences())
             activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
             activity.model.store.guestDeArrow(AccountPreferences()); activity.model.store.pip = true
@@ -78,7 +80,7 @@ class AppSmokeTest {
     private fun openFixture() {
         command("reset")
         compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences()); activity.model.refreshSharedSettings() }
-        waitFor { activity.model.browse.value.videos.isNotEmpty() }
+        waitFor { !activity.model.browse.value.loading && activity.model.browse.value.videos.any { it.title == "A quiet moment · playback fixture" } }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
     }
@@ -280,13 +282,13 @@ class AppSmokeTest {
         command("reset")
         compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080") }
         waitFor { activity.model.browse.value.videos.isNotEmpty() }
-        compose.onNodeWithTag("navigation-You").performClick()
+        compose.selectFeed("You")
         compose.onNodeWithTag("you-sign-in").performClick()
         compose.onNodeWithText("Username").performTextInput("EmulatorViewer")
         compose.onNodeWithText("Password").performTextInput("fixture-password")
         compose.onNodeWithTag("account-auth-submit").performClick()
         waitFor { activity.model.account.value != null }
-        compose.selectDiscoveryFeed("Popular")
+        compose.selectFeed("Popular")
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
         assertNull(activity.model.playback.value.error)
@@ -301,12 +303,12 @@ class AppSmokeTest {
         compose.runOnUiThread { assertEquals(1.5f, activity.model.controller.value!!.playbackParameters.speed) }
         compose.navigateBack()
         compose.onNodeWithContentDescription("Pause").assertExists()
-        compose.onNodeWithTag("navigation-You").performClick()
+        compose.selectFeed("You")
         compose.onNodeWithTag("you-playlists").performClick()
         waitFor { activity.model.route == "playlists" && !activity.model.browse.value.loading }
         compose.onNodeWithTag("playlist-create").performClick()
         compose.onNodeWithText("Title").performTextInput("Emulator playlist")
-        compose.onNodeWithText("Save", useUnmergedTree = true).performClick()
+        compose.onNodeWithText("Create", useUnmergedTree = true).performClick()
         waitFor { activity.model.playlists.value.any { it.title == "Emulator playlist" } }
         compose.onNodeWithText("Emulator playlist").performClick()
         waitFor { activity.model.playlist.value?.title == "Emulator playlist" }

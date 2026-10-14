@@ -17,6 +17,7 @@ android {
         versionCode = 21
         versionName = "0.10.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("boolean", "ALLOW_FIXTURE_HTTP", "false")
     }
     buildFeatures { compose = true; buildConfig = true }
     if (signing.isNotEmpty()) {
@@ -30,16 +31,25 @@ android {
     }
     buildTypes {
         release { isMinifyEnabled = false }
-        debug { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug" }
+        debug { applicationIdSuffix = ".debug"; versionNameSuffix = "-debug"; buildConfigField("boolean", "ALLOW_FIXTURE_HTTP", "true") }
+        create("benchmark") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            applicationIdSuffix = ".benchmark"
+            versionNameSuffix = "-benchmark"
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+            buildConfigField("boolean", "ALLOW_FIXTURE_HTTP", "true")
+        }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 dependencies {
-    implementation("io.github.kyant0:backdrop:1.0.6")
     implementation("com.google.re2j:re2j:1.8")
     implementation(platform("androidx.compose:compose-bom:2026.03.00"))
     implementation("androidx.activity:activity-compose:1.12.3")
+    implementation("androidx.window:window:1.5.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.compose.material3:material3")
@@ -58,6 +68,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20251224")
     testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")

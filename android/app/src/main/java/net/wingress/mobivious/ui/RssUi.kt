@@ -11,10 +11,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
-import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -79,22 +77,22 @@ internal fun RssSheet(vm: AppViewModel) {
         }
     }
     ModalBottomSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = androidx.compose.ui.graphics.Color.Transparent) {
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
         val maxHeight = with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp() * .85f }
-        BrowseGlassSurface(Modifier.fillMaxWidth().height(480.dp.coerceAtMost(maxHeight)).testTag("rss-sheet"), toolbar = {
+        BrowseAppSurface(Modifier.fillMaxWidth().height(480.dp.coerceAtMost(maxHeight)).testTag("rss-sheet"), toolbar = {
             BrowsePanelToolbar(state.title, "Close feed", vm::dismissRss)
         }) { contentModifier, topInset ->
-        Column(contentModifier.verticalScroll(rememberScrollState()).padding(start = Liquid.inset, end = Liquid.inset, top = topInset, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            GlassSection {
+        Column(contentModifier.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset, top = topInset, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            AppSection {
 
             if (state.privateLink) Text("Anyone with this link can read your subscription feed. Share it only when you want to grant that access.")
             if (state.playlist?.let { it.owned && it.privacy == "private" } == true) Text("This exports a snapshot of your private playlist. The file does not update automatically.")
-            if (state.opml) LibraryControlScene {
+            if (state.opml) Box {
                 BrowseTabs(listOf("rss", "newpipe"), state.format,
                     { if (it == "rss") "Invidious feeds" else "YouTube feeds" }, { "feed-format-$it" }, select = vm::openOpml)
             }
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryControlScene { LibraryActionButton("Retry", onClick = vm::retryRss) } }
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); Box { LibraryActionButton("Retry", onClick = vm::retryRss) } }
             if (!state.loading && state.error == null && state.url != null) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 LibraryActionButton("Open", prominent = true, onClick = { external(Intent(Intent.ACTION_VIEW, Uri.parse(state.url))) })
                 LibraryActionButton("Copy", onClick = {

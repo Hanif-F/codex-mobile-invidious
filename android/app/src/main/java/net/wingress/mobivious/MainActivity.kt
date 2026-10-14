@@ -99,6 +99,7 @@ class MainActivity : ComponentActivity() {
     }
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) { super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig); pipMode.value = isInPictureInPictureMode }
     override fun onStop() {
+        model.flushPreferenceEdits()
         super.onStop()
         if (!isChangingConfigurations) model.cancelAccumulatedSeek(isInPictureInPictureMode || model.store.background)
         if (!isChangingConfigurations && !isInPictureInPictureMode && !model.store.background) model.controller.value?.pause()

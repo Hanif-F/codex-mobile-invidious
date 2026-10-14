@@ -1,12 +1,5 @@
 package net.wingress.mobivious.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -35,7 +28,7 @@ import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackService
 
 @Composable
-internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (String) -> Unit) {
+internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (String) -> Unit, fullHeight: Boolean = false) {
     val state by vm.queue.collectAsStateWithLifecycle()
     val expanded by vm.queueExpanded.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
@@ -50,7 +43,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
     val current = state.current?.video
     val currentTitle = current?.let { if (prefs.dearrowEnabled) titles[it.id] ?: it.title else it.title }
     val owned = state.source?.owned == true || lists.any { it.id == state.source?.id && it.owned }
-    PlaybackQueueContent(state, expanded, prefs.showMemberVideos, currentTitle,
+    PlaybackQueueContent(state, expanded || fullHeight, prefs.showMemberVideos, currentTitle, fullHeight = fullHeight,
         toggle = { vm.queueExpanded.value = !vm.queueExpanded.value }, previous = { vm.nextQueue(-1) }, next = { vm.nextQueue(1) },
         repeat = vm::repeatQueue, retry = vm::retryPlayback, more = { vm.queueCommand(PlaybackService.QUEUE_MORE) }) { entry ->
         val indicator = WatchedIndicators.forVideo(entry.video,
@@ -76,7 +69,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
 /** The viewport scrolls independently; following playback never moves the watch page. */
 @Composable
 internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolean, showMembers: Boolean,
-    currentTitle: String? = state.current?.video?.title, toggle: () -> Unit, previous: () -> Unit, next: () -> Unit,
+    currentTitle: String? = state.current?.video?.title, fullHeight: Boolean = false, toggle: () -> Unit, previous: () -> Unit, next: () -> Unit,
     repeat: (QueueRepeat) -> Unit, retry: () -> Unit, more: () -> Unit,
     row: @Composable (QueueOccurrence) -> Unit) {
     if (!state.hasExplicitQueue) return
@@ -86,53 +79,40 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
     LaunchedEffect(state.token, state.currentKey, expanded) {
         if (expanded) visible.indexOfFirst { it.key == state.currentKey }.takeIf { it >= 0 }?.let { list.scrollToItem(it) }
     }
-    GlassSection(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).testTag("playback-queue")) {
-        Column {
-            ActionRow(state.source?.title?.ifBlank { "Playback queue" } ?: "Playback queue",
-                detail = currentTitle?.let { "Now playing · $it" }, icon = Icons.AutoMirrored.Filled.PlaylistPlay,
-                trailingIcon = Icons.Default.ExpandMore,
-                trailingRotation = animateFloatAsState(if (expanded) 180f else 0f, tween(200), label = "queue-chevron").value,
-                actionLabel = if (expanded) "Collapse playback queue" else "Expand playback queue",
-                modifier = Modifier.testTag("playback-queue-header").semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" },
-                onClick = toggle)
-            AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
-                exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
-              Column {
-                HorizontalDivider()
-                Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        GlassInsetIconButton(previous, enabled = !state.loading && (state.currentIndex > 0 ||
-                            (state.current?.sourceIndex ?: 0) > 0 || state.repeat == QueueRepeat.ALL)) {
-                            Icon(Icons.Default.SkipPrevious, "Previous video")
-                        }
-                        GlassInsetIconButton(next, enabled = !state.loading && (QueueRules.successor(state, 1, showMembers) != null ||
-                            !state.sourceComplete || state.repeat == QueueRepeat.ALL)) {
-                            Icon(Icons.Default.SkipNext, "Next video")
-                        }
-                        Text("Repeat", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
-                    }
-                    LibraryControlScene {
-                        BrowseTabs(QueueRepeat.entries, state.repeat, { it.label }, { "queue-repeat-${it.name}" },
-                            available = { it != QueueRepeat.ALL || state.source?.mix != true }, select = repeat)
-                    }
+    Column(Modifier.fillMaxWidth().then(if (fullHeight) Modifier.fillMaxHeight() else Modifier).testTag("playback-queue")) {
+        if (!fullHeight) ActionRow(state.source?.title?.ifBlank { "Playback queue" } ?: "Playback queue",
+            detail = currentTitle?.let { "Now playing · $it" }, icon = Icons.AutoMirrored.Filled.PlaylistPlay,
+            trailingIcon = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+            actionLabel = if (expanded) "Collapse playback queue" else "Open playback queue",
+            modifier = Modifier.testTag("playback-queue-header").semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }, onClick = toggle)
+        if (expanded) {
+            Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                state.source?.title?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
+                currentTitle?.let { Text("Now playing · $it", style = MaterialTheme.typography.bodyMedium) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AppInsetIconButton(previous, enabled = !state.loading && (state.currentIndex > 0 ||
+                        (state.current?.sourceIndex ?: 0) > 0 || state.repeat == QueueRepeat.ALL)) { Icon(Icons.Default.SkipPrevious, "Previous video") }
+                    AppInsetIconButton(next, enabled = !state.loading && (QueueRules.successor(state, 1, showMembers) != null ||
+                        !state.sourceComplete || state.repeat == QueueRepeat.ALL)) { Icon(Icons.Default.SkipNext, "Next video") }
+                    Text("Repeat", Modifier.padding(start = 8.dp), style = MaterialTheme.typography.labelLarge)
                 }
-              }
+                BrowseTabs(QueueRepeat.entries, state.repeat, { it.label }, { "queue-repeat-${it.name}" },
+                    available = { it != QueueRepeat.ALL || state.source?.mix != true }, select = repeat)
             }
-            // Status and recovery remain accessible even if the user collapsed the list.
-            if (state.loading || state.sourceLoading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("queue-loading"))
-            if (state.error != null || state.sourceError != null) Column(Modifier.padding(12.dp)) {
-                state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryActionButton("Retry playback", onClick = retry) }
-                state.sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryActionButton("Retry queue", onClick = more) }
-            }
-            AnimatedVisibility(expanded, enter = expandVertically(tween(200)) + fadeIn(tween(200)),
-                exit = shrinkVertically(tween(200)) + fadeOut(tween(200))) {
-              Column {
-                if (visible.isEmpty() && !state.loading && !state.sourceLoading) Text("Your queue is empty. Add a video using its actions menu.", Modifier.padding(12.dp))
-                if (visible.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth().heightIn(max = 288.dp).testTag("playback-queue-items"), state = list) {
-                    items(visible, key = { it.key }) { entry -> row(entry) }
+        }
+        if (state.loading || state.sourceLoading) LinearProgressIndicator(Modifier.fillMaxWidth().testTag("queue-loading"))
+        if (state.error != null || state.sourceError != null) Column(Modifier.padding(12.dp)) {
+            state.error?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryActionButton("Retry playback", onClick = retry) }
+            state.sourceError?.let { Text(it, color = MaterialTheme.colorScheme.error); LibraryActionButton("Retry queue", onClick = more) }
+        }
+        if (expanded) {
+            if (visible.isEmpty() && !state.loading && !state.sourceLoading) Text("Your queue is empty. Add a video using its actions menu.", Modifier.padding(12.dp))
+            if (visible.isNotEmpty()) LazyColumn(Modifier.fillMaxWidth()
+                .then(if (fullHeight) Modifier.weight(1f) else Modifier.heightIn(max = 288.dp)).testTag("playback-queue-items"), state = list) {
+                items(visible, key = { it.key }, contentType = { "queue-occurrence" }) { entry -> row(entry) }
+                if (!state.sourceComplete && !state.sourceLoading) item(key = "queue:more", contentType = "action") {
+                    LibraryActionButton("Load more queue items", Modifier.fillMaxWidth().padding(12.dp), enabled = !state.loading, onClick = more)
                 }
-                if (!state.sourceComplete && !state.sourceLoading) LibraryActionButton("Load more queue items", Modifier.fillMaxWidth().padding(12.dp), enabled = !state.loading, onClick = more)
-              }
             }
         }
     }

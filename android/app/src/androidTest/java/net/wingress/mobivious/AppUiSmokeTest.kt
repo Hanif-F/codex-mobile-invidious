@@ -1,0 +1,437 @@
+package net.wingress.mobivious
+
+import android.content.Intent
+import android.os.ParcelFileDescriptor
+import androidx.compose.ui.test.*
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.toArgb
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import net.wingress.mobivious.data.*
+import org.junit.*
+import org.junit.Assert.*
+import org.junit.runner.RunWith
+import java.net.HttpURLConnection
+import java.net.URL
+
+/** Tests the redesigned navigation and real service/surface boundaries on a device. */
+@RunWith(AndroidJUnit4::class)
+class AppUiSmokeTest {
+    @get:Rule val compose = createServiceComposeRule()
+    private lateinit var activity: MainActivity
+    private val vm get() = activity.model
+    private var densityOverride: String? = null
+    private var originalFontScale = "1.0"
+    private var originalHardwareIme = "null"
+    private var originalHandwriting = "null"
+    private fun until(condition: () -> Boolean) = compose.waitUntil(30_000, condition)
+    private fun command(path: String, body: String = "{}") {
+        (URL("http://127.0.0.1:18080/test/$path").openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"; doOutput = true
+            outputStream.use { it.write(body.toByteArray()) }; inputStream.close(); disconnect()
+        }
+    }
+    private fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(
+        InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommand(command)).use { String(it.readBytes()).trim() }
+    private fun currentActivity() = compose.runOnUiThread {
+        ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+            .filterIsInstance<MainActivity>().firstOrNull()?.let { activity = it }
+    }
+    private fun screenshot(name: String) {
+        compose.waitForIdle()
+        captureWatchScreenshot(name)
+    }
+    private fun back() {
+        compose.waitForIdle()
+        compose.runOnUiThread { activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+    }
+    private fun menuVisible(label: String) = until {
+        runCatching { compose.onNodeWithText(label).assertIsDisplayed() }.isSuccess
+    }
+    private fun preferences(value: AccountPreferences) {
+        compose.runOnUiThread { vm.store.guestDeArrow(value); vm.refreshSharedSettings() }
+        until { vm.preferences.value == LocalPreferences.normalize(value) }
+    }
+    private var sizeOverride: String? = null
+    private fun viewport(width: Int, height: Int=800) { shell("wm size ${width*2}x${height*2}"); shell("wm density 320") }
+    @Before fun launch() {
+        sizeOverride = Regex("Override size: (\\d+x\\d+)").find(shell("wm size"))?.groupValues?.get(1)
+        densityOverride = Regex("Override density: (\\d+)").find(shell("wm density"))?.groupValues?.get(1)
+        originalFontScale = shell("settings get system font_scale").takeIf { it.toFloatOrNull() != null } ?: "1.0"
+        originalHardwareIme = shell("settings get secure show_ime_with_hard_keyboard")
+        shell("settings put secure show_ime_with_hard_keyboard 1")
+        originalHandwriting = shell("settings get secure stylus_handwriting_enabled")
+        shell("settings put secure stylus_handwriting_enabled 0")
+        command("reset")
+        activity = InstrumentationRegistry.getInstrumentation().startActivitySync(
+            Intent(InstrumentationRegistry.getInstrumentation().targetContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
+        compose.runOnUiThread {
+            vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
+            vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.store.clearVisibilitySnapshot(vm.api.context()); vm.refreshSharedSettings(); vm.navigate("Popular")
+        }
+        until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() && activity.window.decorView.hasWindowFocus() }
+    }
+    @After fun close() {
+        shell("wm size ${sizeOverride ?: "reset"}"); shell("wm density ${densityOverride ?: "reset"}"); shell("settings put system font_scale $originalFontScale")
+        shell(if (originalHardwareIme == "null") "settings delete secure show_ime_with_hard_keyboard" else "settings put secure show_ime_with_hard_keyboard $originalHardwareIme")
+        shell(if (originalHandwriting == "null") "settings delete secure stylus_handwriting_enabled" else "settings put secure stylus_handwriting_enabled $originalHandwriting")
+        currentActivity()
+        if (::activity.isInitialized) compose.runOnUiThread {
+            vm.closePlayer(); vm.store.save(null); vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false)
+            activity.finishAndRemoveTask()
+        }
+    }
+    @Test fun directFeedsAndTopSearchPreserveTheirOrigin() {
+        command("watched", """{"indicatorVideos":true}""")
+        compose.runOnUiThread { vm.refresh() }
+        until { !vm.browse.value.loading && vm.browse.value.videos.size == 4 }
+        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        compose.onNodeWithTag("navigation-Popular").assertIsSelected()
+        screenshot("discover-light")
+        compose.onNodeWithTag("browse-video-list").performScrollToIndex(2)
+        compose.waitForIdle()
+        val popular = vm.browse.value.position
+        compose.selectFeed("Trending")
+        until { vm.tab == "Trending" && !vm.browse.value.loading }
+        compose.onNodeWithTag("trending-region").assertIsDisplayed()
+        screenshot("trending-light")
+        compose.selectFeed("Popular")
+        until { vm.tab == "Popular" && !vm.browse.value.loading }
+        assertEquals(popular, vm.browse.value.position)
+        compose.onNodeWithTag("global-search").performClick()
+        until { vm.tab == "Search" }
+        compose.onNodeWithTag("main-search").performTextInput("fixture")
+        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
+        screenshot("search-ime")
+        compose.onNodeWithTag("main-search").performImeAction()
+        until { vm.searchInput.value.submitted == "fixture" && !vm.browse.value.loading }
+        screenshot("search-results")
+        compose.onNodeWithContentDescription("Close search").performClick()
+        until { vm.tab == "Popular" }
+        assertEquals(popular, vm.browse.value.position)
+    }
+    @Test fun youOwnsGuestSettingsAndOpaqueAccessibilityMode() {
+        compose.selectFeed("You")
+        compose.onNodeWithTag("you-guest").assertExists()
+        screenshot("you-guest")
+        compose.onNodeWithTag("you-instance").assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f)).performClick()
+        compose.onNodeWithText("HTTPS address").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back from Server").performClick()
+        compose.onNodeWithContentDescription("Back from Settings").performClick()
+        compose.onNodeWithTag("global-settings").performClick()
+        screenshot("settings-root")
+        compose.onNodeWithText("Appearance").performClick()
+        compose.onNodeWithText("Reduce transparency").performScrollTo().performClick()
+        until { vm.store.reduceTransparency.value }
+        assertTrue(SessionStore(activity).reduceTransparency.value)
+        screenshot("appearance-opaque")
+        back(); back()
+        compose.selectFeed("Popular")
+        preferences(AccountPreferences(darkMode = "dark", uiDensity = "compact"))
+        screenshot("discover-dark-compact")
+        compose.selectFeed("You")
+        compose.onNodeWithTag("you-downloads").performClick()
+        compose.onNodeWithTag("downloads-page").assertExists()
+        screenshot("downloads-dark")
+    }
+    @Test fun opaqueSurfacesKeepActionsReachableAcrossLightAndDarkPages() {
+        for (appearance in listOf("light", "dark")) {
+            preferences(AccountPreferences(darkMode = appearance, autoplay = false, continueAutoplay = false))
+            screenshot("overhaul-pages-start-$appearance")
+            compose.selectFeed("Popular").assertIsSelected()
+            screenshot("neutral-discover-$appearance")
+            compose.onNodeWithTag("global-search").performClick()
+            compose.onNodeWithTag("main-search").performTextReplacement("fixture")
+            until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+            compose.onNodeWithTag("main-search").performImeAction()
+            until { !vm.browse.value.loading && vm.searchInput.value.submitted == "fixture" }
+            screenshot("neutral-search-$appearance")
+            compose.onNodeWithContentDescription("Close search").performClick()
+            compose.selectFeed("You").assertIsSelected()
+            screenshot("neutral-you-$appearance")
+            compose.onNodeWithTag("you-downloads").performClick()
+            compose.onNodeWithTag("downloads-page").assertExists()
+            screenshot("neutral-downloads-$appearance")
+            back()
+            compose.onNodeWithTag("global-settings").performClick()
+            compose.onNodeWithTag("settings-root").assertExists()
+            screenshot("neutral-settings-$appearance")
+            back()
+            compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+            until { !vm.playback.value.loading && vm.playback.value.duration > 0 }
+            compose.runOnUiThread { vm.controller.value!!.pause() }
+            compose.onNodeWithTag("watch-more").assertIsDisplayed()
+            screenshot("neutral-watch-$appearance")
+            compose.onNodeWithTag("watch-more").performClick()
+            menuVisible("Create clip")
+            compose.onNodeWithText("Create clip").assertIsDisplayed()
+            screenshot("neutral-menu-$appearance")
+            shell("input keyevent KEYCODE_BACK")
+            compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+            compose.onNodeWithTag("watch-description-text").assertExists()
+            compose.onNodeWithTag("comments-entry").performScrollTo().performClick()
+            until { vm.comments.value.feed.loaded }
+            screenshot("neutral-comments-$appearance")
+            compose.onNodeWithContentDescription("Close comments").performClick()
+            back()
+            until { compose.onAllNodesWithTag("navigation-Popular").fetchSemanticsNodes().isNotEmpty() }
+            compose.selectFeed("Popular")
+            compose.runOnUiThread { vm.closePlayer() }
+            // Closing the service queue is asynchronous; wait before changing appearance.
+            until { vm.queue.value.token.isEmpty() && vm.playback.value.details == null }
+            until { compose.onAllNodesWithTag("navigation-Popular").fetchSemanticsNodes().isNotEmpty() }
+        }
+    }
+    @Test fun systemAppearanceUsesNeutralSurfacesAndHonorsAnExplicitLightChoice() {
+        val original = shell("cmd uimode night").substringAfter(":").trim()
+        assertTrue(original in listOf("yes", "no", "auto", "custom"))
+        fun waitForSurface(expected: androidx.compose.ui.graphics.Color) {
+            val expectDark = expected.red < .3f
+            until {
+                currentActivity()
+                if (!activity.window.decorView.hasWindowFocus()) false else try {
+                    val image = compose.onRoot().captureToImage()
+                    val actual = image.toPixelMap()[1, image.height / 2]
+                    // The designed environment replaces a flat surface. Verify appearance and visible hue.
+                    val lightness = androidx.core.graphics.ColorUtils.calculateLuminance(actual.toArgb())
+                    (if (expectDark) lightness < .20 else lightness > .55)
+                } catch (_: androidx.compose.ui.test.ComposeTimeoutException) { false }
+            }
+        }
+        try {
+            preferences(AccountPreferences(darkMode = ""))
+            shell("cmd uimode night yes")
+            until { currentActivity(); activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES }
+            waitForSurface(net.wingress.mobivious.ui.AppTokens.dark.surface)
+            screenshot("neutral-system-dark")
+            preferences(AccountPreferences(darkMode = "light"))
+            waitForSurface(net.wingress.mobivious.ui.AppTokens.light.surface)
+            screenshot("neutral-explicit-light")
+            preferences(AccountPreferences(darkMode = ""))
+            shell("cmd uimode night no")
+            until { currentActivity(); activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_NO }
+            waitForSurface(net.wingress.mobivious.ui.AppTokens.light.surface)
+            screenshot("neutral-system-light")
+        } finally {
+            shell("cmd uimode night $original")
+            currentActivity()
+        }
+    }
+    @Test fun watchPreservesFourAspectRatiosAndPlaybackThroughMiniSearchAndSettings() {
+        for ((id, ratio) in listOf("portrait001" to 9f/16f, "square00001" to 1f, "landscape01" to 16f/9f, "ultrawide01" to 8f/3f)) {
+            compose.runOnUiThread { vm.openLink(VideoLink(id)); activity.sharedVideo.value = true }
+            until { vm.playback.value.mediaId == id && vm.playback.value.geometry.ratio != null && vm.playback.value.playing }
+            compose.onNodeWithTag("watch-content").assertExists()
+            compose.onNodeWithTag("navigation-Popular").assertDoesNotExist()
+            assertEquals(ratio, vm.playback.value.geometry.ratio!!, .01f)
+            screenshot("watch-$id")
+        }
+        val token = vm.queue.value.token
+        back()
+        compose.onNodeWithTag("mini-player-preview").assertIsDisplayed()
+        assertTrue(vm.playback.value.playing)
+        screenshot("mini-player")
+        compose.onNodeWithTag("global-search").performClick()
+        compose.onNodeWithTag("main-search").performClick()
+        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("mini-player").assertDoesNotExist()
+        compose.onNodeWithTag("player-surface").assertDoesNotExist()
+        screenshot("mini-search-ime")
+        assertEquals(token, vm.queue.value.token)
+        assertTrue(vm.playback.value.playing)
+        compose.onNodeWithContentDescription("Close search").performClick()
+        compose.selectFeed("You")
+        compose.onNodeWithTag("global-settings").performClick()
+        assertTrue(vm.playback.value.playing)
+        assertEquals(token, vm.queue.value.token)
+    }
+    @Test fun wideRailAndLargeTextRemainReachable() {
+        command("watched", """{"indicatorVideos":true}""")
+        compose.runOnUiThread { vm.refresh() }
+        until { !vm.browse.value.loading && vm.browse.value.videos.size == 4 }
+        viewport(960,700)
+        until { activity.resources.configuration.screenWidthDp >= 840 }
+        currentActivity()
+        compose.onNodeWithTag("navigation-Popular").assertIsDisplayed()
+        compose.onNodeWithTag("global-search").assertIsDisplayed()
+        screenshot("discover-wide")
+        preferences(AccountPreferences(darkMode = "dark"))
+        screenshot("discover-wide-dark")
+        compose.runOnUiThread { vm.openLink(VideoLink("portrait001")); activity.sharedVideo.value = true }
+        until { vm.playback.value.playing && vm.playback.value.geometry.ratio != null }
+        compose.onNodeWithTag("watch-more").assertIsDisplayed()
+        screenshot("watch-wide-portrait")
+        back()
+        compose.selectFeed("You")
+        compose.onNodeWithTag("global-settings").assertIsDisplayed()
+        screenshot("you-wide")
+        viewport(320)
+        shell("settings put system font_scale 2.0")
+        until { activity.resources.configuration.screenWidthDp <= 360 }
+        currentActivity()
+        compose.selectFeed("Popular")
+        screenshot("discover-narrow-large-text")
+        compose.selectFeed("You")
+        compose.onNodeWithTag("global-settings").performClick()
+        compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Appearance"))
+        compose.onNodeWithText("Appearance").performClick()
+        compose.onAllNodesWithTag("settings-save").assertCountEquals(0)
+        compose.onNodeWithText("Ambient mode").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithContentDescription("Back from Appearance").assertIsDisplayed()
+        screenshot("appearance-narrow-large-text")
+        compose.onNodeWithContentDescription("Back from Appearance").performClick()
+        compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Server"))
+        compose.onNodeWithText("Server", substring = false).performClick()
+        compose.onNodeWithText("HTTPS address").performClick()
+        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets)
+            .isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        compose.onNodeWithText("HTTPS address").assertIsDisplayed()
+        screenshot("overhaul-server-320dp-2x-ime-field")
+        compose.onNodeWithText("Connect", substring = false).performScrollTo().assertIsDisplayed()
+        screenshot("overhaul-server-320dp-2x-ime-action")
+    }
+    @Test fun systemReducedMotionKeepsNavigationAndMinimizationUsable() {
+        val scale = shell("settings get global animator_duration_scale")
+        try {
+            shell("settings put global animator_duration_scale 0")
+            compose.selectFeed("Trending")
+            until { vm.tab == "Trending" && !vm.browse.value.loading }
+            compose.selectFeed("You")
+            compose.onNodeWithTag("global-settings").performClick()
+            back()
+            compose.selectFeed("Popular")
+            compose.runOnUiThread { vm.openLink(VideoLink("landscape01")); activity.sharedVideo.value = true }
+            until { vm.playback.value.playing }
+            until { compose.onAllNodesWithTag("watch-content").fetchSemanticsNodes().isNotEmpty() }
+            back()
+            until { compose.onAllNodesWithTag("mini-player-preview").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("mini-player-preview").performClick()
+            compose.onNodeWithTag("watch-content").assertIsDisplayed()
+            assertTrue(vm.playback.value.playing)
+        } finally {
+            shell(if (scale == "null") "settings delete global animator_duration_scale" else "settings put global animator_duration_scale $scale")
+        }
+    }
+
+    @Test fun guestTitleContributionReturnsToWatchAfterSignInCancellation() {
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { vm.playback.value.playing && compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isNotEmpty() }
+        val token = vm.queue.value.token
+        compose.onNodeWithTag("watch-more").performClick()
+        menuVisible("DeArrow Title")
+        screenshot("overhaul-guest-watch-menu")
+        compose.onNodeWithText("DeArrow Title").performClick()
+        compose.onNodeWithTag("sign-in-screen").assertIsDisplayed()
+        back()
+        until { compose.onAllNodesWithTag("watch-more").fetchSemanticsNodes().isNotEmpty() }
+        assertEquals(token, vm.queue.value.token)
+        assertTrue(vm.playback.value.playing)
+    }
+
+    @Test fun miniPlayerExposesRetryAfterARealStreamFailureWithoutLosingItsOccurrence() {
+        command("stream","""{"type":"mp4"}""")
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value=true }
+        until { vm.playback.value.playing }
+        val token=vm.queue.value.token
+        val occurrence=vm.queue.value.currentKey
+        back()
+        until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isNotEmpty() }
+        command("stream","""{"type":"mp4","mediaFail":true}""")
+        compose.runOnUiThread { vm.refreshBuffer() }
+        until { vm.playback.value.error!=null }
+        command("stream","""{"type":"mp4","mediaFail":false}""")
+        compose.onNodeWithTag("mini-player-retry").assertIsDisplayed().assertWidthIsAtLeast(androidx.compose.ui.unit.Dp(48f))
+            .assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f)).performClick()
+        until { vm.playback.value.error==null && vm.playback.value.playing }
+        assertEquals(token,vm.queue.value.token);assertEquals(occurrence,vm.queue.value.currentKey)
+        compose.onNodeWithTag("mini-player").assertIsDisplayed()
+        compose.onNodeWithTag("navigation-Popular").assertIsDisplayed()
+    }
+    @Test fun watchActionsPanelsAndFullscreenRemainUsableAcrossAppearances() {
+        command("chapters"); command("chat")
+        preferences(AccountPreferences(autoplay = false, continueAutoplay = false, darkMode = "light"))
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { !vm.playback.value.loading && vm.playback.value.duration > 0 && vm.playback.value.seekable }
+        compose.runOnUiThread { vm.controller.value!!.pause() }
+        for (name in listOf("Save", "Download", "Share", "More")) {
+            compose.onNodeWithContentDescription(name).assertIsDisplayed()
+                .assertWidthIsAtLeast(androidx.compose.ui.unit.Dp(48f)).assertHeightIsAtLeast(androidx.compose.ui.unit.Dp(48f))
+            compose.onNodeWithText(name).assertIsDisplayed()
+        }
+        screenshot("watch-native-light")
+        compose.onNodeWithTag("watch-more").performClick()
+        screenshot("overhaul-watch-menu-diagnostic")
+        menuVisible("Create clip")
+        compose.onNodeWithText("Create clip").assertIsDisplayed()
+        screenshot("watch-native-more")
+        shell("input keyevent KEYCODE_BACK")
+        compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+        compose.onNodeWithTag("watch-description-text").assertExists()
+        screenshot("watch-native-description")
+        compose.onNodeWithTag("comments-entry").performScrollTo().performClick()
+        until { vm.comments.value.feed.loaded }
+        screenshot("watch-native-comments")
+        compose.onNodeWithContentDescription("Close comments").performClick()
+        compose.onNodeWithTag("chapters-entry").assertDoesNotExist()
+        compose.onNodeWithTag("player-chapter-title").performClick()
+        screenshot("watch-native-chapters")
+        compose.onNodeWithContentDescription("Close chapters").performClick()
+        compose.onNodeWithTag("chat-entry").assertDoesNotExist()
+        compose.onNodeWithTag("player-chat").performClick()
+        until { vm.chatReplay.value.loaded }
+        screenshot("watch-native-chat")
+        compose.onNodeWithContentDescription("Close chat replay").performClick()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("Playback speed").assertIsDisplayed()
+        screenshot("watch-native-settings")
+        compose.onNodeWithContentDescription("Close player settings").performClick()
+        compose.onNodeWithContentDescription("Full screen").performClick()
+        until { currentActivity(); activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE }
+        screenshot("watch-native-fullscreen")
+        compose.onNodeWithContentDescription("Exit full screen").performClick()
+        until { currentActivity(); activity.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT }
+        preferences(AccountPreferences(autoplay = false, continueAutoplay = false, darkMode = "dark"))
+        compose.onNodeWithTag("watch-more").performScrollTo()
+        screenshot("watch-native-dark")
+        compose.runOnUiThread { vm.store.reduceTransparency(true) }
+        screenshot("watch-native-opaque")
+    }
+
+    @Test fun watchNarrowLargeTextAndWideLayoutsKeepActionsReachable() {
+        preferences(AccountPreferences(autoplay = false, continueAutoplay = false))
+        compose.runOnUiThread { vm.openLink(VideoLink("landscape01")); activity.sharedVideo.value = true }
+        until { vm.playback.value.duration > 0 && !vm.playback.value.loading }
+        compose.runOnUiThread { vm.controller.value!!.pause() }
+        viewport(320); shell("settings put system font_scale 2.0")
+        until { currentActivity(); activity.resources.configuration.screenWidthDp <= 360 && activity.resources.configuration.fontScale >= 2f }
+        compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()
+        screenshot("watch-native-narrow-large-text")
+        compose.onNodeWithTag("watch-description-toggle").performScrollTo().performClick()
+        screenshot("watch-native-narrow-description")
+        shell("settings put system font_scale 1.0"); viewport(960,700)
+        until { currentActivity(); activity.resources.configuration.screenWidthDp >= 840 }
+        compose.onNodeWithTag("watch-more").performScrollTo().assertIsDisplayed()
+        screenshot("watch-native-wide")
+    }
+
+}
+
+/** Fixture-only visual evidence kept outside the package that UTP uninstalls. */
+internal fun captureWatchScreenshot(name: String) {
+    require(name.matches(Regex("[a-z0-9-]+")))
+    val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
+    automation.waitForIdle(500, 5_000)
+    val path = "/data/local/tmp/mobivious-ui/$name.png"
+    for (command in listOf("mkdir -p /data/local/tmp/mobivious-ui", "screencap -p $path")) {
+        ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+    }
+    val header = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("head -c 8 $path")).use { it.readBytes() }
+    check(header.contentEquals(byteArrayOf(0x89.toByte(),0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A))) { "Screenshot missing or invalid: $path" }
+}
