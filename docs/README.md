@@ -2,7 +2,7 @@
 
 This is the current documentation for the Android app in `androidInvidious`.
 The current guides describe the opaque Material 3 implementation in this working
-tree. Version remains **0.10.3**, code **21**; this task does not publish a release.
+tree. Current release version is **0.11.0**, code **22**.
 The [approved overhaul](ui-ux-overhaul-2026-10-13/README.md) defines acceptance.
 The [implementation report](ui-ux-implementation-2026-10-13/README.md) records
 completed work, failed/passing checks, evidence and acceptance boundaries. Its

@@ -3676,3 +3676,26 @@ in `artifacts/release-notes-0.10.3.md`. Build, signing, metadata, signed-update 
 startup/appearance evidence is retained in the ignored
 `artifacts/release-0.10.3/` directory. Release target:
 [GitHub Releases v0.10.3](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.10.3).
+
+
+## Mobivious 0.11.0 release preparation — 14 October 2026
+
+The minor release bumps versionName to **0.11.0** and versionCode to **22**.
+It includes the opaque Material 3 overhaul and the simplified feed bars,
+pull-to-refresh and uniform 10% player dimming from implementation commit
+`598184360afed107846a7e41082854088880d8c2`.
+
+- Release build and all 362 JVM tests passed. Release lint reports zero errors
+  and 36 warnings; documentation/fingerprint checks and whitespace checks passed.
+- The UI implementation passed 48 distinct focused emulator checks across
+  gesture, refresh/failure/cancellation, navigation, subscription and player runs.
+- The universal APK includes arm64-v8a, armeabi-v7a, x86 and x86_64. Android 13
+  is the minimum; target SDK is 37 and the release is not debuggable.
+- APK signature verification passed and matches the published 0.10.3 certificate.
+  The previous APK's local SHA-256 matches its GitHub asset digest.
+- Pixel 8 Pro / API 36 accepted an in-place signed update from 0.10.3/21 to
+  0.11.0/22, preserving firstInstallTime. A cold launch rendered the Popular
+  feed and its simplified toolbar; the crash buffer remained unchanged.
+- The APK and checksum are under ignored `artifacts/`; release build, signature,
+  metadata, installation and startup evidence is in `artifacts/release-0.11.0/`.
+  These UI changes require no server rollout or migration.
