@@ -165,3 +165,23 @@ shared preference mutex and sparse patches against current confirmed data. Text
 has a 500ms debounce with lifecycle flush. Account/server generation changes
 invalidate queued work. Entity/security operations keep explicit submit semantics.
 See [UI](UI.md), [Settings](SETTINGS.md) and [Testing](TESTING.md).
+
+## Channel spoiler presentation
+
+`ChannelSpoilerRepository` is application-owned and shared by Compose and the
+playback service. Its state holds confirmed context-bound rules, a content-load
+clock, batched cache publication results/misses and playback-occurrence reveals.
+Confirmed DeArrow enablement shares this state so service metadata cannot lag
+behind the account’s current presentation preferences.
+Account contexts begin unready, keeping sensitive titles/artwork behind safe
+placeholders until shared preferences arrive. Guest contexts initialize from their
+instance-local profile. Context changes cancel work and reject late responses.
+
+Domain rules normalize the website’s preference schema and preserve publication
+precision separately from ordinary display formatting. Compose keeps card reveals
+per occurrence; watch/mini-player reveal state belongs to the repository. The
+service creates and updates masked media-session metadata, including logical queue
+items, without restarting playback. Metadata-only replacements retain occurrence
+identity. Sparse preference intents use per-channel keys in the existing serialized
+save controller. Download presentation uses active-profile rules and stored source
+dates; download records and files retain their original metadata.

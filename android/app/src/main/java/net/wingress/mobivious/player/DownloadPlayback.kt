@@ -11,11 +11,12 @@ import net.wingress.mobivious.data.*
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal object DownloadPlayback {
-    fun source(context: Context, repository: DownloadRepository, record: DownloadRecord, occurrence: String) : androidx.media3.exoplayer.source.MediaSource {
+    fun source(context: Context, repository: DownloadRepository, record: DownloadRecord, occurrence: String,
+        title: String = record.details.video.title, hideArtwork: Boolean = false) : androidx.media3.exoplayer.source.MediaSource {
         require(record.playable) { "The selected media tracks have not finished downloading." }
         val details = repository.localDetails(record)
-        val metadata = MediaMetadata.Builder().setTitle(details.video.title).setArtist(details.video.author)
-            .setArtworkUri(details.video.thumbnail.takeIf(String::isNotBlank)?.let(Uri::parse))
+        val metadata = MediaMetadata.Builder().setTitle(title).setArtist(details.video.author)
+            .setArtworkUri(if (hideArtwork) null else details.video.thumbnail.takeIf(String::isNotBlank)?.let(Uri::parse))
             .setExtras(Bundle().apply { putString("occurrence", occurrence); putString("downloadId", record.id); putBoolean("savePosition", true) }).build()
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
         val media = record.assets.filter { it.media }.sortedBy { if (it.choice.kind == DownloadKind.VIDEO) 0 else 1 }

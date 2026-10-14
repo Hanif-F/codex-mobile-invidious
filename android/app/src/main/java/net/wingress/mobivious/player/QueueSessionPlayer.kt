@@ -22,7 +22,7 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
         val entries = state.items.map { entry ->
             val active = entry.key == state.currentKey && player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == entry.key
             val item = if (active) player.currentMediaItem!! else MediaItem.Builder().setMediaId(entry.video.id)
-                .setMediaMetadata(MediaMetadata.Builder().setTitle(entry.video.title).setArtist(entry.video.author).build()).build()
+                .setMediaMetadata(MediaMetadata.Builder().setTitle(queue.queueTitle(entry)).setArtist(entry.video.author).build()).build()
             // Keep the real active window, including live-edge timing and manifest state.
             val real = base.playlist.getOrNull(base.currentMediaItemIndex).takeIf { active }
             (real?.buildUpon()?.setUid(entry.key) ?: MediaItemData.Builder(entry.key)

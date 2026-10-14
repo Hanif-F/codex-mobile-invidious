@@ -64,9 +64,9 @@ import net.wingress.mobivious.R
 import kotlin.math.abs
 import kotlin.math.roundToLong
 
-internal fun shareClip(context: Context, clip: Clip, failure: () -> Unit) {
+internal fun shareClip(context: Context, clip: Clip, title: String = clip.title, failure: () -> Unit) {
     runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain")
-        .putExtra(Intent.EXTRA_TEXT, clip.permalink), "Share clip")) }.onFailure { failure() }
+        .putExtra(Intent.EXTRA_TEXT, clip.permalink).putExtra(Intent.EXTRA_TITLE, title), "Share clip")) }.onFailure { failure() }
 }
 internal fun copyClip(context: Context, clip: Clip, vm: AppViewModel) {
     (context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("Clip", clip.permalink))
@@ -87,9 +87,11 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
           val imageHeight = if (warning == null) maxWidth * 9f / 16f else maxOf(maxWidth * 9f / 16f, 96.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale)
           Box(Modifier.fillMaxWidth().height(imageHeight).clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)) {
-            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true,
+            ChannelSpoilerArtwork(vm, clip.video, Modifier.fillMaxSize(), play) { revealed ->
+            if (warning != null && !revealed) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true,
                 bottomInset = with(androidx.compose.ui.platform.LocalDensity.current) { 12.sp.toDp() } + 16.dp)
             else AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
             Row(Modifier.align(Alignment.BottomEnd).padding(5.dp)
                 .padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                 PlayerIcon(Icons.Default.ContentCut, null, size = 13.dp)
@@ -98,15 +100,15 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
           }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(clip.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            DeArrowTitle(vm, clip.video, MaterialTheme.typography.titleSmall, maxLines = 2, originalTitle = clip.title, useDeArrow = false)
             Text("from ${clip.video.author.ifBlank { "Source video" }}",
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOf(clip.creator.takeIf(String::isNotBlank), clippedDate(clip).takeIf(String::isNotBlank),
                 playerTime(clip.durationMs).takeIf { prefs.thinMode }).filterNotNull().joinToString(" · "),
                 style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
         }
-        OverflowMenu("Actions for clip ${clip.title}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
-            DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip) { vm.message.value = "No app could share this clip." } })
+        OverflowMenu("Actions for clip ${maskedVideoTitle(vm, clip.video, clip.title)}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
+            DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } })
             DropdownMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
             if (clip.owned(vm.api.context())) DropdownMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
         }
@@ -139,12 +141,12 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             Text("Public", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelMedium)
         }
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(clip.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            DeArrowTitle(vm, source, MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold, originalTitle = clip.title, useDeArrow = false, playbackOccurrence = queue.currentKey)
             Text(listOf(clippedDate(clip), "${ClipRules.timestamp(clip.startMs)} – ${ClipRules.timestamp(clip.endMs)}").filter(String::isNotBlank).joinToString(" · "),
                 color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            LibraryActionButton("Share clip", Modifier.testTag("clip-share"), Icons.Default.Share, prominent = true) { shareClip(context, clip) { vm.message.value = "No app could share this clip." } }
+            LibraryActionButton("Share clip", Modifier.testTag("clip-share"), Icons.Default.Share, prominent = true) { shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } }
             LibraryActionButton("Copy link", icon = Icons.Default.Link) { copyClip(context, clip, vm) }
             LibraryActionButton(if (queue.repeat == QueueRepeat.ONE) "Loop on" else "Loop off",
                 Modifier.testTag("clip-loop").semantics { selected = queue.repeat == QueueRepeat.ONE }, Icons.Default.Repeat,
@@ -156,11 +158,13 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
+                    ChannelSpoilerArtwork(vm, source, Modifier.fillMaxSize(), vm::watchFullClip) {
                     AsyncImage(resolved(clip.server, source.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    }
                     DisplayFormats.duration(source.duration).takeIf(String::isNotBlank)?.let { Text(it, Modifier.align(Alignment.BottomEnd).padding(7.dp), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow)) }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(source.title, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall)
+                    DeArrowTitle(vm, source, MaterialTheme.typography.titleSmall, maxLines = 2)
                     Text(source.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text("Continue from this moment", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
@@ -193,7 +197,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     deletion?.let { clip -> LibraryConfirmation("Delete clip?", { vm.clipDelete.value = null }, vm::deleteClip,
         enabled = !busy, confirmLabel = if (busy) "Deleting…" else "Delete", confirmTag = "clip-delete-confirm") {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("“${clip.title}” will be removed from My Clips and its channel. Its shared link will stop working.")
+            Text("“${maskedVideoTitle(vm, clip.video, clip.title)}” will be removed from My Clips and its channel. Its shared link will stop working.")
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
     } }
@@ -248,17 +252,17 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                             } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 timeField(true, Modifier.weight(1f)); timeField(false, Modifier.weight(1f))
                             }
-                            ClipFilmstrip(editor, vm::clipTimes)
+                            ClipFilmstrip(vm, editor, vm::clipTimes)
                             Text("Clips are public and can be 5–120 seconds long. The source video stays unchanged.",
                                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             editor.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("clip-publish-error")) }
                         } else {
                             val clip = editor.published!!
-                            Text(clip.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                            DeArrowTitle(vm, clip.video, MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, originalTitle = clip.title, useDeArrow = false)
                             Text("Saved to My Clips and ${clip.video.author}’s Clips tab.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text(clip.permalink, style = MaterialTheme.typography.bodySmall)
                             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                LibraryActionButton("Share", icon = Icons.Default.Share, prominent = true) { shareClip(context, clip) { vm.message.value = "No app could share this clip." } }
+                                LibraryActionButton("Share", icon = Icons.Default.Share, prominent = true) { shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } }
                                 LibraryActionButton("Copy link") { copyClip(context, clip, vm) }
                                 LibraryActionButton("Watch clip", Modifier.testTag("clip-watch-published")) { vm.watchClip(clip) }
                             }
@@ -341,8 +345,11 @@ private class StoryboardCrop(private val frame: StoryboardFrame) : Transformatio
     }
 }
 
-@Composable private fun ClipFilmstrip(editor: ClipEditorState, change: (Long, Long) -> Unit) {
+@Composable private fun ClipFilmstrip(vm: AppViewModel, editor: ClipEditorState, change: (Long, Long) -> Unit) {
     val context = LocalContext.current
+    val spoilers by vm.channelSpoilers.state.collectAsStateWithLifecycle()
+    val decision = editor.details?.video?.let { spoilers.decision(it) } ?: SpoilerDecision()
+    val hidden = decision.pending || decision.thumbnail && !(spoilers.playback.occurrence == editor.occurrence && spoilers.playback.thumbnail)
     val duration = (editor.details?.video?.duration ?: 0) * 1000
     if (duration < 5_000) return
     val window = minOf(180_000L, duration)
@@ -363,7 +370,8 @@ private class StoryboardCrop(private val frame: StoryboardFrame) : Transformatio
             val primary = MaterialTheme.colorScheme.primary
             val startFraction = ((editor.startMs - viewport).toFloat() / window).coerceIn(0f, 1f)
             val endFraction = ((editor.endMs - viewport).toFloat() / window).coerceIn(0f, 1f)
-            Row(Modifier.fillMaxSize()) { repeat(6) { n ->
+            if (hidden) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(decision.thumbnailLabel) }
+            else Row(Modifier.fillMaxSize()) { repeat(6) { n ->
                 val time = viewport + window * (2 * n + 1) / 12
                 val frame = editor.frames.firstOrNull { time in it.startMs until it.endMs }
                 val request = frame?.let { ImageRequest.Builder(context).data(it.url).size(CoilSize.ORIGINAL).transformations(StoryboardCrop(it)).build() }

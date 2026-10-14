@@ -43,7 +43,11 @@ class DeArrowSmokeTest {
         if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask() }
     }
     private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
-    private fun settings() { compose.openAppSettings(); compose.onNodeWithText("DeArrow").performScrollTo().performClick() }
+    private fun settings() {
+        compose.openAppSettings()
+        compose.onNodeWithTag("settings-root").performScrollToNode(hasText("DeArrow"))
+        compose.onNodeWithText("DeArrow").performClick()
+    }
     private fun waitForReplacement() { until { compose.onAllNodesWithText(replacement).fetchSemanticsNodes().isNotEmpty() } }
     private fun save() {
         compose.finishAutomaticPreferencePage()
@@ -57,6 +61,12 @@ class DeArrowSmokeTest {
         var title: String? = null
         compose.runOnUiThread { title = activity.model.controller.value?.mediaMetadata?.title?.toString() }
         return title
+    }
+    private fun waitForMetadata(expected: String) {
+        try { until { controllerTitle() == expected } }
+        catch (e: Exception) { throw AssertionError("Expected fixture metadata $expected; got ${controllerTitle()}; " +
+            "DeArrow=${activity.model.preferences.value.dearrowEnabled}, rulesReady=${activity.model.channelSpoilers.state.value.ready}, " +
+            "cachedTitle=${activity.model.dearrowTitles.titles.value[activity.model.playback.value.mediaId]}", e) }
     }
     private fun login() {
         compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
@@ -113,17 +123,17 @@ class DeArrowSmokeTest {
         until { activity.model.playlist.value != null }; waitForReplacement(); compose.onNodeWithText(replacement).assertExists()
         openVideo(replacement)
         until { state().getJSONArray("watched").length() == 1 }
-        until { controllerTitle() == replacement }
+        waitForMetadata(replacement)
         assertEquals(original, activity.model.playback.value.details!!.video.title)
         compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(30_000); activity.model.speed(1.5f); activity.model.quality(720) }
         until { activity.model.playback.value.selection?.overrides?.values?.any { it.type == C.TRACK_TYPE_VIDEO } == true }
         val watchedBefore = state().getJSONArray("events").let { events -> (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/testvideo01" } }
         settings(); toggle("Replace video titles with DeArrow"); save()
-        until { controllerTitle() == original }
+        waitForMetadata(original)
         assertEquals(30_000L, activity.model.playback.value.position); assertEquals(1.5f, activity.model.playback.value.speed)
         assertFalse(activity.model.playback.value.playWhenReady)
         settings(); toggle("Replace video titles with DeArrow"); save()
-        until { controllerTitle() == replacement }
+        waitForMetadata(replacement)
         compose.onNodeWithTag("watch-details-list").performScrollToNode(hasText("Another calm scene"))
         compose.onNodeWithText("Another calm scene").assertExists()
         compose.navigateBack()

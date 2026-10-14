@@ -330,6 +330,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun addToPlaylist(id: String, video: String, context: ApiContext = context()): Video = ApiParser.video(JSONObject(scopedPlaylistWrite("api/v1/auth/playlists/$id/videos", "POST", context, JSONObject().put("videoId", video))))
     suspend fun removeFromPlaylist(id: String, index: String, context: ApiContext = context()) { require(index.matches(Regex("^[A-Fa-f0-9]+$"))) { "Missing playlist occurrence ID." }; scopedPlaylistWrite("api/v1/auth/playlists/$id/videos/$index", "DELETE", context) }
     suspend fun preferences(context: ApiContext = context()): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context)))
+
+    suspend fun spoilerPublications(ids: List<String>, context: ApiContext): Map<String, Long?> {
+        require(ids.size in 1..100 && ids.distinct().size == ids.size && ids.all { it.matches(Regex("[A-Za-z0-9_-]{11}")) })
+        val result = JSONObject(request("api/v1/spoilers/publications", query = mapOf("ids" to ids.joinToString(",")), context = context)).getJSONObject("publications")
+        return ids.associateWith { ChannelSpoilerRules.publication(result.opt(it)) }
+    }
     suspend fun chatReplay(id: String, offsetMs: Long, continuation: String, context: ApiContext): ChatChunk {
         require(id.matches(Regex("[A-Za-z0-9_-]{11}")) && offsetMs >= 0 && continuation.toByteArray(Charsets.UTF_8).size <= 4096)
         return ChatChunk.parse(JSONObject(scopedRead("api/v1/live_chat/$id", buildMap {

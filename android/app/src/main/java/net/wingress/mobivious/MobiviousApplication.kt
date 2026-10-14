@@ -25,6 +25,7 @@ class MobiviousApplication : Application() {
     lateinit var watched: WatchedRepository
     lateinit var blocked: BlockedRepository
     lateinit var dearrowTitles: DeArrowTitles
+    lateinit var channelSpoilers: net.wingress.mobivious.data.ChannelSpoilerRepository
     lateinit var aiFilter: net.wingress.mobivious.data.AiFilterRepository
     private val titleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val offline = MutableStateFlow(false)
@@ -38,6 +39,8 @@ class MobiviousApplication : Application() {
         cache = ResponseCache(File(cacheDir, "feeds"))
         api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration }, onProfile = store::confirmProfile)
         dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }
+        channelSpoilers = net.wingress.mobivious.data.ChannelSpoilerRepository(titleScope, api::context, api::spoilerPublications)
+        channelSpoilers.reset(preferences = if (store.account.value == null) store.guestPreferences() else null)
         aiFilter = net.wingress.mobivious.data.AiFilterRepository(titleScope, api::context, api::aiStatus, api::aiChannels)
         aiFilter.reset()
         watched = WatchedRepository(api, store)
@@ -47,6 +50,7 @@ class MobiviousApplication : Application() {
             if (context != api.context()) return
             watched.reset(context); blocked.reset(context); dearrowTitles.clear(); offline.value = false; playbackContext.value = context
             aiFilter.reset(context)
+            channelSpoilers.reset(context, if (context.account == null) store.guestPreferences(context) else null)
         }
         store.onContextChanged = { context ->
             if (Looper.myLooper() == Looper.getMainLooper()) changed(context) else main.post { changed(context) }

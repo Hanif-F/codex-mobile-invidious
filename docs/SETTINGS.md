@@ -181,3 +181,39 @@ also update the saved default. Offline playback does not rewrite online defaults
 Server/account/local save boundaries and legacy migration are specified in
 [Storage and security](STORAGE_AND_SECURITY.md); playback application is detailed
 in [Playback](PLAYBACK.md).
+
+## Channel title and thumbnail settings
+
+Open **You → Settings → Preferences → Channel title and thumbnail settings**,
+or the shortcut in a channel, video, or watch action menu. Select a channel by
+canonical `UC…` ID or `/channel/UC…` URL. **Hide title** and **Hide thumbnail** save
+immediately; **Reveal after this many days since upload** saves valid text after
+500ms. Blank means indefinite hiding. Invalid delays remain editable with Revert;
+failed saves offer Retry/Revert. Reset or disabling both switches removes the rule.
+There are at most 1,000 configured channels; delays are integers 1–2,147,483,647.
+
+Signed-in rules use `channel_spoiler_settings` and are shared with the website.
+Guest rules stay on this device for the selected instance and are never copied
+into an account. Rules apply to browsing, history, playlists/mixes, recommendations,
+queues, clips, downloads, watch/mini-player titles and static artwork. Media-session
+notifications and passive action/dialog/accessibility labels respect hiding.
+Transfer notifications use the generic “Mobivious download” title.
+
+Tap a hidden thumbnail once to reveal the original image, then again to open it.
+The blue title control cycles Hidden → DeArrow → Original → Hidden, or Hidden →
+Original → Hidden when no replacement is available. Hidden titles stay hidden
+while a requested replacement loads; the cycle remains available when “Show
+original titles using the DeArrow icon” is disabled. Independent displayed copies
+reveal separately and reset on navigation/refresh. Watch and mini-player share the
+current playback occurrence’s reveal state with media-session metadata.
+
+Upload age uses source publication metadata, with midnight UTC for date-only
+values and exact timestamps otherwise. Missing dates can use the instance’s
+batched cache-only publication endpoint; errors and misses stay unknown. Unknown
+uploads stay hidden and are labeled “upload date unknown”. Clips use their source
+video’s upload age. Downloads use locally stored dates without new network
+lookups. Expiry is checked on loading/refresh and rule changes, without a timer
+changing an open screen. Account-rule loading uses safe placeholders; read failures
+can be retried in this settings page. Rules change presentation, preserving raw
+metadata, playback, downloaded files and descriptions. An active thumbnail rule
+wins over an AI warning image, and explicit reveal shows the original image.

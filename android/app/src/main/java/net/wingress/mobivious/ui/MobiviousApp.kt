@@ -97,6 +97,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val accent by vm.store.accentPreset.collectAsStateWithLifecycle()
     val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
     val sponsorEditor by vm.sponsorSettingsChannel.collectAsStateWithLifecycle()
+    val spoilerEditor by vm.spoilerSettingsChannel.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val offline by vm.offline.collectAsStateWithLifecycle()
     val blocked by vm.blocked.collectAsStateWithLifecycle()
@@ -509,6 +510,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                     DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openChannelRss(info) })
                                     BlockChannelMenuItem(vm, info.id, info.name, { signIn() }, Modifier.testTag("channel-block-${info.id}"), close)
                                     DropdownMenuItem(text = { Text("Channel SponsorBlock settings") }, onClick = { close(); vm.openSponsorBlock(info.id) })
+                                    DropdownMenuItem(text = { Text(channelSpoilerSettingsPage) }, onClick = { close(); vm.openChannelSpoilers(info.id) })
                                 }
                             }, readDescription = { channelDescriptionOpen = true },
                                 subscriptionBusy = info.id in subscriptionChannels.busy,
@@ -636,6 +638,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             }
             val dearrow by vm.dearrowContribution.collectAsStateWithLifecycle()
             if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, dismiss = { vm.sponsorSettingsChannel.value = null })
+            if (spoilerEditor != null && !pip) key(vm.api.context()) { ChannelSpoilerSettings(vm, spoilerEditor!!, dismiss = { vm.spoilerSettingsChannel.value = null }) }
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
             if (!pip) DownloadExportConsent()
             if (downloadDialog.video != null && !pip) DownloadDialog(vm)
@@ -673,10 +676,12 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
           val naturalHeight = if (prefs.thinMode) 64.dp else maxWidth * 9f / 16f
           val imageHeight = if (warning == null) naturalHeight else maxOf(naturalHeight,
               (if (warningCompact) 96.dp else 144.dp) * fontScale + if (indicator.watched) badgeInset else 0.dp)
-          Box(Modifier.fillMaxWidth().height(imageHeight).clip(AppTokens.media).background(MaterialTheme.colorScheme.surfaceContainer).clickable(onClick = play)) {
-            if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = warningCompact,
+          Box(Modifier.fillMaxWidth().height(imageHeight).clip(AppTokens.media).background(MaterialTheme.colorScheme.surfaceContainer)) {
+            ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), play) { revealed ->
+            if (warning != null && !revealed) AiThumbnail(warning, Modifier.fillMaxSize(), compact = warningCompact,
                 topInset = if (indicator.watched) badgeInset else 0.dp, bottomInset = if (duration.isNotBlank()) badgeInset else 4.dp)
-            else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), video.title, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
             if (indicator.watched) {
                 Text("Watched", Modifier.align(Alignment.TopStart).padding(8.dp)
                     .padding(horizontal = 8.dp, vertical = 4.dp)
@@ -719,7 +724,7 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
             }
             VideoActionsMenu(vm, video, signIn, channel, audioPlay ?: { vm.playVideo(video, audio = true) }, remove, removalLabel,
                 removeFromPlaylist, removeFromPlaylistEnabled)
-            if(remove != null && !libraryRow) AppInsetIconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${video.title}") }
+            if(remove != null && !libraryRow) AppInsetIconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${maskedVideoTitle(vm, video)}") }
         }
     }
     val cardModifier = Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset, vertical = if (compact) 8.dp else 12.dp)
@@ -792,8 +797,8 @@ private fun MiniPlayer(vm: AppViewModel, playback: PlaybackState, presentation: 
                         onClickLabel = "Open player", onClick = open).testTag("mini-player-preview"))
                 Column(Modifier.weight(1f).clickable(enabled = presentation.mode == PlayerPresentation.MINI && !presentation.active,
                     onClickLabel = "Open player", onClick = open).padding(horizontal = 8.dp)) {
-                    if (playback.clip != null) Text(playback.clip.title, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    else playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1) }
+                    if (playback.clip != null) DeArrowTitle(vm, playback.details?.video ?: playback.clip.video, MaterialTheme.typography.labelLarge, maxLines = 1, originalTitle = playback.clip.title, useDeArrow = false, playbackOccurrence = occurrence.currentKey)
+                    else playback.details?.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.labelLarge, maxLines = 1, playbackOccurrence = occurrence.currentKey, offline = playback.downloadId != null) }
                     when {
                         playback.error != null -> Text("Playback failed",color=MaterialTheme.colorScheme.error,style=MaterialTheme.typography.bodySmall)
                         playback.loading || playback.buffering -> Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
@@ -885,8 +890,7 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
                       Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         if (details.video.membersOnly) MembersBadge(details.video.id)
                         val titleStyle = MaterialTheme.typography.titleLarge
-                        if (playback.downloadId != null) Text(details.video.title, style = titleStyle)
-                        else DeArrowTitle(vm, details.video, titleStyle)
+                        DeArrowTitle(vm, details.video, titleStyle, playbackOccurrence = queue.currentKey, offline = playback.downloadId != null)
                         VideoNotices(details)
                         VideoMetadataLine(details.video, likes = details.likes)
                         if (playback.downloadId != null) DownloadChannelIdentity(details.video)

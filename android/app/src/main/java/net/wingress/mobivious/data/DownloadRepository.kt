@@ -84,7 +84,7 @@ class DownloadRepository(private val context: Context) {
                 record = record.copy(assets = record.assets.toMutableList().apply { set(index, pending) }); save(record)
                 val target = file(record, pending); check(target.parentFile!!.mkdirs() || target.parentFile!!.isDirectory)
                 val request = DownloadManager.Request(Uri.parse(address(record.server, asset.choice.url)))
-                    .setDestinationUri(Uri.fromFile(target)).setTitle(record.details.video.title)
+                    .setDestinationUri(Uri.fromFile(target)).setTitle("Mobivious download")
                     .setDescription(if (asset.artwork) "Download artwork" else "${asset.choice.kind.name.lowercase()} track")
                     .setMimeType(asset.choice.mime).setAllowedOverMetered(true).setAllowedOverRoaming(true)
                     .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)

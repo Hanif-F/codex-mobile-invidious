@@ -213,3 +213,14 @@ segments are non-fatal. Clips/downloads bypass segment work.
 
 The clip editor uses a separate preview player with carefully scoped lifetime,
 described in [Library](LIBRARY.md#clips).
+
+## Channel title and artwork hiding
+
+Watch and mini-player titles use the same occurrence-scoped explicit reveal cycle.
+The service masks media metadata before assigning a new item and updates it when
+rules, publication fallbacks or explicit reveals change. Hidden artwork is omitted
+from media-session notifications. Metadata-only updates preserve play/pause,
+position, queue and track choices. Actual video frames and autoplay remain available.
+Offline downloads use locally stored publication dates. Clip filmstrip thumbnails
+stay hidden while the current source artwork is hidden; clip-range controls remain
+available. See [channel settings](SETTINGS.md#channel-title-and-thumbnail-settings).

@@ -9,6 +9,7 @@ data class AccountPreferences(
     val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true,
     val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings(),
     val aiFilter: AiFilterSettings = AiFilterSettings(),
+    val channelSpoilers: Map<String, ChannelSpoilerRule> = emptyMap(),
     val autoplay: Boolean = true, val listen: Boolean = false, val local: Boolean = true,
     val continueNext: Boolean = false, val continueAutoplay: Boolean = true, val videoLoop: Boolean = false,
     val speed: Float = 1f, val qualityDash: String = "auto", val videoCodec: String = "auto", val captions: List<String> = listOf("", "", ""),
@@ -34,18 +35,21 @@ data class AccountPreferences(
         put("unseen_only", unseenOnly); put("notifications_only", notificationsOnly)
         put("default_playlist", defaultPlaylist.ifBlank { null } ?: JSONObject.NULL)
         put("show_member_videos", showMemberVideos)
+        put("channel_spoiler_settings", ChannelSpoilerRules.json(channelSpoilers))
     }
     fun changesFrom(before: AccountPreferences, includeChannelNames: Boolean = false) = JSONObject().apply {
         val old = before.json(); val current = json()
         current.keys().forEach { key ->
-            if (!key.startsWith("sponsorblock_") && !key.startsWith("chat_") && current.get(key).toString() != old.get(key).toString()) put(key, current.get(key))
+            if (key != "channel_spoiler_settings" && !key.startsWith("sponsorblock_") && !key.startsWith("chat_") && current.get(key).toString() != old.get(key).toString()) put(key, current.get(key))
         }
         sponsorBlock.patch(before.sponsorBlock, this, includeChannelNames)
+        val rules = ChannelSpoilerRules.patch(before.channelSpoilers, channelSpoilers, includeChannelNames)
+        if (rules.length() > 0) put("channel_spoiler_settings", rules)
     }
     fun merge(changes: JSONObject): AccountPreferences {
         val current = json()
         changes.keys().forEach { key ->
-            if (key in listOf("sponsorblock_modes", "sponsorblock_colors", "sponsorblock_channel_overrides")) {
+            if (key in listOf("sponsorblock_modes", "sponsorblock_colors", "sponsorblock_channel_overrides", "channel_spoiler_settings")) {
                 val map = current.getJSONObject(key); val delta = changes.getJSONObject(key)
                 delta.keys().forEach { if (delta.isNull(it)) map.remove(it) else map.put(it, delta.get(it)) }
             } else current.put(key, changes.get(key))
@@ -64,6 +68,7 @@ data class AccountPreferences(
                 watchHistory = j.optBoolean("watch_history", true), savePosition = j.optBoolean("save_player_pos", false), chat = ChatPreferences.parse(j),
                 dearrowEnabled = j.optBoolean("dearrow_enabled", false), dearrowShowOriginal = j.optBoolean("dearrow_show_original", true), sponsorBlock = SponsorBlockSettings.parse(j),
                 aiFilter = AiFilterSettings.parse(j),
+                channelSpoilers = ChannelSpoilerRules.parse(j.optJSONObject("channel_spoiler_settings")),
                 autoplay = j.optBoolean("autoplay", true), listen = j.optBoolean("listen", false), local = j.optBoolean("local", true),
                 continueNext = j.optBoolean("continue", false), continueAutoplay = j.optBoolean("continue_autoplay", true), videoLoop = j.optBoolean("video_loop", false),
                 speed = rawSpeed.takeIf { it.isFinite() && it in .25f..2f } ?: 1f, qualityDash = j.text("quality_dash", "auto"), videoCodec = PreferenceRules.videoCodec(j.opt("video_codec")),

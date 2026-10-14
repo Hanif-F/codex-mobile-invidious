@@ -17,9 +17,10 @@ import net.wingress.mobivious.data.*
 @Composable
 internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit, channel: (String) -> Unit,
     audio: () -> Unit, remove: (() -> Unit)? = null, removalLabel: String = "Remove",
-    removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true) {
+    removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true, offline: Boolean = false) {
     val account by vm.account.collectAsStateWithLifecycle()
-    OverflowMenu("Actions for ${video.title}", listOf(video, ApiContext(vm.store.server, account)), Modifier.testTag("video-actions-${video.id}")) { close ->
+    OverflowMenu("Actions for ${maskedVideoTitle(vm, video, offline = offline)}", listOf(video, ApiContext(vm.store.server, account)), Modifier.testTag("video-actions-${video.id}")) { close ->
+        if (ContentVisibility.validChannel(video.channelId)) DropdownMenuItem(text = { Text(channelSpoilerSettingsPage) }, onClick = { close(); vm.openChannelSpoilers(video.channelId) })
         DropdownMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
         DropdownMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
         DropdownMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
@@ -53,7 +54,7 @@ internal fun SavePlaylistSheet(vm: AppViewModel, signIn: () -> Unit) {
         dismissButton = { TextButton({ discard = false }) { Text("Keep editing") } })
     LibraryPanel("Save to playlist", ::close, enabled = !state.busy) { modifier, top ->
         LazyColumn(modifier.testTag("save-playlist-sheet"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { Text(state.video?.title.orEmpty(), style = MaterialTheme.typography.titleMedium) }
+            item { state.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.titleMedium) } }
             if (account == null) item { Text("Sign in to save this video."); LibraryActionButton("Sign in", prominent = true, onClick = signIn) }
             else {
                 if (state.loading || state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }

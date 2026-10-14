@@ -48,7 +48,7 @@ default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_wor
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
                      related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
                      sort='published', latest_only=False, unseen_only=False, notifications_only=False,
-                     default_playlist=None, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
+                     default_playlist=None, channel_spoiler_settings={}, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
 default_prefs.update(ai_filter_enabled=False, **{f'ai_{kind}_{group}_action': 'off' for kind in ('blocklist', 'warnlist') for group in ('feeds', 'search', 'recommendations', 'other_pages')})
 state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
@@ -186,7 +186,8 @@ def reset_search_history():
 reset_search_history()
 
 def reset_accounts():
-    state.update(accountUsername='Fixture', accountProfileId=None, registrationEnabled=True, registrationCaptcha=None, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[],
+    prefs['channel_spoiler_settings'] = {}
+    state.update(accountUsername='Fixture', accountProfileId=None, registrationEnabled=True, registrationCaptcha=None, accountRevoked=False, preferencesDelayNext=0, preferencesRequests=[], spoilerRequests=[], spoilerPatches=[], spoilerDates={}, spoilerDelay=0, spoilerTitleDelay=0, failPreferenceRead=False,
                  accountSessions=[dict(id='current', type='api', issuedAt=1700000000, expiresAt=9999999999, current=True),
                                   dict(id='browser', type='browser', issuedAt=1700000001, expiresAt=9999999999, current=False)])
 reset_accounts()
@@ -579,13 +580,20 @@ class Handler(BaseHTTPRequestHandler):
                               liveNow=state['liveNow'], isMember=state['memberCurrent'], liveChatReplay=state['chatReplay']))
         elif p.startswith('/api/v1/dearrow/'):
             video_id = p.rsplit('/', 1)[-1]
+            if state.get('spoilerTitleDelay'): time.sleep(state['spoilerTitleDelay'] / 1000)
             state['titleLookups'][video_id] = state['titleLookups'].get(video_id, 0) + 1
             self.respond(dict(title={'testvideo01': replacement, 'testvideo02': 'Another calm scene'}.get(video_id)))
+        elif p == '/api/v1/spoilers/publications':
+            ids = parse_qs(url.query).get('ids', [''])[0].split(',')
+            state['spoilerRequests'].append(ids)
+            if state['spoilerDelay']: time.sleep(state['spoilerDelay'] / 1000)
+            self.respond(dict(publications={id: state['spoilerDates'].get(id) for id in ids}))
         elif p == '/api/v1/auth/dearrow/identity':
             self.respond(dict(ready=state['identityReady'], configured=state['identityConfigured']))
         elif p.endswith('/submissions') and p.startswith('/api/v1/auth/dearrow/'):
             self.respond(dict(error='Fixture submissions unavailable') if state['failSubmissions'] else dict(titles=submissions()), 502 if state['failSubmissions'] else 200)
         elif p == '/api/v1/auth/preferences':
+            if state.get('failPreferenceRead'): return self.respond(dict(error='Fixture preference read unavailable'), 503)
             event = dict(completed=False)
             state['preferencesRequests'].append(event)
             delay = state['preferencesDelayNext']; state['preferencesDelayNext'] = 0
@@ -828,6 +836,13 @@ class Handler(BaseHTTPRequestHandler):
             for key in ('commentFailNext', 'commentDelayNext', 'commentEmpty'):
                 if key in data: state[key] = data[key]
             return self.respond({})
+        if p == '/test/spoilers':
+            if 'dates' in data: state['spoilerDates'] = data['dates']
+            if 'delay' in data: state['spoilerDelay'] = data['delay']
+            if 'titleDelay' in data: state['spoilerTitleDelay'] = data['titleDelay']
+            if 'failRead' in data: state['failPreferenceRead'] = data['failRead']
+            if 'rules' in data: prefs['channel_spoiler_settings'] = data['rules']
+            return self.respond({})
         if p == '/test/preferences':
             if 'delayNextMillis' in data: state['preferencesDelayNext'] = data.pop('delayNextMillis')
             prefs.update(data)
@@ -1000,6 +1015,11 @@ class Handler(BaseHTTPRequestHandler):
             if state['failPreferences']: return self.respond(dict(error='Fixture settings could not be saved'), 503)
             for key, value in data.items():
                 if key in ('sponsorblock_modes', 'sponsorblock_colors'): prefs[key].update(value)
+                elif key == 'channel_spoiler_settings':
+                    state['spoilerPatches'].append(value)
+                    for channel, entry in value.items():
+                        if entry is None or not (entry.get('hide_title') or entry.get('hide_thumbnail')): prefs[key].pop(channel, None)
+                        else: prefs[key][channel] = dict(entry, name=prefs[key].get(channel, {}).get('name', 'Mobivious Studio'), reveal_after_days=entry.get('reveal_after_days'))
                 elif key == 'sponsorblock_channel_overrides':
                     for channel, entry in value.items():
                         if entry is None or (entry.get('enabled') is None and not entry.get('modes')): prefs[key].pop(channel, None)

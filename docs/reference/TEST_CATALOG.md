@@ -50,6 +50,18 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `existingApiResponsesNeedNoAvatarMetadataRequests`
 - `imageClientNeverFollowsRedirectsOrSendsCredentials`
 
+### ChannelSpoilersTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/ChannelSpoilersTest.kt) — Channel rule normalization, expiry, sparse changes, lookup isolation and reveal state tests.
+
+- `normalizationMatchesWebsiteAndKeepsInvalidDelaysOut`
+- `sparseChangesAndDeletionPreserveOtherChannelsAndGuestNames`
+- `exactExpiryUnknownAndFutureDatesRemainCorrect`
+- `pendingRulesNeverExposeTitlesAndRevealModesAreExplicit`
+- `lookupsBatchDeduplicateRetainMissesAndSkipKnownOrInactiveRules`
+- `accountChangeRejectsLateLookupAndReveals`
+- `publicLookupUsesBoundedCacheEndpointWithoutAuthentication`
+
 ### ChannelTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/ChannelTest.kt) — Channel declared scenarios; exact cases are enumerated in the test catalog.
@@ -681,6 +693,19 @@ Test support/helper file; no declared `@Test` methods.
 - `delayedPagesCannotReplaceTheSelectedTabOrAppendToAnotherChannelRoute`
 - `delayedMetadataCannotRestoreAChannelAfterLeavingIt`
 
+### ChannelSpoilersSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChannelSpoilersSmokeTest.kt) — Emulator channel settings, masking, reveals, account failures, DeArrow, AI and offline acceptance.
+
+- `guestEditorValidationPersistenceAndThumbnailFirstTap`
+- `accountSparseSaveFailureRetryAndResetPreserveOtherRules`
+- `delayedDeArrowCyclesAndPlaybackNotificationStayMasked`
+- `timedRulesUseCachedUploadAgeAndRetainUnknownMisses`
+- `duplicateOccurrencesRevealIndependently`
+- `channelThumbnailTakesPrecedenceOverAiWarningAndExplicitRevealShowsOriginal`
+- `accountPreferenceReadFailureKeepsSafePlaceholdersAndCanRetry`
+- `clipsAndOfflineDownloadsRespectSourceChannelRules`
+
 ### ChaptersPresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChaptersPresentationTest.kt) — Chapters Presentation declared scenarios; exact cases are enumerated in the test catalog.
@@ -1227,4 +1252,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **720 declared test methods** (including ignored tests).
+Inventory total: **735 declared test methods** (including ignored tests).

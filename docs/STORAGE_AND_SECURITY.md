@@ -150,3 +150,13 @@ They are not a process-death journal. Failed persistence retains confirmed durab
 values and the requested edit with Retry/Revert. Sign-out/server changes warn
 before discarding unconfirmed intent. Sensitive identity/account operations retain
 explicit submission.
+
+## Channel hiding rules
+
+Guest `channel_spoiler_settings` live in the existing instance-scoped preference
+profile. Signed-in rules are confirmed account preferences, not imported guest
+settings. Unconfirmed edits and publication lookups retain their API context;
+late responses from a previous account/server cannot change presentation.
+Reveal state is ephemeral and scoped to displayed/playing occurrences. Raw titles,
+descriptions, downloaded metadata and files remain intact: these are presentation
+preferences, not encryption or metadata access restrictions.

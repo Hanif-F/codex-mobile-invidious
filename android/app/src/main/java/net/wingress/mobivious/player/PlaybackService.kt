@@ -157,6 +157,7 @@ class PlaybackService : MediaSessionService() {
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
         scope.launch { app.playbackContext.collect { if (app.playbackQueue.value.context != null && app.playbackQueue.value.context != it) queue.close() } }
         scope.launch { app.dearrowTitles.titles.collect { queue.syncDisplayTitle() } }
+        scope.launch { app.channelSpoilers.state.collect { queue.syncDisplayTitle(); sessionPlayer.refresh() } }
     }
     private fun queueCommand(action: String, args: Bundle): SessionResult {
         if (args.getString("server") != app.store.server || args.getString("account") != app.store.account.value?.username || args.getLong("generation") != app.store.contextGeneration)

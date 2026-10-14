@@ -50,7 +50,7 @@ internal fun DownloadDialog(vm: AppViewModel) {
             prominent = true, onClick = vm::confirmDownload)
     }) { modifier, top ->
             LazyColumn(modifier.testTag("download-dialog"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                item { Text(state.video?.title.orEmpty()); Text("Choose at least one video or audio track. Captions are optional.", style = MaterialTheme.typography.bodySmall) }
+                item { state.video?.let { DeArrowTitle(vm, it, MaterialTheme.typography.titleMedium) }; Text("Choose at least one video or audio track. Captions are optional.", style = MaterialTheme.typography.bodySmall) }
                 if (state.loading || state.busy) item { LinearProgressIndicator(Modifier.fillMaxWidth()) }
                 state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error); TextButton(onClick = { state.video?.let(vm::openDownload) }) { Text("Retry") } } }
                 if (catalog != null && !catalog.allowed) item { Text(catalog.reason) }
@@ -119,7 +119,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
         val media = record.assets.filter { it.media }
         val extension = asset?.choice?.extension ?: if (media.size == 2) "mp4" else media.single().choice.extension
         val mime = asset?.choice?.mime ?: if (media.size == 2) "video/mp4" else media.single().choice.mime
-        val name = record.details.video.title.replace(Regex("[\\\\/\\r\\n]"), "_").take(120)
+        val name = vm.displayTitle(record.details.video, cached = false).replace(Regex("[\\\\/\\r\\n]"), "_").take(120)
         picker.launch(Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE).setType(mime)
             .putExtra(Intent.EXTRA_TITLE, "$name-${record.id.take(8)}${asset?.choice?.language?.takeIf(String::isNotBlank)?.let { "-$it" }.orEmpty()}.$extension"))
     }
@@ -139,7 +139,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
             Column(Modifier.fillMaxWidth().testTag("download-entry-${record.id}").padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 val heading: @Composable () -> Unit = {
                     Column(Modifier.fillMaxWidth()) {
-                        Text(video.title, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, maxLines = 3, offline = true)
                         Text(video.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                     }
@@ -147,7 +147,9 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                 if (!prefs.thinMode) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.width(if (prefs.uiDensity == "compact") 80.dp else 112.dp).aspectRatio(16f / 9f).clip(AppTokens.media), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.OndemandVideo, null)
+                        ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), offline = true) {
                         if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        }
                     }
                     Box(Modifier.weight(1f)) { heading() }
                 } else heading()
@@ -162,7 +164,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                         if (record.active) TextButton(onClick = { vm.cancelDownload(record.id) }) { Text("Cancel") }
                         if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L }) TextButton(onClick = { vm.retryDownload(record.id) }) { Text("Retry") }
                         TextButton(onClick = { details = !details }, modifier = Modifier.testTag("download-details-${record.id}")) { Text("Details") }
-                        OverflowMenu("Actions for download ${video.title}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->
+                        OverflowMenu("Actions for download ${maskedVideoTitle(vm, video, offline = true)}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->
                             DropdownMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
                             DropdownMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
                         }
@@ -170,7 +172,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                 }
                 if (details) LibraryPanel("Download details",{details=false},closeLabel="Close download details") { body, _ ->
                     LazyColumn(body.testTag("download-details-sheet"),contentPadding=PaddingValues(AppTokens.inset),verticalArrangement=Arrangement.spacedBy(16.dp)) {
-                        item {Text(video.title,style=MaterialTheme.typography.titleLarge);Text(status,style=MaterialTheme.typography.bodyMedium)}
+                        item {DeArrowTitle(vm, video, MaterialTheme.typography.titleLarge, offline = true);Text(status,style=MaterialTheme.typography.bodyMedium)}
                         items(record.assets.filterNot {it.artwork},key={it.choice.key},contentType={"download-asset"}) { asset ->
                             Column {Text(choiceLabel(asset.choice),style=MaterialTheme.typography.bodyLarge)
                                 Text(DisplayFormats.bytes(asset.bytes),style=MaterialTheme.typography.bodySmall)
@@ -184,14 +186,14 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
     }
     records.firstOrNull { it.id == deleting }?.let { record ->
         LibraryConfirmation("Delete download?", { deleting = null }, { vm.deleteDownload(record.id); deleting = null }) {
-            Text("Remove ${record.details.video.title} and its saved files from this device?")
+            Text("Remove ${maskedVideoTitle(vm, record.details.video, offline = true)} and its saved files from this device?")
         }
     }
     records.firstOrNull { it.id == exporting }?.let { record ->
         LibraryPanel("Save to files", { exporting = null }) { modifier, top ->
             Column(modifier.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset, top = top, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 AppSection {
-                Text(record.details.video.title, style = MaterialTheme.typography.titleMedium)
+                DeArrowTitle(vm, record.details.video, MaterialTheme.typography.titleMedium, offline = true)
                 TextButton(onClick = { save(record, null) }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (record.assets.count { it.media } == 2) "Combined video and audio" else "Media file") }
                 record.assets.filter { it.choice.kind == DownloadKind.CAPTION && it.status == DownloadStatus.COMPLETE }.forEach { asset -> TextButton(onClick = { save(record, asset) }) { Text("Caption: ${asset.choice.label}") } }
                 TextButton(onClick = { exporting = null }) { Text("Cancel") }

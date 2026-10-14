@@ -217,3 +217,13 @@ client does not add YouTube account access, membership entitlements, uploads,
 comment writing, poll voting or a local RSS reader. Queue shuffle and durable
 queue restoration after process death are not implemented. Compatibility on
 other instances varies; an APK update does not update the server.
+
+## Hide a channel’s video titles and thumbnails
+
+Use **Settings → Channel title and thumbnail settings**, or a channel/video/watch
+menu shortcut, to hide either or both for one channel. Optionally reveal uploads
+after a number of days. Rules save automatically, share with the website when
+signed in, and stay isolated per instance for guests. A hidden thumbnail reveals
+on the first tap; titles have an explicit reveal cycle, including DeArrow when
+enabled. Playback remains available. See [the settings reference](SETTINGS.md#channel-title-and-thumbnail-settings)
+for expiry, unknown-date handling, offline downloads and reveal lifetime.

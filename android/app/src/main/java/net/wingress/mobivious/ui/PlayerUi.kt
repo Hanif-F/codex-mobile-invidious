@@ -75,6 +75,7 @@ internal fun VideoPlayer(
     pictureOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
+    val spoilerQueue by vm.queue.collectAsStateWithLifecycle()
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
     val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
@@ -128,8 +129,10 @@ internal fun VideoPlayer(
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller,
             Modifier.fillMaxSize())
         else playback.details?.video?.let { video ->
+            ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), playbackOccurrence = spoilerQueue.currentKey, offline = playback.downloadId != null) {
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+            }
         }
         PlayerControlsDim(controls && visible && chromeVisible, Modifier.matchParentSize())
         Box(Modifier.matchParentSize().testTag("player-gestures")

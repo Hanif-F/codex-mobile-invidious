@@ -185,6 +185,27 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var chatAppearanceContext = api.context()
     val sponsorBlock = MutableStateFlow(SponsorBlockPlayback())
     val sponsorSettingsChannel = MutableStateFlow<String?>(null)
+    val spoilerSettingsChannel = MutableStateFlow<String?>(null)
+    val channelSpoilers = app.channelSpoilers
+    val spoilerNavigation = MutableStateFlow(0L)
+    val spoilerSettingsError = MutableStateFlow<String?>(null)
+    fun openChannelSpoilers(id: String = "") { spoilerSettingsChannel.value = id }
+    internal fun requestChannelSpoiler(id: String, rule: ChannelSpoilerRule, days: String, debounce: Boolean = false) {
+        val context = api.context(); preferenceSaves.bind(context)
+        val valid = days.isBlank() || ChannelSpoilerRules.days(days) != null
+        val rules = preferenceValues().channelSpoilers
+        val atLimit = rule.enabled && id !in rules && rules.size >= 1000
+        val value = rule.copy(revealAfterDays = ChannelSpoilerRules.days(days)).json(context.account == null)
+        if (!valid) value.put("reveal_after_days", days)
+        val key = "channel_spoiler_settings.$id"
+        val confirmed = JSONObject().put("channel_spoiler_settings", JSONObject().put(id,
+            preferences.value.channelSpoilers[id]?.json(context.account == null) ?: JSONObject.NULL))
+        val requested = JSONObject().put("channel_spoiler_settings", JSONObject().put(id,
+            if (rule.enabled) value else JSONObject.NULL))
+        preferenceSaves.request(key, "Channel title and thumbnail settings", confirmed.toString(), requested.toString(),
+            if (atLimit) "At most 1,000 channels can be configured. Reset another channel first."
+            else if (rule.enabled && !valid) "Enter a whole number from 1 to 2147483647, or leave blank." else null, debounce)
+    }
     fun openSponsorBlock(channelId: String = "") { sponsorSettingsChannel.value = channelId; refreshSharedSettings() }
     val dearrowTitles = app.dearrowTitles
     val aiFilter = app.aiFilter
@@ -269,7 +290,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val patch = value.changesFrom(before, includeChannelNames=context.account == null)
         val confirmed = preferences.value.json()
         patch.keys().forEach { field ->
-            if (field in listOf("sponsorblock_modes","sponsorblock_colors","sponsorblock_channel_overrides")) {
+            if (field in listOf("sponsorblock_modes","sponsorblock_colors","sponsorblock_channel_overrides","channel_spoiler_settings")) {
                 val delta=patch.getJSONObject(field)
                 delta.keys().forEach { entry ->
                     val requested=JSONObject().put(field,JSONObject().put(entry,delta.get(entry))).toString()
@@ -458,7 +479,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             }
-            syncComments(); syncChat(); if (state.current?.downloadId == null) state.details?.video?.id?.let(::ensureDeArrow); syncDeArrowMetadata(); syncSponsorSettings()
+            syncComments(); syncChat(); if (state.current?.downloadId == null) state.details?.video?.id?.let(::ensureDeArrow); syncSponsorSettings()
         } }
         viewModelScope.launch { subscriptionChannels.collect { state ->
             val pending = pendingChannelSubscription ?: return@collect
@@ -501,6 +522,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             trendingCategory.value = store.trendingCategory(api.context())
             cancelAccumulatedSeek(false)
             sponsorSettingsChannel.value = null
+            spoilerSettingsChannel.value = null; spoilerSettingsError.value = null
             sponsorBlock.value = SponsorBlockPlayback()
             preferenceGeneration++; identityGeneration++
             dearrowTitles.clear(); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
@@ -514,12 +536,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { combine(preferences, dearrowTitles.titles) { prefs, _ -> prefs }.collect {
             if (it.dearrowEnabled) playback.value.details?.video?.id?.let(::ensureDeArrow)
             else dearrowTitles.clear()
-            syncDeArrowMetadata()
         } }
         viewModelScope.launch { app.playbackContext.collect { context ->
             if (downloadDialog.value.context != null && downloadDialog.value.context != context) { downloadJob?.cancel(); downloadDialog.value = DownloadDialogState() }
         } }
-        viewModelScope.launch { preferences.collect { syncComments(); syncChat(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) } } }
+        viewModelScope.launch { preferences.collect { syncComments(); syncChat(); syncSponsorSettings(); syncHistorySettings(); if (preferencesContext == api.context()) {
+            channelSpoilers.configure(it)
+            queueCommand(PlaybackService.QUEUE_SETTINGS) { putString("settings", it.json().toString()) }
+        } } }
         viewModelScope.launch {
             combine(preferences, browse, navigation) { prefs, state, destination ->
                 Triple(prefs.aiFilter, AiPageGroup.browsing(destination.first, destination.second),
@@ -608,10 +632,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
         val navigationAtRequest = navigationRevision
-        action { val value = api.preferences(context); if (api.context() == context && prefsGeneration == preferenceGeneration) {
+        action { val value = try { api.preferences(context) } catch (e: CancellationException) { throw e } catch (e: Exception) { if (api.context() == context) spoilerSettingsError.value = friendly(e); throw e }; if (api.context() == context && prefsGeneration == preferenceGeneration) {
             val refreshCurrent = currentBrowseAffected(preferences.value, value)
             invalidateSavedTabs(preferences.value, value)
-            preferencesContext = context; preferences.value = value; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
+            preferencesContext = context; preferences.value = value; channelSpoilers.configure(value, context); spoilerSettingsError.value = null; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
             val applyHome = homeAppliedContext != context && navigationRevision == navigationAtRequest && route != "sign-in" && signInReturn == null
             homeAppliedContext = context
             if (applyHome) openDefaultHome()
@@ -661,17 +685,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         lists.filter { it.channelId !in blocked.value.takeIf { state -> state.context == api.context() }?.ids.orEmpty() } else lists
     fun visibleSearchResults(items: List<SearchResult>) = SearchResults.visible(items, preferences.value.showMemberVideos,
         searchVisibility.value, blocked.value.takeIf { it.context == api.context() }?.ids.orEmpty()).filterNot { it is SearchResult.VideoItem && aiDecision(it.video, AiPageGroup.SEARCH).hidden }
-    fun displayTitle(video: Video): String = if (preferences.value.dearrowEnabled) dearrowTitles.titles.value[video.id] ?: video.title else video.title
-    private fun syncDeArrowMetadata() {
-        if (queue.value.current?.clip != null || queue.value.current?.downloadId != null) return
-        val video = playback.value.details?.video ?: return
-        val p = controller.value ?: return
-        val title = displayTitle(video)
-        if (p.currentMediaItem?.mediaId == video.id && p.mediaMetadata.title?.toString() != title) {
-            p.sendCustomCommand(SessionCommand(PlaybackService.SET_DISPLAY_TITLE, Bundle.EMPTY), Bundle().apply { putString("mediaId", video.id); putString("title", title) })
-        }
-    }
+    fun displayTitle(video: Video, original: String = video.title, cached: Boolean = true): String = channelSpoilers.state.value.title(video,
+        if (preferences.value.dearrowEnabled && original == video.title) dearrowTitles.titles.value[video.id] else null, original = original, cached = cached)
     fun navigate(tab: String, route: String = "", loadContent: Boolean = true, rememberOrigin: Boolean = false) {
+        spoilerNavigation.value++; channelSpoilers.reload()
         if (this.route.isEmpty() && this.tab in PreferenceRules.tabs) tabBrowse[this.tab] = captureBrowse()
         navigationRevision++
         dismissClipResolution(); closeClipEditor()
@@ -692,6 +709,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         channel.value = null; channelTab.value = null; playlist.value = null; playlistSeed = null; playlistLink = null; channelPlaylistSort.value = "last"; channelVideoSort.value = ChannelSort.NEWEST; if (loadContent) refresh()
     }
     private fun restoreBrowse(saved: BrowseReturn, afterSignIn: Boolean = false) {
+        spoilerNavigation.value++; channelSpoilers.reload()
         navigationRevision++
         dismissLinkResolution()
         if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Popular"); return }
@@ -907,11 +925,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (value !in listOf("popular", "trending")) return
         selectTab(if (value == "trending") "Trending" else "Popular")
     }
-    fun refresh() { dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow); refreshWatched() }
+    fun refresh() { spoilerNavigation.value++; channelSpoilers.reload(); dearrowTitles.clear(); load(false); playback.value.details?.video?.id?.let(::ensureDeArrow); refreshWatched() }
     /** Refresh the current root feed without clearing its rows or restarting an active request. */
     fun refreshFeed() {
         if (route.isNotEmpty() || tab !in listOf("Popular", "Trending", "Subscriptions") ||
             tab == "Subscriptions" && account.value == null || browse.value.loading) return
+        spoilerNavigation.value++; channelSpoilers.reload()
         dearrowTitles.clear()
         load(false, retainFeed = true)
         playback.value.details?.video?.id?.let(::ensureDeArrow)

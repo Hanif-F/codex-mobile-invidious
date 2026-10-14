@@ -28,18 +28,42 @@ import net.wingress.mobivious.data.*
 
 @Composable
 internal fun DeArrowTitle(vm: AppViewModel, video: Video, style: TextStyle, modifier: Modifier = Modifier,
-    maxLines: Int = Int.MAX_VALUE, fontWeight: FontWeight? = null) {
+    maxLines: Int = Int.MAX_VALUE, fontWeight: FontWeight? = null, playbackOccurrence: String? = null,
+    originalTitle: String = video.title, offline: Boolean = false, useDeArrow: Boolean = true) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val titles by vm.dearrowTitles.titles.collectAsStateWithLifecycle()
-    LaunchedEffect(video.id, prefs.dearrowEnabled, video.id in titles) { vm.ensureDeArrow(video.id) }
-    val replacement = if (prefs.dearrowEnabled) titles[video.id]?.takeIf { it != video.title } else null
-    var original by remember(video.id, vm.store.server, replacement, prefs.dearrowShowOriginal) { mutableStateOf(false) }
+    val spoilers by vm.channelSpoilers.state.collectAsStateWithLifecycle()
+    val navigation by vm.spoilerNavigation.collectAsStateWithLifecycle()
+    LaunchedEffect(video, prefs.dearrowEnabled, video.id in titles, spoilers.ready, spoilers.revision, navigation) {
+        if (!offline && useDeArrow) vm.ensureDeArrow(video.id)
+        if (!offline) vm.channelSpoilers.ensure(listOf(video))
+    }
+    val replacement = if (prefs.dearrowEnabled && useDeArrow && !offline) titles[video.id]?.takeIf { it != originalTitle } else null
+    var mode by remember(video.id, video.indexId, video.playlistIndex, vm.api.context(), navigation, spoilers.revision, originalTitle) { mutableStateOf(SpoilerTitleMode.HIDDEN) }
+    var requesting by remember(video.id, vm.api.context(), navigation, spoilers.revision) { mutableStateOf(false) }
+    val decision = spoilers.decision(video, cached = !offline)
+    val selected = if (playbackOccurrence != null) spoilers.playback.takeIf { it.occurrence == playbackOccurrence }?.title ?: SpoilerTitleMode.HIDDEN else mode
+    fun select(next: SpoilerTitleMode) { if (playbackOccurrence != null) vm.channelSpoilers.revealTitle(playbackOccurrence, next) else mode = next }
+    LaunchedEffect(requesting, video.id in titles, prefs.dearrowEnabled, useDeArrow) {
+        if (requesting && (video.id in titles || !prefs.dearrowEnabled || !useDeArrow)) {
+            requesting = false; select(SpoilerTitleMode.HIDDEN.next(replacement != null))
+        }
+    }
+    val text = if (!decision.title && selected == SpoilerTitleMode.ORIGINAL) originalTitle else
+        spoilers.title(video, replacement, selected, originalTitle, cached = !offline)
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(if (original) video.title else replacement ?: video.title, modifier.weight(1f), style = style,
+        Text(text, modifier.weight(1f), style = style,
             maxLines = maxLines, fontWeight = fontWeight, overflow = TextOverflow.Ellipsis)
-        if (replacement != null && prefs.dearrowShowOriginal) AppInsetIconButton(onClick = { original = !original },
-            modifier = Modifier.semantics { stateDescription = if (original) "Original title" else "DeArrow title" }) {
-            Icon(Icons.AutoMirrored.Filled.CompareArrows, if (original) "Show DeArrow title" else "Show original title", tint = MaterialTheme.colorScheme.primary)
+        if (decision.title && !decision.pending || replacement != null && prefs.dearrowShowOriginal) AppInsetIconButton(enabled = !requesting, onClick = {
+            if (decision.title && selected == SpoilerTitleMode.HIDDEN && prefs.dearrowEnabled && useDeArrow && !offline && video.id !in titles) {
+                requesting = true; vm.ensureDeArrow(video.id)
+            } else select(if (decision.title) selected.next(replacement != null) else if (selected == SpoilerTitleMode.ORIGINAL) SpoilerTitleMode.DEARROW else SpoilerTitleMode.ORIGINAL)
+        }, modifier = Modifier.testTag("spoiler-title-reveal-${video.id}").semantics { stateDescription = if (decision.title && selected == SpoilerTitleMode.HIDDEN) "Hidden title" else if (selected == SpoilerTitleMode.ORIGINAL) "Original title" else "DeArrow title" }) {
+            Icon(Icons.AutoMirrored.Filled.CompareArrows, if (requesting) "Loading title…" else if (decision.title) when (selected) {
+                SpoilerTitleMode.HIDDEN -> "Reveal title"
+                SpoilerTitleMode.DEARROW -> "Show original title"
+                SpoilerTitleMode.ORIGINAL -> "Hide title"
+            } else if (selected == SpoilerTitleMode.ORIGINAL) "Show DeArrow title" else "Show original title", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }

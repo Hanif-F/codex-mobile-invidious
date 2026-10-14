@@ -17,6 +17,7 @@ data class Clip(val id: String, val title: String, val startMs: Long, val endMs:
         .put("creator", creator).put("createdAt", createdAt).put("server", server)
         .put("video", JSONObject().put("videoId", video.id).put("title", video.title).put("author", video.author)
             .put("authorId", video.channelId).put("lengthSeconds", video.duration).put("thumbnail", video.thumbnail)
+            .put("published", video.publicationTime ?: JSONObject.NULL)
             .apply { if (video.authorAvatar.isNotBlank()) put("authorThumbnail", video.authorAvatar) })
     companion object {
         fun parse(j: JSONObject, id: String, server: String): Clip {

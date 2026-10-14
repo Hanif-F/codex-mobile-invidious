@@ -7,6 +7,43 @@ Its scope is `androidInvidious`: the Android application, benchmark module,
 tests, fixtures, build/release runners, deployment examples and documentation.
 The sibling Invidious repository is an integration boundary and is unchanged.
 
+## Channel title and thumbnail hiding — 15 October 2026
+
+Implemented the channel rules from Invidious commits `106c1ad5` and `9e31f7e5`
+in Android and extended the sibling server's native preference PATCH and cache-only
+publication endpoint. Automatic per-channel saves preserve account/guest isolation;
+masking covers browsing, playback metadata, clips and downloads. The service shares
+confirmed presentation preferences and rejects stale occurrence reveals. Date
+normalization rejects sentinel values in source, history and cached metadata.
+
+Validation on `emulator-5554` (Pixel 8 Pro AVD, Android 16/API 36):
+
+- All **361 JVM tests** pass, including seven channel-spoiler rule/API tests.
+- The final **11 device tests** (`ChannelSpoilersSmokeTest`, `DeArrowSmokeTest`)
+  pass with no skips; the same runner builds the debug app/test APKs and passes lint.
+- The related clip, download and queue run passed **32 further device cases**.
+  The existing accepted-video-conversion case remains explicitly ignored for the
+  documented emulator gfxstream crash; it was not counted as passing.
+- All **19 Python documentation/workflow tests** pass with local socket access
+  and with the shared fixture port free.
+- The server's **13 focused channel/native-preference specs**, production account
+  route/database harness, normal/API-only no-codegen builds, changed-file formatting
+  and documentation/reference checks pass. The disposable PostgreSQL container
+  was removed after testing.
+
+The full Crystal spec suite fails at `playlists.cr:585` because the reduced spec
+helper does not load `Invidious::Frontend::ChannelSpoilers`. The same failure was
+reproduced from an untouched archive of server HEAD `c8773947`; it is separate
+from the passing native API checks. Early Android test-selector failures were
+corrected, and the media metadata journey was rechecked after moving confirmed
+DeArrow enablement into the shared presentation state.
+
+Normal-size emulator screenshots for settings, hidden feeds/watch and downloads
+were inspected. Logs and captures are ignored local artifacts under
+`.tools/channel-spoilers*`; they are synthetic-fixture acceptance, not physical-device
+or live-instance validation. The debug APK remains installed. Account saves need
+the companion server changes deployed; no schema migration or token renewal is needed.
+
 ## Watch presentation follow-up
 
 The expanded watch page now uses four filled circular action buttons with labels

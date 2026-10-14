@@ -33,9 +33,15 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private val playlistWrites = Mutex()
     private val mixContinuations = mutableSetOf<String>()
     var changed: () -> Unit = {}
-    fun update(value: PlaybackQueueSnapshot) { app.playbackQueue.value = value; changed() }
+    fun update(value: PlaybackQueueSnapshot) {
+        app.playbackQueue.value = value
+        app.channelSpoilers.bindPlayback(value.currentKey)
+        if (value.current?.downloadId == null) app.channelSpoilers.ensure(value.items.map { it.video } + value.details?.recommendations.orEmpty())
+        changed()
+    }
     fun settings(value: AccountPreferences) {
         prefs = value; prefsContext = app.api.context(); settingsVersion++
+        app.channelSpoilers.configure(value)
         app.aiFilter.configure(value.aiFilter)
         if (state.current?.downloadId == null) {
             app.aiFilter.ensure(state.items.filter { it.downloadId == null }.map { it.video.channelId }, value.aiFilter.active(AiPageGroup.OTHER))
@@ -47,12 +53,27 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     fun syncDisplayTitle() {
         val item = player.currentMediaItem ?: return
         val details = state.details ?: return
-        if (state.current?.downloadId != null) return
         if (state.context != app.api.context() || item.mediaMetadata.extras?.getString("occurrence") != state.currentKey) return
-        val title = state.current?.clip?.title ?: if (prefs.dearrowEnabled) app.dearrowTitles.titles.value[item.mediaId] ?: details.video.title else details.video.title
-        if (item.mediaMetadata.title?.toString() == title) return
+        val title = displayTitle(details.video, state.currentKey.orEmpty(), state.current?.clip?.title)
+        val artwork = if (artworkHidden(details.video, state.currentKey.orEmpty())) null else
+            details.video.thumbnail.takeIf { it.isNotBlank() }?.let { Uri.parse(app.api.url("/").resolve(it)?.toString() ?: it) }
+        if (item.mediaMetadata.title?.toString() == title && item.mediaMetadata.artworkUri == artwork) return
         val extras = Bundle(item.mediaMetadata.extras ?: Bundle.EMPTY).apply { putBoolean("dearrowMetadataOnly", true) }
-        player.replaceMediaItem(0, item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setTitle(title).setExtras(extras).build()).build())
+        player.replaceMediaItem(0, item.buildUpon().setMediaMetadata(item.mediaMetadata.buildUpon().setTitle(title).setArtworkUri(artwork).setArtworkData(null).setExtras(extras).build()).build())
+    }
+    private fun displayTitle(video: Video, occurrence: String, clipTitle: String? = null): String {
+        val spoilers = app.channelSpoilers.state.value
+        val reveal = spoilers.playback.takeIf { it.occurrence == occurrence }?.title ?: SpoilerTitleMode.HIDDEN
+        val replacement = if (spoilers.dearrowEnabled && clipTitle == null && state.current?.downloadId == null) app.dearrowTitles.titles.value[video.id] else null
+        return spoilers.title(video, replacement, reveal, clipTitle ?: video.title, cached = state.current?.downloadId == null)
+    }
+    fun queueTitle(entry: QueueOccurrence): String = app.channelSpoilers.state.value.title(entry.video,
+        if (app.channelSpoilers.state.value.dearrowEnabled && entry.clip == null && entry.downloadId == null) app.dearrowTitles.titles.value[entry.video.id] else null,
+        original = entry.clip?.title ?: entry.video.title, cached = entry.downloadId == null)
+    private fun artworkHidden(video: Video, occurrence: String): Boolean {
+        val spoilers = app.channelSpoilers.state.value
+        val decision = spoilers.decision(video, cached = state.current?.downloadId == null)
+        return decision.pending || decision.thumbnail && !(spoilers.playback.occurrence == occurrence && spoilers.playback.thumbnail)
     }
     fun playerError(message: String?) {
         if (message != null) { requestedPlayWhenReady = player.playWhenReady; decoderError = true; update(state.copy(loading = false, error = message)) }
@@ -100,7 +121,8 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             .setPreferredTextLanguage(snapshot?.parameters?.preferredTextLanguages?.firstOrNull() ?: PreferenceRules.caption(prefs.captions, details.captions)?.language).build()
         player.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
         pendingSelection = snapshot; selectionPending = true
-        player.setMediaSource(DownloadPlayback.source(app, app.downloads, record, entry.key), positionMs ?: record.positionMs)
+        player.setMediaSource(DownloadPlayback.source(app, app.downloads, record, entry.key,
+            displayTitle(details.video, entry.key), artworkHidden(details.video, entry.key)), positionMs ?: record.positionMs)
         player.prepare(); player.playWhenReady = playing; requestedPlayWhenReady = playing
         update(state.copy(details = details, loading = false, error = null))
     }
@@ -117,10 +139,15 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             sourceComplete = source == null, explicitQueue = source != null, carriedOptions = (linkPlayback?.options?.carried() ?: PlaybackLinkOptions()).let { if (audio) it.copy(listen = true) else it }))
         launch { _, _ ->
             val version = settingsVersion
+            val spoilerRevision = app.channelSpoilers.state.value.revision
+            var confirmed = true
             val fetched = if (context.account == null) app.store.initialPreferences() else try { app.api.preferences(context) }
-                catch (e: CancellationException) { throw e } catch (_: Exception) { prefs }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { confirmed = false; prefs }
             check(token, context)
-            if (version == settingsVersion) prefs = fetched
+            if (version == settingsVersion) {
+                prefs = fetched
+                if (confirmed && app.channelSpoilers.state.value.revision == spoilerRevision) app.channelSpoilers.configure(fetched, context)
+            }
             baseRepeat = if (clip != null || prefs.videoLoop) QueueRepeat.ONE else QueueRepeat.OFF
             update(state.copy(repeat = baseRepeat))
             var entry: QueueOccurrence? = null
@@ -201,10 +228,15 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         update(state.copy(currentKey = entry.key, details = null, loading = true, error = null))
         if (!fresh && !sameOccurrence) {
             val version = settingsVersion
+            val spoilerRevision = app.channelSpoilers.state.value.revision
+            var confirmed = true
             val fetched = if (context.account == null) app.store.initialPreferences() else try { app.api.preferences(context) }
-                catch (e: CancellationException) { throw e } catch (_: Exception) { prefs }
+                catch (e: CancellationException) { throw e } catch (_: Exception) { confirmed = false; prefs }
             check(token, context)
-            if (version == settingsVersion) prefs = fetched
+            if (version == settingsVersion) {
+                prefs = fetched
+                if (confirmed && app.channelSpoilers.state.value.revision == spoilerRevision) app.channelSpoilers.configure(fetched, context)
+            }
         }
         val prefs = state.effective(this.prefs)
         app.aiFilter.configure(prefs.aiFilter)
@@ -230,8 +262,8 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         require(details.upcoming != true || details.video.live) { details.notice.ifBlank { "This video is upcoming. Retry when it starts." } }
         require(stream.isNotBlank()) { "No playable stream is available." }
         val uri = stream.toHttpUrlOrNull()!!.newBuilder().setQueryParameter("local", prefs.local.toString()).apply { entry.linkPlayback?.options?.region?.let { setQueryParameter("region", it) } }.build().toString()
-        val metadata = MediaMetadata.Builder().setTitle(entry.clip?.title ?: details.video.title).setArtist(details.video.author)
-            .setArtworkUri(Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
+        val metadata = MediaMetadata.Builder().setTitle(displayTitle(details.video, entry.key, entry.clip?.title)).setArtist(details.video.author)
+            .setArtworkUri(if (artworkHidden(details.video, entry.key)) null else Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
                 putString("occurrence", entry.key); putBoolean("clip", entry.clip != null); putBoolean("history", entry.clip == null && context.account != null && prefs.watchHistory); putBoolean("savePosition", entry.clip == null && prefs.savePosition)
                 putString("channelId", details.video.channelId); putBoolean("liveNow", details.video.live)
                 putString("sponsorblock", prefs.sponsorBlock.effective(details.video.channelId).json().toString())

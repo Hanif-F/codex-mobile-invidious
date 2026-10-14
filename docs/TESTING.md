@@ -240,3 +240,22 @@ chat timestamps save independently of invalid filter text. Context-bound chat
 callbacks reject edits from another video/account. Download details are a local
 opaque sheet. `captureWatchScreenshot` validates each saved PNG header so a path
 or capture failure cannot silently count as screenshot evidence.
+
+## Channel hiding acceptance
+
+Run the channel and DeArrow journeys on the selected running device:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.ChannelSpoilersSmokeTest,net.wingress.mobivious.DeArrowSmokeTest
+```
+
+These cover guest persistence/validation, account sparse saves and retry/reset,
+first-tap thumbnail reveal, duplicate occurrences, timed cache dates/misses, delayed
+DeArrow cycling, AI precedence, account-read failures during playback, clips and
+offline media metadata. JVM tests additionally cover sentinel/future dates, exact
+UTC boundaries, sparse merge/isolation, lookup batching and stale occurrence/context
+rejection. Screenshot names start with `spoiler-` under `/data/local/tmp/mobivious-ui`.
+The local fixture exposes `/test/spoilers` controls and records only non-secret
+channel patches and publication IDs. The sibling account harness tests production
+route validation, scopes, CSRF, concurrent writes and cache-only date responses.

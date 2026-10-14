@@ -150,3 +150,14 @@ user/word filter group; stale callbacks carry their originating context/video an
 cannot edit a different session. Download details open in a local opaque sheet.
 Wide watch keeps information below the picture in its primary pane, with tools
 or recommendations in the supporting pane.
+
+## Channel title and thumbnail masking
+
+The native channel editor uses the existing opaque settings surfaces and automatic
+save feedback. Hidden artwork uses a neutral text placeholder with a 48dp-or-larger
+interactive image area; its first tap reveals without navigation. Title buttons
+announce Reveal title, Show original title or Hide title according to state.
+Passive action/dialog labels use masked text. Upload-date uncertainty is visible in
+the placeholder. Independent card occurrences keep independent reveals; watch and
+mini-player share the active playback reveal. Account loading uses safe placeholders
+and read failures offer Retry in the channel settings page.

@@ -195,3 +195,24 @@ These are requirements recorded by this repository, not a live capability probe
 of any production instance. Install/update/migrate the sibling server separately
 using [Deployment](../deploy/README.md). Public API availability does not by itself
 prove the corresponding account permission or upstream content availability.
+
+## Channel title and thumbnail hiding
+
+Account preference GET already includes `channel_spoiler_settings`. Native sparse
+PATCH now accepts a map of changed canonical channel IDs to complete
+`{hide_title: boolean, hide_thumbnail: boolean, reveal_after_days: integer|null}`
+rules. Omitted delay means indefinite hiding; blank delays explicitly serialize
+null. A null entry deletes that channel. The server owns channel names; native
+patches cannot submit `name`. It merges under the existing account lock, preserves
+other channels and unrelated JSON, and rejects malformed edits atomically. Existing
+GET/PATCH preference scopes suffice, with no token renewal or migration.
+
+`GET /api/v1/spoilers/publications?ids=videoId,videoId` is public and accepts 1–100
+distinct 11-character video IDs. It returns
+`{"publications":{"videoId":<Unix seconds or null>}}`, including null misses, with
+`Cache-Control: no-store`. The server reads only existing video/channel caches
+and never refreshes from YouTube. Android batches matching timed rules with missing
+source dates and retains results/misses for the current content load. Missing or
+older-server endpoints leave upload dates unknown and content hidden. Ordinary
+public metadata retains its original values. Account saves require the companion
+native API update; unsupported servers show the existing shared-settings error.

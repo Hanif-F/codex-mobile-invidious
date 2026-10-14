@@ -45,7 +45,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
         if (state.current?.downloadId == null) { vm.aiFilter.configure(prefs.aiFilter); vm.aiFilter.ensure(state.items.filter { it.downloadId == null }.map { it.video.channelId }, prefs.aiFilter.active(AiPageGroup.OTHER)) }
     }
     val current = state.current?.video
-    val currentTitle = current?.let { if (prefs.dearrowEnabled) titles[it.id] ?: it.title else it.title }
+    val currentTitle = current?.let { maskedVideoTitle(vm, it, state.current?.clip?.title ?: it.title, offline = state.current?.downloadId != null) }
     val owned = state.source?.owned == true || lists.any { it.id == state.source?.id && it.owned }
     PlaybackQueueContent(state, expanded || fullHeight, prefs.showMemberVideos, currentTitle, fullHeight = fullHeight,
         toggle = { vm.queueExpanded.value = !vm.queueExpanded.value }, previous = { vm.nextQueue(-1) }, next = { vm.nextQueue(1) },
@@ -56,16 +56,22 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
         QueueVideoRow(entry, entry.key == state.currentKey, vm.store.server, prefs.thinMode, indicator, eligible,
             hiddenMember = entry.video.membersOnly && !prefs.showMemberVideos,
             aiWarning = if (entry.downloadId == null) vm.aiDecision(entry.video, AiPageGroup.OTHER, aiState).warning else null,
+            artwork = { modifier -> ChannelSpoilerArtwork(vm, entry.video, modifier, { vm.selectQueue(entry.key) }, offline = entry.downloadId != null) { revealed ->
+                val warning = if (entry.downloadId == null && !revealed) vm.aiDecision(entry.video, AiPageGroup.OTHER, aiState).warning else null
+                if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true)
+                else AsyncImage(resolved(vm.store.server, entry.video.thumbnail.ifBlank { "/vi/${entry.video.id}/mqdefault.jpg" }), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            } },
             play = { vm.selectQueue(entry.key) }, channel = channel,
             title = { modifier -> DeArrowTitle(vm, entry.video, MaterialTheme.typography.titleSmall, modifier, maxLines = 2,
-                fontWeight = if (entry.key == state.currentKey) FontWeight.Bold else FontWeight.Medium) }) {
+                fontWeight = if (entry.key == state.currentKey) FontWeight.Bold else FontWeight.Medium,
+                originalTitle = entry.clip?.title ?: entry.video.title, useDeArrow = entry.clip == null, offline = entry.downloadId != null) }) {
             VideoActionsMenu(vm, entry.video, signIn, channel,
                 audio = { vm.audioOnly(true); if (eligible) vm.selectQueue(entry.key) },
                 remove = if (!entry.removed) ({ vm.queueCommand(PlaybackService.QUEUE_REMOVE) { putString("key", entry.key) } }) else null,
                 removalLabel = "Remove from queue",
                 removeFromPlaylist = if (owned && entry.video.indexId.isNotEmpty() && !entry.removed) ({
                     vm.queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", entry.key) }
-                }) else null, removeFromPlaylistEnabled = !state.loading && !state.sourceLoading)
+                }) else null, removeFromPlaylistEnabled = !state.loading && !state.sourceLoading, offline = entry.downloadId != null)
         }
     }
 }
@@ -126,6 +132,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
 internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: String, thinMode: Boolean,
     indicator: VideoIndicator, eligible: Boolean, hiddenMember: Boolean = false, aiWarning: AiListKind? = null,
     play: () -> Unit, channel: (String) -> Unit,
+    artwork: (@Composable (Modifier) -> Unit)? = null,
     title: @Composable (Modifier) -> Unit = { modifier -> Text(entry.video.title, modifier, maxLines = 2,
         overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall,
         fontWeight = if (current) FontWeight.Bold else FontWeight.Medium) },
@@ -139,11 +146,12 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
                 if (video.unavailable) "Unavailable video" else null, if (hiddenMember) "Hidden by members-only setting" else null,
                 indicator.description.takeIf { it.isNotEmpty() }).joinToString(". ")
         }
-        .clickable(enabled = eligible, role = Role.Button, onClickLabel = "Play ${video.title}", onClick = play)
+        .clickable(enabled = eligible, role = Role.Button, onClickLabel = "Play video", onClick = play)
         .heightIn(min = 96.dp).padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         if (!thinMode || aiWarning != null) Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface)) {
-            if (aiWarning != null) AiThumbnail(aiWarning, Modifier.fillMaxSize(), compact = true)
+            if (artwork != null) artwork(Modifier.fillMaxSize())
+            else if (aiWarning != null) AiThumbnail(aiWarning, Modifier.fillMaxSize(), compact = true)
             else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             indicator.bar?.let { fraction ->

@@ -64,6 +64,10 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
         key(context) { SponsorBlockSheet(vm, "", back, fullScreen = true) }
         return
     }
+    if (page == channelSpoilerSettingsPage) {
+        key(context) { ChannelSpoilerSettings(vm, "", back, fullScreen = true) }
+        return
+    }
     BackHandler { if (!accountBusy) back() }
     BrowseAppSurface(Modifier.fillMaxSize().imePadding(), toolbar = {
         LibraryToolbar(page, back = back, backLabel = "Back from $page", backEnabled = !accountBusy)
@@ -96,6 +100,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                             SettingsLink("Browsing", "Homepage, region and video pages", Icons.Default.Explore, navigate)
                             SettingsLink("Subscriptions", "Feed size, sorting and filters", Icons.Default.Subscriptions, navigate)
                             SettingsLink("History & library", "Watch history, resume and default playlist", Icons.Default.History, navigate)
+                            SettingsLink(channelSpoilerSettingsPage, "Hide selected channels’ video titles and thumbnails", Icons.Default.VisibilityOff, navigate)
                         } }
                         item { AppSection {
                             SectionHeading("Community tools")
