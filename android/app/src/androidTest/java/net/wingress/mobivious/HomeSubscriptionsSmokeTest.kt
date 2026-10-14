@@ -36,14 +36,14 @@ class HomeSubscriptionsSmokeTest {
         compose.runOnUiThread {
             val vm = activity.model
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
+            vm.store.guestPreferences(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null)
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
+            activity.model.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask()
         }
     }
     private fun login() {
@@ -83,7 +83,7 @@ class HomeSubscriptionsSmokeTest {
         command("""{"discoveryDistinct":true}""")
         compose.runOnUiThread {
             activity.model.navigate("Popular")
-            activity.model.store.guestDeArrow(AccountPreferences(defaultHome = "Trending"))
+            activity.model.store.guestPreferences(AccountPreferences(defaultHome = "Trending"))
             activity.model.refreshSharedSettings(); activity.model.openDefaultHome()
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.firstOrNull()?.title == "trending discovery fixture" }

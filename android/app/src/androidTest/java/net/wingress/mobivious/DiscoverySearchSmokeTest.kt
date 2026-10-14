@@ -38,7 +38,7 @@ class DiscoverySearchSmokeTest {
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
             (activity.application as MobiviousApplication).cache.clear()
-            vm.store.guestDeArrow(AccountPreferences()); vm.store.trendingCategory(vm.api.context(), TrendingCategory.LIVESTREAMS)
+            vm.store.guestPreferences(AccountPreferences()); vm.store.trendingCategory(vm.api.context(), TrendingCategory.LIVESTREAMS)
             vm.trendingCategory.value = TrendingCategory.LIVESTREAMS
             vm.saveSearchVisibility(SearchVisibility()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
@@ -96,7 +96,7 @@ class DiscoverySearchSmokeTest {
         country("trending-region", "Indonesia", "ID")
         until { vm.preferences.value.region == "ID" && !vm.browse.value.loading && vm.preferenceSaves.edits.value["region"] == null }
         assertEquals("trending gaming ID", vm.browse.value.videos.single().title)
-        assertEquals("ID", vm.store.guestDeArrow().region)
+        assertEquals("ID", vm.store.guestPreferences().region)
         assertEquals(TrendingCategory.GAMING, vm.store.trendingCategory(vm.api.context()))
         screenshot("trending-gaming-id")
         compose.selectFeed("Popular")
@@ -115,7 +115,7 @@ class DiscoverySearchSmokeTest {
             compose.onNodeWithTag("settings-list").performScrollToNode(hasTestTag("settings-region"))
         }
         open();country("settings-region","Japan","JP")
-        until {vm.preferences.value.region=="JP" && vm.store.guestDeArrow().region=="JP"}
+        until {vm.preferences.value.region=="JP" && vm.store.guestPreferences().region=="JP"}
         compose.onNodeWithContentDescription("Back from Browsing").performClick();back()
         open();country("settings-region","JP","JP");compose.finishAutomaticPreferencePage()
         until { vm.preferences.value.region == "JP" && compose.onAllNodesWithTag("settings-root").fetchSemanticsNodes().isNotEmpty() }

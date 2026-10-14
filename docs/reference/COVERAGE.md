@@ -1,69 +1,33 @@
 # Documentation coverage and review boundaries
 
-[Documentation index](../README.md) · [Source map](SOURCE_MAP.md) ·
-[Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)
+[Documentation index](../README.md) · [Source map](SOURCE_MAP.md) · [Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)
 
-The current guides describe Mobivious 0.10.3 (version code 21), reviewed against
-the implementation at `2df3584` plus the patch release version bump on 13 October 2026.
-Runtime acceptance is recorded in the [implementation record](../liquid-glass-overhaul-2026-10-13/IMPLEMENTATION.md). The review covers the maintained
-Android project and its supporting scripts/deployment examples in this repository.
-The sibling Invidious project is described at its integration boundary; it is not
-an additional Android module.
+The current guides describe Mobivious **0.11.0** (version code **22**). This report is generated from the current Gradle configuration and reviewed inventory; counts describe files, not measured execution coverage.
 
 ## File coverage
 
-| Maintained files | Count | Documentation |
-| --- | ---: | --- |
-| Main application Kotlin | 93 | Per-file responsibilities and owning guides in [Source map](SOURCE_MAP.md). |
-| JVM test Kotlin | 34 | Every file and declared test method in [Test catalog](TEST_CATALOG.md). |
-| Android device test/support Kotlin | 60 | Every suite/helper, declared method and explicit Ignore in the test catalog. |
-| Build, manifests, resources, scripts, deployment and repository support | 39 | Per-file responsibilities and owning guides in the source map. |
-| **Total** | **226** | Explicit entries with reviewed SHA-256 fingerprints in `coverage.json`. |
+| Maintained files | Count |
+| --- | ---: |
+| Main application Kotlin | 95 |
+| JVM test Kotlin | 37 |
+| Android device test/support Kotlin | 65 |
+| Build, benchmark, resources, scripts, deployment and repository support | 52 |
+| **Total** | **249** |
 
-The inventory uses Git's tracked and non-ignored untracked files under `android/`,
-`scripts/` and `deploy/`, plus `.env.example`, `.gitignore`, `docker-compose.yml`
-and `LICENSE`. It includes wrapper scripts/JAR/configuration and the documentation
-checker itself. Generated source/test catalogs are reproducible from the manifest
-and Kotlin declarations. Counts describe files, not measured execution coverage.
+Every maintained file has a reviewed SHA-256 fingerprint, responsibility and owning guide in `coverage.json`. The source map indexes implementations; the test catalog lists every declared JVM/device test and explicit Ignore.
 
-## Behavior coverage
+## Review scope
 
-| System | Documented behavior and boundaries | Guide |
-| --- | --- | --- |
-| Application and state | Startup, ownership, navigation, snapshots, pagination, lifecycles, contexts, revisions, cancellation and failure isolation. | [Architecture](../ARCHITECTURE.md) |
-| User workflows | Discovery/search, channels/posts, watch/discussions, replay chat, accounts, library, sharing, offline media and current exclusions. | [Features](../FEATURES.md) |
-| Preferences | Defaults, wire keys, local/account/device scope, save behavior, validation and link/current-player precedence. | [Settings](../SETTINGS.md) |
-| Networking | Consumed public/authenticated APIs, models, pagination, permissions, media transport, errors, cache and server rollout requirements. | [API](../API.md) |
-| Playback | Media session/service, lazy queues, duplicate occurrences, track/codec selection, successors, links/bounds, progress, gestures, PiP, power and optional tools. | [Playback](../PLAYBACK.md) |
-| Accounts and content | Credentials/tokens, membership/statistics, blocking, playlists/mixes, history, clips/preview, download journal/recovery, export/conversion, RSS, DeArrow and AI. | [Library](../LIBRARY.md) |
-| Persistence and security | All stores, stable profiles/migration, session encryption, local write failures, URL/auth boundaries, components/permissions, backup and privacy. | [Storage and security](../STORAGE_AND_SECURITY.md) |
-| Presentation | Responsive layout, glass scenes, player geometry/motion, ambient capture gates, native rich content, accessibility and resources. | [UI](../UI.md), [Liquid Glass](../LIQUID_GLASS.md) |
-| Engineering | Toolchain/dependencies, build/sign/release, upstream maintenance, JVM/device/fixture checks, restart/conversion acceptance and documentation upkeep. | [Development](../DEVELOPMENT.md), [Testing](../TESTING.md) |
-| Operations and recovery | Matching server/extensions/migrations, secrets/proxy configuration and symptom-specific recovery. | [Deployment](../../deploy/README.md), [Troubleshooting](../TROUBLESHOOTING.md) |
+The inventory includes tracked and non-ignored untracked files under `android/`, `scripts/` and `deploy/`, plus `.env.example`, `.gitignore`, `docker-compose.yml` and `LICENSE`. Locally deleted files are excluded. The sibling Invidious checkout is reviewed at its integration boundary; it is not an Android module.
 
-## Supporting and excluded material
+The [architecture](../ARCHITECTURE.md), [features](../FEATURES.md), [settings](../SETTINGS.md), [API](../API.md), [playback](../PLAYBACK.md), [library](../LIBRARY.md), [storage/security](../STORAGE_AND_SECURITY.md), [UI](../UI.md), [development](../DEVELOPMENT.md) and [testing](../TESTING.md) guides own current behavior. Generated logs and captures belong under ignored `.tools/`, with source and device provenance.
 
-Existing parity, verification and dated visual evidence remain historical records.
-Their purpose and locations are indexed in [Source map](SOURCE_MAP.md). Images,
-videos, fixture patches, capture harnesses, manifests and logs support the relevant
-dated reports; they are not independent application features.
-
-Ignored build output, caches, IDE state, local SDK paths, release artifacts and
-personal secrets are explained by category in the source map. Secret contents are
-not reproduced. Generated dependency sources and third-party library internals
-belong to their upstream projects; the guides document their use by this app.
+Ignored builds, caches, IDE files, SDK paths, fixture media and release artifacts are explained by category in the source map. Local secrets and third-party library internals are excluded from fingerprints; secret values are never reproduced in documentation.
 
 ## Verification and freshness
 
-Run `python3 scripts/check-documentation.py` from the repository root. It checks
-inventory completeness, required descriptions/guide assignments, reviewed source
-fingerprints, generated catalog contents and local Markdown file links across the
-22 indexed documents. Remote URLs and Markdown section anchors are not part of
-that automated check. [Testing](../TESTING.md#documentation-checks) explains the
-explicit review-and-refresh workflow.
+`python3 scripts/check-documentation.py` checks inventory completeness, guide assignments, reviewed fingerprints and all three generated catalogs. It checks local file links in **all 18 repository Markdown documents**, including the cleanup report. Remote URLs and Markdown section anchors are outside this local check.
 
-The documentation pass does not change application behavior or claim a new
-Android test, emulator, production deployment or release acceptance result.
-Test names identify intended checks; actual results and ignored/device-limited
-cases remain in the testing guide and dated verification records. Source review
-and the appropriate runtime checks remain necessary after a behavior change.
+After reviewing changed sources and updating their guides, run `python3 scripts/check-documentation.py --refresh`, then the checker without refresh. New sources and documents require explicit inventory registration first. [Testing](../TESTING.md#documentation-checks) explains the review workflow.
+
+Fingerprints and catalogs establish inventory freshness; semantic accuracy, emulator/device behavior, production compatibility, performance and release acceptance require their relevant checks. Test names and previous passing totals do not certify a current run.

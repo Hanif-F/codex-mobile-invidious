@@ -113,15 +113,15 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
         current(context); require(context.account == null && SponsorBlockRules.validVideo(videoId) && value in -3_600_000..3_600_000)
         profiles.write(context, "chat.timing." + videoId, value)
     }
-    fun guestDeArrow(context: ApiContext = ApiContext(server, null, contextGeneration)): AccountPreferences = runCatching {
+    fun guestPreferences(context: ApiContext = ApiContext(server, null, contextGeneration)): AccountPreferences = runCatching {
         require(context.account == null)
         LocalPreferences.read(JSONObject(profiles.value(context, "preferences") as? String ?: "{}"))
     }.getOrElse { LocalPreferences.normalize(AccountPreferences()) }
-    @Synchronized fun guestDeArrow(value: AccountPreferences, context: ApiContext = positionContext()) {
+    @Synchronized fun guestPreferences(value: AccountPreferences, context: ApiContext = positionContext()) {
         current(context); require(context.account == null)
         profiles.write(context, "preferences", LocalPreferences.normalize(value).json().toString())
     }
-    fun initialPreferences(context: ApiContext = positionContext()) = if (context.account == null) guestDeArrow(context) else AccountPreferences()
+    fun initialPreferences(context: ApiContext = positionContext()) = if (context.account == null) guestPreferences(context) else AccountPreferences()
     private fun key(): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         return (store.getKey("mobivious.session", null) as? SecretKey) ?: KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {
@@ -191,7 +191,6 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
         profiles.write(context, "positions", values.toString())
     }
     @Synchronized override fun clearPositions(context: ApiContext) { current(context); profiles.write(context, "positions", null) }
-    fun clearPositions() = clearPositions(positionContext())
     override fun searchVisibility(context: ApiContext) = runCatching {
         SearchVisibility.parse(JSONObject(profiles.value(context, "search") as? String ?: "{}"))
     }.getOrDefault(SearchVisibility())

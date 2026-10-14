@@ -32,7 +32,7 @@ class WatchPresentationTest {
         var dark by mutableStateOf(true)
         var ambient by mutableStateOf<WatchAmbientState?>(null)
         compose.setContent {
-            MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light) {
+            MaterialTheme(colorScheme = if (dark) appColorScheme(true) else appColorScheme(false)) {
                 AppBackground {
                     CompositionLocalProvider(LocalWatchAmbient provides ambient) {
                         WatchContent(Modifier.size(320.dp, 180.dp).testTag("watch-flat-fallback")) {}
@@ -47,7 +47,7 @@ class WatchPresentationTest {
                     compose.runOnIdle { ambient = WatchAmbientState() }
                     compose.runOnIdle { ambient = null }
                 }
-                val expected = if (night) AppTokens.dark.surface else AppTokens.light.surface
+                val expected = if (night) appColorScheme(true).surface else appColorScheme(false).surface
                 val pixels = compose.onNodeWithTag("watch-flat-fallback").captureToImage().toPixelMap()
                 for (x in listOf(1, pixels.width / 2, pixels.width - 2)) {
                     for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
@@ -62,7 +62,7 @@ class WatchPresentationTest {
 
     @Test fun arrivingAmbientPalettePreservesAnOpenMenu() {
         val ambient = mutableStateOf<WatchAmbientState?>(null)
-        compose.setContent { MaterialTheme(colorScheme = AppTokens.dark, typography = AppTokens.typography) {
+        compose.setContent { MaterialTheme(colorScheme = appColorScheme(true), typography = AppTokens.typography) {
             AppBackground {
                 CompositionLocalProvider(LocalWatchAmbient provides ambient.value) {
                     WatchContent(Modifier.width(320.dp)) {
@@ -89,7 +89,7 @@ class WatchPresentationTest {
         val width = mutableIntStateOf(320)
         val enabled = mutableStateOf(true)
         val clicks = IntArray(4)
-        compose.setContent { MaterialTheme(colorScheme = AppTokens.light, typography = AppTokens.typography) {
+        compose.setContent { MaterialTheme(colorScheme = appColorScheme(false), typography = AppTokens.typography) {
             WatchContent(Modifier.width(width.intValue.dp)) {
                 WatchActionRow(enabled.value, { clicks[0]++ }, { clicks[1]++ }, { clicks[2]++ }, { clicks[3]++ })
             }
@@ -127,7 +127,7 @@ class WatchPresentationTest {
 
     @Test fun disclosureKeepsExpandedSemanticsAndWrapsWithLargeTextInOpaqueMode() {
         val expanded = mutableStateOf(false)
-        compose.setContent { MaterialTheme(colorScheme = AppTokens.dark, typography = AppTokens.typography) {
+        compose.setContent { MaterialTheme(colorScheme = appColorScheme(true), typography = AppTokens.typography) {
             CompositionLocalProvider(LocalReduceTransparency provides true,
                 LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 WatchContent(Modifier.width(320.dp)) {

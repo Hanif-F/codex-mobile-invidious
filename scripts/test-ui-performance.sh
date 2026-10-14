@@ -3,60 +3,36 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 journeys=(popular popularCompact popularTextOnly popularColdArt searchPagination trending trendingChanges subscriptions channels search mixedSearch history playlists settings settingsSaving downloads watch watchAmbient navigation)
-label='' journey=all adapter=redesigned record=false
+label='' journey=all record=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --list) printf '%s\n' "${journeys[@]}"; exit 0 ;;
     --record) record=true; shift ;;
     --label) label="${2:?Missing label}"; shift 2 ;;
     --journey) journey="${2:?Missing journey}"; shift 2 ;;
-    --adapter) adapter="${2:?Missing adapter}"; shift 2 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
 done
 [[ "$label" =~ ^[a-zA-Z0-9_-]+$ ]] || { echo 'Provide --label with letters, numbers, underscores or hyphens.' >&2; exit 2; }
-[[ "$adapter" == redesigned || "$adapter" == current-glass || "$adapter" == pre-glass ]] || exit 2
 if [[ "$journey" != all ]] && ! printf '%s\n' "${journeys[@]}" | rg -qx "$journey"; then
   echo "Unknown journey: $journey" >&2; exit 2
 fi
-export JAVA_HOME="${JAVA_HOME:-/opt/android-studio/jbr}"
-export ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}"
-adb="$ANDROID_HOME/platform-tools/adb"
-if [[ -z "${ANDROID_SERIAL:-}" ]]; then
-  mapfile -t devices < <("$adb" devices | awk 'NR > 1 && $2 == "device" {print $1}')
-  [[ ${#devices[@]} -eq 1 ]] || { echo 'Select one running device with ANDROID_SERIAL.' >&2; exit 1; }
-  export ANDROID_SERIAL="${devices[0]}"
-fi
-[[ "$("$adb" get-state)" == device ]]
+source scripts/lib/android-fixture.sh
+android_test_environment
 benchmark_args=()
 if "$record"; then benchmark_args+=("-Pandroid.testInstrumentationRunnerArguments.recordVideo=true"); fi
 if [[ "$("$adb" shell getprop ro.kernel.qemu | tr -d '\r')" == 1 ]]; then
   benchmark_args+=("-Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR")
-  echo 'Emulator diagnostics only; task acceptance uses emulator verification by user instruction.' >&2
+  echo 'Emulator measurements are diagnostic; verify performance targets on the intended device.' >&2
 fi
-if python3 - <<'PY'
-import socket
-with socket.socket() as s:
-    raise SystemExit(0 if s.connect_ex(('127.0.0.1',18080)) == 0 else 1)
-PY
-then echo 'Port 18080 is occupied; stop its owner before measuring.' >&2; exit 1; fi
 media_dir="$PWD/.tools/test-media"
-mkdir -p "$media_dir"
-if [[ ! -f "$media_dir/fixture.mp4" ]]; then
-  ffmpeg -y -hide_banner -loglevel error -f lavfi -i testsrc2=size=640x360:rate=24 \
-    -f lavfi -i sine=frequency=440:sample_rate=48000 -t 120 -c:v libx264 \
-    -preset ultrafast -g 48 -b:v 700k -c:a aac -movflags +faststart "$media_dir/fixture.mp4"
-fi
-if [[ ! -f "$media_dir/thumbnail.jpg" ]]; then
-  ffmpeg -y -hide_banner -loglevel error -i "$media_dir/fixture.mp4" -frames:v 1 "$media_dir/thumbnail.jpg"
-fi
 python3 scripts/generate-player-fixture.py "$media_dir"
 run="$(date -u +%Y%m%dT%H%M%SZ)"
 recording_run="${run,,}-$RANDOM"
 benchmark_args+=("-Pandroid.testInstrumentationRunnerArguments.evidenceRun=$recording_run")
 if "$record"; then benchmark_args+=("-Pandroid.testInstrumentationRunnerArguments.recordingRun=$recording_run"); fi
 device="${ANDROID_SERIAL//[^a-zA-Z0-9_.-]/_}"
-output="$PWD/.tools/ui-ux-overhaul/performance/$label/$device/$run"
+output="$PWD/.tools/ui-performance/$label/$device/$run"
 mkdir -p "$output"
 python3 - "$media_dir" "$output/fixture-media.sha256.json" <<'PY_MEDIA'
 from pathlib import Path
@@ -67,34 +43,8 @@ manifest={str(path.relative_to(root)):hashlib.sha256(path.read_bytes()).hexdiges
 Path(sys.argv[2]).write_text(json.dumps(manifest,indent=2)+'\n')
 PY_MEDIA
 ffmpeg -version > "$output/ffmpeg.txt"
-python3 scripts/fixture-server.py --media-dir "$media_dir" --performance > "$output/fixture.log" 2>&1 &
-fixture_pid=$!; owned_reverse=false
-cleanup() {
-  kill "$fixture_pid" 2>/dev/null || true; wait "$fixture_pid" 2>/dev/null || true
-  if "$owned_reverse"; then "$adb" reverse --remove tcp:18080 2>/dev/null || true; fi
-}
-trap cleanup EXIT
-trap 'exit 130' INT
-trap 'exit 143' TERM
-python3 - <<'PY'
-import time,urllib.request
-for attempt in range(50):
-    try:
-        with urllib.request.urlopen('http://127.0.0.1:18080/test/state',timeout=1) as r:
-            if r.status == 200: break
-    except OSError: time.sleep(.1)
-else: raise SystemExit('Fixture did not become ready')
-PY
-kill -0 "$fixture_pid"
-mappings="$("$adb" reverse --list)"
-if awk '$2 == "tcp:18080" && $3 != "tcp:18080" {f=1} END {exit !f}' <<< "$mappings"; then
-  echo 'A conflicting reverse mapping already owns device port 18080.' >&2; exit 1
-fi
-if ! awk '$2 == "tcp:18080" && $3 == "tcp:18080" {f=1} END {exit !f}' <<< "$mappings"; then
-  "$adb" reverse tcp:18080 tcp:18080; owned_reverse=true
-fi
+android_start_fixture "$media_dir" "$output/fixture.log" --performance
 git rev-parse HEAD > "$output/source-commit.txt"
-if [[ -f benchmark-base-source.txt ]]; then cp benchmark-base-source.txt "$output/source-commit.txt"; fi
 python3 - "$output" <<'PY_HASH'
 from pathlib import Path
 import difflib,hashlib,io,json,subprocess,sys,tarfile,zipfile
@@ -129,7 +79,7 @@ PY_HASH
 sha256sum "$output/source.diff" scripts/fixture-server.py android/macrobenchmark/src/main/java/net/wingress/mobivious/benchmarks/UiScrollBenchmark.kt > "$output/source-hashes.txt"
 ui_mode=timing; ui_compilation=Full; ui_iterations=10
 if "$record"; then ui_mode=normal-speed-recording; ui_compilation=none; ui_iterations=0; fi
-printf '%s\n' "label=$label" "journey=$journey" "adapter=$adapter" "fixture=ui-overhaul-v2" "mode=$ui_mode" "compilation=$ui_compilation" "iterations=$ui_iterations" "recording=$record" > "$output/run.txt"
+printf '%s\n' "label=$label" "journey=$journey" "fixture=performance" "mode=$ui_mode" "compilation=$ui_compilation" "iterations=$ui_iterations" "recording=$record" > "$output/run.txt"
 printf '%s\n' 'gradleJvmHeap=2g' 'gradleWorkers=1' 'gradleDaemon=single-use' 'kotlinCompiler=in-process' >> "$output/run.txt"
 "$JAVA_HOME/bin/java" -version > "$output/java.txt" 2>&1
 "$adb" shell getprop ro.build.fingerprint > "$output/os.txt"
@@ -141,8 +91,8 @@ printf '%s\n' 'gradleJvmHeap=2g' 'gradleWorkers=1' 'gradleDaemon=single-use' 'ko
 "$adb" shell dumpsys power > "$output/power-before.txt"
 "$adb" shell dumpsys thermalservice > "$output/thermal-before.txt"
 "$adb" shell dumpsys battery > "$output/battery-before.txt"
-# Reinstall only the disposable benchmark package, allowing historical version
-# codes as well as clean origin/account setup through ordinary app controls.
+# Reinstall the disposable benchmark package for clean account setup through
+# ordinary app controls.
 "$adb" shell am force-stop net.wingress.mobivious.debug
 "$adb" uninstall net.wingress.mobivious.benchmark > "$output/clear.txt" 2>&1 || true
 selector=net.wingress.mobivious.benchmarks.UiScrollBenchmark
@@ -151,7 +101,7 @@ set +e
 (cd android && ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest --offline --no-daemon --console=plain --max-workers=1 \
   '-Dorg.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8' '-Pkotlin.compiler.execution.strategy=in-process' \
   "-Pandroid.testInstrumentationRunnerArguments.class=$selector" \
-  "-Pandroid.testInstrumentationRunnerArguments.adapter=$adapter" "${benchmark_args[@]}") 2>&1 | tee "$output/gradle.log"
+  "${benchmark_args[@]}") 2>&1 | tee "$output/gradle.log"
 result=${PIPESTATUS[0]}
 set -e
 if ! python3 - "$output/source-files.sha256.json" <<'PY_DRIFT'
@@ -189,7 +139,7 @@ PY_VIDEO
   then if [[ "$result" -eq 0 ]]; then result=1; fi; fi
 fi
 mkdir -p "$output/gestures"
-if ! python3 - "$output" "$recording_run" "$journey" "$adapter" "$result" <<'PY_GESTURES'
+if ! python3 - "$output" "$recording_run" "$journey" "$result" <<'PY_GESTURES'
 import json,shutil,sys
 from pathlib import Path
 root=Path(sys.argv[1]); files=list((root/'connected_android_test_additional_output').rglob(f'mobivious-gestures-{sys.argv[2]}-*.json'))
@@ -198,8 +148,8 @@ for path in files:
     for gesture in json.loads(path.read_text()):
         if gesture['phase']=='measure' and not 400<=gesture['durationMs']<=475:
             raise SystemExit(f'Invalid gesture timing: {path}: {gesture}')
-expected=(18 if sys.argv[4]=='pre-glass' else 19) if sys.argv[3]=='all' else 1
-if sys.argv[5]=='0' and len(files)!=expected:
+expected=19 if sys.argv[3]=='all' else 1
+if sys.argv[4]=='0' and len(files)!=expected:
     raise SystemExit(f'Missing gesture provenance: expected {expected}, got {len(files)}')
 PY_GESTURES
 then result=2; fi

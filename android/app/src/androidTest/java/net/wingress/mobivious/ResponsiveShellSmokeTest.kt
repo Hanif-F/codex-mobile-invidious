@@ -40,7 +40,7 @@ class ResponsiveShellSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui {
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay=false,darkMode="light")); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences(autoplay=false,darkMode="light")); activity.model.refreshSharedSettings()
             activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading }
@@ -68,7 +68,7 @@ class ResponsiveShellSmokeTest {
         for(width in listOf(320,360,448,600,840,1200)) for(font in listOf(1f,1.3f,2f)) {
             resize(width,font)
             for(dark in listOf(false,true)) {
-                ui { activity.model.store.guestDeArrow(AccountPreferences(autoplay=false,darkMode=if(dark) "dark" else "light")); activity.model.refreshSharedSettings() }
+                ui { activity.model.store.guestPreferences(AccountPreferences(autoplay=false,darkMode=if(dark) "dark" else "light")); activity.model.refreshSharedSettings() }
                 compose.waitForIdle()
                 val bounds=listOf("Popular","Trending","Subscriptions","You").map { name ->
                     val node=compose.onNodeWithTag("navigation-$name")
@@ -119,7 +119,7 @@ class ResponsiveShellSmokeTest {
             resize(width,font)
             for(dark in listOf(false,true)) {
                 ui {
-                    activity.model.store.guestDeArrow(AccountPreferences(autoplay=false,darkMode=if(dark) "dark" else "light"))
+                    activity.model.store.guestPreferences(AccountPreferences(autoplay=false,darkMode=if(dark) "dark" else "light"))
                     activity.model.refreshSharedSettings();activity.model.navigate("You")
                 }
                 compose.onNodeWithTag("you-guest").assertExists()

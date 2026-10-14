@@ -1,5 +1,6 @@
 package net.wingress.mobivious.ui
 
+import net.wingress.mobivious.player.QueueRepeat
 import android.app.Application
 import android.content.ComponentName
 import android.os.Bundle
@@ -258,7 +259,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 val baseline=JSONObject(edit.confirmed)
                 baseline.keys().forEach { put(it,baseline.get(it)) }
             }), edit.context)
-        } else savePreferences(before.merge(patch), before, edit.context, automatic = true)
+        } else savePreferences(before.merge(patch), before, edit.context)
     }).also { it.bind(api.context()) }
     internal fun preferenceValues(): AccountPreferences = preferenceSaves.edits.value.values.fold(preferences.value) { value, edit ->
         if (edit.status == PreferenceSaveStatus.INVALID || edit.key.startsWith("device:") || edit.key.startsWith("profile:")) value else value.merge(JSONObject(edit.requested))
@@ -465,7 +466,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { subscriptionChannels.collect { state ->
             val pending = pendingChannelSubscription ?: return@collect
             if (pending.first != api.context().server) { pendingChannelSubscription = null; return@collect }
-            if (state.context == api.context() && state.context?.account != null && state.loaded) {
+            if (state.context == api.context() && state.context.account != null && state.loaded) {
                 pendingChannelSubscription = null
                 if (state.channels.none { it.id == pending.second.id }) subscriptionsController.toggle(pending.second)
             }
@@ -606,7 +607,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context()
         refreshBlockedChannels()
         refreshWatched()
-        if (context.account == null) { preferencesContext = context; preferences.value = store.guestDeArrow(); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return }
+        if (context.account == null) { preferencesContext = context; preferences.value = store.guestPreferences(); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return }
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
         val navigationAtRequest = navigationRevision
@@ -1506,7 +1507,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         changed.keys().forEach { if (old.get(it) != changed.get(it)) patch.put(it, changed.get(it)) }
         if (patch.length() == 0) return@withLock
         preferenceGeneration++
-        val saved = if (context.account == null) LocalPreferences.normalize(preferences.value.merge(patch)).also { store.guestDeArrow(it, context) }
+        val saved = if (context.account == null) LocalPreferences.normalize(preferences.value.merge(patch)).also { store.guestPreferences(it, context) }
             else api.chatPreferences(patch, context)
         if (api.context() == context) { preferenceGeneration++; preferencesContext = context; preferences.value = saved }
     }
@@ -1563,13 +1564,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         api.revokeSession(session.id, context); if (session.current) clearAccount(context)
     }
     fun logout() = action { accountOperation { val context = api.context(); try { api.logout() } finally { clearAccount(context) } } }
-    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.ALLOW_FIXTURE_HTTP); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestDeArrow(); homeAppliedContext = null; openDefaultHome() }
-    suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext, automatic: Boolean = false): Unit = preferenceWrites.withLock {
+    fun switchServer(value: String) { dismissRss(); pendingPlaylistSubscription = null; sponsorSettingsChannel.value = null; val address = InvidiousApi.normalizeServer(value, net.wingress.mobivious.BuildConfig.ALLOW_FIXTURE_HTTP); if (address == store.server) return; pendingClipEditor = null; clipJob?.cancel(); clipEditorJob?.cancel(); clipDeleteJob?.cancel(); clipEditor.value = ClipEditorState(); dismissClipResolution(); clearNavigationReturns(); postCommentController.bind(null); closePlayer(); saveSheet.value = PlaylistSaveState(); blockUndo.value = null; store.save(null); app.cache.clear(); dearrowTitles.clear(); dearrowIdentity.value = null; dearrowIdentityError.value = null; store.server = address; subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput(); searchVisibility.value = store.searchVisibility(api.context()); preferences.value = store.guestPreferences(); homeAppliedContext = null; openDefaultHome() }
+    suspend fun savePreferences(value: AccountPreferences, before: AccountPreferences, context: ApiContext): Unit = preferenceWrites.withLock {
         if (api.context() != context) throw CancellationException("Account or instance changed")
         preferenceGeneration++
         val changes = value.changesFrom(before, includeChannelNames = context.account == null)
         val saved = if (context.account == null) {
-            LocalPreferences.normalize(preferences.value.merge(changes)).also { store.guestDeArrow(it, context) }
+            LocalPreferences.normalize(preferences.value.merge(changes)).also { store.guestPreferences(it, context) }
         } else if (changes.length() > 0) try { api.preferences(changes, context) }
             catch (e: ApiException) {
                 if (e.status in listOf(404, 405) || e.status == 400 && (e.message?.contains("preference", true) == true || e.message?.contains("Only boolean") == true))
@@ -1581,9 +1582,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             val refreshCurrent = currentBrowseAffected(previousConfirmed, saved)
             invalidateSavedTabs(preferences.value, saved)
             preferenceGeneration++; preferencesContext = context; preferences.value = saved
-            syncSponsorSettings(); syncHistorySettings(); if (previousConfirmed.savePosition && !saved.savePosition) store.clearPositions()
+            syncSponsorSettings(); syncHistorySettings(); if (previousConfirmed.savePosition && !saved.savePosition) store.clearPositions(context)
             if (refreshCurrent) refresh()
-            if (!automatic) message.value = if (context.account == null) "Settings saved" else "Account settings saved"
         }
     }
     suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) {

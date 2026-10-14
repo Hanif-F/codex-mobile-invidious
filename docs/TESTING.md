@@ -16,9 +16,9 @@
 
 [Test catalog](reference/TEST_CATALOG.md) enumerates every maintained JVM/device
 test file and declared test method, including helper-only files and ignored cases.
-It is an inventory, not a passing-results report. [VERIFICATION.md](../VERIFICATION.md)
-and dated evidence bundles record actual results and gaps. The developer guide
-explicitly notes that the complete connected suite is not yet green.
+It is an inventory, not a passing-results report. [Cleanup results](CLEANUP.md)
+record the latest source/device checks and baseline failures. The complete
+connected suite is not yet green.
 
 ## Build and unit/static checks
 
@@ -110,7 +110,7 @@ Build debug and instrumentation APKs and generate media first, then run:
 scripts/test-download-restart.sh
 ```
 
-This installs the test app/APKs on the selected device (default emulator-5554),
+This installs the test app/APKs on the selected device (one connected device or explicit `ANDROID_SERIAL`),
 seeds background transfers, force-stops only `net.wingress.mobivious.debug`, and
 starts a fresh instrumentation process to check restored/offline resume behavior.
 It uses port 18080 and saves evidence in `.tools/download-verification`. It does
@@ -121,6 +121,28 @@ because Emulator 37.2.12 crashes in host gfxstream TextureResize. Remove Ignore
 only on a capable physical device or fixed emulator. Unchanged paired export
 and declining conversion have separate checks. Do not count ignored conversion
 as accepted runtime evidence.
+
+## Runner and release safeguards
+
+The Android, download-restart and performance runners source
+`scripts/lib/android-fixture.sh` for device selection, fixture readiness and
+owned-process/reverse-mapping cleanup. They preserve pre-existing or replaced
+mappings and reject occupied host/device ports. Signals also clean up owned
+resources. `generate-player-fixture.py` owns all base and specialized media;
+each missing base output is generated independently so a cached manifest does
+not hide missing captions or artwork. Standalone Python contract checks use
+`fixture_support.py` for readiness, startup diagnostics and bounded teardown.
+
+Run workflow regression checks while port 18080 is free:
+
+```sh
+python3 -m unittest discover -s scripts/tests -v
+```
+
+They use disposable repositories and fake ADB/keytool executables to check
+resource ownership, signals, conflicting/multiple devices and signing safeguards.
+No real signing material or device data is modified. Release initialization is
+explicit and refuses existing keys; see [Development](DEVELOPMENT.md#signed-releases).
 
 ## Coverage by behavior
 
@@ -145,8 +167,8 @@ python3 scripts/check-documentation.py
 ```
 
 The checker compares maintained files with `reference/coverage.json`, verifies
-guide/source links and reviewed content hashes, and checks generated source/test
-catalogs. It reports added/removed/changed files rather than silently treating
+local links across every repository Markdown document and reviewed content hashes,
+and checks generated source, test and coverage catalogs. It reports added/removed/changed files rather than silently treating
 them as documented. It uses only the standard Python library and Git inventory.
 It does not compile or execute Android code, or certify semantic accuracy.
 
@@ -164,8 +186,9 @@ refresh refuses unknown inventory entries. Review the resulting diff. Refreshing
 hashes without reviewing prose would defeat the freshness check. Update version/
 source/date context in the documentation index when behavior/version changes.
 
-Historical visual logs/media stay in their dated collections. Avoid rewriting
-old test counts as current status; add new evidence or clear superseding notes.
+Keep generated logs/media under ignored `.tools/`, with source, command and device
+provenance. Update the current results report when checks change; Git retains
+superseded documentation.
 
 ## Opaque UI performance diagnostics
 
@@ -175,7 +198,7 @@ Run with `ANDROID_SERIAL=emulator-5554 scripts/test-ui-performance.sh --label op
 profileable, non-debuggable and debug-signed; release security/optimization remain
 unchanged. Only loopback fixture HTTP is enabled. The runner owns its fixture and
 reverse mapping, and preserves source/APK fingerprints, configuration, raw JSON,
-per-iteration traces and exit status under `.tools/ui-ux-overhaul/performance/`.
+per-iteration traces and exit status under `.tools/ui-performance/`.
 
 Every timing uses Full compilation and ten iterations. Fixture account/origin are
 configured through ordinary UI; account preference reads must finish before
@@ -186,9 +209,8 @@ P99 CPU/overrun values and positive-overrun fractions without pooling frames or
 silently removing outliers. Timing is separate from normal-speed visual recordings.
 
 Scrolling injects ordinary touch events across 70% of the scrollable viewport for
-400ms, six forward and six reverse swipes with 100ms gaps. UI Automator 2.4's
-step-based swipe waits for display frames, so a step count cannot define duration.
-The harness schedules by elapsed time, retains each gesture's event duration and
+400ms, six forward and six reverse swipes with 100ms gaps. The harness schedules
+by elapsed time, retains each gesture's event duration and
 injection completion time in additional test output, and rejects measured event
 durations outside 400–475ms. The runner rejects missing gesture provenance.
 
@@ -201,21 +223,18 @@ from being reported. Do not record during a timing run.
 API. `trendingChanges` waits for the selected category/country's returned content;
 `settingsSaving` confirms delayed/failing toggle and speed changes. Downloads
 queues three slow fixture transfers. Warm scrolling primes artwork outside the
-measured region; cold-artwork runs use fresh URL identities. Historical adapters
-map existing ordinary controls and record their original source commit alongside
-the exact adapted source archive/diff. Unavailable newer features remain explicit
-N/A entries.
+measured region; cold-artwork runs use fresh URL identities. All nineteen journeys
+use current controls and automatic preference saving. The runner records HEAD
+alongside the exact source archive/diff; retired UI adapters and commit overrides
+have been removed.
 
-This task uses emulator acceptance by user instruction. Emulator results cannot
-be described as physical-device smoothness. Preserve failed runs and inherited
-failures separately from successful acceptance evidence. If the emulator is lost,
-stop development/testing while attempting recovery; if recovery fails, wait for
-the user to restart it.
+Emulator results cannot be described as physical-device smoothness. Preserve
+failed runs and inherited failures separately from successful acceptance evidence.
+If a device disconnects, stop connected testing until it is available again.
 
 The documentation inventory reflects existing files in the working tree, including
 untracked additions and excluding locally deleted tracked files before a commit.
 
-The screen audit is tracked in [Screen acceptance](ui-ux-implementation-2026-10-13/SCREEN_ACCEPTANCE.md).
 Search visibility choices apply while their sheet stays open and reset pagination;
 chat timestamps save independently of invalid filter text. Context-bound chat
 callbacks reject edits from another video/account. Download details are a local

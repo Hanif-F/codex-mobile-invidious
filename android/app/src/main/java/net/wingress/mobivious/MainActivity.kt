@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.drawable.Icon
 import android.graphics.Rect
-import android.os.Build
 import android.os.Bundle
 import android.util.Rational
 import androidx.activity.ComponentActivity
@@ -63,7 +62,7 @@ class MainActivity : ComponentActivity() {
                 action(if (playing) "Pause" else "Play", if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, "mobivious.toggle", 2),
                 action("Forward 10 seconds", android.R.drawable.ic_media_ff, "mobivious.forward", 3)))
         pipSource?.let { params.setSourceRectHint(it) }
-        if (Build.VERSION.SDK_INT >= 31) params.setAutoEnterEnabled(active && playing).setSeamlessResizeEnabled(true)
+        params.setAutoEnterEnabled(active && playing).setSeamlessResizeEnabled(true)
         setPictureInPictureParams(params.build())
     }
     fun updatePipSource(bounds: Rect) {
@@ -95,7 +94,6 @@ class MainActivity : ComponentActivity() {
         super.onUserLeaveHint()
         model.cancelAccumulatedSeek()
         updatePip(pipWatching)
-        if (Build.VERSION.SDK_INT < 31 && pipWatching && model.store.pip && model.playback.value.playing) enterPip()
     }
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) { super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig); pipMode.value = isInPictureInPictureMode }
     override fun onStop() {

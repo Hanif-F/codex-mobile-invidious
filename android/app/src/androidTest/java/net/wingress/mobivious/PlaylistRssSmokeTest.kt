@@ -31,7 +31,7 @@ class PlaylistRssSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        compose.runOnUiThread { vm.store.save(null); vm.switchServer("http://127.0.0.1:18080"); vm.store.guestDeArrow(AccountPreferences()); vm.navigate("Popular") }
+        compose.runOnUiThread { vm.store.save(null); vm.switchServer("http://127.0.0.1:18080"); vm.store.guestPreferences(AccountPreferences()); vm.navigate("Popular") }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
     }
     @After fun close() { if (::activity.isInitialized) compose.runOnUiThread { vm.closePlayer(); activity.finishAndRemoveTask() } }

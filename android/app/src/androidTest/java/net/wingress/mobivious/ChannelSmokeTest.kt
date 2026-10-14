@@ -39,7 +39,7 @@ class ChannelSmokeTest {
         compose.runOnUiThread {
             activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings()
             activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }

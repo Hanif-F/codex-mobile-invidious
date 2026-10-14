@@ -32,7 +32,8 @@ flowchart LR
 
 ## Module and dependency organization
 
-`android/settings.gradle.kts` includes only `:app`. There are no feature modules,
+`android/settings.gradle.kts` includes `:app` and the `:macrobenchmark` test module.
+The benchmark targets an isolated, profileable app variant. There are no feature modules,
 Room database, dependency-injection framework, Retrofit service or Navigation
 Compose route graph. `MobiviousApplication` constructs process-wide dependencies;
 the activity creates an `AndroidViewModel`, which drives Compose with StateFlows.
@@ -46,7 +47,9 @@ the activity creates an `AndroidViewModel`, which drives Compose with StateFlows
 | `ui/MobiviousApp.kt` | Compose shell, screen/panel selection, watch presentation, navigation controls, dialogs and callbacks. |
 | `player/PlaybackService.kt` | Owns decoder, media session, history/progress writes, SponsorBlock engine and service lifetime. |
 | `player/QueueCoordinator.kt` | Resolves current media, fetches source pages, owns occurrence identity, tracks, link bounds, clips, offline loading and successor rules. |
+| `player/PlaybackQueue.kt` | Queue runtime snapshot, occurrence identity, repeat and successor/merge rules. API source/page models stay in `data/Models.kt`; data does not depend on the player. |
 | `downloads/DownloadExportService.kt` | User-started foreground copy, muxing or explicitly approved conversion to a document URI. |
+| `data/DownloadReceiver.kt` | Manifest-bound DownloadManager broadcast adapter. Its existing component identity is preserved; repository persistence does not depend on the activity/application wiring. |
 
 Versions and prerequisites are recorded in [Development](DEVELOPMENT.md). The
 main libraries are Compose Material3, Media3 ExoPlayer/session/UI/Transformer,
@@ -162,4 +165,4 @@ recreation. A single worker coalesces unsent same-key edits; the sink uses the
 shared preference mutex and sparse patches against current confirmed data. Text
 has a 500ms debounce with lifecycle flush. Account/server generation changes
 invalidate queued work. Entity/security operations keep explicit submit semantics.
-See [UI](UI.md), [Settings](SETTINGS.md) and the [acceptance report](ui-ux-implementation-2026-10-13/README.md).
+See [UI](UI.md), [Settings](SETTINGS.md) and [Testing](TESTING.md).

@@ -42,7 +42,7 @@ class CommunitySmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui {
             activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false)); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false)); activity.model.refreshSharedSettings()
             activity.model.navigate("Popular", "channel:$owner")
         }
         until { !activity.model.browse.value.loading && activity.model.channel.value != null }
@@ -182,7 +182,7 @@ class CommunitySmokeTest {
     }
 
     @Test fun postCommentsSheetSortsRepliesRetriesAndIgnoresVideoCommentVisibility() {
-        ui { activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, comments = emptyList())); activity.model.refreshSharedSettings() }
+        ui { activity.model.store.guestPreferences(AccountPreferences(autoplay = false, comments = emptyList())); activity.model.refreshSharedSettings() }
         choose(ChannelTab.POSTS); feedComments("Ugpost1")
         compose.onNodeWithTag("post-comments-sheet").assertIsDisplayed()
         compose.onNodeWithTag("comments-list").performScrollToNode(hasTestTag("comment-replies-parent"))

@@ -38,7 +38,7 @@ class AiFilterSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.saveSearchVisibility(SearchVisibility())
+            vm.store.guestPreferences(AccountPreferences()); vm.saveSearchVisibility(SearchVisibility())
             vm.aiFilter.reset(force = true); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.size == 3 }
@@ -46,7 +46,7 @@ class AiFilterSmokeTest {
     @After fun close() {
         if (::activity.isInitialized) ui {
             vm.closePlayer(); vm.store.background = true; vm.store.pip = true; vm.store.save(null)
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); activity.finishAndRemoveTask()
+            vm.store.guestPreferences(AccountPreferences()); vm.refreshSharedSettings(); activity.finishAndRemoveTask()
         }
     }
     private fun save(value: AccountPreferences) {
@@ -114,7 +114,7 @@ class AiFilterSmokeTest {
         compose.onNodeWithTag("video-card-testvideo01").assertDoesNotExist()
         save(vm.preferences.value.copy(aiFilter = vm.preferences.value.aiFilter.copy(enabled = false)))
         compose.onNodeWithTag("video-card-testvideo01").assertExists()
-        assertEquals(AiAction.HIDE, vm.store.guestDeArrow().aiFilter.saved(AiListKind.BLOCKLIST, AiPageGroup.FEEDS))
+        assertEquals(AiAction.HIDE, vm.store.guestPreferences().aiFilter.saved(AiListKind.BLOCKLIST, AiPageGroup.FEEDS))
     }
     @Test fun fullyHiddenSearchPageStillLoadsTheNextUnfilteredPage() {
         command("visibility", """{"hiddenFirstPage":true}""")

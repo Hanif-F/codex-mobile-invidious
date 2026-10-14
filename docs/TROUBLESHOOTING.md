@@ -34,5 +34,5 @@
 
 For development failures, use [Development](DEVELOPMENT.md) and
 [Testing](TESTING.md). A device test compiled successfully is not a passed runtime
-test. Dated logs/screenshots in [VERIFICATION.md](../VERIFICATION.md) describe their
-specific source/date/device, not a blanket acceptance guarantee.
+test. [Cleanup results](CLEANUP.md) distinguish known baseline failures from
+regressions and record the tested source/device scope.

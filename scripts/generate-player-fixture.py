@@ -8,6 +8,40 @@ import xml.etree.ElementTree as ET
 parser = argparse.ArgumentParser()
 parser.add_argument('media_dir', type=Path)
 args = parser.parse_args()
+args.media_dir.mkdir(parents=True, exist_ok=True)
+
+
+def generate_base():
+    """Build the shared audiovisual, caption and storyboard inputs independently.
+
+    Checking each output also repairs an interrupted run instead of assuming
+    an existing manifest means every fixture asset is present.
+    """
+    directory = args.media_dir
+    video = directory / 'fixture.mp4'
+    if not video.exists():
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                        '-f', 'lavfi', '-i', 'testsrc2=size=640x360:rate=24',
+                        '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+                        '-t', '120', '-c:v', 'libx264', '-preset', 'ultrafast',
+                        '-threads', '2', '-g', '48', '-b:v', '700k', '-c:a', 'aac',
+                        '-movflags', '+faststart', str(video)], check=True)
+    if not all((directory / name).exists() for name in ('dash.mpd', 'master.m3u8')):
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                        '-i', str(video), '-c', 'copy', '-f', 'dash', '-seg_duration', '4',
+                        '-hls_playlist', '1', str(directory / 'dash.mpd')], check=True)
+    for name, options in [('thumbnail.jpg', []),
+                          ('clip-storyboard.jpg', ['-vf', 'fps=1/20,scale=160:90,tile=6x1'])]:
+        target = directory / name
+        if not target.exists():
+            subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
+                            '-i', str(video), *options, '-frames:v', '1', str(target)], check=True)
+    captions = directory / 'captions.vtt'
+    if not captions.exists():
+        captions.write_text('WEBVTT\n\n00:00.000 --> 00:30.000\nMobivious caption test\n')
+
+
+generate_base()
 
 def generate_ambient():
     target = args.media_dir / 'ambient.mp4'

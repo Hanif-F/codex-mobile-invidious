@@ -2,12 +2,9 @@
 """Verify the disposable avatar API/image fixture without contacting an upstream host."""
 import argparse
 import json
+from fixture_support import fixture_server
 from pathlib import Path
-import socket
-import subprocess
-import sys
-import time
-from urllib.error import HTTPError, URLError
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -17,35 +14,17 @@ def main():
     args = parser.parse_args()
     if not (args.media_dir / 'thumbnail.jpg').is_file():
         parser.error('Local test media is required; generate it with scripts/test-android.sh first.')
-    with socket.socket() as listener:
-        listener.bind(('127.0.0.1', 0))
-        port = listener.getsockname()[1]
-    server = subprocess.Popen([sys.executable, str(Path(__file__).with_name('fixture-server.py')),
-                               '--port', str(port), '--media-dir', str(args.media_dir)],
-                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    base = f'http://127.0.0.1:{port}'
+    with fixture_server(args.media_dir) as base:
+        def read(path, *, body=None, auth=False):
+            request = Request(base + path, data=json.dumps(body).encode() if body is not None else None)
+            if auth:
+                request.add_header('Authorization', 'Bearer fixture-token')
+            with urlopen(request, timeout=5) as response:
+                return response.status, response.headers, response.read()
 
-    def read(path, *, body=None, auth=False):
-        request = Request(base + path, data=json.dumps(body).encode() if body is not None else None)
-        if auth:
-            request.add_header('Authorization', 'Bearer fixture-token')
-        with urlopen(request, timeout=5) as response:
-            return response.status, response.headers, response.read()
+        def api(path, **kwargs):
+            return json.loads(read(path, **kwargs)[2] or b'null')
 
-    def api(path, **kwargs):
-        return json.loads(read(path, **kwargs)[2] or b'null')
-
-    try:
-        for attempt in range(100):
-            try:
-                api('/test/state')
-                break
-            except URLError:
-                if server.poll() is not None:
-                    raise RuntimeError('Fixture server exited before starting')
-                time.sleep(.05)
-        else:
-            raise RuntimeError('Fixture server did not start')
         api('/test/reset', body={})
         video = api('/api/v1/popular')[0]
         channel = api('/api/v1/channels/' + video['authorId'])
@@ -77,9 +56,6 @@ def main():
         except HTTPError as error:
             assert error.code == 404
         print('Avatar API/image fixture passed: placements, deferred images, query preservation, caching headers, credential exclusion and image failures.')
-    finally:
-        server.terminate()
-        server.wait(timeout=5)
 
 
 if __name__ == '__main__':

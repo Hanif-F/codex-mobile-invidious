@@ -33,7 +33,7 @@ class VisibilitySmokeTest {
         compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences())
+            activity.model.store.guestPreferences(AccountPreferences())
             activity.model.saveSearchVisibility(SearchVisibility())
             activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
@@ -42,7 +42,7 @@ class VisibilitySmokeTest {
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.clearVisibilitySnapshot(activity.model.api.context())
-            activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences())
+            activity.model.store.save(null); activity.model.store.guestPreferences(AccountPreferences())
             activity.model.saveSearchVisibility(SearchVisibility()); activity.finishAndRemoveTask()
         }
     }
@@ -89,7 +89,7 @@ class VisibilitySmokeTest {
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("video-card-membervid01"))
         compose.onNodeWithTag("video-members-membervid01", useUnmergedTree = true).assertIsDisplayed()
         screenshot("members-compact-dark")
-        assertTrue(activity.model.store.guestDeArrow().showMemberVideos)
+        assertTrue(activity.model.store.guestPreferences().showMemberVideos)
     }
     @Test fun hiddenSearchPagesRemainReachableAndSearchOverrideCanReset() {
         command("""{"hiddenFirstPage":true}""")

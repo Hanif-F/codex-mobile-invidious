@@ -75,7 +75,7 @@ class SubscriptionJourneyTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences(autoplay = false)); vm.store.reduceTransparency(false); vm.refreshSharedSettings()
+            vm.store.guestPreferences(AccountPreferences(autoplay = false)); vm.store.reduceTransparency(false); vm.refreshSharedSettings()
             vm.action { vm.login("UiViewer", "fixture-password") }
         }
         until { vm.account.value != null && vm.subscriptionChannels.value.loaded && vm.dearrowIdentity.value != null }
@@ -88,7 +88,7 @@ class SubscriptionJourneyTest {
         shell(if (handwriting == "null") "settings delete secure stylus_handwriting_enabled" else "settings put secure stylus_handwriting_enabled $handwriting")
         currentActivity()
         if (::activity.isInitialized) compose.runOnUiThread {
-            vm.closePlayer(); vm.store.save(null); vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false)
             activity.finishAndRemoveTask()
         }
     }
@@ -100,8 +100,8 @@ class SubscriptionJourneyTest {
         compose.onNodeWithTag("mini-player-preview").assertExists()
         val token = vm.queue.value.token
         compose.onNodeWithTag("subscription-search").performClick()
-        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets)
-            .isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
         compose.onNodeWithTag("player-surface").assertDoesNotExist()
         compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()

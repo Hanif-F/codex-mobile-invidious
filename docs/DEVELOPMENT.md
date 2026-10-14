@@ -6,10 +6,7 @@ For current behavior and implementation references, start with the
 [complete documentation index](README.md). It includes architecture, all feature
 workflows, settings and API contracts, subsystem guides, and source/test catalogs.
 
-For the next complete UI/UX redesign, follow the
-[opaque Android overhaul handoff](ui-ux-overhaul-2026-10-13/README.md). It supersedes
-Liquid Glass design instructions. Track verification and remaining acceptance in
-the [implementation report](ui-ux-implementation-2026-10-13/README.md).
+The [UI guide](UI.md) describes the current opaque Material 3 implementation.
 
 This guide covers building, testing and maintaining Mobivious for human and AI
 contributors. Commands run from this repository's root unless shown otherwise.
@@ -21,8 +18,8 @@ contributors. Commands run from this repository's root unless shown otherwise.
 | [android/](../android/) | Native Android app, Gradle configuration and tests |
 | [scripts/](../scripts/) | Build helpers, local API fixtures and test runners |
 | [deploy/](../deploy/) and [docker-compose.yml](../docker-compose.yml) | Server deployment configuration |
-| [FEATURE_PARITY.md](../FEATURE_PARITY.md) | Detailed native feature coverage and server dependencies |
-| [VERIFICATION.md](../VERIFICATION.md) | Dated validation evidence and reproduction instructions |
+| [Features](FEATURES.md) and [API](API.md) | Supported capabilities and server dependencies |
+| [Testing](TESTING.md) | Repeatable checks and acceptance boundaries |
 
 The app's Kotlin source is under `android/app/src/main/java/net/wingress/mobivious/`:
 `data/` handles APIs, models and preferences; `player/` owns service playback
@@ -80,19 +77,20 @@ a dependency update.
 | Component | Configured version / purpose |
 | --- | --- |
 | Gradle wrapper | 9.4.1, with distribution SHA-256 verification. |
-| Android Gradle plugin | 9.2.1; single `com.android.application` module. |
+| Android Gradle plugin | 9.2.1; `:app` application and `:macrobenchmark` test modules. |
 | Compose compiler plugin | 2.3.10. |
 | Android SDK | Minimum 33; compile/target 37. |
 | Java source/bytecode target | 17. |
 | Compose BOM | 2026.03.00; aligns Material3, icons, UI tooling and Compose tests. |
 | Activity Compose | 1.12.3; activity/UI integration. |
-| Lifecycle Compose | 2.10.0; view-model and lifecycle-aware collection. |
+| Lifecycle Runtime Compose | 2.10.0; lifecycle-aware collection. AndroidViewModel is hosted by the activity. |
 | Media3 | 1.9.3; ExoPlayer, DASH/HLS, sessions, PlayerView and Transformer. |
 | OkHttp / MockWebServer | 4.12.0; application HTTP / JVM contract fixtures. |
 | Coil Compose | 2.7.0; images and caching. |
 | Coroutines Android | 1.10.2; asynchronous work and state flows. |
 | WindowManager | 1.5.1; opaque fold/hinge layout policy. |
 | RE2/J | 1.8; bounded-complexity chat regex matching. |
+| Macrobenchmark / UI Automator | 1.5.0 / 2.3.0; isolated performance journeys and input. |
 | JUnit / JVM JSON | 4.13.2 / 20251224. |
 | Android test JUnit / runner / Espresso | 1.3.0 / 1.7.0 / 3.7.0. |
 
@@ -140,8 +138,7 @@ Stop any earlier fixture using the same port before starting it. The fixture tes
 use generated media and local accounts rather than production accounts or YouTube
 requests. Generated files stay in the ignored `.tools/` directory.
 
-See [repeat Android checks](../VERIFICATION.md#repeat-android-checks) and the
-feature-specific sections of the verification record for focused scenarios.
+See [Testing](TESTING.md) and its test catalog for focused scenarios.
 Pass additional Gradle options to run focused checks, for example:
 
 ```sh
@@ -180,9 +177,11 @@ as described above. The release script also requires `keytool`, Python 3 and
 `sha256sum`; publishing uses an authenticated GitHub CLI (`gh`) and Git.
 
 **Preserve `android/keystore/` and `android/signing.properties` securely.**
-APK updates must use the same signing key. If `signing.properties` is absent,
-the build script generates a new personal key; restore the existing signing
-material before building an update to an already distributed APK. Keep keys and
+APK updates must use the same signing key. The build script refuses to build when
+`signing.properties` is absent; restore the existing material before building an
+update. For a first release only, `scripts/build-release.sh --init-signing` creates
+a new identity in an empty keystore directory. It refuses existing material and
+publishes no partial configuration after failed key generation. Keep keys and
 passwords local and out of Git.
 
 ### Prepare and verify
@@ -234,16 +233,19 @@ gh release create "v$release_version" \
   --title "Mobivious $release_version" --notes-file artifacts/release-notes.md
 ```
 
-Record checks and remaining acceptance gaps in the verification record as
-appropriate. Its dated entries describe individual implementation and release
-stages; older test totals or rollout statements are historical.
+Record the verified source, commands, device, results and acceptance gaps in the
+release notes. Preserve raw output under ignored `.tools/`; do not infer current
+acceptance from previous test totals.
 
 ## Upstream maintenance
 
 Merge upstream changes into the independent Invidious repository, run its
 account/API checks, rebuild the Docker image and pull Companion updates. Follow
-[repeat server checks](../VERIFICATION.md#repeat-server-checks) and the local
-mobile API and database harness documentation.
+the sibling checkout's `docs/mobile-api.md` and `tests/database/README.md`.
+Run the database harness only against its empty disposable test database; preserve
+production credentials and data. From the server checkout, `shards install` and
+`crystal spec` run its dependency setup and specs. Initialize its `mocks` submodule
+as documented there before running specs.
 
 The client contains no YouTube scraping or signature deciphering. Server fixes
 can be adopted without rebuilding the APK while API contracts remain compatible;

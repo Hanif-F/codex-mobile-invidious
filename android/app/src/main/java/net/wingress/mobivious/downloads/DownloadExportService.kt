@@ -88,8 +88,7 @@ class DownloadExportService : Service() {
         val cancel = PendingIntent.getService(this, 31, Intent(this, DownloadExportService::class.java).setAction("cancel"), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val notification = NotificationCompat.Builder(this, "download-export").setSmallIcon(android.R.drawable.stat_sys_download).setContentTitle("Export download")
             .setContentText(value.phase).setContentIntent(open).setOngoing(value.busy).setProgress(100, value.progress, value.progress == 0).addAction(0, "Cancel", cancel).build()
-        if (Build.VERSION.SDK_INT >= 29) startForeground(41, notification, if (Build.VERSION.SDK_INT >= 35) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING else ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        else startForeground(41, notification)
+        startForeground(41, notification, if (Build.VERSION.SDK_INT >= 35) ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING else ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == "cancel") { job?.cancel(); return START_NOT_STICKY }

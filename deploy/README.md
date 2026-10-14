@@ -33,8 +33,8 @@ projects/
 For a different server checkout location, set `INVIDIOUS_SOURCE_DIR` in this
 project's `.env`. Relative paths are resolved against `docker-compose.yml`;
 absolute paths such as `/srv/invidious` also work. The build context and both SQL
-initialization mounts use this same setting. The old local `source/.git` is a
-recovery copy only and does not need to be copied to the server.
+initialization mounts use this same setting. There is no bundled server checkout
+inside the Android repository.
 
 1. Back up the existing database and confirm its volume name with `docker volume ls`.
    Preserve the current deployment and secrets for rollback. Do not run two stacks
@@ -137,8 +137,8 @@ Response-provided images retain priority; cache misses and cache failures use
 placeholders without fetching channel/video metadata. Images use the existing
 fixed-host `/ggpht` proxy, which now preserves query parameters. Normal image
 requests may still reach YouTube's image CDN. Older servers remain usable with
-available response images/placeholders. Native runtime and screenshot acceptance
-are pending; see `../VERIFICATION.md` for validation and repeat commands.
+available response images/placeholders. For native checks and runtime boundaries,
+see the [testing guide](../docs/TESTING.md).
 
 
 ## Shared preferred video codec
@@ -171,12 +171,11 @@ listing and revocation, selected token permissions/expiry, and account deletion
 using disposable accounts. The account harness exercises these transactions and
 CAPTCHA replay before rollout; see the sibling `tests/database/README.md`.
 
-The Android update puts Settings inside Account and Search in the top-right;
-it also sizes playback from decoded dimensions. Test portrait/square/landscape/
-ultrawide media, comments, fullscreen, PiP and queue transitions on a real device
-before runtime acceptance. Local connected tests are unverified because the
-emulator crashes before boot. No production deployment or release publishing was
-performed for this change.
+The current Android UI exposes Settings from You, Account from Settings, and
+Search from browse toolbars. Playback sizes itself from decoded dimensions.
+Test portrait/square/landscape/ultrawide media, comments, fullscreen, PiP and queue
+transitions on the intended device before rollout. Dated emulator results and
+remaining acceptance boundaries are in the [cleanup report](../docs/CLEANUP.md).
 
 ## Native AI channel filter
 
@@ -188,6 +187,6 @@ adds no migration or token scopes, and existing native sessions remain valid.
 Android uses public `/api/v1/ai/status` and bounded `/api/v1/ai/channels` queries;
 the existing preference PATCH endpoint accepts the master switch and eight action
 fields. Lists and channel resolution stay on the instance. Verify guest/account
-settings, warning thumbnails and recommendation autoplay with the fixture checks
-in `VERIFICATION.md`. Old instances keep browsing and playback available and show
+settings, warning thumbnails and recommendation autoplay with `AiFilterSmokeTest`
+and `AiFilterTest`; see the [testing guide](../docs/TESTING.md). Old instances keep browsing and playback available and show
 an update-required message in AI settings. Downloads remain independent.

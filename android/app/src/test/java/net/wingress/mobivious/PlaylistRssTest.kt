@@ -24,7 +24,7 @@ class PlaylistRssTest {
             server.start()
             val api = InvidiousApi({ account(server).server }, { null })
             server.enqueue(MockResponse().setBody("""[{"type":"playlist","playlistId":"RDopaque","title":"Mix","playlistThumbnail":"/vi/abcdefghijk/mqdefault.jpg","videoCount":-1},{"type":"video","videoId":"abcdefghijk"}]"""))
-            val result = api.searchPlaylists("music", 2, "relevance")
+            val result = api.searchResults("music", 2, SearchType.PLAYLISTS, "relevance", "", "").items.filterIsInstance<SearchResult.PlaylistItem>().map { it.playlist }
             assertEquals("abcdefghijk", result.single().seedVideoId); assertTrue(result.single().mix)
             val request = server.takeRequest(); assertNull(request.getHeader("Authorization"))
             assertEquals(setOf("q", "page", "sort", "type"), request.requestUrl!!.queryParameterNames)
@@ -37,9 +37,9 @@ class PlaylistRssTest {
         MockWebServer().use { server ->
             server.start(); val api = InvidiousApi({ account(server).server }, { null })
             server.enqueue(MockResponse().setBody("""{"playlists":[{"playlistId":"PLx","title":"Channel list"}],"continuation":"next&token"}"""))
-            val first = api.channelPlaylists("UCchannel", sort = "newest"); server.takeRequest()
+            val first = api.channelPlaylistPage("UCchannel", ChannelTab.PLAYLISTS, sort = "newest"); server.takeRequest()
             server.enqueue(MockResponse().setBody("""{"playlists":[],"continuation":null}"""))
-            assertTrue(api.channelPlaylists("UCchannel", first.continuation, "newest").continuation.isEmpty())
+            assertTrue(api.channelPlaylistPage("UCchannel", ChannelTab.PLAYLISTS, first.continuation, "newest").continuation.isEmpty())
             val request = server.takeRequest(); assertEquals("next&token", request.requestUrl!!.queryParameter("continuation"))
             assertEquals("newest", request.requestUrl!!.queryParameter("sort_by"))
             assertEquals(listOf(ChannelTab.PLAYLISTS), Channel("UCchannel", "Only lists", tabs = listOf("playlists")).contentTabs)

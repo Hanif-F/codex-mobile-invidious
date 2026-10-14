@@ -43,7 +43,7 @@ class AmbientPaletteTest {
     @Test fun vividIlluminationBoundsSupportingTextContrastInBothThemes() {
         for (color in listOf(Color.White, Color.Black, Color.Red, Color.Green, Color.Blue, Color.Yellow, Color.Magenta, Color.Cyan)) {
             for (dark in listOf(false, true)) {
-                val scheme = if (dark) AppTokens.dark else AppTokens.light
+                val scheme = if (dark) appColorScheme(true) else appColorScheme(false)
                 val background = ambientIllumination(color, scheme.surface, dark)
                     .copy(alpha = if (dark) .55f else .30f).compositeOver(scheme.surface)
                 val foreground = scheme.onSurfaceVariant.luminance()

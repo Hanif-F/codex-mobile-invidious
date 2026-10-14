@@ -175,22 +175,5 @@ object VideoLinks {
         }
         number.toBigInteger().takeIf { it.signum() >= 0 && it.bitLength() <= 63 }?.toLong()
     }.getOrNull()
-    fun share(server: String, queue: PlaybackQueueSnapshot, positionMs: Long): String? {
-        if (queue.context != null && queue.context.server.toHttpUrlOrNull() != server.toHttpUrlOrNull()) return null
-        val current = queue.current ?: return null
-        val id = queue.details?.video?.id ?: current.video.id
-        if (!idPattern.matches(id)) return null
-        val url = server.toHttpUrlOrNull()?.newBuilder()?.addPathSegment("watch")?.addQueryParameter("v", id) ?: return null
-        val playback = current.linkPlayback
-        val at = positionMs.coerceAtLeast(0).let { playback?.endMs?.let { end -> minOf(it, (end - 1).coerceAtLeast(0)) } ?: it }
-        url.addQueryParameter("t", time(at))
-        if (current.sourceIndex != null && queue.source != null && current.key.startsWith("${queue.source.id}:")) {
-            url.addQueryParameter("list", queue.source.id).addQueryParameter("index", current.sourceIndex.toString())
-            if (queue.source.mix) url.addQueryParameter("continuation", id)
-        }
-        playback?.endMs?.let { url.addQueryParameter("end", time(it)) }
-        queue.shareOptions.json().let { j -> j.keys().forEach { key -> url.addQueryParameter(key, j.get(key).toString()) } }
-        return url.build().toString()
-    }
-    private fun time(ms: Long) = BigDecimal(ms).divide(BigDecimal(1000)).stripTrailingZeros().toPlainString()
+
 }

@@ -39,7 +39,7 @@ class DeviceProfilesSmokeTest {
             }
             vm.store.save(null)
             vm.store.clearVisibilitySnapshot(vm.api.context()); vm.saveSearchVisibility(SearchVisibility())
-            vm.store.guestDeArrow(AccountPreferences()); vm.store.background = true; vm.store.pip = true
+            vm.store.guestPreferences(AccountPreferences()); vm.store.background = true; vm.store.pip = true
             vm.store.chatAppearance(ChatAppearance()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { activity.model.browse.value.videos.isNotEmpty() && !activity.model.browse.value.loading }
@@ -50,7 +50,7 @@ class DeviceProfilesSmokeTest {
             val vm = activity.model
             vm.closePlayer(); vm.store.save(null); vm.store.clearVisibilitySnapshot(vm.api.context())
             vm.store.background = true; vm.store.pip = true; vm.store.chatAppearance(ChatAppearance())
-            vm.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
+            vm.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask()
         }
     }
     private fun login(name: String, id: Char) {
@@ -67,7 +67,7 @@ class DeviceProfilesSmokeTest {
         compose.runOnUiThread {
             activity.model.store.pip = false
             activity.model.setChatAppearance(ChatAppearance(fontScale = 145))
-            activity.model.store.guestDeArrow(AccountPreferences(speed = .75f, savePosition = true))
+            activity.model.store.guestPreferences(AccountPreferences(speed = .75f, savePosition = true))
             activity.model.refreshSharedSettings()
         }
         login("ProfileAlice", 'a')
@@ -82,7 +82,7 @@ class DeviceProfilesSmokeTest {
         logout(); login("ProfileAlice", 'a')
         until { activity.model.chatAppearance.value.fontScale == 175 }
         assertFalse(activity.model.store.background); assertTrue(activity.model.store.pip)
-        assertEquals(.75f, activity.model.store.guestDeArrow().speed)
+        assertEquals(.75f, activity.model.store.guestPreferences().speed)
     }
     @Test fun existingSessionDiscoversStableIdentityAndLateGuestSavesAreRejected() {
         val vm = activity.model
@@ -129,14 +129,16 @@ class DeviceProfilesSmokeTest {
         compose.onNodeWithText("Channel SponsorBlock settings").performClick()
         compose.onNodeWithText("Channel ID or /channel/UC… URL").performTextInput(channel)
         compose.onNodeWithText("Edit channel settings").performClick()
-        until { compose.onAllNodesWithTag("sponsor-channel-enabled").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithTag("sponsor-channel-enabled").performClick()
+        // The row exists while its channel metadata request still disables input.
+        until { compose.onAllNodes(hasTestTag("sponsor-channel-enabled") and isEnabled()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("sponsor-channel-enabled").assertIsEnabled().performClick()
+        until { compose.onAllNodes(hasText("Enabled") and hasAnyAncestor(isPopup())).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasText("Enabled") and hasAnyAncestor(isPopup())).performClick()
         compose.runOnUiThread { activity.model.flushPreferenceEdits() }
         until { activity.model.preferenceSaves.edits.value.isEmpty() }
         compose.onNodeWithContentDescription("Close SponsorBlock settings").performClick()
         until { activity.model.preferences.value.sponsorBlock.channels[channel]?.enabled == true }
-        assertTrue(SessionStore(activity).guestDeArrow().sponsorBlock.effective(channel).enabled)
+        assertTrue(SessionStore(activity).guestPreferences().sponsorBlock.effective(channel).enabled)
         compose.runOnUiThread { activity.model.play("testvideo01", 0) }
         until { activity.model.sponsorBlock.value.segments.any { it.id == "guest-segment" } }
         assertFalse(fixture().getBoolean("sponsorAuthorized"))
@@ -145,7 +147,7 @@ class DeviceProfilesSmokeTest {
         compose.onNodeWithTag("sponsor-configured-channel-$channel").performClick()
         compose.onNodeWithText("Reset to global").performClick()
         until { channel !in activity.model.preferences.value.sponsorBlock.channels }
-        assertFalse(SessionStore(activity).guestDeArrow().sponsorBlock.channels.containsKey(channel))
+        assertFalse(SessionStore(activity).guestPreferences().sponsorBlock.channels.containsKey(channel))
         until { activity.model.sponsorBlock.value.segments.isEmpty() }
         assertEquals(0, fixture().getJSONArray("preferencesRequests").length())
         assertNull(activity.model.account.value)

@@ -36,7 +36,7 @@ class DeviceProfileStorageTest {
     }
     @Test fun guestTwoAccountsAndRestartRestoreOnlyTheirOwnDeviceSaves() {
         store.background = false; store.pip = false; store.chatAppearance(ChatAppearance(fontScale = 145))
-        store.guestDeArrow(AccountPreferences(speed = .75f, savePosition = true)); store.position("abcdefghijk", 35)
+        store.guestPreferences(AccountPreferences(speed = .75f, savePosition = true)); store.position("abcdefghijk", 35)
         store.saveSearchVisibility(store.positionContext(), SearchVisibility(true, true))
         store.save(account("Alice", 'a'))
         assertTrue(store.background); assertTrue(store.pip); assertEquals(100, store.chatAppearance().fontScale)
@@ -59,7 +59,7 @@ class DeviceProfileStorageTest {
         val guest = store.positionContext(); store.save(account("Alice", 'a'))
         stale { store.background(false, guest) }; stale { store.pip(false, guest) }
         stale { store.chatAppearance(ChatAppearance(fontScale = 200), guest) }
-        stale { store.guestDeArrow(AccountPreferences(speed = 2f), guest) }
+        stale { store.guestPreferences(AccountPreferences(speed = 2f), guest) }
         stale { store.saveSearchVisibility(guest, SearchVisibility(true, true)) }
         stale { store.chatTiming("abcdefghijk", 4000, guest) }
         val old = store.positionContext(); store.save(account("Alice", 'a', "replacement"))
@@ -116,12 +116,12 @@ class DeviceProfileStorageTest {
     }
     @Test fun deletionPurgesOnlySelectedAccountAndGuestOverridesPersist() {
         val channel = "UC" + "a".repeat(22)
-        store.guestDeArrow(AccountPreferences(sponsorBlock = SponsorBlockSettings(channels = mapOf(channel to SponsorBlockChannel("Guest", true)))))
+        store.guestPreferences(AccountPreferences(sponsorBlock = SponsorBlockSettings(channels = mapOf(channel to SponsorBlockChannel("Guest", true)))))
         store.saveBlockedSnapshot(store.positionContext(), listOf(BlockedChannel(channel, "Guest")))
         store.save(account("Alice", 'a')); store.pip = false
         store.save(account("Bob", 'b')); store.background = false
         store.save(account("Alice", 'a')); store.deleteProfile(store.positionContext()); store.save(null)
-        assertTrue(store.guestDeArrow().sponsorBlock.effective(channel).enabled)
+        assertTrue(store.guestPreferences().sponsorBlock.effective(channel).enabled)
         assertEquals(channel, store.blockedSnapshot(store.positionContext())!!.single().id)
         store.save(account("Bob", 'b')); assertFalse(store.background)
         store.save(account("Alice", 'a')); assertTrue(store.pip)
@@ -135,7 +135,7 @@ class DeviceProfileStorageTest {
             .putLong("position.abcdefghijk", 55).putString("visibility.search." + JSONArray().put(address).put("Alice"), SearchVisibility(true, true).json().toString()).commit()
         store = SessionStore(context)
         assertNull(store.account.value); assertFalse(store.background); assertEquals(150, store.chatAppearance().fontScale)
-        assertEquals(1.5f, store.guestDeArrow().speed); assertEquals(0L, store.position("abcdefghijk"))
+        assertEquals(1.5f, store.guestPreferences().speed); assertEquals(0L, store.position("abcdefghijk"))
         store.save(account("Alice", 'a').copy(profileId = null))
         assertTrue(store.background); assertEquals(100, store.chatAppearance().fontScale); assertEquals(55L, store.position("abcdefghijk"))
         assertEquals(SearchVisibility(true, true), store.searchVisibility(store.positionContext()))

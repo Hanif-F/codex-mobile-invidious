@@ -5,7 +5,6 @@ import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.os.PersistableBundle
-import android.os.Build
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -308,9 +307,7 @@ private fun TokenForm(vm: AppViewModel, context: ApiContext, modifier: Modifier,
             Text(token!!, modifier = Modifier.testTag("account-created-token"))
             Box { LibraryActionButton("Copy token", prominent = true, onClick = {
                 val clip = ClipData.newPlainText("Invidious API token", token!!)
-                if (Build.VERSION.SDK_INT >= 33) {
-                    clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
-                }
+                clip.description.extras = PersistableBundle().apply { putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true) }
                 (androidContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(clip)
                 vm.message.value = "Token copied"
             }) }

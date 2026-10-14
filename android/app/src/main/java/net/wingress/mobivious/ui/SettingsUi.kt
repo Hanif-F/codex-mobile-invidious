@@ -60,14 +60,13 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
         if (previousContext != context && page in accountSettingsPages && page != "Account") navigate("Account")
         previousContext = context
     }
-    var saving by remember(page, context) { mutableStateOf(false) }
     if (page == "SponsorBlock") {
-        key(context) { SponsorBlockSheet(vm, "", signIn, back, fullScreen = true) }
+        key(context) { SponsorBlockSheet(vm, "", back, fullScreen = true) }
         return
     }
-    BackHandler { if (!saving && !accountBusy) back() }
+    BackHandler { if (!accountBusy) back() }
     BrowseAppSurface(Modifier.fillMaxSize().imePadding(), toolbar = {
-        LibraryToolbar(page, back = back, backLabel = "Back from $page", backEnabled = !saving && !accountBusy)
+        LibraryToolbar(page, back = back, backLabel = "Back from $page", backEnabled = !accountBusy)
     }) { body, top ->
         Box(body, contentAlignment = Alignment.TopCenter) {
           CompositionLocalProvider(LocalSettingsTopInset provides top) {
@@ -114,7 +113,7 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                     "About" -> AboutSettingsScreen(content)
                     "Blocked channels" -> BlockedChannelsScreen(vm, content, signIn, openChannel)
                     in accountSettingsPages -> AccountSettingsContent(vm, page, content, navigate, signIn)
-                    else -> PreferenceSettingsScreen(vm, page, prefs, content, back, signIn, navigate)
+                    else -> PreferenceSettingsScreen(vm, page, prefs, content, signIn, navigate)
                 }
             }
           }
@@ -128,12 +127,11 @@ private fun SettingsLink(title: String, detail: String, icon: ImageVector, navig
 }
 
 @Composable
-private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: AccountPreferences, modifier: Modifier, back: () -> Unit, signIn: () -> Unit, navigate: (String) -> Unit) {
+private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: AccountPreferences, modifier: Modifier, signIn: () -> Unit, navigate: (String) -> Unit) {
     val account by vm.account.collectAsStateWithLifecycle()
     val playlists by vm.playlists.collectAsStateWithLifecycle()
     val context = remember { vm.api.context() }
     val edits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
-    val busy = false
     val background = vm.localPreferenceValue("profile:background",vm.store.background) as Boolean
     val pip = vm.localPreferenceValue("profile:pip",vm.store.pip) as Boolean
     val scope = rememberCoroutineScope()
@@ -160,7 +158,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                 "AI channel filter" -> {
                     item { AppSection {
                         Column(Modifier.testTag("ai-filter-master")) {
-                            SettingsToggle("Enable AI Channel Filter", "Pause filtering and warnings without clearing your choices", value.aiFilter.enabled, !busy) { update(value.copy(aiFilter = value.aiFilter.copy(enabled = it))) }
+                            SettingsToggle("Enable AI Channel Filter", "Pause filtering and warnings without clearing your choices", value.aiFilter.enabled) { update(value.copy(aiFilter = value.aiFilter.copy(enabled = it))) }
                         }
                         if (!value.aiFilter.enabled) Text("Filtering is paused. Edit the actions, then enable the filter to apply them.", style = MaterialTheme.typography.bodySmall)
                         Text("AiSList is a community classification of channels. Blocklist means high confidence; Warnlist means moderate confidence. Classifications may be incorrect. Invidious does not perform automatic AI detection.", style = MaterialTheme.typography.bodySmall)
@@ -177,7 +175,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         AiListKind.entries.forEach { kind ->
                             Box(Modifier.testTag("ai-choice-${kind.wire}-${group.wire}")) {
                                 SettingsChoice(kind.label, AiAction.entries.filter { group != AiPageGroup.OTHER || it != AiAction.HIDE }.map { it.wire to it.label },
-                                    value.aiFilter.saved(kind, group).wire, !busy) { update(value.copy(aiFilter = value.aiFilter.withAction(kind, group, AiAction.parse(it, group)))) }
+                                    value.aiFilter.saved(kind, group).wire) { update(value.copy(aiFilter = value.aiFilter.withAction(kind, group, AiAction.parse(it, group)))) }
                                 val actionEdit=edits["ai_${kind.wire}_${group.wire}_action"]
                                 PreferenceSaveFeedback(actionEdit?.status,actionEdit?.error,
                                     {actionEdit?.let {vm.preferenceSaves.retry(it.key)}},{actionEdit?.let {vm.preferenceSaves.revert(it.key)}})
@@ -189,28 +187,28 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                 "Playback" -> {
                     item { AppSection {
                         SettingsHeading("Playback defaults")
-                        SettingsToggle("Autoplay opened videos", "Start playing when you open a video", value.autoplay, !busy) { update(value.copy(autoplay = it)) }
-                        SettingsToggle("Next recommendation", "Select the next eligible recommendation when a standalone video ends", value.continueNext, !busy) { update(value.copy(continueNext = it)) }
-                        SettingsToggle("Autoplay next video", "Start successors automatically; opened-video autoplay also enables this", value.continueAutoplay, !busy) { update(value.copy(continueAutoplay = it)) }
-                        SettingsToggle("Loop videos by default", "Start playback sessions with Repeat One", value.videoLoop, !busy) { update(value.copy(videoLoop = it)) }
-                        SettingsToggle("Audio only by default", "Disable video tracks when opening a video", value.listen, !busy) { update(value.copy(listen = it)) }
-                        SettingsToggle("Proxy video streams", "Route streams through your Invidious instance", value.local, !busy) { update(value.copy(local = it)) }
-                        SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString(), !busy) { update(value.copy(speed = it.toFloat())) }
-                        SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec, !busy) { update(value.copy(videoCodec = it)) }
-                        SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash, !busy) { update(value.copy(qualityDash = it)) }
+                        SettingsToggle("Autoplay opened videos", "Start playing when you open a video", value.autoplay) { update(value.copy(autoplay = it)) }
+                        SettingsToggle("Next recommendation", "Select the next eligible recommendation when a standalone video ends", value.continueNext) { update(value.copy(continueNext = it)) }
+                        SettingsToggle("Autoplay next video", "Start successors automatically; opened-video autoplay also enables this", value.continueAutoplay) { update(value.copy(continueAutoplay = it)) }
+                        SettingsToggle("Loop videos by default", "Start playback sessions with Repeat One", value.videoLoop) { update(value.copy(videoLoop = it)) }
+                        SettingsToggle("Audio only by default", "Disable video tracks when opening a video", value.listen) { update(value.copy(listen = it)) }
+                        SettingsToggle("Proxy video streams", "Route streams through your Invidious instance", value.local) { update(value.copy(local = it)) }
+                        SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString()) { update(value.copy(speed = it.toFloat())) }
+                        SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec) { update(value.copy(videoCodec = it)) }
+                        SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash) { update(value.copy(qualityDash = it)) }
                         Text("Playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
                     } }
                     item { AppSection {
                         SettingsHeading("On this device")
-                        SettingsToggle("Background playback", "Keep playing when the app is in the background", background, !busy) { vm.setBackground(it, context) }
-                        SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip, !busy) { vm.setPip(it, context) }
+                        SettingsToggle("Background playback", "Keep playing when the app is in the background", background) { vm.setBackground(it, context) }
+                        SettingsToggle("Picture in picture", "Allow the floating player when leaving a video", pip) { vm.setPip(it, context) }
                         Text("These two options save immediately for this account or guest on this device.", style = MaterialTheme.typography.bodySmall)
                     } }
                     item { AppSection {
                         SettingsHeading("Caption language priority")
                         Text("Use the first available language. Set all priorities to None to start with captions off.", style = MaterialTheme.typography.bodySmall)
                         repeat(3) { index ->
-                            SettingsChoice("Caption priority ${index + 1}", CaptionLanguages.values.map { it to it.ifBlank { "None" } }, value.captions.getOrElse(index) { "" }, !busy) { language ->
+                            SettingsChoice("Caption priority ${index + 1}", CaptionLanguages.values.map { it to it.ifBlank { "None" } }, value.captions.getOrElse(index) { "" }) { language ->
                                 val languages = MutableList(3) { value.captions.getOrElse(it) { "" } }; languages[index] = language
                                 update(value.copy(captions = languages))
                             }
@@ -218,7 +216,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     } }
                 }
                 "Appearance" -> item { AppSection {
-                    SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode, !busy) { update(value.copy(darkMode = it)) }
+                    SettingsChoice("Color mode", listOf("" to "System", "light" to "Light", "dark" to "Dark"), value.darkMode) { update(value.copy(darkMode = it)) }
                     val savedAccent by vm.store.accentPreset.collectAsStateWithLifecycle()
                     val accent = AccentPreset.saved(vm.localPreferenceValue("device:accent",savedAccent.id) as String)
                     Text("Accent", style = MaterialTheme.typography.titleMedium)
@@ -239,28 +237,28 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     SettingsToggle("Ambient mode", if (reduceTransparency) "Paused while Reduce transparency is on. Your choice is saved on this device."
                         else "Let video colors illuminate the expanded watch view. Saves on this device immediately.",
                         ambientMode, true) { vm.requestAmbientMode(it) }
-                    SettingsChoice("Video list density", listOf("balanced" to "Comfortable", "compact" to "Compact"), value.uiDensity, !busy) { update(value.copy(uiDensity = it)) }
-                    SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode, !busy) { update(value.copy(thinMode = it)) }
+                    SettingsChoice("Video list density", listOf("balanced" to "Comfortable", "compact" to "Compact"), value.uiDensity) { update(value.copy(uiDensity = it)) }
+                    SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode) { update(value.copy(thinMode = it)) }
                     SettingsHeading("Accessibility")
-                    SettingsToggle("Reduce transparency", "Suppress optional ambient lighting. The interface already uses solid surfaces. Saves on this device immediately.", reduceTransparency, !busy) { vm.requestLocalPreference("device:reduceTransparency","Appearance",savedTransparency,it) }
+                    SettingsToggle("Reduce transparency", "Suppress optional ambient lighting. The interface already uses solid surfaces. Saves on this device immediately.", reduceTransparency) { vm.requestLocalPreference("device:reduceTransparency","Appearance",savedTransparency,it) }
                 } }
                 "Browsing" -> {
                     item { AppSection {
-                        SettingsToggle("Show members-only videos", "Include members-only content in video lists. This does not grant membership access.", value.showMemberVideos, !busy) { update(value.copy(showMemberVideos = it)) }
+                        SettingsToggle("Show members-only videos", "Include members-only content in video lists. This does not grant membership access.", value.showMemberVideos) { update(value.copy(showMemberVideos = it)) }
                         SettingsLink("Blocked channels", "Manage channels hidden from discovery and recommendations", Icons.Default.Block, navigate)
                     } }
                     item { AppSection {
                         val homes = PreferenceRules.homes.filter { account != null || it !in listOf("Subscriptions", "Playlists") }
-                        SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome, !busy) { update(value.copy(defaultHome = it)) }
+                        SettingsChoice("Default homepage", homes.map { it to PreferenceRules.homeLabel(it) }, value.defaultHome) { update(value.copy(defaultHome = it)) }
                         Text("Choose where the app opens. Popular, Trending, Subscriptions and You have independent destinations. Signing in returns you to what you were doing.", style = MaterialTheme.typography.bodySmall)
-                        RegionChoice(value.region, !busy, "settings-region") { update(value.copy(region = it)) }
+                        RegionChoice(value.region, tag = "settings-region") { update(value.copy(region = it)) }
                         LocalPreferenceFeedback.current("Trending region")
                     } }
                     item { AppSection {
                         SettingsHeading("Video pages")
-                        SettingsToggle("Show related videos", "Display recommendations below the video", value.relatedVideos, !busy) { update(value.copy(relatedVideos = it)) }
-                        SettingsToggle("Expand descriptions by default", "Show the full description when opening a video", value.extendDescription, !busy) { update(value.copy(extendDescription = it)) }
-                        SettingsToggle("Show YouTube comments", "Show a comments entry on video pages; text stays hidden until opened", value.showYoutubeComments, !busy) { enabled ->
+                        SettingsToggle("Show related videos", "Display recommendations below the video", value.relatedVideos) { update(value.copy(relatedVideos = it)) }
+                        SettingsToggle("Expand descriptions by default", "Show the full description when opening a video", value.extendDescription) { update(value.copy(extendDescription = it)) }
+                        SettingsToggle("Show YouTube comments", "Show a comments entry on video pages; text stays hidden until opened", value.showYoutubeComments) { enabled ->
                             val others = value.comments.filter { it != "youtube" && it.isNotBlank() }
                             update(value.copy(comments = ((if (enabled) listOf("youtube") else emptyList()) + others).take(2).let { it + List((2 - it.size).coerceAtLeast(0)) { "" } }))
                         }
@@ -269,27 +267,27 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                 "Subscriptions" -> {
                     if (account == null) item { AppSection { LibraryEmptyState("Your subscription feed", "Sign in to change your subscription feed.", Icons.Default.Subscriptions, "Sign in", signIn) } }
                     else item { AppSection {
-                        SettingsChoice("Videos per page", (listOf(10, 20, 30, 40, 60, 100, 200, 500, 1000, 1500) + value.maxResults).distinct().sorted().map { it.toString() to it.toString() }, value.maxResults.toString(), !busy) { update(value.copy(maxResults = it.toInt())) }
-                        SettingsChoice("Feed sorting", PreferenceRules.feedSorts.zip(listOf("Newest first", "Oldest first", "Title A–Z", "Title Z–A", "Channel A–Z", "Channel Z–A")), value.feedSort, !busy) { update(value.copy(feedSort = it)) }
-                        SettingsToggle("Latest video from each channel", "Show one video per subscribed channel", value.latestOnly, !busy) { update(value.copy(latestOnly = it)) }
-                        SettingsToggle("Unwatched videos only", "Hide videos already in your watch history", value.unseenOnly, !busy) { update(value.copy(unseenOnly = it)) }
-                        SettingsToggle("Pending notifications only", "Show pending account uploads in this feed", value.notificationsOnly, !busy) { update(value.copy(notificationsOnly = it)) }
+                        SettingsChoice("Videos per page", (listOf(10, 20, 30, 40, 60, 100, 200, 500, 1000, 1500) + value.maxResults).distinct().sorted().map { it.toString() to it.toString() }, value.maxResults.toString()) { update(value.copy(maxResults = it.toInt())) }
+                        SettingsChoice("Feed sorting", PreferenceRules.feedSorts.zip(listOf("Newest first", "Oldest first", "Title A–Z", "Title Z–A", "Channel A–Z", "Channel Z–A")), value.feedSort) { update(value.copy(feedSort = it)) }
+                        SettingsToggle("Latest video from each channel", "Show one video per subscribed channel", value.latestOnly) { update(value.copy(latestOnly = it)) }
+                        SettingsToggle("Unwatched videos only", "Hide videos already in your watch history", value.unseenOnly) { update(value.copy(unseenOnly = it)) }
+                        SettingsToggle("Pending notifications only", "Show pending account uploads in this feed", value.notificationsOnly) { update(value.copy(notificationsOnly = it)) }
                         Text("This filters the feed; it does not enable Android alerts. Page size also applies to watch history.", style = MaterialTheme.typography.bodySmall)
                     } }
                 }
                 "History & library" -> item { AppSection {
-                    if (account != null) SettingsToggle("Watch history", "Record played videos in your shared account history", value.watchHistory, !busy) { update(value.copy(watchHistory = it)) }
+                    if (account != null) SettingsToggle("Watch history", "Record played videos in your shared account history", value.watchHistory) { update(value.copy(watchHistory = it)) }
                     else Text("Sign in to keep a shared watch history.", style = MaterialTheme.typography.bodyMedium)
-                    SettingsToggle("Remember playback position", if (account != null) "Resume across Android and the website" else "Resume videos on this device", value.savePosition, !busy) { update(value.copy(savePosition = it)) }
+                    SettingsToggle("Remember playback position", if (account != null) "Resume across Android and the website" else "Resume videos on this device", value.savePosition) { update(value.copy(savePosition = it)) }
                     if (account != null) {
-                        SettingsChoice("Default playlist", listOf("" to "None") + playlists.filter { it.owned }.map { it.id to it.title }, value.defaultPlaylist, !busy) { update(value.copy(defaultPlaylist = it)) }
+                        SettingsChoice("Default playlist", listOf("" to "None") + playlists.filter { it.owned }.map { it.id to it.title }, value.defaultPlaylist) { update(value.copy(defaultPlaylist = it)) }
                         Text("The default playlist appears first when saving a video.", style = MaterialTheme.typography.bodySmall)
                     }
                 } }
                 "DeArrow" -> {
                     item { AppSection {
-                        SettingsToggle("Replace video titles with DeArrow", "Use community titles throughout browsing and playback", value.dearrowEnabled, !busy) { update(value.copy(dearrowEnabled = it)) }
-                        SettingsToggle("Show original titles using the DeArrow icon", "Keep original titles available on each video", value.dearrowShowOriginal, !busy) { update(value.copy(dearrowShowOriginal = it)) }
+                        SettingsToggle("Replace video titles with DeArrow", "Use community titles throughout browsing and playback", value.dearrowEnabled) { update(value.copy(dearrowEnabled = it)) }
+                        SettingsToggle("Show original titles using the DeArrow icon", "Keep original titles available on each video", value.dearrowShowOriginal) { update(value.copy(dearrowShowOriginal = it)) }
                     } }
                     if (account != null) item { AppSection { DeArrowIdentitySettings(vm) } }
                     item { AppSection { CommunityDataLinks() } }
@@ -326,7 +324,7 @@ private fun AiListDetails(state: AiFilterState, refresh: () -> Unit) {
 }
 
 @Composable
-private fun SettingsToggle(label: String, detail: String, value: Boolean, enabled: Boolean, update: (Boolean) -> Unit) {
+private fun SettingsToggle(label: String, detail: String, value: Boolean, enabled: Boolean = true, update: (Boolean) -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp).appItemFeedback(interaction)
         .toggleable(value, interactionSource = interaction, indication = null, enabled = enabled, role = Role.Switch, onValueChange = update).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -338,7 +336,7 @@ private fun SettingsToggle(label: String, detail: String, value: Boolean, enable
 }
 
 @Composable
-private fun SettingsChoice(label: String, choices: List<Pair<String, String>>, selected: String, enabled: Boolean, update: (String) -> Unit) {
+private fun SettingsChoice(label: String, choices: List<Pair<String, String>>, selected: String, enabled: Boolean = true, update: (String) -> Unit) {
     Column {
         DropdownChoiceRow(label, choices, selected, enabled = enabled, change = update)
         LocalPreferenceFeedback.current(label)

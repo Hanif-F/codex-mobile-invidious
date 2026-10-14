@@ -93,7 +93,7 @@ class ContentVisibilityTest {
             val post = f.server.takeRequest(); assertEquals("POST", post.method); assertEquals("Alpha", JSONObject(post.body.readUtf8()).getString("name"))
             f.server.enqueue(MockResponse().setResponseCode(204)); f.api.blockChannel(first, "Alpha", false, f.context)
             assertEquals("DELETE", f.server.takeRequest().method)
-            f.server.enqueue(MockResponse().setBody("[]")); f.api.search("cats", 2, "view_count", "week", "short")
+            f.server.enqueue(MockResponse().setBody("[]")); f.api.searchResults("cats", 2, SearchType.VIDEOS, "view_count", "week", "short")
             val search = f.server.takeRequest(); assertEquals("views", search.requestUrl!!.queryParameter("sort"))
             assertNull(search.requestUrl!!.queryParameter("sort_by")); assertNull(search.getHeader("Authorization"))
         }

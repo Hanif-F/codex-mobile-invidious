@@ -26,7 +26,6 @@ import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.Video
 import net.wingress.mobivious.data.VideoLink
-import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -65,7 +64,7 @@ class PlaybackVisibilitySmokeTest {
             activity.model.switchServer("http://127.0.0.1:18080")
             originalBackground = activity.model.store.background; originalPip = activity.model.store.pip
             activity.model.store.background = true; activity.model.store.pip = true
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings()
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() && activity.model.queue.value.token.isEmpty() }
     }
@@ -563,7 +562,7 @@ class PlaybackVisibilitySmokeTest {
             shell(if (originalDensity != null) "wm density $originalDensity" else "wm density reset")
             shell(if (originalFont.toFloatOrNull() != null) "settings put system font_scale $originalFont" else "settings delete system font_scale")
             resumed()
-            ui { activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
+            ui { activity.model.store.save(null); activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings() }
         }
     }
 }

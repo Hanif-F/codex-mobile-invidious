@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.*
 
@@ -26,7 +25,7 @@ internal fun WatchPrimaryActions(vm: AppViewModel, details: VideoDetails, save: 
     var expanded by remember(details.video.id) { mutableStateOf(false) }
     WatchActionRow(downloadEnabled = !details.video.live && details.upcoming != true, save = save,
         download = { vm.openDownload(details.video) }, share = {
-            VideoLinks.share(vm.store.server, vm.queue.value, vm.controller.value?.currentPosition ?: vm.playback.value.position)?.let { url ->
+            vm.queue.value.share(vm.store.server, vm.controller.value?.currentPosition ?: vm.playback.value.position)?.let { url ->
                 runCatching { context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url), "Share video")) }
                     .onFailure { vm.message.value = "No app could share this link." }
             }

@@ -11,7 +11,6 @@ import androidx.test.runner.lifecycle.Stage
 import java.net.URL
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.SessionStore
-import net.wingress.mobivious.ui.appColorScheme
 import net.wingress.mobivious.data.AccentPreset
 import org.json.JSONObject
 import org.junit.*
@@ -35,13 +34,13 @@ class SettingsSmokeTest {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
-            activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
+            activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
-            activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
+            activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask()
         }
     }
     private fun open(page: String) { compose.selectFeed("You"); compose.openAppSettings(); compose.onNodeWithText(page).performScrollTo().performClick() }
@@ -125,7 +124,7 @@ class SettingsSmokeTest {
         until { var ready = false; compose.runOnUiThread { ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== activity } }; ready }
         compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
         save("Browsing")
-        assertFalse(activity.model.store.guestDeArrow().relatedVideos)
+        assertFalse(activity.model.store.guestPreferences().relatedVideos)
         compose.selectFeed("You"); compose.openAppSettings()
         compose.onNodeWithText("Playback").performScrollTo().performClick()
         compose.onNodeWithContentDescription("Back from Playback").performClick()

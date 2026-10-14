@@ -12,7 +12,6 @@ import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.player.AudioSection
 import net.wingress.mobivious.player.StreamCatalog
-import net.wingress.mobivious.player.PlaybackService
 import net.wingress.mobivious.player.VideoSelectionMode
 import net.wingress.mobivious.data.Video
 import org.json.JSONObject
@@ -40,7 +39,7 @@ class StreamControlsSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.save(null)
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings()
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
@@ -49,7 +48,7 @@ class StreamControlsSmokeTest {
         until { !activity.model.playback.value.playWhenReady && activity.model.playback.value.position == 40_000L }
     }
     @After fun close() {
-        if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
+        if (::activity.isInitialized) compose.runOnUiThread { activity.model.closePlayer(); activity.model.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask() }
     }
     private fun showControls() {
         if (compose.onAllNodesWithContentDescription("Player settings").fetchSemanticsNodes().isEmpty())
@@ -86,7 +85,7 @@ class StreamControlsSmokeTest {
         compose.onNode(hasText("720p24 · H.264") and hasText("1.4 Mbps")).performScrollTo().performClick()
         until { selected(C.TRACK_TYPE_VIDEO)?.height == 720 }
         val videoKey = selected(C.TRACK_TYPE_VIDEO)!!.key
-        assertEquals("auto", activity.model.store.guestDeArrow().qualityDash)
+        assertEquals("auto", activity.model.store.guestPreferences().qualityDash)
         compose.onNodeWithText("Audio").performClick()
         screenshot("audio-portrait")
         compose.onNodeWithText("Stable Volume").assertExists()
@@ -122,7 +121,7 @@ class StreamControlsSmokeTest {
     }
     @Test fun savedQualityDefaultsSelectActualSupportedTracks() {
         for (preference in listOf("best", "worst", "360p", "4320p", "auto")) {
-            compose.runOnUiThread { activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, qualityDash = preference)); activity.model.play("testvideo01", 40) }
+            compose.runOnUiThread { activity.model.store.guestPreferences(AccountPreferences(autoplay = false, qualityDash = preference)); activity.model.play("testvideo01", 40) }
             until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
                 (preference == "auto" || selected(C.TRACK_TYPE_VIDEO) != null) }
             val choices = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_VIDEO)
@@ -135,7 +134,7 @@ class StreamControlsSmokeTest {
         until { activity.model.queue.value.token.isEmpty() }
         command("stream", """{"type":"$source"}"""); command("media-reset")
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, videoCodec = codec, qualityDash = quality))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, videoCodec = codec, qualityDash = quality))
             activity.model.play("testvideo01", 0)
         }
         try {
@@ -181,7 +180,7 @@ class StreamControlsSmokeTest {
         // A preference refresh updates future defaults while the open occurrence
         // retains its captured AV1 policy, including an explicit return to Auto.
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(videoCodec = "h264")); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences(videoCodec = "h264")); activity.model.refreshSharedSettings()
             activity.model.refreshBuffer(); activity.model.autoQuality()
         }
         until { activity.model.playback.value.playerState == Player.STATE_READY && activity.model.playback.value.videoSelection.mode == VideoSelectionMode.AUTO && selected(C.TRACK_TYPE_VIDEO) == null }

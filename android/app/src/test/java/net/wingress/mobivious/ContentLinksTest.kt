@@ -1,11 +1,12 @@
 package net.wingress.mobivious
 
+import net.wingress.mobivious.player.PlaybackQueueSnapshot
+import net.wingress.mobivious.player.QueueOccurrence
 import kotlinx.coroutines.*
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.LinkPlaybackRules
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
-import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.TimeUnit
@@ -76,19 +77,19 @@ class ContentLinksTest {
         val first = QueueOccurrence.source("PLtest", Video(id, "First"), 0)
         val second = QueueOccurrence.source("PLtest", Video(id, "Second"), 8).copy(linkPlayback = LinkPlayback(5000, 20000, options))
         val queue = PlaybackQueueSnapshot(source = QueueSource("PLtest"), items = listOf(first, second), currentKey = second.key, carriedOptions = options.carried())
-        val shared = VideoLinks.parse(VideoLinks.share(server, queue, 12345)!!, server)!!
+        val shared = VideoLinks.parse(queue.share(server, 12345)!!, server)!!
         assertEquals(8, shared.index); assertEquals("PLtest", shared.playlistId); assertEquals(12345L, shared.startMs)
         assertEquals(20000L, shared.playback.endMs); assertEquals(options, shared.playback.options)
         val inserted = QueueOccurrence.local(Video("bbbbbbbbbbb", "Inserted"))
-        val standalone = VideoLinks.parse(VideoLinks.share(server, queue.copy(items = queue.items + inserted, currentKey = inserted.key), 1000)!!, server)!!
+        val standalone = VideoLinks.parse(queue.copy(items = queue.items + inserted, currentKey = inserted.key).share(server, 1000)!!, server)!!
         assertNull(standalone.playlistId); assertNull(standalone.index)
         val mixEntry = second.copy(key = "RDmix:8")
-        val mix = VideoLinks.parse(VideoLinks.share(server, queue.copy(source = QueueSource("RDmix"), items = listOf(mixEntry), currentKey = mixEntry.key), 20000)!!, server)!!
+        val mix = VideoLinks.parse(queue.copy(source = QueueSource("RDmix"), items = listOf(mixEntry), currentKey = mixEntry.key).share(server, 20000)!!, server)!!
         assertEquals(id, mix.seedVideoId); assertTrue(mix.startMs!! < mix.playback.endMs!!)
         val unresolvedSeed = second.copy(key = "unresolved-seed")
-        val seedShare = VideoLinks.parse(VideoLinks.share(server, queue.copy(items = listOf(unresolvedSeed), currentKey = unresolvedSeed.key), 1000)!!, server)!!
+        val seedShare = VideoLinks.parse(queue.copy(items = listOf(unresolvedSeed), currentKey = unresolvedSeed.key).share(server, 1000)!!, server)!!
         assertNull(seedShare.playlistId)
-        assertNull(VideoLinks.share(server, queue.copy(context = ApiContext("https://previous.test", null)), 1000))
+        assertNull(queue.copy(context = ApiContext("https://previous.test", null)).share(server, 1000))
     }
     @Test fun onlyModeSpeedAndProxyCarryToOtherOccurrences() {
         val options = PlaybackLinkOptions(listen = true, speed = 1.5f, local = false, quality = "720p", loop = true, description = true)

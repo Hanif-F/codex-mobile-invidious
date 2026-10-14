@@ -36,14 +36,14 @@ class SponsorBlockSmokeTest {
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
             activity.model.store.background = true
         }
         until { activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
-            activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
+            activity.model.closePlayer(); activity.model.store.save(null); activity.model.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask()
         }
     }
     private fun openVideo() {
@@ -52,7 +52,7 @@ class SponsorBlockSmokeTest {
         compose.runOnUiThread { activity.model.controller.value!!.pause() }
     }
     private fun guestSettings(settings: SponsorBlockSettings) {
-        compose.runOnUiThread { activity.model.store.guestDeArrow(AccountPreferences(sponsorBlock = settings)); activity.model.refreshSharedSettings() }
+        compose.runOnUiThread { activity.model.store.guestPreferences(AccountPreferences(sponsorBlock = settings)); activity.model.refreshSharedSettings() }
     }
     private fun seek(position: Long) { compose.runOnUiThread { activity.model.seekTo(position) } }
     private fun saveSheet() {
@@ -79,7 +79,7 @@ class SponsorBlockSmokeTest {
         color.performTextReplacement("#123456")
         screenshot("guest-colors")
         saveSheet()
-        assertTrue(activity.model.store.guestDeArrow().sponsorBlock.enabled)
+        assertTrue(activity.model.store.guestPreferences().sponsorBlock.enabled)
         // Fullscreen SponsorBlock returns to the Settings screen.
         compose.onNodeWithContentDescription("Back from Settings").performClick()
         compose.selectFeed("Popular")
@@ -87,7 +87,7 @@ class SponsorBlockSmokeTest {
         until { activity.model.sponsorBlock.value.segments.size == 1 }
         assertFalse(fixture().getBoolean("sponsorAuthorized"))
         compose.runOnUiThread { activity.model.refreshSharedSettings() }
-        assertEquals("#123456", activity.model.store.guestDeArrow().sponsorBlock.colors[SponsorBlockCategory.SPONSOR])
+        assertEquals("#123456", activity.model.store.guestPreferences().sponsorBlock.colors[SponsorBlockCategory.SPONSOR])
         seek(12_000)
         compose.onNodeWithTag("sponsorblock-prompt").assertExists(); screenshot("portrait-manual")
         compose.onNodeWithTag("player-timeline").assertExists()

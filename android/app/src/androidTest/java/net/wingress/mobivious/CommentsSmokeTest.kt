@@ -37,7 +37,7 @@ class CommentsSmokeTest {
         compose.runOnUiThread {
             activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = "light"))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, darkMode = "light"))
             activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
@@ -86,7 +86,7 @@ class CommentsSmokeTest {
         compose.onNodeWithContentDescription("Hearted by Mobivious Studio").assertExists()
         screenshot("comments-light")
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = "dark"))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, darkMode = "dark"))
             activity.model.refreshSharedSettings()
         }
         until { activity.model.preferences.value.darkMode == "dark" }
@@ -145,7 +145,7 @@ class CommentsSmokeTest {
         compose.onNodeWithText("No comments to show.", substring = true).assertExists()
         assertEquals(0L, activity.model.comments.value.feed.page.count)
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(comments = listOf("", "")))
+            activity.model.store.guestPreferences(AccountPreferences(comments = listOf("", "")))
             activity.model.refreshSharedSettings()
         }
         until { !activity.model.preferences.value.showYoutubeComments }

@@ -145,14 +145,6 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         if (type.videoFilters) { query["date"] = date; query["duration"] = duration }
         return GeneralSearchPage.parse(JSONArray(scopedRead("api/v1/search", query, false, context)), type)
     }
-    suspend fun search(q: String, page: Int, sort: String, date: String, duration: String): List<Video> {
-        val order = if (sort in listOf("views", "view_count")) "views" else "relevance"
-        return ApiParser.videos(JSONArray(request("api/v1/search", query = mapOf("q" to q, "page" to page.toString(), "sort" to order, "date" to date, "duration" to duration, "type" to "video"))))
-    }
-    suspend fun searchPlaylists(q: String, page: Int, sort: String, context: ApiContext = context()) =
-        ApiParser.playlists(JSONArray(scopedRead("api/v1/search", mapOf("q" to q, "page" to "$page", "sort" to sort, "type" to "playlist"), false, context)))
-    suspend fun channelPlaylists(id: String, continuation: String = "", sort: String = "last", context: ApiContext = context()): Page<Playlist> =
-        channelPlaylistPage(id, ChannelTab.PLAYLISTS, continuation, sort, context)
     suspend fun subscribePlaylist(list: Playlist, subscribe: Boolean, context: ApiContext): Playlist? {
         require(list.id.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid playlist ID" }
         val raw = scopedPlaylistWrite("api/v1/auth/saved_playlists/${list.id}", if (subscribe) "PUT" else "DELETE", context,
@@ -317,10 +309,6 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun history(page: Int, q: String = "", context: ApiContext = context()) = History.parse(scopedRead("api/v1/auth/history",
         mapOf("details" to "true", "organized" to "true", "q" to q, "page" to "$page"), true, context))
     suspend fun playlists(context: ApiContext = context()) = JSONArray(scopedRead("api/v1/auth/playlists", emptyMap(), true, context)).objects().map { ApiParser.playlist(it, legacyOwned = true) }
-    suspend fun playlist(id: String, page: Int = 1): Pair<Playlist, List<Video>> {
-        val result = queuePage(id, (page - 1) * 100)
-        return (result.playlist ?: Playlist(result.source.id, result.source.title, result.source.count)) to result.videos
-    }
     suspend fun queuePage(id: String, index: Int = 0, continuation: String? = null, context: ApiContext = context()): QueuePage {
         require(id.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) { "Invalid playlist ID." }
         val mix = id.startsWith("RD")

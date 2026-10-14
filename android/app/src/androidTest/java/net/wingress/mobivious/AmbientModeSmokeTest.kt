@@ -61,7 +61,7 @@ class AmbientModeSmokeTest {
             originalServer = vm.store.server; originalAmbient = vm.store.ambientMode.value
             originalTransparency = vm.store.reduceTransparency.value
             vm.closePlayer(); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = "dark")); vm.refreshSharedSettings()
+            vm.store.guestPreferences(AccountPreferences(autoplay = false, darkMode = "dark")); vm.refreshSharedSettings()
             vm.store.reduceTransparency(false); vm.store.ambientMode(true); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
@@ -75,7 +75,7 @@ class AmbientModeSmokeTest {
         currentActivity()
         if (::activity.isInitialized) ui {
             vm.closePlayer(); vm.store.ambientMode(originalAmbient); vm.store.reduceTransparency(originalTransparency)
-            vm.store.guestDeArrow(AccountPreferences()); vm.switchServer(originalServer); activity.finishAndRemoveTask()
+            vm.store.guestPreferences(AccountPreferences()); vm.switchServer(originalServer); activity.finishAndRemoveTask()
         }
         shell(if (animator == "null") "settings delete global animator_duration_scale" else "settings put global animator_duration_scale $animator")
         shell("wm size ${originalSize ?: "reset"}")
@@ -106,7 +106,7 @@ class AmbientModeSmokeTest {
         ui { vm.seekTo(9_000) }
         expectColor(false)
         captureWatchScreenshot("ambient-live-dark-blue")
-        ui { vm.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = "light")); vm.refreshSharedSettings() }
+        ui { vm.store.guestPreferences(AccountPreferences(autoplay = false, darkMode = "light")); vm.refreshSharedSettings() }
         until { vm.preferences.value.darkMode == "light" }
         until { background().red > .35f }
         captureWatchScreenshot("ambient-live-light-blue")
@@ -199,7 +199,7 @@ class AmbientModeSmokeTest {
         }
         for ((id, night) in listOf("portrait001" to true, "landscape01" to false)) {
             ui {
-                vm.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = if (night) "dark" else "light"))
+                vm.store.guestPreferences(AccountPreferences(autoplay = false, darkMode = if (night) "dark" else "light"))
                 vm.refreshSharedSettings(); vm.play(id)
             }
             until { vm.playback.value.mediaId == id && vm.playback.value.playerState == Player.STATE_READY &&

@@ -1,10 +1,8 @@
 package net.wingress.mobivious.data
 
 import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.ContentValues
 import android.content.Context
-import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.net.Uri
@@ -15,8 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.wingress.mobivious.BuildConfig
-import net.wingress.mobivious.MobiviousApplication
-import net.wingress.mobivious.MainActivity
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.json.JSONObject
 import java.io.File
@@ -170,17 +166,4 @@ class DownloadRepository(private val context: Context) {
     }
     fun refresh() { scope.launch { runCatching { reconcile() }.onFailure { error.value = it.message } } }
     suspend fun completion() { initialized.await(); reconcile() }
-}
-
-class DownloadReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action !in listOf(DownloadManager.ACTION_DOWNLOAD_COMPLETE, DownloadManager.ACTION_NOTIFICATION_CLICKED)) return
-        val app = context.applicationContext as MobiviousApplication
-        // DownloadProvider runs under a separate privileged UID. This receiver is
-        // exported, but treats broadcasts only as a hint: all state comes from our
-        // own DownloadManager rows, never from caller-supplied IDs or paths.
-        val pending = goAsync()
-        CoroutineScope(Dispatchers.IO).launch { try { runCatching { app.downloads.completion() }.onFailure { app.downloads.error.value = it.message ?: "Could not reconcile downloads." } } finally { pending.finish() } }
-        if (intent.action == DownloadManager.ACTION_NOTIFICATION_CLICKED) context.startActivity(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK).putExtra("openDownloads", true))
-    }
 }

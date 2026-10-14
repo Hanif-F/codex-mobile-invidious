@@ -79,7 +79,7 @@ class PlaybackService : MediaSessionService() {
     override fun onCreate() {
         super.onCreate()
         // This data source has no Authorization headers or account cookies.
-        val mediaHttp = DefaultHttpDataSource.Factory().setUserAgent("Mobivious/0.1").setAllowCrossProtocolRedirects(false)
+        val mediaHttp = DefaultHttpDataSource.Factory().setUserAgent("Mobivious/${net.wingress.mobivious.BuildConfig.VERSION_NAME}").setAllowCrossProtocolRedirects(false)
         val trackSelector = CodecAwareTrackSelector(this)
         player = ExoPlayer.Builder(this).setTrackSelector(trackSelector).setMediaSourceFactory(DefaultMediaSourceFactory(androidx.media3.datasource.DefaultDataSource.Factory(this, mediaHttp))).build().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)

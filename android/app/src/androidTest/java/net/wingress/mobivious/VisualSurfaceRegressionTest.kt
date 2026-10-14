@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material3.*
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -31,12 +32,15 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class VisualSurfaceRegressionTest {
+    private fun colorContrast(a: Color, b: Color) =
+        (maxOf(a.luminance(), b.luminance()) + .05f) / (minOf(a.luminance(), b.luminance()) + .05f)
+
     @get:Rule val compose = createComposeRule()
 
     @Test fun artworkAvailabilityPreservesAnOpenControlMenu() {
         var artwork by mutableStateOf<String?>(null)
         compose.setContent {
-            MaterialTheme(colorScheme = AppTokens.light) {
+            MaterialTheme(colorScheme = appColorScheme(false)) {
                 AppBackground(Modifier.fillMaxSize()) {
                     Box {
                         OverflowMenu("Artwork actions", "stable-artwork") { close ->
@@ -56,7 +60,7 @@ class VisualSurfaceRegressionTest {
 
     @Test fun roundedActionsLeaveTheContrastingContainerVisibleAtTheirCorners() {
         var dark by mutableStateOf(false)
-        compose.setContent { MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light) {
+        compose.setContent { MaterialTheme(colorScheme = if (dark) appColorScheme(true) else appColorScheme(false)) {
             Box(Modifier.size(240.dp, 120.dp).background(Color.Magenta).testTag("container"), contentAlignment = Alignment.Center) {
                 Box {
                     Box { LibraryActionButton("Retry", Modifier.width(160.dp).testTag("retry"), onClick = {}) }
@@ -80,7 +84,7 @@ class VisualSurfaceRegressionTest {
     @Test fun wrappedToolbarTitleMasksScrollingGlyphsAndReservesMeasuredInsets() {
         var dark by mutableStateOf(false)
         var underlay by mutableStateOf(Color.Magenta)
-        compose.setContent { MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light, typography = AppTokens.typography) {
+        compose.setContent { MaterialTheme(colorScheme = if (dark) appColorScheme(true) else appColorScheme(false), typography = AppTokens.typography) {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
                 BrowseAppSurface(Modifier.width(320.dp).height(700.dp),
                     toolbar = { LibraryToolbar("History & library", back = {}, statusInset = false) }) { body, top ->
@@ -104,7 +108,7 @@ class VisualSurfaceRegressionTest {
             assertTrue("Body must reserve the complete measured toolbar", compose.onNodeWithTag("first-row").fetchSemanticsNode().boundsInRoot.top >= bounds.bottom)
             val pixels = header.captureToImage().toPixelMap()
             val background = pixels[pixels.width - 3, (titleBounds.center.y - bounds.top).toInt()]
-            val foreground = (if (appearance) AppTokens.dark else AppTokens.light).onSurface
+            val foreground = (if (appearance) appColorScheme(true) else appColorScheme(false)).onSurface
             assertTrue("Title contrast must remain >= 4.5", colorContrast(foreground, background) >= 4.5f)
             val buttonBefore = compose.onNodeWithTag("library-toolbar-back").captureToImage().toPixelMap()
             compose.runOnIdle { underlay = Color.Cyan }
@@ -157,7 +161,7 @@ class VisualSurfaceRegressionTest {
     }
 
     @Test fun multipartToolbarPlacesControlsBelowTheSafeTitle() {
-        compose.setContent { MaterialTheme(colorScheme = AppTokens.light, typography = AppTokens.typography) {
+        compose.setContent { MaterialTheme(colorScheme = appColorScheme(false), typography = AppTokens.typography) {
             BrowseAppSurface(Modifier.width(320.dp).height(700.dp), toolbar = {
                 BrowsePageTitle("Channel", back = {})
                 Box(Modifier.fillMaxWidth().height(56.dp).testTag("channel-search"))

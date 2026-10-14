@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import net.wingress.mobivious.ui.appColorScheme
 import android.content.Intent
 import android.os.ParcelFileDescriptor
 import androidx.compose.ui.geometry.Rect
@@ -9,7 +10,6 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.AccountPreferences
-import net.wingress.mobivious.ui.AppTokens
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -50,7 +50,7 @@ class VisualFixesSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences(autoplay = false)); vm.refreshSharedSettings(); vm.navigate("Popular")
+            vm.store.guestPreferences(AccountPreferences(autoplay = false)); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
     }
@@ -59,7 +59,7 @@ class VisualFixesSmokeTest {
         shell(if (hardwareIme == "null") "settings delete secure show_ime_with_hard_keyboard" else "settings put secure show_ime_with_hard_keyboard $hardwareIme")
         shell(if (handwriting == "null") "settings delete secure stylus_handwriting_enabled" else "settings put secure stylus_handwriting_enabled $handwriting")
         if (::activity.isInitialized) ui {
-            vm.closePlayer(); vm.store.save(null); vm.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask()
+            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask()
         }
     }
     private fun watchBounds() = compose.onNodeWithTag("watch-content", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -71,7 +71,7 @@ class VisualFixesSmokeTest {
     @Test fun watchViewportStaysFixedAcrossMiniChromeChangesAndCoversTheBottomInset() {
         for ((tab, dark) in listOf("Popular" to false, "Search" to true)) {
             ui {
-                vm.closePlayer(); vm.store.guestDeArrow(AccountPreferences(autoplay = false, darkMode = if (dark) "dark" else "light"))
+                vm.closePlayer(); vm.store.guestPreferences(AccountPreferences(autoplay = false, darkMode = if (dark) "dark" else "light"))
                 vm.refreshSharedSettings(); vm.query = "fixture"; vm.navigate(tab)
             }
             until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
@@ -89,7 +89,7 @@ class VisualFixesSmokeTest {
             capture("watch-restored-${if (dark) "dark" else "light"}")
             val screenshot = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
             val pixel = screenshot.getPixel(screenshot.width / 10, screenshot.height - 20)
-            val surface = if (dark) AppTokens.dark.surface else AppTokens.light.surface
+            val surface = if (dark) appColorScheme(true).surface else appColorScheme(false).surface
             assertEquals(surface.red, android.graphics.Color.red(pixel) / 255f, .02f)
             assertEquals(surface.green, android.graphics.Color.green(pixel) / 255f, .02f)
             assertEquals(surface.blue, android.graphics.Color.blue(pixel) / 255f, .02f)

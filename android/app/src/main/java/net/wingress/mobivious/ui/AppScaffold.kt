@@ -29,8 +29,8 @@ internal enum class AppWindowWidth { COMPACT, MEDIUM, EXPANDED;
 }
 
 @Composable
-internal fun AppNavigation(selected: AppDestination?, rail: Boolean, enabled: Boolean = true,
-    modifier: Modifier = Modifier, select: (AppDestination) -> Unit) {
+internal fun AppNavigation(selected: AppDestination?, rail: Boolean, modifier: Modifier = Modifier,
+    enabled: Boolean = true, select: (AppDestination) -> Unit) {
     val colors=MaterialTheme.colorScheme
     if(rail) NavigationRail(modifier.width(112.dp).shadow(1.dp),containerColor=colors.surfaceContainer) {
         AppDestination.entries.forEach { item -> NavigationRailItem(

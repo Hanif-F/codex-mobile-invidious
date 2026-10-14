@@ -27,7 +27,7 @@ class HistorySearchTest {
         assertEquals(channel, video.channelId); assertEquals(123L, video.duration)
         assertEquals("", video.published)
         assertEquals(LocalDate.of(2024, 2, 29), video.history!!.released)
-        assertEquals(LocalDate.of(2026, 1, 2), video.history!!.watched)
+        assertEquals(LocalDate.of(2026, 1, 2), video.history.watched)
         assertEquals(3, page.total); assertTrue(page.hasMore); assertTrue(page.organized)
         assertEquals("Asia/Jakarta", page.timezone)
     }
@@ -37,8 +37,8 @@ class HistorySearchTest {
         val video = page.entries.single()
         assertTrue(video.unavailable); assertEquals("abcdefghijk", video.id)
         assertEquals("Unavailable video", video.title); assertEquals("Unknown channel", video.author)
-        assertNull(video.history!!.released); assertNull(video.history!!.watched)
-        assertEquals(HistoryGroup.OLDER, History.group(video.history!!.watched, page.today))
+        assertNull(video.history!!.released); assertNull(video.history.watched)
+        assertEquals(HistoryGroup.OLDER, History.group(video.history.watched, page.today))
     }
 
     @Test fun rollingGroupsAreDisjointAcrossYearAndLeapBoundaries() {

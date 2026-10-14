@@ -38,7 +38,7 @@ class ContentLinksSmokeTest {
         ui {
             background = activity.model.store.background
             activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, continueAutoplay = false))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, continueAutoplay = false))
             activity.model.refreshSharedSettings()
         }
     }
@@ -121,13 +121,13 @@ class ContentLinksSmokeTest {
         assertEquals(token, activity.model.queue.value.token)
         assertEquals(requests, fixture().getJSONArray("videoDetailRequests").length())
         assertEquals(1234L, activity.model.queue.value.current!!.linkPlayback!!.startMs)
-        assertEquals(1f, activity.model.store.guestDeArrow().speed)
+        assertEquals(1f, activity.model.store.guestPreferences().speed)
         ui { activity.model.nextQueue(1) }; ready()
         until { activity.model.playback.value.details?.video?.id == "testvideo02" }
         val effective = activity.model.queue.value.effective(activity.model.preferences.value)
         assertTrue(effective.listen); assertEquals(1.5f, effective.speed); assertFalse(effective.local); assertFalse(effective.extendDescription)
         assertNull(activity.model.queue.value.current!!.linkPlayback)
-        val shared = VideoLinks.parse(VideoLinks.share(activity.model.store.server, activity.model.queue.value, 5000)!!, activity.model.store.server)!!
+        val shared = VideoLinks.parse(activity.model.queue.value.share(activity.model.store.server, 5000)!!, activity.model.store.server)!!
         assertEquals("PLlive", shared.playlistId); assertEquals(1, shared.index)
     }
 

@@ -26,12 +26,12 @@ internal fun SubscriptionControl(subscribed: Boolean, onChange: () -> Unit, modi
     }
     val interaction = remember { MutableInteractionSource() }
 
-    val foreground = appContentColors(prominent = !subscribed)
+    val foreground = if (subscribed) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onPrimaryContainer
     Column {
         Box {
             TextButton(onClick = { if (subscribed && known) expanded = true else onChange() },
                 enabled = !busy && !(checking && !known), interactionSource = interaction,
-                colors = ButtonDefaults.textButtonColors(contentColor = foreground.primary),
+                colors = ButtonDefaults.textButtonColors(contentColor = foreground),
                 modifier = modifier.heightIn(min = 48.dp)
 
                     .appControl(prominent = !subscribed)

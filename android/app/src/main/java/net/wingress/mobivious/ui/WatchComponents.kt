@@ -3,7 +3,6 @@ package net.wingress.mobivious.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
@@ -14,11 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -32,37 +29,13 @@ internal fun WatchContent(modifier: Modifier = Modifier, content: @Composable Bo
     Surface(modifier,color=MaterialTheme.colorScheme.surface,contentColor=MaterialTheme.colorScheme.onSurface) { Box(content=content) }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun WatchIconButton(icon: ImageVector, description: String, modifier: Modifier = Modifier,
-    enabled: Boolean = true, size: Dp = 48.dp, media: Boolean = false, prominent: Boolean = false, busy: Boolean = false,
-    onClick: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-
-    val foreground = if (media) AppContentColors.light else appContentColors(prominent = prominent)
-    TooltipBox(positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
-        tooltip = { AppTooltip(description) }, state = rememberTooltipState()) {
-        IconButton(onClick, modifier.size(size)
-            .appControl(CircleShape, prominent, if (media) AppSurfaceRole.MEDIA_OVERLAY else AppSurfaceRole.CONTROL),
-            enabled = enabled, interactionSource = interaction) {
-            AppForeground(foreground) {
-            Icon(icon, description, Modifier.size(if (size > 56.dp) 36.dp else 24.dp),
-                tint = foreground.primary.copy(alpha = if (enabled) 1f else .38f))
-            if (busy) CircularProgressIndicator(Modifier.size(44.dp).semantics { contentDescription = "Buffering" },
-                color = Color.White, strokeWidth = 2.dp)
-            }
-        }
-    }
-}
-
 @Composable
 internal fun WatchDisclosureRow(title: String, icon: ImageVector, modifier: Modifier = Modifier,
     detail: String? = null, expanded: Boolean = false, actionLabel: String = "Open $title", onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
 
-    val foreground = appContentColors()
     val rotation = if (expanded) 180f else 0f
-    AppForeground(foreground) {
+    AppForeground {
     Row(modifier.fillMaxWidth().appControl(AppTokens.card)
         .semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }
         .clickable(interactionSource = interaction, indication = null, role = Role.Button,
@@ -102,8 +75,7 @@ internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () ->
 internal fun WatchPanelToolbar(title: String, closeLabel: String, close: () -> Unit,
     icon: ImageVector, detail: String? = null, backLabel: String = "Back", back: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {}) {
-    val foreground = appContentColors()
-    AppForeground(foreground) {
+    AppForeground {
 
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).appControl()
         .heightIn(min = 56.dp).padding(start = if (back == null) 16.dp else 4.dp, end = 4.dp),

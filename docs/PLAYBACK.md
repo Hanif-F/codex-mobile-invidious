@@ -11,6 +11,11 @@ agent and no account cookies/bearer; cross-protocol redirects are disabled.
 `QueueCoordinator` owns all loading and logical queue operations on the service
 main scope. Compose connects with `MediaController` and does not own that player.
 
+`player/PlaybackQueue.kt` owns the runtime snapshot, occurrences, repeat and
+merge/successor rules, plus occurrence-aware share URLs. `data/Models.kt` retains
+plain source-page/library models and `data/ContentLinks.kt` parses incoming links.
+The data layer does not import player or UI types; queue wire fields are unchanged.
+
 `QueueSessionPlayer` wraps ExoPlayer with a logical playlist while resolving only
 the active item. Placeholder entries expose missing previous pages and future
 source pages to system controls. The active real timeline is retained, including

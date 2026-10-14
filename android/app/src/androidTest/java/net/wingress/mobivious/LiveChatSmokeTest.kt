@@ -108,7 +108,7 @@ class LiveChatSmokeTest {
             val app = instrumentation.targetContext.applicationContext as MobiviousApplication
             app.store.save(null); app.store.server = base; app.cache.clear(); app.store.chatAppearance(ChatAppearance())
             app.store.chatTiming("testvideo01", 0, app.api.context())
-            app.store.guestDeArrow(AccountPreferences(autoplay = false, continueAutoplay = false, thinMode = true))
+            app.store.guestPreferences(AccountPreferences(autoplay = false, continueAutoplay = false, thinMode = true))
         }
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
@@ -306,7 +306,7 @@ class LiveChatSmokeTest {
         assertEquals(0, fixture().getJSONArray("chatPreferenceWrites").length()); assertEquals(0, fixture().getJSONArray("chatTimingRequests").length())
         ui { activity.recreate() }; reacquire(); compose.onNodeWithTag("chat-panel").assertExists()
         assertEquals(2500, activity.model.chatReplay.value.timingOffsetMs)
-        assertEquals("spam /nothing/", activity.model.store.guestDeArrow().chat.words)
+        assertEquals("spam /nothing/", activity.model.store.guestPreferences().chat.words)
     }
     @Test fun signedInFiltersAndTimingUseDedicatedApisAndSaveFailuresRetry() {
         account(); incoming(); ready(); chat(); settings()
@@ -432,7 +432,7 @@ class LiveChatSmokeTest {
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-timestamps"))
         compose.onNodeWithTag("chat-timestamps").performClick()
         until { !activity.model.preferences.value.chat.timestamps }
-        assertEquals("",activity.model.store.guestDeArrow().chat.words)
+        assertEquals("",activity.model.store.guestPreferences().chat.words)
         compose.onNodeWithTag("chat-settings-list").performScrollToNode(hasTestTag("chat-words"))
         compose.onNodeWithTag("chat-words").assertTextContains("/(?=private)/")
         assertEquals(0,fixture().getJSONArray("chatPreferenceWrites").length())
@@ -451,7 +451,7 @@ class LiveChatSmokeTest {
         until { activity.model.account.value==null && activity.model.preferenceSaves.edits.value.isEmpty() }
         ui { activity.model.requestChatPreferences(ChatPreferences(words="private from old account"),context=oldContext) }
         assertTrue(activity.model.preferenceSaves.edits.value.isEmpty())
-        assertEquals("",activity.model.store.guestDeArrow().chat.words)
+        assertEquals("",activity.model.store.guestPreferences().chat.words)
         assertEquals(0,fixture().getJSONArray("chatPreferenceWrites").length())
     }
     private fun foreground() {

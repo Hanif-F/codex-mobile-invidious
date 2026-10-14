@@ -42,14 +42,14 @@ class SecondaryScreensJourneyTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false); vm.refreshSharedSettings(); vm.navigate("Popular")
+            vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
       shell(if (hardwareIme == "null") "settings delete secure show_ime_with_hard_keyboard" else "settings put secure show_ime_with_hard_keyboard $hardwareIme")
       if (::activity.isInitialized) compose.runOnUiThread {
-        vm.closePlayer(); vm.store.save(null); vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false); activity.finishAndRemoveTask()
+        vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false); activity.finishAndRemoveTask()
     } }
     private fun settings() { compose.selectFeed("You"); compose.openAppSettings() }
     private fun page(name: String) {

@@ -28,8 +28,6 @@ class UiScrollBenchmark {
     @get:Rule val benchmark = MacrobenchmarkRule()
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     private val args = InstrumentationRegistry.getArguments()
-    private val legacy get() = args.getString("adapter", "redesigned") != "redesigned"
-    private val preGlass get() = args.getString("adapter") == "pre-glass"
     private var currentJourney: String? = null
     private var gesturePhase = "setup"
     private val gestures = mutableListOf<JSONObject>()
@@ -91,15 +89,12 @@ class UiScrollBenchmark {
         reveal(By.text(text))
     }
     private fun openSettings() {
-        if (legacy) root("You")
+        root("You")
         navigateControl(By.desc("Settings"),By.res("settings-root"))
     }
     private fun openPreferencePage(name: String) = navigateControl(By.text(name),By.desc("Back from $name"))
     private fun root(tab: String) {
-        if (legacy && !preGlass && tab in listOf("Popular", "Trending")) {
-            navigateControl(By.desc("Discover"),By.res("navigation-Discover").selected(true))
-            navigateControl(By.text(tab),By.res("discover-$tab").selected(true))
-        } else navigateControl(if(legacy) By.desc(tab) else By.res("navigation-$tab"),
+        navigateControl(By.res("navigation-$tab"),
             if(tab=="You") By.res("you-identity") else By.res("navigation-$tab").selected(true))
     }
     @Before fun configureThroughUi() {
@@ -114,7 +109,7 @@ class UiScrollBenchmark {
         click("Connect")
         val deadline=SystemClock.uptimeMillis()+20_000
         var confirmed=false;var discarded=false
-        val shellRoot=By.res(if(legacy && !preGlass) "navigation-Discover" else "navigation-Popular")
+        val shellRoot=By.res("navigation-Popular")
         while(!device.hasObject(By.res("settings-root")) && !device.hasObject(shellRoot)) {
             if(!confirmed && device.hasObject(By.text("Change server?"))) {
                 device.findObjects(By.text("Connect")).last().click();confirmed=true
@@ -124,7 +119,7 @@ class UiScrollBenchmark {
             SystemClock.sleep(50)
         }
         if(device.hasObject(By.res("settings-root")))
-            navigateControl(By.desc("Back from Settings"),if(legacy) By.desc("You") else By.res("navigation-You"))
+            navigateControl(By.desc("Back from Settings"),By.res("navigation-You"))
         root("You")
         if (!device.hasObject(By.text("Fixture").clazz("android.widget.TextView"))) {
             click("Sign in")
@@ -133,11 +128,10 @@ class UiScrollBenchmark {
             reveal(By.res("account-auth-submit"),(48*InstrumentationRegistry.getInstrumentation().context.resources.displayMetrics.density).toInt())
             required(By.res("account-auth-submit").enabled(true)).click()
             required(By.text("Fixture").clazz("android.widget.TextView"))
-            if (!preGlass) required(By.text("Your library"))
+            required(By.text("Your library"))
         }
     }
     private fun ambient(value: Boolean) {
-        if (preGlass) { check(!value) { "Historical source has no ambient feature" }; return }
         scrollBounds = null
         root("You"); openSettings(); openPreferencePage("Appearance"); scrollTo("Ambient mode")
         var control = required(By.text("Ambient mode"))
@@ -172,7 +166,6 @@ class UiScrollBenchmark {
             try { check(automation.injectInputEvent(event,false)) {"Swipe input injection failed"} }
             finally {event.recycle()}
         }
-        // UI Automator 2.4's step-based swipe waits for each display frame.
         // Schedule ordinary touch events by elapsed time to keep the specified
         // 400ms gesture independent of refresh rate and renderer speed.
         inject(MotionEvent.ACTION_DOWN,startY.toFloat())
@@ -288,7 +281,7 @@ class UiScrollBenchmark {
     })
     @Test fun playlists() = runJourney("playlists", prepare = {
         root("You")
-        if(preGlass) scrollTo("Benchmark playlist 000") else required(By.res("you-playlists")).click()
+        required(By.res("you-playlists")).click()
         required(By.textContains("Benchmark playlist"))
     })
     @Test fun settings() = runJourney("settings", prepare = {
@@ -298,14 +291,8 @@ class UiScrollBenchmark {
         root("You"); openSettings(); openPreferencePage("Playback"); required(By.text("Autoplay opened videos"))
     }, measure = {
         click("Autoplay opened videos")
-        if (legacy) {
-            scrollTo("Save"); click("Save")
-            required(By.res("settings-save-error"))
-            required(By.res("settings-save").enabled(true)).click()
-            required(By.res("settings-root")); openPreferencePage("Playback")
-        } else required(By.text("Retry")).click()
+        required(By.text("Retry")).click()
         scrollTo("Default speed"); click("Default speed"); click("1.5×")
-        if (legacy) { scrollTo("Save"); click("Save") }
         val deadline=SystemClock.uptimeMillis()+20_000
         do {
             val saved=JSONObject(URL("http://127.0.0.1:18080/test/state").readText()).getJSONObject("preferences")
@@ -338,12 +325,9 @@ class UiScrollBenchmark {
         feed("Popular"); click("Benchmark video 000"); required(By.text("Benchmark playing video"))
         required(By.desc("Pause"))
     })
-    @Test fun watchAmbient() {
-        org.junit.Assume.assumeFalse("Historical source has no ambient feature",preGlass)
-        runJourney("watch-ambient", ambientEnabled = true, prepare = {
+    @Test fun watchAmbient() = runJourney("watch-ambient", ambientEnabled = true, prepare = {
         feed("Popular"); click("Benchmark video 000"); required(By.text("Benchmark playing video")); required(By.desc("Pause"))
     })
-    }
     @Test fun navigation() = runJourney("navigation", prepare = { feed("Popular") }, measure = {
         listOf("Trending", "Subscriptions", "You", "Popular").forEach {root(it);SystemClock.sleep(350)}
         required(By.res("video-actions-perf0000000")).click()

@@ -52,7 +52,7 @@ class AppUiSmokeTest {
         runCatching { compose.onNodeWithText(label).assertIsDisplayed() }.isSuccess
     }
     private fun preferences(value: AccountPreferences) {
-        compose.runOnUiThread { vm.store.guestDeArrow(value); vm.refreshSharedSettings() }
+        compose.runOnUiThread { vm.store.guestPreferences(value); vm.refreshSharedSettings() }
         until { vm.preferences.value == LocalPreferences.normalize(value) }
     }
     private var sizeOverride: String? = null
@@ -71,7 +71,7 @@ class AppUiSmokeTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false)
             vm.store.clearVisibilitySnapshot(vm.api.context()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() && activity.window.decorView.hasWindowFocus() }
@@ -82,7 +82,7 @@ class AppUiSmokeTest {
         shell(if (originalHandwriting == "null") "settings delete secure stylus_handwriting_enabled" else "settings put secure stylus_handwriting_enabled $originalHandwriting")
         currentActivity()
         if (::activity.isInitialized) compose.runOnUiThread {
-            vm.closePlayer(); vm.store.save(null); vm.store.guestDeArrow(AccountPreferences()); vm.store.reduceTransparency(false)
+            vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); vm.store.reduceTransparency(false)
             activity.finishAndRemoveTask()
         }
     }
@@ -106,7 +106,7 @@ class AppUiSmokeTest {
         compose.onNodeWithTag("global-search").performClick()
         until { vm.tab == "Search" }
         compose.onNodeWithTag("main-search").performTextInput("fixture")
-        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
         until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
         screenshot("search-ime")
         compose.onNodeWithTag("main-search").performImeAction()
@@ -148,7 +148,7 @@ class AppUiSmokeTest {
             screenshot("neutral-discover-$appearance")
             compose.onNodeWithTag("global-search").performClick()
             compose.onNodeWithTag("main-search").performTextReplacement("fixture")
-            until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+            until { androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
             compose.onNodeWithTag("main-search").performImeAction()
             until { !vm.browse.value.loading && vm.searchInput.value.submitted == "fixture" }
             screenshot("neutral-search-$appearance")
@@ -208,15 +208,15 @@ class AppUiSmokeTest {
             preferences(AccountPreferences(darkMode = ""))
             shell("cmd uimode night yes")
             until { currentActivity(); activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES }
-            waitForSurface(net.wingress.mobivious.ui.AppTokens.dark.surface)
+            waitForSurface(net.wingress.mobivious.ui.appColorScheme(true).surface)
             screenshot("neutral-system-dark")
             preferences(AccountPreferences(darkMode = "light"))
-            waitForSurface(net.wingress.mobivious.ui.AppTokens.light.surface)
+            waitForSurface(net.wingress.mobivious.ui.appColorScheme(false).surface)
             screenshot("neutral-explicit-light")
             preferences(AccountPreferences(darkMode = ""))
             shell("cmd uimode night no")
             until { currentActivity(); activity.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_NO }
-            waitForSurface(net.wingress.mobivious.ui.AppTokens.light.surface)
+            waitForSurface(net.wingress.mobivious.ui.appColorScheme(false).surface)
             screenshot("neutral-system-light")
         } finally {
             shell("cmd uimode night $original")
@@ -239,7 +239,7 @@ class AppUiSmokeTest {
         screenshot("mini-player")
         compose.onNodeWithTag("global-search").performClick()
         compose.onNodeWithTag("main-search").performClick()
-        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets).isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
         until { compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
         compose.onNodeWithTag("player-surface").assertDoesNotExist()
@@ -290,8 +290,8 @@ class AppUiSmokeTest {
         compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Server"))
         compose.onNodeWithText("Server", substring = false).performClick()
         compose.onNodeWithText("HTTPS address").performClick()
-        until { androidx.core.view.WindowInsetsCompat.toWindowInsetsCompat(activity.window.decorView.rootWindowInsets)
-            .isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) }
+        until { androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
         compose.onNodeWithText("HTTPS address").assertIsDisplayed()
         screenshot("overhaul-server-320dp-2x-ime-field")
         compose.onNodeWithText("Connect", substring = false).performScrollTo().assertIsDisplayed()

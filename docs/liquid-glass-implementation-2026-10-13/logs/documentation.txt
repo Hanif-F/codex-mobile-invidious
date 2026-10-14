@@ -1,2 +1,0 @@
-Documentation checks passed: 226 maintained files, 22 documents, reviewed fingerprints and local file links.
-Semantic accuracy and runtime acceptance require human/code review and the relevant app checks.

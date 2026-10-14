@@ -94,8 +94,7 @@ internal fun BrowsePageTitle(title: String, back: (() -> Unit)? = null, statusIn
 @Composable
 internal fun BrowsePanelToolbar(title: String, closeLabel: String, close: () -> Unit,
     detail: String? = null, back: (() -> Unit)? = null, enabled: Boolean = true) {
-    val foreground = appContentColors()
-    AppForeground(foreground) {
+    AppForeground {
 
     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).appControl()
         .heightIn(min = 56.dp).padding(start = if (back == null) 16.dp else 4.dp, end = 4.dp),
@@ -123,8 +122,7 @@ internal fun <T> BrowseTabs(options: List<T>, selected: T?, label: (T) -> String
 @Composable
 internal fun <T> BrowseSortMenu(options: List<T>, selected: T, label: (T) -> String,
     modifier: Modifier = Modifier, optionTag: (T) -> String = { "" }, available: (T) -> Boolean = { true }, select: (T) -> Unit) {
-    val foreground = appContentColors()
-    AppForeground(foreground) {
+    AppForeground {
 
     val source = remember { MutableInteractionSource() }
 

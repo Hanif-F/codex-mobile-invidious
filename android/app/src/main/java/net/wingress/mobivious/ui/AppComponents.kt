@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
@@ -21,41 +20,38 @@ import androidx.compose.ui.unit.dp
 internal val LocalInsideAppSection = staticCompositionLocalOf { false }
 internal val LocalReduceTransparency = staticCompositionLocalOf { false }
 internal val LocalContentBottomInset = staticCompositionLocalOf { 16.dp }
-internal enum class AppSurfaceRole { CONTROL, SECTION, MINI_PLAYER, MEDIA_OVERLAY }
-internal data class AppContentColors(val primary: Color,val secondary: Color,val plate: Color) {
-    companion object {
-        val light=AppContentColors(Color.White,Color.White,Color.Black.copy(alpha=.72f))
-        val dark=AppContentColors(Color(0xFF1B1B1F),Color(0xFF45464F),Color.White)
-    }
-}
-internal val LocalAppContentColors = staticCompositionLocalOf { AppContentColors.dark }
+internal enum class AppSurfaceRole { CONTROL, SECTION, MINI_PLAYER }
 
-@Composable internal fun appContentColors(role: AppSurfaceRole=AppSurfaceRole.CONTROL,prominent: Boolean=false): AppContentColors {
-    val c=MaterialTheme.colorScheme
+@Composable
+private fun appSurfaceColor(role: AppSurfaceRole, prominent: Boolean): Color {
+    val colors = MaterialTheme.colorScheme
     return when {
-        role==AppSurfaceRole.MINI_PLAYER -> AppContentColors(c.onSurface,c.onSurfaceVariant,c.surfaceContainer)
-        role==AppSurfaceRole.MEDIA_OVERLAY -> AppContentColors.light
-        prominent -> AppContentColors(c.onPrimaryContainer,c.onPrimaryContainer,c.primaryContainer)
-        role==AppSurfaceRole.SECTION -> AppContentColors(c.onSurface,c.onSurfaceVariant,c.surfaceContainerLow)
-        else -> AppContentColors(c.onSurface,c.onSurfaceVariant,c.surfaceContainerHigh)
+        role == AppSurfaceRole.MINI_PLAYER -> colors.surfaceContainer
+        prominent -> colors.primaryContainer
+        role == AppSurfaceRole.SECTION -> colors.surfaceContainerLow
+        else -> colors.surfaceContainerHigh
     }
 }
-@Composable internal fun AppForeground(colors: AppContentColors=appContentColors(),content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalContentColor provides colors.primary,LocalAppContentColors provides colors,content=content)
+
+@Composable
+internal fun AppForeground(color: Color = MaterialTheme.colorScheme.onSurface, content: @Composable () -> Unit) {
+    CompositionLocalProvider(LocalContentColor provides color, content = content)
 }
+
 @Composable internal fun AppSurface(modifier: Modifier=Modifier,shape: Shape=MaterialTheme.shapes.medium,
     prominent: Boolean=false,role: AppSurfaceRole=AppSurfaceRole.CONTROL,content: @Composable BoxScope.() -> Unit) {
-    val colors=appContentColors(role=role,prominent=prominent)
-    Surface(modifier,shape=shape,color=colors.plate,contentColor=colors.primary,tonalElevation=0.dp,
+    val colors = MaterialTheme.colorScheme
+    Surface(modifier,shape=shape,color=appSurfaceColor(role,prominent),
+        contentColor=if(prominent) colors.onPrimaryContainer else colors.onSurface,tonalElevation=0.dp,
         shadowElevation=if(role==AppSurfaceRole.MINI_PLAYER) 1.dp else 0.dp) {
-        AppForeground(colors) {Box(content=content)}
+        Box(content=content)
     }
 }
 @Composable internal fun AppBackground(modifier: Modifier=Modifier,content: @Composable BoxScope.() -> Unit) {
     Box(modifier.background(MaterialTheme.colorScheme.surface),content=content)
 }
 @Composable internal fun Modifier.appControl(shape: Shape=MaterialTheme.shapes.medium,prominent: Boolean=false,
-    role: AppSurfaceRole=AppSurfaceRole.CONTROL): Modifier = clip(shape).background(appContentColors(role=role,prominent=prominent).plate)
+    role: AppSurfaceRole=AppSurfaceRole.CONTROL): Modifier = clip(shape).background(appSurfaceColor(role,prominent))
 @Composable internal fun Modifier.appItemFeedback(source: MutableInteractionSource): Modifier = indication(source,ripple())
 @Composable internal fun AppInsetIconButton(onClick: () -> Unit,modifier: Modifier=Modifier,enabled: Boolean=true,
     interactionSource: MutableInteractionSource?=null,content: @Composable () -> Unit) {
@@ -69,7 +65,6 @@ internal val LocalAppContentColors = staticCompositionLocalOf { AppContentColors
     SnackbarHost(state) {data -> Snackbar(data,containerColor=MaterialTheme.colorScheme.inverseSurface,
         contentColor=MaterialTheme.colorScheme.inverseOnSurface,actionColor=MaterialTheme.colorScheme.inversePrimary)}
 }
-internal fun colorContrast(a: Color,b: Color) = (maxOf(a.luminance(),b.luminance())+.05f)/(minOf(a.luminance(),b.luminance())+.05f)
 
 @Composable
 internal fun AppSection(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {

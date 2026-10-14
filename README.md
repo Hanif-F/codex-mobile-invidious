@@ -149,8 +149,8 @@ Most watched uses all-time distinct video counts. Existing native tokens already
 have the required subscriptions and history permissions.
 
 For instance owners, the [deployment guide](deploy/README.md) covers server setup,
-migrations and token renewal. The [feature checklist](FEATURE_PARITY.md) records
-individual capabilities and their dependencies.
+migrations and token renewal. [Features](docs/FEATURES.md) and [API compatibility](docs/API.md)
+cover supported capabilities and their dependencies.
 
 Archived livestreams with `liveChatReplay` support offer on-demand chat replay
 through the player chat button. Replay follows playback and
@@ -173,8 +173,8 @@ thumbnail previews are not implemented. Comments, polls and quizzes are read-onl
 RSS support provides links and exports rather than an in-app feed reader.
 
 Native interaction and playback checks run on an already started emulator. See the
-dated [verification record](VERIFICATION.md) for completed checks, remaining device
-acceptance and reproduction instructions.
+[testing guide](docs/TESTING.md) for repeatable checks and the
+[cleanup report](docs/CLEANUP.md) for results and known failures.
 
 ## Development and documentation
 
@@ -188,16 +188,13 @@ whether you are contributing directly or working with an AI coding agent.
 Debug builds appear as **Mobivious Preview** and install separately from the
 release app for local review.
 
-- [Next UI/UX overhaul](docs/ui-ux-overhaul-2026-10-13/README.md) — approved opaque
-  Android design, complete screen/flow specifications and implementation/verification
-  handoff. See the [implementation report](docs/ui-ux-implementation-2026-10-13/README.md) for current verification and remaining acceptance.
-- [Historical Liquid Glass design](docs/LIQUID_GLASS.md) — rationale for the
-  previous UI, superseded by the opaque Android overhaul.
+- [UI guide](docs/UI.md) — current opaque Android layouts, theme, controls and
+  accessibility.
 - [Developer guide](docs/DEVELOPMENT.md) — repository orientation, prerequisites,
   builds, tests, signing, releases and upstream maintenance.
 - [Deployment guide](deploy/README.md) — install and update the server.
-- [Feature checklist](FEATURE_PARITY.md) — detailed coverage compared with the web app.
-- [Verification record](VERIFICATION.md) — dated results and repeatable checks.
+- [Testing guide](docs/TESTING.md) — repeatable builds, fixtures and device checks.
+- [Cleanup report](docs/CLEANUP.md) — audit changes, results and remaining issues.
 
 ## License
 

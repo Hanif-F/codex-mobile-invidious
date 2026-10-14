@@ -34,17 +34,17 @@ class WatchedIndicatorsSmokeTest {
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
-            activity.model.closePlayer(); activity.model.store.clearPositions(); activity.model.store.save(null)
+            activity.model.closePlayer(); activity.model.store.clearPositions(activity.model.store.positionContext()); activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
-            activity.model.store.clearPositions(); activity.model.store.guestDeArrow(AccountPreferences())
+            activity.model.store.clearPositions(activity.model.store.positionContext()); activity.model.store.guestPreferences(AccountPreferences())
             activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
     }
     @After fun close() {
         if (::activity.isInitialized) compose.runOnUiThread {
-            activity.model.closePlayer(); activity.model.store.clearPositions(); activity.model.store.save(null)
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.store.pip = true
+            activity.model.closePlayer(); activity.model.store.clearPositions(activity.model.store.positionContext()); activity.model.store.save(null)
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.store.pip = true
             activity.finishAndRemoveTask()
         }
     }
@@ -101,7 +101,7 @@ class WatchedIndicatorsSmokeTest {
 
     @Test fun guestsUseLocalProgressOnlyWhenResumeIsEnabled() {
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(savePosition = true))
+            activity.model.store.guestPreferences(AccountPreferences(savePosition = true))
             activity.model.store.position(first, 35); activity.model.refreshSharedSettings()
             val guest = activity.model.api.context()
             val signed = guest.copy(account = net.wingress.mobivious.data.Account("fixture-token", "OtherViewer", Long.MAX_VALUE, guest.server))
@@ -115,7 +115,7 @@ class WatchedIndicatorsSmokeTest {
         progress(first).assertExists(); watched(first).assertDoesNotExist()
         assertEquals(0, fixture().getInt("playbackRequests"))
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(savePosition = false)); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences(savePosition = false)); activity.model.refreshSharedSettings()
         }
         until { activity.model.watched.value.positions.isEmpty() }
         progress(first).assertDoesNotExist(); watched(first).assertDoesNotExist()

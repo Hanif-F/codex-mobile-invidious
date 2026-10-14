@@ -55,7 +55,7 @@ class SubscriptionSortingSmokeTest {
         launchActivity()
         compose.runOnUiThread {
             activity.model.closePlayer(); activity.model.store.save(null); activity.model.switchServer(address)
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings()
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings()
             activity.model.action { activity.model.login("SortingViewer", "fixture-password") }
         }
         until { activity.model.account.value != null && activity.model.subscriptionChannels.value.loaded && activity.model.dearrowIdentity.value != null }

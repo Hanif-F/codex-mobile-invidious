@@ -66,7 +66,7 @@ class ChaptersSmokeTest {
         instrumentation.runOnMainSync {
             val app = instrumentation.targetContext.applicationContext as MobiviousApplication
             app.store.save(null); app.store.server = base; app.cache.clear()
-            app.store.guestDeArrow(AccountPreferences(autoplay = false, continueAutoplay = false, thinMode = true))
+            app.store.guestPreferences(AccountPreferences(autoplay = false, continueAutoplay = false, thinMode = true))
         }
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
@@ -219,27 +219,31 @@ class ChaptersSmokeTest {
         info.flags = info.flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
             android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
         automation.serviceInfo = info
-        automation.waitForIdle(500, 5_000)
-        val bounds = android.graphics.Rect()
-        until { automation.windows.firstOrNull { it.root?.packageName?.toString() == instrumentation.targetContext.packageName }
-            ?.let { it.getBoundsInScreen(bounds); !bounds.isEmpty } == true }
-        captureWatchScreenshot("watch-native-pip")
-        android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(
-            "input tap ${bounds.centerX()} ${bounds.centerY()} ")).use { it.readBytes() }
-        captureWatchScreenshot("watch-native-pip-menu")
-        until {
-            fun expand(node: android.view.accessibility.AccessibilityNodeInfo): Boolean {
-                val label = "${node.text?.toString().orEmpty()} ${node.contentDescription?.toString().orEmpty()}".lowercase()
-                if (label.contains("full screen") || label.contains("fullscreen") || label.contains("expand") ||
-                    node.viewIdResourceName?.endsWith("expand_button") == true)
-                    return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
-                return (0 until node.childCount).any { index -> node.getChild(index)?.let(::expand) == true }
+        try {
+            automation.waitForIdle(500, 5_000)
+            val bounds = android.graphics.Rect()
+            until { automation.windows.firstOrNull { it.root?.packageName?.toString() == instrumentation.targetContext.packageName }
+                ?.let { it.getBoundsInScreen(bounds); !bounds.isEmpty } == true }
+            captureWatchScreenshot("watch-native-pip")
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(
+                "input tap ${bounds.centerX()} ${bounds.centerY()} ")).use { it.readBytes() }
+            captureWatchScreenshot("watch-native-pip-menu")
+            until {
+                fun expand(node: android.view.accessibility.AccessibilityNodeInfo): Boolean {
+                    val label = "${node.text?.toString().orEmpty()} ${node.contentDescription?.toString().orEmpty()}".lowercase()
+                    if (label.contains("full screen") || label.contains("fullscreen") || label.contains("expand") ||
+                        node.viewIdResourceName?.endsWith("expand_button") == true)
+                        return node.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_CLICK)
+                    return (0 until node.childCount).any { index -> node.getChild(index)?.let(::expand) == true }
+                }
+                automation.windows.any { window -> window.root?.takeIf { it.packageName?.toString() == "com.android.systemui" }?.let(::expand) == true }
             }
-            automation.windows.any { window -> window.root?.takeIf { it.packageName?.toString() == "com.android.systemui" }?.let(::expand) == true }
+            reacquire(); until { !activity.isInPictureInPictureMode }
+            compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
+            assertTrue(activity.model.playback.value.playWhenReady)
+        } finally {
+            info.flags = originalFlags
+            automation.serviceInfo = info
         }
-        reacquire(); until { !activity.isInPictureInPictureMode }
-        compose.onNodeWithTag("chapters-panel").assertDoesNotExist()
-        assertTrue(activity.model.playback.value.playWhenReady)
-        info.flags = originalFlags; automation.serviceInfo = info
     }
 }

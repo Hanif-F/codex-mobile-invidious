@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import net.wingress.mobivious.player.QueueRepeat
 import android.content.Intent
 import android.os.Bundle
 import androidx.media3.session.SessionCommand
@@ -77,7 +78,7 @@ class ClipsSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         ui {
             vm.store.save(null); vm.switchServer(base)
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings()
+            vm.store.guestPreferences(AccountPreferences()); vm.refreshSharedSettings()
             vm.store.save(Account("fixture-token", "fixture-user", Long.MAX_VALUE, base))
         }
         until { vm.account.value != null && vm.preferences.value.watchHistory && vm.controller.value != null && vm.queue.value.token.isEmpty() && !vm.browse.value.loading }

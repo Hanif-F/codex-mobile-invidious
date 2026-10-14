@@ -1,5 +1,6 @@
 package net.wingress.mobivious.ui
 
+import net.wingress.mobivious.player.QueueRepeat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -276,7 +277,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
     val player = remember(editor.occurrence) { ExoPlayer.Builder(context).setMediaSourceFactory(DefaultMediaSourceFactory(DefaultHttpDataSource.Factory()
-        .setUserAgent("Mobivious/0.6").setAllowCrossProtocolRedirects(false))).build().apply {
+        .setUserAgent("Mobivious/${net.wingress.mobivious.BuildConfig.VERSION_NAME}").setAllowCrossProtocolRedirects(false))).build().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
             setHandleAudioBecomingNoisy(true)
             repeatMode = Player.REPEAT_MODE_ONE
@@ -312,7 +313,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         BoxWithConstraints(Modifier.fillMaxWidth()) {
-            AndroidView(factory = { (LayoutInflater.from(it).inflate(R.layout.clip_preview, null) as PlayerView).apply {
+            AndroidView(factory = { (LayoutInflater.from(it).inflate(R.layout.clip_preview, android.widget.FrameLayout(it), false) as PlayerView).apply {
                 removeBlackUiBackgrounds()
                 this.player = player; setShowNextButton(false); setShowPreviousButton(false)
             } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().height(minOf(maxWidth * 9 / 16, 210.dp))

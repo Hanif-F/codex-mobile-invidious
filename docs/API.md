@@ -77,8 +77,7 @@ continuations and suppress repeated cursors. No discussion mutation API is used.
 | GET `/api/v1/auth/subscriptions/search` | `q`, `page`; subscription-scoped video search. |
 
 The native logical queue resolves one ExoPlayer media item at a time. Finite
-playlist pages use zero-based indexes (the older `playlist(page)` helper maps
-pages to 100-position offsets). Mixes follow video-ID continuations and detect
+playlist pages use zero-based indexes through `queuePage`. Mixes follow video-ID continuations and detect
 cycles/no-new-successor responses. Repeated video IDs remain distinct occurrences.
 
 `subscriptionStats` contains nullable `latestUpload`, all-time distinct watched

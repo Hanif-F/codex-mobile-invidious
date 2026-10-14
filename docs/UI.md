@@ -1,10 +1,10 @@
 # UI, rendering and accessibility
 
-[Documentation index](README.md) · [Approved design](ui-ux-overhaul-2026-10-13/DESIGN_SYSTEM.md) · [Implementation evidence](ui-ux-implementation-2026-10-13/README.md)
+[Documentation index](README.md) · [Testing](TESTING.md)
 
 This guide describes the opaque Material 3 implementation in the working tree.
-Verification status and remaining acceptance work belong to the implementation
-report. Earlier glass specifications and reports remain historical references.
+The [testing guide](TESTING.md) describes validation; [cleanup results](CLEANUP.md)
+record the latest tested scope and known failures.
 
 ## Shell and screen ownership
 
@@ -32,7 +32,7 @@ The opaque mini-player spans the content width immediately above navigation. Its
 minimum height is 72dp with independent 48dp play/pause and close targets. The IME
 hides navigation and mini-player presentation while playback continues. Scaffold,
 top bars and dialogs own their insets once. `BrowseAppSurface` places a pinned,
-opaque toolbar above the list; no content recording or optical mask is involved.
+opaque toolbar above the list.
 
 Comfortable feeds use fitted artwork; compact feeds use rows; thin mode removes
 ordinary thumbnails. Wide comfortable feeds use columns of at least 280dp.
@@ -41,7 +41,8 @@ at 600dp. Insets are 16dp on compact windows and 24dp otherwise. You uses contin
 library rows in the order Playlists, History, My Clips, Downloads, following
 identity and guest sign-in guidance. Subscription creator shortcuts precede
 Channels/scoped search and uploads. Channel banner/identity precede tabs, sorting,
-scoped search and results.
+scoped search and results. The channel header uses the same explicit neutral
+surface in light/dark appearance, with or without banner artwork or thin mode.
 
 `AppWindowLayout` observes WindowManager folding features. An opaque separating
 hinge selects the larger contiguous pane. Watch stacks unless an expanded window
@@ -62,10 +63,8 @@ surfaces remain opaque in both appearances, including menus and dialogs.
 Sections use surface-container-low; controls, menus and tooltips use appropriate
 opaque container roles; the mini-player uses surface-container. Navigation uses
 primary-container selection. Focus, selected state, disabled state, errors,
-progress and ripple remain native. There is no Backdrop dependency, window
-PixelCopy crop, shader, refraction, scene recording or backdrop polarity system.
-Legacy Colored backgrounds and Adaptive control colors values remain dormant in
-storage and have no UI effect.
+progress and ripple remain native. [Storage](STORAGE_AND_SECURITY.md) describes
+appearance-key migration and retained saved values.
 
 ## Saving and editing
 
@@ -113,8 +112,8 @@ which still need review. Theme unit tests check all twelve appearance/accent
 combinations for opaque roles and text/boundary contrast.
 
 Use [Testing](TESTING.md) for functional, screenshot, accessibility and benchmark
-runners. Emulator diagnostics are the acceptance hardware for this task by the
-user's explicit instruction; they do not establish physical-phone performance.
+runners. Emulator diagnostics establish behavior in that environment; they do
+not establish physical-phone performance.
 
 Search filters apply each valid choice immediately, keep the query and reset
 pagination. Active filters remain summarized beside results. Outstanding search,

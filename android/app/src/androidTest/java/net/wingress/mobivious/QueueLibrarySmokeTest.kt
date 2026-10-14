@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import net.wingress.mobivious.player.QueueRepeat
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.ui.test.*
@@ -34,7 +35,7 @@ class QueueLibrarySmokeTest {
         command("reset"); command("queue")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        ui { activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
+        ui { activity.model.store.save(null); activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings() }
         waitFor {
             var empty = false
             ui { empty = activity.model.controller.value?.mediaItemCount == 0 }
@@ -128,7 +129,7 @@ class QueueLibrarySmokeTest {
         compose.onNodeWithTag("playback-queue-items").assertExists()
         compose.onNodeWithTag("watch-up-next").assertDoesNotExist()
         ui {
-            activity.model.store.guestDeArrow(AccountPreferences(continueNext = true))
+            activity.model.store.guestPreferences(AccountPreferences(continueNext = true))
             activity.model.refreshSharedSettings(); activity.model.play("testvideo01")
         }
         waitFor { activity.model.playback.value.playing && !activity.model.queue.value.explicitQueue }

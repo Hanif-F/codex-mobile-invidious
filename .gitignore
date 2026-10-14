@@ -9,3 +9,5 @@ android/.idea/
 *.log
 artifacts/
 .tools/
+__pycache__/
+*.py[cod]

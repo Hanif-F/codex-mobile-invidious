@@ -30,7 +30,7 @@ class WatchCommentsPresentationTest {
         val items = (0..19).map { Comment("Studio $it", "A readable comment.", "Today", 12,
             id = "$it", replyCount = 2, replyContinuation = "replies:$it") }
         compose.setContent {
-            MaterialTheme(colorScheme = if (dark.value) AppTokens.dark else AppTokens.light, typography = AppTokens.typography) {
+            MaterialTheme(colorScheme = if (dark.value) appColorScheme(true) else appColorScheme(false), typography = AppTokens.typography) {
                 CompositionLocalProvider(LocalReduceTransparency provides opaque.value,
                     LocalDensity provides Density(LocalDensity.current.density, scale.floatValue)) {
                     CommentsPanel(CommentsState(target = CommentTarget.Video("abcdefghijk"), open = true,

@@ -1,5 +1,6 @@
 package net.wingress.mobivious
 
+import net.wingress.mobivious.ui.appColorScheme
 import android.content.Intent
 import androidx.compose.ui.test.*
 import androidx.compose.ui.graphics.toPixelMap
@@ -8,7 +9,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.ui.AvatarImageLoader
-import net.wingress.mobivious.ui.AppTokens
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -38,7 +38,7 @@ class AvatarsSmokeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             activity.model.store.save(null); activity.model.switchServer(server)
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false))
             activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
         }
         until { !activity.model.browse.value.loading && activity.model.browse.value.videos.isNotEmpty() }
@@ -105,7 +105,7 @@ class AvatarsSmokeTest {
         for (night in listOf(true, false)) {
             for ((banner, thin) in listOf(true to false, false to false, true to true)) {
                 compose.runOnUiThread {
-                    activity.model.store.guestDeArrow(AccountPreferences(autoplay = false,
+                    activity.model.store.guestPreferences(AccountPreferences(autoplay = false,
                         darkMode = if (night) "dark" else "light", thinMode = thin))
                     activity.model.refreshSharedSettings()
                     activity.model.channel.value = info.copy(banner = if (banner) info.banner else "")
@@ -113,8 +113,12 @@ class AvatarsSmokeTest {
                 until { activity.model.preferences.value.darkMode == if (night) "dark" else "light" }
                 if (banner && !thin) compose.onNodeWithTag("channel-banner").assertExists()
                 else compose.onNodeWithTag("channel-banner").assertDoesNotExist()
+                // Theme and artwork changes resize this lazy item. Bring its
+                // current bounds into the viewport before sampling screen pixels.
+                compose.onNodeWithTag("channel-header").performScrollTo()
+                compose.waitForIdle()
                 val pixels = compose.onNodeWithTag("channel-header").captureToImage().toPixelMap()
-                val expected = if (night) AppTokens.dark.surface else AppTokens.light.surface
+                val expected = if (night) appColorScheme(true).surface else appColorScheme(false).surface
                 for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
                     assertEquals(expected.red, pixels[1, y].red, .01f)
                     assertEquals(expected.green, pixels[1, y].green, .01f)
@@ -173,7 +177,7 @@ class AvatarsSmokeTest {
 
     @Test fun thinModeMakesNoAvatarRequestsAndFailuresKeepAuthorsUsable() {
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false, thinMode = true))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, thinMode = true))
             activity.model.refreshSharedSettings()
         }
         until { activity.model.preferences.value.thinMode }
@@ -186,7 +190,7 @@ class AvatarsSmokeTest {
         AvatarImageLoader.get(activity).apply { memoryCache?.clear(); diskCache?.clear() }
         command("avatars", """{"fail":true}""")
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(AccountPreferences(autoplay = false))
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false))
             activity.model.refreshSharedSettings()
         }
         until { !activity.model.preferences.value.thinMode && state().getJSONArray("avatarRequests").length() > 0 }

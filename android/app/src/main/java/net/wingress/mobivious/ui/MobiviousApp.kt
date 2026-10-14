@@ -366,8 +366,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (!imeVisible && presentation.mode != PlayerPresentation.CLOSED && playback.details != null)
                             MiniPlayer(vm,playback,presentation,::restorePlayer,vm::togglePlay,::closePlayer,
                                 gesturesEnabled=!pip && dialog.isEmpty() && sponsorEditor==null && !searchOpen && !accountBusy && saveSheet.video==null && !contribution.open && !rss.open && !channelDescriptionOpen && !postComments.open && linkResolution.link==null)
-                        if (!wideLayout && !imeVisible) AppNavigation(destination,false,!accountBusy,
-                            Modifier.playerAnchor { presentation.navigationBounds=it },::selectDestination)
+                        if (!wideLayout && !imeVisible) AppNavigation(destination,false,enabled=!accountBusy,
+                            modifier=Modifier.playerAnchor { presentation.navigationBounds=it },select=::selectDestination)
                         else if (wideLayout && !imeVisible) Spacer(Modifier.navigationBarsPadding())
                     }
 
@@ -595,8 +595,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 }
               }
             }
-              if (wideLayout && !watch && !fullscreen && !pip && !imeVisible) AppNavigation(destination,true,!accountBusy,
-                  Modifier.align(Alignment.TopStart).fillMaxHeight(),::selectDestination)
+              if (wideLayout && !watch && !fullscreen && !pip && !imeVisible) AppNavigation(destination,true,enabled=!accountBusy,
+                  modifier=Modifier.align(Alignment.TopStart).fillMaxHeight(),select=::selectDestination)
               if (presentation.showsWatch && !pip) {
                   // Watch owns the whole window, independently of changing browse/mini chrome allocations.
                   Box(Modifier.fillMaxSize().graphicsLayer { alpha = presentation.watchAlpha }
@@ -636,7 +636,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                 }) { Text("This also changes your account on the website.") }
             }
             val dearrow by vm.dearrowContribution.collectAsStateWithLifecycle()
-            if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, { vm.sponsorSettingsChannel.value = null; signIn() }, dismiss = { vm.sponsorSettingsChannel.value = null })
+            if (sponsorEditor != null && !pip) SponsorBlockSheet(vm, sponsorEditor!!, dismiss = { vm.sponsorSettingsChannel.value = null })
             if (dearrow.open && !pip && !fullscreen) DeArrowContributionSheet(vm)
             if (!pip) DownloadExportConsent()
             if (downloadDialog.video != null && !pip) DownloadDialog(vm)

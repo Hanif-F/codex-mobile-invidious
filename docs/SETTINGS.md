@@ -2,15 +2,14 @@
 
 [Documentation index](README.md) · [Storage ownership](STORAGE_AND_SECURITY.md)
 
-Preferences save automatically from **Settings**, available from every browse root.
+Preferences save automatically from **You → Settings**.
 Choices save immediately, sliders on release, and valid text after 500ms, blur,
 Done, page exit or backgrounding. Fields retain pending, invalid or failed input
 with Retry/Revert; the Settings root links to changes needing attention. Sparse
 patches preserve unrelated website fields. A ViewModel-owned revisioned pipeline
 serializes writers and rejects stale account/instance context. Account/security,
 identity import, destructive operations and entity editors retain explicit submit
-buttons. [Implementation evidence](ui-ux-implementation-2026-10-13/README.md)
-records current verification limits.
+buttons. [Testing](TESTING.md) describes the relevant checks.
 
 **Shared** below means website/account settings when signed in and local
 instance-specific guest settings where supported. **Profile-local** means saved
@@ -168,8 +167,8 @@ destination guest profile. Local downloads remain available. See
 Account and its child pages provide authentication, credentials, sessions, API
 tokens and deletion rather than preference fields; see [Library](LIBRARY.md#accounts-and-authentication).
 Blocked channels opens the confirmed block-list manager. About displays the
-build version, Invidious/Companion attribution, Backdrop source/license, and
-community-data attribution/license links. It has no update installer or setting
+build version, Invidious/Companion attribution and community-data attribution/license
+links. It has no update installer or setting
 that changes server capabilities.
 
 ## Current player overrides and precedence

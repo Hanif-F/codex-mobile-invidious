@@ -37,10 +37,10 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/benchmark/res/xml/benchmark_network_security.xml](../../android/app/src/benchmark/res/xml/benchmark_network_security.xml) | Benchmark-only loopback fixture HTTP; ordinary production origins retain HTTPS policy. | [TESTING](../../docs/TESTING.md) |
 | [android/macrobenchmark/build.gradle.kts](../../android/macrobenchmark/build.gradle.kts) | Self-instrumenting release-like Macrobenchmark module, ten-iteration test dependencies and isolated target. | [TESTING](../../docs/TESTING.md) |
 | [android/macrobenchmark/src/main/AndroidManifest.xml](../../android/macrobenchmark/src/main/AndroidManifest.xml) | Benchmark instrumentation permissions, target visibility and fixture network policy. | [TESTING](../../docs/TESTING.md) |
-| [android/macrobenchmark/src/main/java/net/wingress/mobivious/benchmarks/UiScrollBenchmark.kt](../../android/macrobenchmark/src/main/java/net/wingress/mobivious/benchmarks/UiScrollBenchmark.kt) | Ordinary UI account/origin setup, verified preference reads and deterministic Full-compilation timing journeys. | [TESTING](../../docs/TESTING.md) |
+| [android/macrobenchmark/src/main/java/net/wingress/mobivious/benchmarks/UiScrollBenchmark.kt](../../android/macrobenchmark/src/main/java/net/wingress/mobivious/benchmarks/UiScrollBenchmark.kt) | Nineteen current-UI performance journeys with ordinary-control setup, automatic-save recovery and measured gesture provenance. | [TESTING](../../docs/TESTING.md) |
 | [android/macrobenchmark/src/main/res/xml/fixture_network_security.xml](../../android/macrobenchmark/src/main/res/xml/fixture_network_security.xml) | Instrumentation-side loopback HTTP exception for deterministic local fixtures. | [TESTING](../../docs/TESTING.md) |
 | [scripts/summarize-ui-performance.py](../../scripts/summarize-ui-performance.py) | Median per-iteration CPU/overrun percentiles, frame counts and positive-overrun fractions from raw benchmark samples. | [TESTING](../../docs/TESTING.md) |
-| [scripts/test-ui-performance.sh](../../scripts/test-ui-performance.sh) | Isolated benchmark runner, fixture/reverse ownership, source/APK provenance and raw timing/trace capture. | [TESTING](../../docs/TESTING.md) |
+| [scripts/test-ui-performance.sh](../../scripts/test-ui-performance.sh) | Runs current isolated benchmark journeys or recordings with fixture ownership, source/APK provenance and gesture/video validation. | [TESTING](../../docs/TESTING.md) |
 
 ## Android manifests and resources
 
@@ -53,10 +53,10 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/res/drawable/ic_launcher_background.xml](../../android/app/src/main/res/drawable/ic_launcher_background.xml) | Adaptive launcher background artwork. | [UI](../../docs/UI.md) |
 | [android/app/src/main/res/drawable/ic_launcher_monochrome.xml](../../android/app/src/main/res/drawable/ic_launcher_monochrome.xml) | Monochrome themed launcher vector. | [UI](../../docs/UI.md) |
 | [android/app/src/main/res/layout/clip_preview.xml](../../android/app/src/main/res/layout/clip_preview.xml) | Separate Media3 TextureView preview with native controls for clip editing. | [LIBRARY](../../docs/LIBRARY.md) |
-| [android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml](../../android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml) | Adaptive launcher foreground/background/monochrome composition. | [UI](../../docs/UI.md) |
+| [android/app/src/main/res/mipmap-anydpi/ic_launcher.xml](../../android/app/src/main/res/mipmap-anydpi/ic_launcher.xml) | Adaptive launcher foreground/background/monochrome composition. | [UI](../../docs/UI.md) |
 | [android/app/src/main/res/values-night/colors.xml](../../android/app/src/main/res/values-night/colors.xml) | Dark launch background and dark system-bar flag. | [UI](../../docs/UI.md) |
 | [android/app/src/main/res/values/colors.xml](../../android/app/src/main/res/values/colors.xml) | Light launch background and light system-bar flag. | [UI](../../docs/UI.md) |
-| [android/app/src/main/res/values/media_colors.xml](../../android/app/src/main/res/values/media_colors.xml) | Native clip-preview footer black scrim and opaque Media3 settings popup colors; no tinted optical surfaces. | [UI](../../docs/UI.md) |
+| [android/app/src/main/res/values/media_colors.xml](../../android/app/src/main/res/values/media_colors.xml) | Native clip-preview footer scrim, transparent picture overlay and opaque Media3 settings popup colors. | [UI](../../docs/UI.md) |
 | [android/app/src/main/res/values/styles.xml](../../android/app/src/main/res/values/styles.xml) | No-action-bar launch/splash theme, font and system-bar appearance. | [UI](../../docs/UI.md) |
 | [android/app/src/main/res/xml/data_extraction_rules.xml](../../android/app/src/main/res/xml/data_extraction_rules.xml) | Explicit backup/device-transfer exclusions for app-owned data. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
 | [android/app/src/main/res/xml/rss_paths.xml](../../android/app/src/main/res/xml/rss_paths.xml) | FileProvider exposure restricted to the RSS cache subtree. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
@@ -67,6 +67,7 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | --- | --- | --- |
 | [android/app/src/main/java/net/wingress/mobivious/MainActivity.kt](../../android/app/src/main/java/net/wingress/mobivious/MainActivity.kt) | Activity lifecycle, incoming share/app links, fullscreen system bars and PiP actions/bounds. | [ARCHITECTURE](../../docs/ARCHITECTURE.md) |
 | [android/app/src/main/java/net/wingress/mobivious/MobiviousApplication.kt](../../android/app/src/main/java/net/wingress/mobivious/MobiviousApplication.kt) | Application dependency construction, shared repository state and context reset propagation. | [ARCHITECTURE](../../docs/ARCHITECTURE.md) |
+| [android/app/src/main/java/net/wingress/mobivious/data/DownloadReceiver.kt](../../android/app/src/main/java/net/wingress/mobivious/data/DownloadReceiver.kt) | Manifest-bound system download-completion/notification adapter; preserves component identity and reconciles only the app journal. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
 
 ## Data and API
 
@@ -99,11 +100,10 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/data/HttpCall.kt](../../android/app/src/main/java/net/wingress/mobivious/data/HttpCall.kt) | Cancellable asynchronous OkHttp response-body adapter and closed-response transport snapshot. | [API](../../docs/API.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt](../../android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt) | Complete instance HTTP client, auth/error/cache semantics and consumed API endpoint methods. | [API](../../docs/API.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/LiveChat.kt](../../android/app/src/main/java/net/wingress/mobivious/data/LiveChat.kt) | Replay chunks/settings, RE2 filters, bounded presentation-driven replay windows and timing sync. | [PLAYBACK](../../docs/PLAYBACK.md) |
-| [android/app/src/main/java/net/wingress/mobivious/data/Models.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Models.kt) | Core video/channel/playlist/account/context/stream models and defensive API JSON parsing. | [API](../../docs/API.md) |
-| [android/app/src/main/java/net/wingress/mobivious/data/PlaybackQueue.kt](../../android/app/src/main/java/net/wingress/mobivious/data/PlaybackQueue.kt) | Occurrence/source/snapshot models, source-page merging, insertion/removal/repeat/eligibility and save/block state. | [PLAYBACK](../../docs/PLAYBACK.md) |
+| [android/app/src/main/java/net/wingress/mobivious/data/Models.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Models.kt) | API/domain models and parsers, source queue pages, library action state, stream/caption metadata and validated video links. | [API](../../docs/API.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/ResponseCache.kt](../../android/app/src/main/java/net/wingress/mobivious/data/ResponseCache.kt) | Hashed device-private feed snapshots with age, size and count bounds and atomic replacement. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/Rss.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Rss.kt) | Validated public/private/mix feed URL construction and RSS/OPML/Atom panel state. | [API](../../docs/API.md) |
-| [android/app/src/main/java/net/wingress/mobivious/data/SessionStore.kt](../../android/app/src/main/java/net/wingress/mobivious/data/SessionStore.kt) | Encrypted session, checked SharedPreferences, context generation and profile-local/device-wide settings access. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
+| [android/app/src/main/java/net/wingress/mobivious/data/SessionStore.kt](../../android/app/src/main/java/net/wingress/mobivious/data/SessionStore.kt) | Checked local profile and guest preferences, encrypted live session, context isolation and durable player/visibility saves. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt](../../android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt) | Segment/settings/category/mode/color/channel models, parsing, sparse patches and validation. | [SETTINGS](../../docs/SETTINGS.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt) | Directory statistics, local search/sort fallback and revision-fenced confirmed subscription mutations. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt](../../android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt) | Watched/progress models and indicators plus revision-fenced history/progress reconciliation and local fallback. | [LIBRARY](../../docs/LIBRARY.md) |
@@ -120,6 +120,7 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | --- | --- | --- |
 | [android/app/src/main/java/net/wingress/mobivious/player/CodecAwareTrackSelector.kt](../../android/app/src/main/java/net/wingress/mobivious/player/CodecAwareTrackSelector.kt) | Supported DASH codec/preset selection before initial media requests, retaining adaptive decoder checks. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/player/DownloadPlayback.kt](../../android/app/src/main/java/net/wingress/mobivious/player/DownloadPlayback.kt) | Local single/paired media sources and completed captions without remote metadata. | [PLAYBACK](../../docs/PLAYBACK.md) |
+| [android/app/src/main/java/net/wingress/mobivious/player/PlaybackQueue.kt](../../android/app/src/main/java/net/wingress/mobivious/player/PlaybackQueue.kt) | Canonical playback runtime snapshot, occurrence identity, share URLs, repeat and source merge/successor rules. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/player/PlaybackRules.kt](../../android/app/src/main/java/net/wingress/mobivious/player/PlaybackRules.kt) | Pure seek, explicit/resume start, completion save and bounded-link rules. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/player/PlaybackService.kt](../../android/app/src/main/java/net/wingress/mobivious/player/PlaybackService.kt) | ExoPlayer/MediaSession lifetime, trusted commands, history/progress ownership, SponsorBlock and PiP transport actions. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/player/QueueCoordinator.kt](../../android/app/src/main/java/net/wingress/mobivious/player/QueueCoordinator.kt) | Service-owned lazy resolution, source pagination, occurrence transitions, tracks, bounds, offline media, clips and successor behavior. | [PLAYBACK](../../docs/PLAYBACK.md) |
@@ -137,17 +138,17 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | File | Responsibility | Guide |
 | --- | --- | --- |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AccountUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AccountUi.kt) | Sign-in/register/captcha, credentials, account deletion, sessions and token forms with transient secret handling. | [LIBRARY](../../docs/LIBRARY.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/ActionControlsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/ActionControlsUi.kt) | Palette-seeded independent popup menus, thin grouped preference rows, overflow actions and choice semantics. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/ActionControlsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/ActionControlsUi.kt) | Native Material popup menus, grouped preference rows, overflow actions and enabled/selected choice semantics. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AiFilterUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AiFilterUi.kt) | Accessible classification warning thumbnails replacing artwork when configured. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AmbientPalette.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AmbientPalette.kt) | Nine-zone spatial palette extraction and one-copy rate/backoff/generation gate. | [UI](../../docs/UI.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/AppComponents.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppComponents.kt) | Native opaque surface roles, Material controls, tooltips, snackbars and automatic-save feedback. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/AppComponents.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppComponents.kt) | Native opaque surface roles, Material foregrounds, icons, sections and automatic-save feedback. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AppLayout.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppLayout.kt) | Measured native top bars, section headings and accessible wrapping selection controls. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AppScaffold.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppScaffold.kt) | Four fixed root destinations, labeled bottom navigation/rail and window width classes. | [UI](../../docs/UI.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/AppTheme.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppTheme.kt) | Exact neutral light/dark Material 3 roles, six accents, standard typography, shapes and responsive spacing. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/AppTheme.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppTheme.kt) | Canonical six-accent light/dark Material palettes, shapes, typography and window insets. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AppViewModel.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppViewModel.kt) | App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination. | [ARCHITECTURE](../../docs/ARCHITECTURE.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt) | WindowManager occluding-fold observation and contiguous usable-pane policy with physical coordinate placement. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/AvatarUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/AvatarUi.kt) | Redirect-free Coil avatar loader, fallback identity, creator/channel headers and subscription chips. | [UI](../../docs/UI.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/BrowseComponents.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/BrowseComponents.kt) | Pinned opaque browsing toolbars, sort menus, tabs and artwork components without scene recording. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/BrowseComponents.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/BrowseComponents.kt) | Pinned opaque browsing toolbars, sort menus, tabs and artwork components. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/ChannelDescriptionUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/ChannelDescriptionUi.kt) | Adaptive creator description sheet with native rich links. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/ChaptersUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/ChaptersUi.kt) | Current chapter label and retained chapter panel/sheet state with seek actions. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/ClipsState.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/ClipsState.kt) | Clip resolution/editor draft, validation, publication and occurrence-owned preview state. | [LIBRARY](../../docs/LIBRARY.md) |
@@ -172,15 +173,15 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/ui/PreferenceSaveController.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/PreferenceSaveController.kt) | ViewModel-owned revisioned preference intent, coalescing, debounce, serialization, failure recovery and context isolation. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/RssUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/RssUi.kt) | Feed link warning/copy/share/open and XML share/save sheet with scoped file permissions. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt) | Reusable draft input with keyboard/search/physical Enter submission semantics. | [UI](../../docs/UI.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt) | Colored settings environment, related opaque Material preference sections, Save/Cancel footer, server/about and category routing. | [SETTINGS](../../docs/SETTINGS.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt) | Global/channel skip settings, inherited modes, color editor and reset/save sheet. | [SETTINGS](../../docs/SETTINGS.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt) | Settings category routing, automatic per-field preference feedback, server confirmation and About content. | [SETTINGS](../../docs/SETTINGS.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt) | Automatic global/channel skip settings, inherited modes, color validation, channel loading and reset controls. | [SETTINGS](../../docs/SETTINGS.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionBrowseUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionBrowseUi.kt) | Subscription/channel pinned toolbars, scoped inputs, tab and sort controls. | [UI](../../docs/UI.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionControl.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionControl.kt) | Confirmed membership pill, checking/pending/error states and explicit unsubscribe menu. | [LIBRARY](../../docs/LIBRARY.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionControl.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionControl.kt) | Confirmed membership control, checking/pending/error states and explicit unsubscribe menu. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionsUi.kt) | Searchable sorted directory, viewing/upload statistics, counts and fallback/errors. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/VideoInformationUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/VideoInformationUi.kt) | Rich video description, optional exact statistics/credits/notices, safe external intents and channel-resolution dialog. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/VisibilityUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/VisibilityUi.kt) | Members badges, guest/account block actions and blocked-channel manager. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/WatchActionsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchActionsUi.kt) | Equal-width labeled watch action circles with disabled state and tooltips. | [UI](../../docs/UI.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/WatchAmbient.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchAmbient.kt) | PixelCopy sampler lifecycle, animation/power gates, color smoothing, contrast-bounded light and separate backdrop scene. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/WatchAmbient.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchAmbient.kt) | Decoder PixelCopy sampling, lifecycle/animation/power gates, palette smoothing and contrast-bounded watch illumination. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/WatchComponents.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchComponents.kt) | Opaque watch metadata, labeled disclosure rows and native player/tool controls. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/WatchPlayerResize.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchPlayerResize.kt) | Saveable occurrence resize progress and nested-scroll connection for embedded video. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/YouUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/YouUi.kt) | You identity/dashboard destinations and owned/subscribed playlist library sections/empty states. | [FEATURES](../../docs/FEATURES.md) |
@@ -189,42 +190,37 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 
 | File | Responsibility | Guide |
 | --- | --- | --- |
-| [scripts/build-release.sh](../../scripts/build-release.sh) | Generate personal signing material only if absent, run unit/release/lint and copy versioned APK/checksum. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
+| [scripts/build-release.sh](../../scripts/build-release.sh) | Checked signing configuration or explicit first-identity initialization; unit/release/lint builds and versioned APK/checksum outputs. | [DEVELOPMENT](../../docs/DEVELOPMENT.md) |
 | [scripts/check-avatar-fixture.py](../../scripts/check-avatar-fixture.py) | Disposable avatar metadata/proxy fixture assertions; requires generated thumbnail media. | [TESTING](../../docs/TESTING.md) |
 | [scripts/check-chapters-fixture.py](../../scripts/check-chapters-fixture.py) | Description chapter fixtures and forbidden ordinary timeline-preview request tracing. | [TESTING](../../docs/TESTING.md) |
 | [scripts/check-chat-fixture.py](../../scripts/check-chat-fixture.py) | Replay chunk/removal/replacement/failure and dedicated authenticated filter/delay fixture checks. | [TESTING](../../docs/TESTING.md) |
 | [scripts/check-community-fixture.py](../../scripts/check-community-fixture.py) | Disposable channel/post/attachment/comment fixture contract checks; requires thumbnail media. | [TESTING](../../docs/TESTING.md) |
 | [scripts/check-content-links-fixture.py](../../scripts/check-content-links-fixture.py) | Link/channel resolution, hashtag/bounded option fixtures and request tracing checks. | [TESTING](../../docs/TESTING.md) |
-| [scripts/check-documentation.py](../../scripts/check-documentation.py) | Maintained inventory, source fingerprints, generated reference catalogs and local Markdown path validation. | [TESTING](../../docs/TESTING.md) |
+| [scripts/check-documentation.py](../../scripts/check-documentation.py) | Reviewed maintained-file/Markdown inventory, fingerprints, all local links and generated source/test/coverage catalogs. | [TESTING](../../docs/TESTING.md) |
 | [scripts/fixture-server.py](../../scripts/fixture-server.py) | Threaded local HTTP fixture, scenario controls, request tracing, synthetic account/content APIs and media/Range/failure responses. | [TESTING](../../docs/TESTING.md) |
-| [scripts/generate-player-fixture.py](../../scripts/generate-player-fixture.py) | FFmpeg-generated rich tracks, codecs, aspect ratios, ambient and download media in supplied directory. | [TESTING](../../docs/TESTING.md) |
+| [scripts/fixture_support.py](../../scripts/fixture_support.py) | Standalone contract-check fixture lifecycle, early startup diagnostics and bounded process teardown. | [TESTING](../../docs/TESTING.md) |
+| [scripts/generate-player-fixture.py](../../scripts/generate-player-fixture.py) | Canonical base audiovisual/DASH/HLS/caption/artwork fixtures plus codec, geometry, ambient and separate download tracks. | [TESTING](../../docs/TESTING.md) |
+| [scripts/lib/android-fixture.sh](../../scripts/lib/android-fixture.sh) | Shared connected-device selection, local fixture readiness and owned-process/reverse-mapping teardown for Android runners. | [TESTING](../../docs/TESTING.md) |
 | [scripts/test-android.sh](../../scripts/test-android.sh) | Running-device fixture/media/ADB runner for unit, connected and lint checks; owns cleanup. | [TESTING](../../docs/TESTING.md) |
 | [scripts/test-download-restart.sh](../../scripts/test-download-restart.sh) | Two-process background-download persistence/offline-resume check, existing APK installation and local evidence. | [TESTING](../../docs/TESTING.md) |
+| [scripts/tests/test_documentation.py](../../scripts/tests/test_documentation.py) | Disposable Git-inventory regression checks for new/removed sources, Markdown review, fingerprints, dated links and generated coverage. | [TESTING](../../docs/TESTING.md) |
+| [scripts/tests/test_workflows.py](../../scripts/tests/test_workflows.py) | Disposable regression checks for fixture ownership, port/device conflicts, signals and release signing safeguards. | [TESTING](../../docs/TESTING.md) |
 
 ## Tests and test infrastructure
 
 Every JVM and device Kotlin file is indexed in [the test catalog](TEST_CATALOG.md), with exact declared methods and explicit Ignore annotations. The [testing guide](../TESTING.md) explains runners and acceptance boundaries.
 
-## Existing documentation and historical evidence
+## Current documentation
 
 | Location | Role |
 | --- | --- |
 | [README](../../README.md) | Installation, overview and links into the current guides. |
-| [Development](../DEVELOPMENT.md) | Prerequisites, wrapper builds, signing, release publishing and upstream maintenance. |
-| [UI](../UI.md) | Current opaque Material components, four-root navigation, responsive layouts and player presentation. |
-| [UI overhaul specification](../ui-ux-overhaul-2026-10-13/README.md) | Approved screen contracts, design roles, migration and verification requirements. |
-| [UI implementation evidence](../ui-ux-implementation-2026-10-13/README.md) | Current functional results, accessibility review, performance evidence and open acceptance gates. |
-| [Liquid Glass](../LIQUID_GLASS.md) | Superseded optical design references, retained for historical context. |
-| [Overhaul baseline](../liquid-glass-overhaul-2026-10-13/README.md) | Immutable pre-implementation images, provenance and approved brief. |
-| [Overhaul implementation](../liquid-glass-implementation-2026-10-13/README.md) | App-wide material changes, emulator acceptance, screenshots, normal-speed recordings and frame timing. |
-| [Feature parity](../../FEATURE_PARITY.md) | Dated web/native capability comparison, with exclusions and server requirements. |
-| [Verification](../../VERIFICATION.md) | Chronological commands, results, device limitations and release evidence. |
-| [Visual audit report](../visual-audit-2026-10-11/REPORT.md) | Dated screenshot/motion audit, EVIDENCE index, manifests, collector/grouping scripts, temporary harness/fixture patches and diagnostic logs. |
-| [Visual fixes](../visual-fixes-2026-10-11/FIXES.md) | Dated fixes, evidence manifests, temporary capture harness, motion and build/test logs. |
-| [Ambient verification](../ambient-mode-2026-10-11/VERIFICATION.md) | Ambient screenshots, motion, machine-readable verification and acceptance notes. |
-| [Player feedback](../player-feedback-2026-10-11/README.md) | Feedback-specific screenshots and verification notes. |
-
-Evidence images/video/GIF/JSON/text files are supporting records of their collection, not additional runtime features. Temporary `.kt.txt` capture harnesses and fixture patches are reproducibility material, not app sources.
+| [Documentation index](../README.md) | Current subsystem guides and terminology. |
+| [Development](../DEVELOPMENT.md) | Prerequisites, builds, signing, releases and upstream maintenance. |
+| [UI](../UI.md) | Opaque Material components, navigation, responsive layouts and player presentation. |
+| [Features](../FEATURES.md) and [API](../API.md) | Supported capabilities and server contracts. |
+| [Testing](../TESTING.md) | Repeatable checks and acceptance boundaries. |
+| [Cleanup](../CLEANUP.md) | Latest repository audit changes, validation and known baseline failures. |
 
 ## Local and generated files
 

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.platform.testTag
@@ -66,7 +65,7 @@ class AppFoundationTest {
     @Test fun pressCancellationAndRapidRepetitionKeepOneSemanticAction() {
         var clicks = 0
         compose.setContent {
-            MaterialTheme(colorScheme = AppTokens.dark, typography = AppTokens.typography) {
+            MaterialTheme(colorScheme = appColorScheme(true), typography = AppTokens.typography) {
                 AppBackground(Modifier.size(300.dp, 220.dp)) {
                     AppIconButton(androidx.compose.material.icons.Icons.Default.Check, "Confirm",
                         Modifier.align(androidx.compose.ui.Alignment.Center).testTag("press-control")) { clicks++ }

@@ -32,9 +32,9 @@ class AppSmokeTest {
             activity.model.closePlayer(); activity.model.store.save(null)
             activity.model.switchServer("http://127.0.0.1:18080")
             (activity.application as MobiviousApplication).cache.clear()
-            activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences())
+            activity.model.store.guestPreferences(net.wingress.mobivious.data.AccountPreferences())
             activity.model.refreshSharedSettings(); activity.model.navigate("Popular")
-            activity.model.store.guestDeArrow(AccountPreferences()); activity.model.store.pip = true
+            activity.model.store.guestPreferences(AccountPreferences()); activity.model.store.pip = true
         }
     }
     @After fun closeActivity() {
@@ -79,7 +79,7 @@ class AppSmokeTest {
     }
     private fun openFixture() {
         command("reset")
-        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences()); activity.model.refreshSharedSettings() }
+        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.guestPreferences(net.wingress.mobivious.data.AccountPreferences()); activity.model.refreshSharedSettings() }
         waitFor { !activity.model.browse.value.loading && activity.model.browse.value.videos.any { it.title == "A quiet moment · playback fixture" } }
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         waitFor(40_000) { activity.model.playback.value.playing }
@@ -100,7 +100,7 @@ class AppSmokeTest {
         command("reset")
         command("stream", """{"type":"dash","duplicateRecommendations":true}""")
         compose.runOnUiThread {
-            activity.model.store.guestDeArrow(net.wingress.mobivious.data.AccountPreferences(thinMode = true))
+            activity.model.store.guestPreferences(net.wingress.mobivious.data.AccountPreferences(thinMode = true))
             activity.model.refreshSharedSettings()
             activity.model.play("testvideo01")
             activity.sharedVideo.value = true

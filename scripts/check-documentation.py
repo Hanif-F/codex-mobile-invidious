@@ -20,15 +20,16 @@ MANIFEST = REFERENCE / 'coverage.json'
 EXTRA = {'.env.example', '.gitignore', 'docker-compose.yml', 'LICENSE'}
 
 
-def inventory():
+def repository_files():
     result = subprocess.run(
         ['git', 'ls-files', '--cached', '--others', '--exclude-standard', '-z'],
         cwd=ROOT, check=True, capture_output=True,
     )
-    return {
-        p for p in result.stdout.decode().split('\0') if p and (ROOT / p).is_file() and
-        (p.startswith(('android/', 'scripts/', 'deploy/')) or p in EXTRA)
-    }
+    return {p for p in result.stdout.decode().split('\0') if p and (ROOT / p).is_file()}
+
+
+def inventory():
+    return {p for p in repository_files() if p.startswith(('android/', 'scripts/', 'deploy/')) or p in EXTRA}
 
 
 def digest(path):
@@ -59,25 +60,16 @@ def source_catalog(files):
         'Every JVM and device Kotlin file is indexed in [the test catalog](TEST_CATALOG.md), '
         'with exact declared methods and explicit Ignore annotations. '
         'The [testing guide](../TESTING.md) explains runners and acceptance boundaries.', '',
-        '## Existing documentation and historical evidence', '',
+        '## Current documentation', '',
         '| Location | Role |', '| --- | --- |',
         '| [README](../../README.md) | Installation, overview and links into the current guides. |',
-        '| [Development](../DEVELOPMENT.md) | Prerequisites, wrapper builds, signing, release publishing and upstream maintenance. |',
-        '| [UI](../UI.md) | Current opaque Material components, four-root navigation, responsive layouts and player presentation. |',
-        '| [UI overhaul specification](../ui-ux-overhaul-2026-10-13/README.md) | Approved screen contracts, design roles, migration and verification requirements. |',
-        '| [UI implementation evidence](../ui-ux-implementation-2026-10-13/README.md) | Current functional results, accessibility review, performance evidence and open acceptance gates. |',
-        '| [Liquid Glass](../LIQUID_GLASS.md) | Superseded optical design references, retained for historical context. |',
-        '| [Overhaul baseline](../liquid-glass-overhaul-2026-10-13/README.md) | Immutable pre-implementation images, provenance and approved brief. |',
-        '| [Overhaul implementation](../liquid-glass-implementation-2026-10-13/README.md) | App-wide material changes, emulator acceptance, screenshots, normal-speed recordings and frame timing. |',
-        '| [Feature parity](../../FEATURE_PARITY.md) | Dated web/native capability comparison, with exclusions and server requirements. |',
-        '| [Verification](../../VERIFICATION.md) | Chronological commands, results, device limitations and release evidence. |',
-        '| [Visual audit report](../visual-audit-2026-10-11/REPORT.md) | Dated screenshot/motion audit, EVIDENCE index, manifests, collector/grouping scripts, temporary harness/fixture patches and diagnostic logs. |',
-        '| [Visual fixes](../visual-fixes-2026-10-11/FIXES.md) | Dated fixes, evidence manifests, temporary capture harness, motion and build/test logs. |',
-        '| [Ambient verification](../ambient-mode-2026-10-11/VERIFICATION.md) | Ambient screenshots, motion, machine-readable verification and acceptance notes. |',
-        '| [Player feedback](../player-feedback-2026-10-11/README.md) | Feedback-specific screenshots and verification notes. |',
-        '', 'Evidence images/video/GIF/JSON/text files are supporting records of their '
-        'collection, not additional runtime features. Temporary `.kt.txt` capture '
-        'harnesses and fixture patches are reproducibility material, not app sources.', '',
+        '| [Documentation index](../README.md) | Current subsystem guides and terminology. |',
+        '| [Development](../DEVELOPMENT.md) | Prerequisites, builds, signing, releases and upstream maintenance. |',
+        '| [UI](../UI.md) | Opaque Material components, navigation, responsive layouts and player presentation. |',
+        '| [Features](../FEATURES.md) and [API](../API.md) | Supported capabilities and server contracts. |',
+        '| [Testing](../TESTING.md) | Repeatable checks and acceptance boundaries. |',
+        '| [Cleanup](../CLEANUP.md) | Latest repository audit changes, validation and known baseline failures. |',
+        '',
         '## Local and generated files', '',
         '| Location | Role / handling |', '| --- | --- |',
         '| `android/local.properties` | Local Android SDK path, ignored. |',
@@ -119,6 +111,67 @@ def test_catalog(files):
     return '\n'.join(lines)
 
 
+def coverage_catalog(files, documents):
+    build = (ROOT / 'android/app/build.gradle.kts').read_text()
+    version = re.search(r'versionName\s*=\s*"([^"]+)"', build).group(1)
+    code = re.search(r'versionCode\s*=\s*(\d+)', build).group(1)
+    groups = [
+        ('Main application Kotlin', [p for p in files if p.endswith('.kt') and '/app/src/main/' in p]),
+        ('JVM test Kotlin', [p for p in files if p.endswith('.kt') and '/src/test/' in p]),
+        ('Android device test/support Kotlin', [p for p in files if p.endswith('.kt') and '/src/androidTest/' in p]),
+    ]
+    other = len(files) - sum(len(paths) for _, paths in groups)
+    lines = [
+        '# Documentation coverage and review boundaries', '',
+        '[Documentation index](../README.md) · [Source map](SOURCE_MAP.md) · '
+        '[Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)', '',
+        f'The current guides describe Mobivious **{version}** (version code **{code}**). '
+        'This report is generated from the current Gradle configuration and reviewed '
+        'inventory; counts describe files, not measured execution coverage.', '',
+        '## File coverage', '', '| Maintained files | Count |', '| --- | ---: |',
+    ]
+    lines += [f'| {label} | {len(paths)} |' for label, paths in groups]
+    lines += [
+        f'| Build, benchmark, resources, scripts, deployment and repository support | {other} |',
+        f'| **Total** | **{len(files)}** |', '',
+        'Every maintained file has a reviewed SHA-256 fingerprint, responsibility '
+        'and owning guide in `coverage.json`. The source map indexes implementations; '
+        'the test catalog lists every declared JVM/device test and explicit Ignore.', '',
+        '## Review scope', '',
+        'The inventory includes tracked and non-ignored untracked files under '
+        '`android/`, `scripts/` and `deploy/`, plus `.env.example`, `.gitignore`, '
+        '`docker-compose.yml` and `LICENSE`. Locally deleted files are excluded. '
+        'The sibling Invidious checkout is reviewed at its integration boundary; '
+        'it is not an Android module.', '',
+        'The [architecture](../ARCHITECTURE.md), [features](../FEATURES.md), '
+        '[settings](../SETTINGS.md), [API](../API.md), [playback](../PLAYBACK.md), '
+        '[library](../LIBRARY.md), [storage/security](../STORAGE_AND_SECURITY.md), '
+        '[UI](../UI.md), [development](../DEVELOPMENT.md) and [testing](../TESTING.md) '
+        'guides own current behavior. Generated logs and captures belong under '
+        'ignored `.tools/`, with source and device provenance.', '',
+        'Ignored builds, caches, IDE files, SDK paths, fixture media and release '
+        'artifacts are explained by category in the source map. Local secrets '
+        'and third-party library internals are excluded from fingerprints; secret '
+        'values are never reproduced in documentation.', '',
+        '## Verification and freshness', '',
+        '`python3 scripts/check-documentation.py` checks inventory completeness, '
+        'guide assignments, reviewed fingerprints and all three generated catalogs. '
+        f'It checks local file links in **all {len(documents)} repository Markdown documents**, '
+        'including the cleanup report. Remote URLs and Markdown section anchors are '
+        'outside this local check.', '',
+        'After reviewing changed sources and updating their guides, run '
+        '`python3 scripts/check-documentation.py --refresh`, then the checker '
+        'without refresh. New sources and documents require explicit inventory '
+        'registration first. [Testing](../TESTING.md#documentation-checks) explains '
+        'the review workflow.', '',
+        'Fingerprints and catalogs establish inventory freshness; semantic '
+        'accuracy, emulator/device behavior, production compatibility, performance '
+        'and release acceptance require their relevant checks. Test names and '
+        'previous passing totals do not certify a current run.', '',
+    ]
+    return '\n'.join(lines)
+
+
 def local_links(document):
     # Link paths only. Remote links are intentionally not fetched by this local check.
     for match in re.finditer(r'!?\[[^\]\n]*\]\(([^)\n]+)\)', document.read_text()):
@@ -141,6 +194,10 @@ def main():
     errors = []
     errors += [f'Undocumented maintained file: {p}' for p in sorted(found - files.keys())]
     errors += [f'Remove obsolete coverage entry: {p}' for p in sorted(files.keys() - found)]
+    documents = set(manifest['documents'])
+    actual_documents = {p for p in repository_files() if p.endswith('.md')}
+    errors += [f'Undocumented Markdown document: {p}' for p in sorted(actual_documents - documents)]
+    errors += [f'Remove obsolete document entry: {p}' for p in sorted(documents - actual_documents)]
     for path, entry in files.items():
         if not (ROOT / path).is_file():
             errors.append(f'Missing source: {path}')
@@ -156,7 +213,8 @@ def main():
         for path, entry in files.items():
             entry['sha256'] = digest(ROOT / path)
         MANIFEST.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n')
-    catalogs = {'SOURCE_MAP.md': source_catalog(files), 'TEST_CATALOG.md': test_catalog(files)}
+    catalogs = {'SOURCE_MAP.md': source_catalog(files), 'TEST_CATALOG.md': test_catalog(files),
+                'COVERAGE.md': coverage_catalog(files, documents)}
     for name, expected in catalogs.items():
         path = REFERENCE / name
         if args.refresh:

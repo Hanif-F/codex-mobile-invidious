@@ -1112,7 +1112,7 @@ Test support/helper file; no declared `@Test` methods.
 
 ### SettingsSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Settings drafts and shared-save failures, playback/codec settings, immediate device appearance saves, recreation/account isolation and System color-mode updates.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Automatic per-field saves and invalid/failed edits, playback/codec settings, device appearance persistence, recreation/account isolation and System mode updates.
 
 - `outstandingChatValidationLinksToTheActualControlsAndReverts`
 - `deviceAccentAndAmbientSaveImmediatelyAndSurviveRecreationAndAccountChange`

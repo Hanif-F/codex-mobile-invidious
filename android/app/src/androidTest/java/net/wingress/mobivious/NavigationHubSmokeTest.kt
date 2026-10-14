@@ -71,14 +71,14 @@ class NavigationHubSmokeTest {
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
         compose.runOnUiThread {
             vm.closePlayer(); vm.store.save(null); vm.switchServer("http://127.0.0.1:18080")
-            vm.store.guestDeArrow(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
+            vm.store.guestPreferences(AccountPreferences()); vm.refreshSharedSettings(); vm.navigate("Popular")
         }
         until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() && activity.window.decorView.hasWindowFocus() }
     }
     @After fun close() {
         if (::activity.isInitialized) {
             currentActivity()
-            compose.runOnUiThread { vm.closePlayer(); vm.store.save(null); vm.store.guestDeArrow(AccountPreferences()); activity.finishAndRemoveTask() }
+            compose.runOnUiThread { vm.closePlayer(); vm.store.save(null); vm.store.guestPreferences(AccountPreferences()); activity.finishAndRemoveTask() }
         }
     }
 

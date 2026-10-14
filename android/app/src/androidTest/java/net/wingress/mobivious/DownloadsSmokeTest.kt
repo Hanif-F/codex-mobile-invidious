@@ -19,7 +19,6 @@ import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import java.net.URL
-import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
@@ -38,7 +37,7 @@ class DownloadsSmokeTest {
         command("reset"); command("downloads", """{"downloadDisabled":false,"downloadSlow":false,"downloadFailKey":"","downloadEndpointsMissing":false,"downloadDuration":12,"resetRequests":true}""")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
-        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.save(null); activity.model.store.guestDeArrow(AccountPreferences()); activity.model.refreshSharedSettings() }
+        compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080"); activity.model.store.save(null); activity.model.store.guestPreferences(AccountPreferences()); activity.model.refreshSharedSettings() }
         until { activity.model.browse.value.videos.isNotEmpty() }
         runBlocking { app.downloads.records.value.forEach { app.downloads.delete(it.id) } }
         DownloadExportService.state.value = net.wingress.mobivious.downloads.DownloadExportState()

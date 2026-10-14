@@ -31,13 +31,13 @@ class AmbientModePresentationTest {
         var dark by mutableStateOf(true)
         var opaque by mutableStateOf(false)
         lateinit var state: WatchAmbientState
-        var actual = AppContentColors.light
+        var foreground = Color.White
 
         compose.setContent {
             state = remember { WatchAmbientState().apply { enabled = true; show(AmbientPalette(List(9) { 0xFFFF0000.toInt() })) } }
             DisposableEffect(state) { onDispose { state.close() } }
             WatchAmbientAnimation(state)
-            MaterialTheme(colorScheme = if (dark) AppTokens.dark else AppTokens.light, typography = AppTokens.typography) {
+            MaterialTheme(colorScheme = if (dark) appColorScheme(true) else appColorScheme(false), typography = AppTokens.typography) {
                 val density = LocalDensity.current.density
                 CompositionLocalProvider(LocalWatchAmbient provides state, LocalReduceTransparency provides opaque) {
                     WatchAmbientScene(Modifier.width(320.dp).height(640.dp).testTag("ambient-scene"),
@@ -45,8 +45,8 @@ class AmbientModePresentationTest {
                         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
                             Spacer(Modifier.height(200.dp))
                             AppSurface(Modifier.fillMaxWidth().height(72.dp).testTag("ambient-controls")) {
-                                actual = LocalAppContentColors.current
-                                Text("Material", Modifier.align(Alignment.Center).testTag("ambient-label"), color = actual.secondary)
+                                foreground = MaterialTheme.colorScheme.onSurfaceVariant
+                                Text("Material", Modifier.align(Alignment.Center).testTag("ambient-label"), color = foreground)
                             }
                         }
                     }
@@ -74,7 +74,6 @@ class AmbientModePresentationTest {
             for (source in listOf(0xFFFFFFFF.toInt(), 0xFF000000.toInt(), 0xFF00FF00.toInt())) {
                 compose.runOnIdle { state.show(AmbientPalette(List(9) { source })) }
                 compose.mainClock.advanceTimeBy(800)
-                val foreground = actual.secondary
                 val label = compose.onNodeWithTag("ambient-label").captureToImage().toPixelMap()
                 val background = label[label.width / 2, 1]
                 val contrast = (maxOf(foreground.luminance(), background.luminance()) + .05f) /
@@ -88,7 +87,7 @@ class AmbientModePresentationTest {
         compose.onNodeWithTag("watch-ambient-background").assertDoesNotExist()
         for (night in listOf(true, false)) {
             compose.runOnIdle { dark = night }
-            val expected = if (night) AppTokens.dark.surface else AppTokens.light.surface
+            val expected = if (night) appColorScheme(true).surface else appColorScheme(false).surface
             val pixels = compose.onNodeWithTag("ambient-scene").captureToImage().toPixelMap()
             for (y in listOf(1, pixels.height / 2, pixels.height - 2)) {
                 assertEquals(expected.red, pixels[1, y].red, .01f)

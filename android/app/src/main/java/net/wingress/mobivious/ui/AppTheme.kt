@@ -9,13 +9,10 @@ import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.AccentPreset
 
 internal object AppTokens {
-    val light = appColorScheme(false)
-    val dark = appColorScheme(true)
     val inset: androidx.compose.ui.unit.Dp
         @Composable get() = LocalPageInset.current
     val card = RoundedCornerShape(16.dp)
     val media = RoundedCornerShape(12.dp)
-    val pill = RoundedCornerShape(50)
     val typography = Typography()
     val shapes = Shapes(RoundedCornerShape(4.dp), RoundedCornerShape(8.dp), RoundedCornerShape(12.dp),
         RoundedCornerShape(16.dp), RoundedCornerShape(28.dp))

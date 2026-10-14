@@ -8,7 +8,7 @@ import net.wingress.mobivious.data.SessionStore
 import net.wingress.mobivious.data.ResponseCache
 import net.wingress.mobivious.data.WatchedRepository
 import net.wingress.mobivious.data.BlockedRepository
-import net.wingress.mobivious.data.PlaybackQueueSnapshot
+import net.wingress.mobivious.player.PlaybackQueueSnapshot
 import net.wingress.mobivious.data.ApiContext
 import net.wingress.mobivious.data.DeArrowTitles
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +54,6 @@ class MobiviousApplication : Application() {
         playbackContext.value = api.context()
         blocked.reset()
         watched.reset()
-        if (store.account.value == null) watched.configure(api.context(), store.guestDeArrow().savePosition)
+        if (store.account.value == null) watched.configure(api.context(), store.guestPreferences().savePosition)
     }
 }
