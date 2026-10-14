@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "11777524b43b6c442dd3d904d7ea17707c4c77b9",
+  "reviewedSourceCommit": "10b3268e93edaf3422b958b543e0335cb60bb652",
   "reviewedDate": "2026-10-15",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "documents": [
     "README.md",
     "deploy/README.md",
@@ -46,7 +46,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "9c292bf7f9325b460602b5e9d607c38028d6a163cc7e86fa82ceb7ba5503008e"
+      "sha256": "d55553524fd749da18372de7ace45a2dc337e149afb4d1fadce42202dc1c8229"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AccountNavigationSmokeTest.kt": {
       "area": "Android device tests",
@@ -994,7 +994,7 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Equal-width filled circular watch action buttons, wrapping labels below icons, disabled state and tooltips.",
-      "sha256": "48ca9d83b9b7ed1cd0226fe7e8e69be3d740d7565566748c83559f6dfdf242c9"
+      "sha256": "4973898e02bd68a52358b6574aac5265dc850591446ea933674724e7dde2a237"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/WatchComponents.kt": {
       "area": "Compose UI",
