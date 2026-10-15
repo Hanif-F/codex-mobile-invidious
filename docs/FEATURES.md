@@ -21,8 +21,14 @@ Native account flows and several enhancements need the fork's server extensions;
 Phones use four direct labeled destinations: **Popular, Trending, Subscriptions,
 You**. A rail replaces bottom navigation from 600dp window width. Each root keeps
 its stack and scroll position; reselecting a root scrolls to the top without a
-refresh. Search opens a transient top field and returns to its origin. The
+refresh. Search opens a transient editor and returns to its origin. The
 full-width opaque mini-player sits immediately above navigation.
+
+Every search-icon tap starts with a blank, focused field. The editor shows local
+recent searches and live instance suggestions instead of result filters. Tap a
+suggestion/recent query to search immediately, or its arrow to edit it. Recent
+queries can be removed individually or cleared with confirmation. Browsing settings
+can hide/pause recents and disable live suggestions independently.
 
 Search accepts words or a supported URL. Submit through the keyboard, physical
 Enter or search action. Results preserve the server's ordering and may contain
@@ -30,7 +36,12 @@ videos, channels, playlists and mixes. Select All, Videos, Channels or Playlists
 & mixes. Sort choices are Relevance and Views where supported; date/duration
 filters apply to All/Videos. Search visibility can override members-only display
 and include blocked channels. Closing search returns to its originating page.
-Hidden results do not prevent loading subsequent raw pages.
+Hidden results do not prevent loading subsequent raw pages. Tap the query to edit
+it with its filters retained, or New search to start blank. New submissions reset
+type/sort/date/duration; persistent visibility preferences are retained. Canceling
+the editor leaves the previous page/results/position unchanged. Large video
+thumbnails, circular-avatar channel cards and stacked playlist/mix covers make
+mixed result types visually distinct without regrouping relevance order.
 
 Channels open in the app. Advertised tabs can include Videos, Shorts, Streams,
 Podcasts, Releases, Courses, Playlists, Clips, Posts and Channels. Unsupported or

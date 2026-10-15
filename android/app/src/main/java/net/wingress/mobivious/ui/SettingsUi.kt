@@ -142,6 +142,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     val pip = vm.localPreferenceValue("profile:pip",vm.store.pip) as Boolean
     val scope = rememberCoroutineScope()
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
+    val searchAssistance by vm.searchEntry.state.collectAsStateWithLifecycle()
     LaunchedEffect(page, context) { if (page == "AI channel filter") vm.aiFilter.refreshStatus() }
     DisposableEffect(page, context) { onDispose { vm.leavePreferencePage(page) } }
     val value = remember(prefs, edits) { vm.preferenceValues() }
@@ -241,6 +242,17 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     SettingsToggle("Hide thumbnails", "Use a text-only video list", value.thinMode) { update(value.copy(thinMode = it)) }
                 } }
                 "Browsing" -> {
+                    item { AppSection {
+                        SettingsHeading("Search on this device")
+                        SettingsToggle("Save recent searches", "Keep recent queries for this profile and instance. Turning this off hides them and pauses saving.", searchAssistance.settings.remember) {
+                            vm.searchEntry.settings(searchAssistance.settings.copy(remember = it))
+                        }
+                        SettingsToggle("Live search suggestions", "Request suggestions from your Invidious instance while typing", searchAssistance.settings.suggestions) {
+                            vm.searchEntry.settings(searchAssistance.settings.copy(suggestions = it))
+                        }
+                        Text("Clearing recent searches also removes hidden saved queries.", style = MaterialTheme.typography.bodySmall)
+                        key(context) { ClearRecentSearches(vm.searchEntry, searchAssistance.recent.isNotEmpty()) }
+                    } }
                     item { AppSection {
                         SettingsToggle("Show members-only videos", "Include members-only content in video lists. This does not grant membership access.", value.showMemberVideos) { update(value.copy(showMemberVideos = it)) }
                         SettingsLink("Blocked channels", "Manage channels hidden from discovery and recommendations", Icons.Default.Block, navigate)

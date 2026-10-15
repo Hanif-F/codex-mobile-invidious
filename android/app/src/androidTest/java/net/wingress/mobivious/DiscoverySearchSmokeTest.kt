@@ -184,7 +184,14 @@ class DiscoverySearchSmokeTest {
         compose.runOnUiThread { vm.setSearchType(SearchType.PLAYLISTS) }; until { !vm.browse.value.loading }
         assertTrue(vm.browse.value.searchResults.single() is SearchResult.PlaylistItem)
         assertTrue(requests().last().isNull("date"))
-        search("second"); assertEquals(SearchType.PLAYLISTS, vm.searchType.value)
+        compose.onNodeWithTag("search-query").performClick()
+        compose.onNodeWithTag("main-search").assertTextContains("mixed")
+        compose.onNodeWithTag("main-search").performTextReplacement("edited")
+        compose.onNodeWithTag("main-search").performImeAction()
+        until { !vm.browse.value.loading && vm.query == "edited" }
+        assertEquals(SearchType.PLAYLISTS, vm.searchType.value)
+        search("second"); assertEquals(SearchType.ALL, vm.searchType.value)
+        assertEquals("relevance", vm.sort); assertEquals("", vm.date); assertEquals("", vm.durationFilter)
     }
 
     @Test fun hiddenMixedPageStillLoadsChannelsAndVisibilityOverrideIncludesBlockedResults() {

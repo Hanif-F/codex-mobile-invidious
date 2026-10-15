@@ -58,7 +58,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Account Navigation Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "398998905f8d1de9bdddf969f6adb905e6e801b704d40efbd7b8811a6537f040"
+      "sha256": "963567826b4b591e68e2d7bba4887eb6eb4444660cdce006d24ceafc2de37ea5"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ActionControlsPresentationTest.kt": {
       "area": "Android device tests",
@@ -220,7 +220,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Discovery Search Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "8b5972230f71152a035adf3995f07652f62a4a19b6914c49c1d6d9fca7f65098"
+      "sha256": "261e3df7c66213b2f0b7b5b8bcdb6fb1b81a94bc4789f6e6d40fc17a1586beb4"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/DownloadsPersistenceSmokeTest.kt": {
       "area": "Android device tests",
@@ -288,6 +288,12 @@
       "description": "Opaque controls and panels remain independent of scrolling artwork and backgrounds. Exact cases appear in the test catalog.",
       "sha256": "833ed99823edc0538b9e166a7326349f4b8b7d386636219e1cf6563e1b1728a3"
     },
+    "android/app/src/androidTest/java/net/wingress/mobivious/PanelPresentationTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Drawer header, modal scrolling and busy library-action layout and behavior scenarios.",
+      "sha256": "1c8e30b6f3e88faf468722ac1ce8ab4226595ae9b9c7f0a0285ef5ad5a1c8b0e"
+    },
     "android/app/src/androidTest/java/net/wingress/mobivious/PlaybackQueuePresentationTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
@@ -330,11 +336,17 @@
       "description": "Real emulator window widths 320/360/448/600/840/1200dp and font scales 1/1.3/2 in both appearances; visible root labels, non-overlapping targets and bar/rail layout. Exact methods appear in the test catalog.",
       "sha256": "d380e308cc7c3d2d338d0b05b62594da220a5f27dd01af8d64916a39a7c08244"
     },
+    "android/app/src/androidTest/java/net/wingress/mobivious/SearchExperienceSmokeTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Search editor, history, suggestions, filters, profile isolation and mixed-result presentation acceptance.",
+      "sha256": "bb3dc06942e357e19ae408cc20fae24f7ad683f4d051ab746d0e888bcf3bbd7f"
+    },
     "android/app/src/androidTest/java/net/wingress/mobivious/SearchHistorySmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Search History Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "5ce2fddfe57fcb80a3685645dd0ef59775b4353bbc30b9f8156d1eda6acbc49b"
+      "sha256": "fba954b47c66289d6e3416ca0cb2acf8cc113a205df77f18244989c3331cb53c"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/SecondaryScreensJourneyTest.kt": {
       "area": "Android device tests",
@@ -622,7 +634,7 @@
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "Complete instance HTTP client, auth/error/cache semantics and consumed API endpoint methods.",
-      "sha256": "83751ebe463e5e28ba8a630ae6d9172d67f544e97a5245f8d3cfabeb404e0e2b"
+      "sha256": "3aae1899175a8cb9338530f0485f6ae3d339ad0644f52cfa8cef3845ae8b4a96"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/LiveChat.kt": {
       "area": "Data and domain",
@@ -648,11 +660,17 @@
       "description": "Validated public/private/mix feed URL construction and RSS/OPML/Atom panel state.",
       "sha256": "189ee5b996ee2f3be3dee320082e9a727af33632d84c9ad30a5e8a9ca1c647b6"
     },
+    "android/app/src/main/java/net/wingress/mobivious/data/SearchAssistance.kt": {
+      "area": "Data and persistence",
+      "guide": "docs/STORAGE_AND_SECURITY.md",
+      "description": "Profile-local search assistance settings, bounded recent queries and cancellable new/edit search entry state.",
+      "sha256": "775b10b177679fcd7c4a66e0460a0933d58a711325445ead96040790c470eabd"
+    },
     "android/app/src/main/java/net/wingress/mobivious/data/SessionStore.kt": {
       "area": "Data and domain",
       "guide": "docs/STORAGE_AND_SECURITY.md",
       "description": "Checked local profile and guest preferences, encrypted live session, context isolation and durable player/visibility saves.",
-      "sha256": "9fc29b1ef1280706dbe28d1ead33ead3c6be314c171631ba5f79d511fd22e5a6"
+      "sha256": "136795bafe5be7eacafadf0968d9fda06ed2136d7bb85d37611471c8970624a0"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt": {
       "area": "Data and domain",
@@ -814,7 +832,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination.",
-      "sha256": "0b794354cf1e818df0e0ea6d1ae8d493a7a9a2efb412028909474590a17846d1"
+      "sha256": "f3713450a8fef7dd8d924f4e4e7509fcb191de90da97f49370544c2f6a1672ad"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -928,7 +946,13 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "1cc0981f3783136f16e72f10b5722634dac0568a8c9b58a0d10df888ba12a175"
+      "sha256": "d4dac3ec99de3883c0750ffb793f96fbe6c48e158722a25d846d3456f3ef5529"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
+      "area": "Compose UI",
+      "guide": "docs/UI.md",
+      "description": "Shared flat panel surfaces, pinned accessible headers and complete modal-sheet height limits.",
+      "sha256": "80f7a5b9e6918607c63aa824ed13c3282c437fdbbe00b3acc1ed07739fb58682"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlaybackQueueUi.kt": {
       "area": "Compose UI",
@@ -970,7 +994,7 @@
       "area": "Compose UI",
       "guide": "docs/LIBRARY.md",
       "description": "Playlist cards/headers, subscribe state and owned title/privacy/description editor.",
-      "sha256": "7df1d41bdd6a6afb1a303a8e97b379bb55ce7872edf9808160fcd479c1902c5b"
+      "sha256": "bd09aeb136fb0c9f7ca5f4f1861d03cde12012240313a9f5e3fb94a250d8717c"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PreferenceSaveController.kt": {
       "area": "Compose UI",
@@ -984,17 +1008,23 @@
       "description": "Feed link warning/copy/share/open and XML share/save sheet with scoped file permissions.",
       "sha256": "ed465d9eba356456e2042aaf66cb6dfed65958bdb142c439f43e2551ba05009e"
     },
+    "android/app/src/main/java/net/wingress/mobivious/ui/SearchResultCards.kt": {
+      "area": "Compose UI",
+      "guide": "docs/UI.md",
+      "description": "Distinct circular-avatar channel cards and stacked playlist/mix search covers.",
+      "sha256": "2b253d7579af7b6236705d550598e1684e29ee3125aa3bad7746cbde5fe423fd"
+    },
     "android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Reusable draft input with keyboard/search/physical Enter submission semantics.",
-      "sha256": "62a53bbdb6a5b347609273d3d2ca831f255f5861074d4417def52c56da577d3f"
+      "description": "Shared search input, transient suggestions/history editor and results toolbar with removable filters.",
+      "sha256": "94ad5fe063a493eacc5310cd9b2708e3014d3be5456ffd14a958b44a9eee657b"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt": {
       "area": "Compose UI",
       "guide": "docs/SETTINGS.md",
       "description": "Settings category routing, automatic per-field preference feedback, server confirmation and About content; integrates channel title/thumbnail rules.",
-      "sha256": "b3c4a8cc5b6ba7d397a948f31119b354bd95870d5d45e9322107e5dfd0af1be3"
+      "sha256": "bdd44c3bbea0afd244ba73f8637860a9302b2bd81616457dcf6a421296be3f9f"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt": {
       "area": "Compose UI",
@@ -1278,6 +1308,12 @@
       "description": "Preferences declared scenarios; exact cases are enumerated in the test catalog.",
       "sha256": "3ba8ddcf4d736c1750e3ad152b2068919f6cc46ad0aad5c4230223793dd686f2"
     },
+    "android/app/src/test/java/net/wingress/mobivious/SearchAssistanceTest.kt": {
+      "area": "JVM tests",
+      "guide": "docs/TESTING.md",
+      "description": "Search assistance history, isolation, debounce, cancellation, failures and public API contracts.",
+      "sha256": "057a41b404e93b11f2a90267c5b4b465f720fb74b1b73621e74482c4469198d5"
+    },
     "android/app/src/test/java/net/wingress/mobivious/SeekAccumulatorTest.kt": {
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
@@ -1486,7 +1522,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic account/content APIs and media/Range/failure responses.",
-      "sha256": "0c91f0dca15a0840d236c4e3d79a102d91fee3c0f8f8384da04e455d146c253a"
+      "sha256": "3e79f0c3f51cd0441c35bd2b2bf48827b2627aa315c08e013765d7a95eddade0"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1541,18 +1577,6 @@
       "guide": "docs/TESTING.md",
       "description": "Disposable regression checks for fixture ownership, device/port conflicts, signals, release signing and R8 mapping archival/preservation safeguards.",
       "sha256": "834dd7445f0b91e35051ef713c9505b7ee31a906c235ae67a7abac8ee3b9819a"
-    },
-    "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
-      "area": "Compose UI",
-      "guide": "docs/UI.md",
-      "description": "Shared flat panel surfaces, pinned accessible headers and complete modal-sheet height limits.",
-      "sha256": "80f7a5b9e6918607c63aa824ed13c3282c437fdbbe00b3acc1ed07739fb58682"
-    },
-    "android/app/src/androidTest/java/net/wingress/mobivious/PanelPresentationTest.kt": {
-      "area": "Android device tests",
-      "guide": "docs/TESTING.md",
-      "description": "Drawer header, modal scrolling and busy library-action layout and behavior scenarios.",
-      "sha256": "1c8e30b6f3e88faf468722ac1ce8ab4226595ae9b9c7f0a0285ef5ad5a1c8b0e"
     }
   },
   "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md."

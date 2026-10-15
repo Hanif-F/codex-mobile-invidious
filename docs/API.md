@@ -30,6 +30,7 @@ Every request is fenced against a changed live context before accepting its body
 | GET `/api/v1/popular` | Array of video rows; single discovery snapshot. |
 | GET `/api/v1/trending` | `region`, `type=livestreams|gaming`; array of videos. |
 | GET `/api/v1/search` | `q`, `page`, `sort=relevance|views`, `type=all|video|channel|playlist`; `date`/`duration` only for video-capable types. Ordered mixed array with raw source keys. |
+| GET `/api/v1/search/suggestions` | Public `q`, `region`; `{query, suggestions: [string]}`. Optional, uncached assistance; unavailable instances retain manual search. |
 | GET `/api/v1/videos/:id` | `local=true|false`, optional link `region`; VideoDetails and stream/caption metadata. |
 | GET `/api/v1/channels/:id` | Channel metadata, advertised tabs, banner/avatar and optional fields. |
 | GET `/api/v1/channels/:id/videos`, `/shorts`, `/streams` | Optional opaque `continuation`, non-default `sort_by`; `{videos, continuation}`. |

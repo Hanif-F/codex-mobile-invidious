@@ -126,6 +126,18 @@ class SearchHistorySmokeTest {
         assertTrue(requests().all { !it.getBoolean("authorized") })
     }
 
+    @Test fun emptyScopedSubmissionRestoresTheSelectedChannelTab() {
+        compose.runOnUiThread { vm.navigate("Popular", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
+        until { !vm.browse.value.loading && vm.channel.value != null }
+        choose(ChannelTab.STREAMS)
+        submit("channel-search", "many")
+        compose.onNodeWithTag("channel-search").performTextReplacement("")
+        compose.onNodeWithTag("channel-search").performImeAction()
+        until { !vm.browse.value.loading && vm.scopedSearch.value.submitted.isBlank() }
+        assertEquals(ChannelTab.STREAMS, vm.channelTab.value)
+        assertEquals("streamvid01", vm.browse.value.videos.single().id)
+    }
+
     @Test fun subscriptionSearchLoadsBeyondHiddenPagesAndIgnoresFeedOnlyFilters() {
         signIn()
         compose.runOnUiThread { vm.preferences.value = vm.preferences.value.copy(latestOnly = true, notificationsOnly = true); vm.navigate("Subscriptions") }

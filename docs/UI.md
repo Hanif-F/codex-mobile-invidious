@@ -12,8 +12,12 @@ record the latest tested scope and known failures.
 `AppScaffold` defines four direct roots: **Popular, Trending, Subscriptions, You**.
 Available window width selects bottom navigation below 600dp and a labeled rail
 from 600dp. Navigation remains visible during browse scrolling. Search is a
-transient top field with clear, keyboard submission and Back/Close; its origin,
-loaded results and scroll position remain available. Opening a child keeps its
+transient opaque editor with one search bar, clear, keyboard submission and
+Back/Close. Every search icon opens blank; tapping the result query edits it.
+Cancel preserves the origin, loaded results, scroll position and player
+presentation. Typing shows recent queries and live suggestions, without result
+tabs or filters. Results use the query bar followed by type tabs/filter control
+and removable active-filter chips, with no separate Search title row. Opening a child keeps its
 originating root selected. Each root retains its own stack and list position.
 Reselecting a root scrolls to the top without refreshing; reselecting from its
 child returns to that root.
@@ -177,3 +181,18 @@ Passive action/dialog labels use masked text. Upload-date uncertainty is visible
 the placeholder. Independent card occurrences keep independent reveals; watch and
 mini-player share the active playback reveal. Account loading uses safe placeholders
 and read failures offer Retry in the channel settings page.
+
+## Search presentation
+
+Search videos retain large artwork even when ordinary feed density is compact;
+thin mode, spoiler masking, AI warnings and watched indicators remain active.
+Channels use outlined identity cards with a 64dp circular avatar and verification
+beside the name. Thin mode retains a circular person placeholder. Playlists/mixes
+use stacked rectangular covers and a playlist/shuffle icon; known playlist counts
+appear on the cover. Missing artwork keeps that shape; thin mode uses a compact stacked placeholder. Large text stacks
+playlist artwork and metadata vertically. Mixed order remains server-defined.
+
+New queries reset result type to All, sorting to Relevance, upload date to Any time
+and duration to Any duration. Editing retains choices. Filters apply immediately;
+Reset result filters resets those four choices while visibility preferences stay
+in their separate device section. Activity recreation retains the editor draft.

@@ -127,7 +127,10 @@ selected by UI page names, not by a persistent route graph.
 `BrowseReturn` captures the tab, route, raw page state, selected channel tab/sort,
 search draft/submission, playlist segment, preferences and position. Independent
 tab snapshots and return stacks preserve the user's origin after search, details
-or sign-in. Changed browsing preferences invalidate affected snapshots. Account
+or sign-in. `SearchEntryController` owns new/edit mode, draft, recent terms,
+assistance settings and cancellable suggestions independently of loaded browse
+state. Opening/canceling that editor does not navigate or reload. Submission
+consumes the editor once; only new searches reset transient result filters. Changed browsing preferences invalidate affected snapshots. Account
 and instance changes clear account-sensitive navigation state.
 
 Channel tabs retain their loaded pages, sort and position in a bounded set of

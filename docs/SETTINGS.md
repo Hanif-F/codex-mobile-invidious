@@ -227,3 +227,11 @@ changing an open screen. Account-rule loading uses safe placeholders; read failu
 can be retried in this settings page. Rules change presentation, preserving raw
 metadata, playback, downloaded files and descriptions. An active thumbnail rule
 wins over an AI warning image, and explicit reveal shows the original image.
+
+### Search assistance on this device
+
+Browsing includes Save recent searches and Live search suggestions, both enabled
+by default and scoped to the active account/guest and instance. Disabling recents
+hides them and pauses saving; Clear all removes saved terms after confirmation.
+Live suggestions use the selected instance and region. These controls are local
+and do not modify shared account watch history or website preferences.

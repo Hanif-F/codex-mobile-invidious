@@ -140,7 +140,7 @@ internal fun PlaylistDialog(playlist: Playlist?, dismiss: () -> Unit, save: susp
 }
 
 @Composable
-private fun PlaylistAuthor(vm: AppViewModel, list: Playlist, thinMode: Boolean) {
+internal fun PlaylistAuthor(vm: AppViewModel, list: Playlist, thinMode: Boolean) {
     val valid = ContentVisibility.validChannel(list.channelId)
     ChannelAuthor(vm.store.server, list.authorAvatar, list.author, valid && Avatars.show(thinMode, list.channelId),
         modifier = Modifier.fillMaxWidth(), tag = "playlist-avatar-${list.id}",

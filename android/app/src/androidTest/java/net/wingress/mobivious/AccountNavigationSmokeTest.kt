@@ -194,7 +194,7 @@ class AccountNavigationSmokeTest {
         val original = vm.browse.value
         compose.openGlobalSearch()
         compose.onNodeWithTag("main-search").performTextInput("fixture")
-        assertEquals("Search", vm.tab)
+        assertEquals("Popular", vm.tab)
         compose.onNodeWithContentDescription("Close search").performClick()
         until { vm.tab == "Popular" }
         assertEquals(original.videos, vm.browse.value.videos)
@@ -202,7 +202,7 @@ class AccountNavigationSmokeTest {
         compose.onNodeWithTag("main-search").performTextReplacement("fixture")
         compose.onNodeWithTag("main-search").performImeAction()
         until { vm.tab == "Search" && !vm.browse.value.loading }
-        compose.onNodeWithTag("main-search").assertTextContains("fixture")
+        compose.onNodeWithTag("search-query").assertTextContains("fixture")
         compose.onNodeWithContentDescription("Search filters").assertExists()
         compose.onNodeWithContentDescription("Close search").performClick()
         until { vm.tab == "Popular" }; assertEquals(original.videos, vm.browse.value.videos)

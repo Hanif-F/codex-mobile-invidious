@@ -145,9 +145,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val queue by vm.queue.collectAsStateWithLifecycle()
     val chapters = playback.chapters
     val queuePanelOpen by vm.queueExpanded.collectAsStateWithLifecycle()
-    val chapterPanel = key(vm.store.server, queue.token, queue.currentKey) { rememberChapterPanelState() }
-    val watchList = key(queue.currentKey) { rememberLazyListState() }
-    val watchResize = key(queue.currentKey) { rememberWatchPlayerResizeState() }
+    val chapterPanel = key("chapter-panel", vm.store.server, queue.token, queue.currentKey) { rememberChapterPanelState() }
+    val watchList = key("watch-list", queue.currentKey) { rememberLazyListState() }
+    val watchResize = key("watch-resize", queue.currentKey) { rememberWatchPlayerResizeState() }
     val watchDefaults = queue.effective(prefs)
     var watchDescription by rememberSaveable(queue.currentKey, watchDefaults.extendDescription) { mutableStateOf(watchDefaults.extendDescription) }
     fun browsePlayer() = presentation.present(if (vm.playback.value.details != null) PlayerPresentation.MINI else PlayerPresentation.CLOSED, animate = false)
@@ -190,8 +190,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     var dialogContext by remember { mutableStateOf(deviceContext) }
     LaunchedEffect(deviceContext) { if(dialogContext!=deviceContext) {dialog="";dialogContext=deviceContext} }
     var settingsPage by rememberSaveable { mutableStateOf("") }
-    var searchOpen by rememberSaveable { mutableStateOf(false) }
-    var searchDraft by rememberSaveable { mutableStateOf("") }
+    val searchEditor by vm.searchEntry.state.collectAsStateWithLifecycle()
+    val searchOpen = searchEditor.open
     var originIndex by rememberSaveable { mutableIntStateOf(0) }
     var originOffset by rememberSaveable { mutableIntStateOf(0) }
     var originWatch by rememberSaveable { mutableStateOf(false) }
@@ -203,7 +203,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     LaunchedEffect(postNavigation) {
         if (postNavigation > handledPostNavigation) {
             handledPostNavigation = postNavigation
-            searchOpen = false; settingsPage = ""; browsePlayer()
+            vm.searchEntry.cancel(); settingsPage = ""; browsePlayer()
         }
     }
     LaunchedEffect(vm.store.server) {
@@ -211,9 +211,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             authWatchId = ""; authSettings = ""; originWatch = false; vm.clearNavigationReturns(); navigationServer = vm.store.server
         }
     }
-    val searchFocus = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
-    LaunchedEffect(searchOpen,selectedTab) { if (searchOpen && tab=="Search" && route.isEmpty()) { searchFocus.requestFocus(); keyboard?.show() } }
     val restoredBrowse by vm.restoredBrowse.collectAsStateWithLifecycle()
     val authenticationFinished by vm.authenticationFinished.collectAsStateWithLifecycle()
     var handledRestore by rememberSaveable { mutableLongStateOf(0L) }
@@ -252,7 +250,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val blockUndo by vm.blockUndo.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    fun navigate(selected: String, path: String = "") { searchOpen = false; keyboard?.hide(); vm.cancelAccumulatedSeek(); browsePlayer(); vm.navigate(selected, path) }
+    fun navigate(selected: String, path: String = "") { vm.searchEntry.cancel(); keyboard?.hide(); vm.cancelAccumulatedSeek(); browsePlayer(); vm.navigate(selected, path) }
     fun openRichLink(raw: String) {
         val target = ContentLinks.resolve(raw, vm.store.server) ?: return
         channelDescriptionOpen = false; vm.closePostComments()
@@ -260,33 +258,42 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         else if (vm.openContent(target)) openPlayer() else browsePlayer()
     }
     fun signIn() {
-        dialog = ""; searchOpen = false
+        dialog = ""; vm.searchEntry.cancel()
         originIndex = latestBrowseList.firstVisibleItemIndex; originOffset = latestBrowseList.firstVisibleItemScrollOffset
         originWatch = presentation.watch; authSettings = settingsPage; settingsPage = ""
         if (watch) { authWatchId = playback.details?.video?.id.orEmpty(); authWatchPosition = playback.position / 1000 }
         vm.openSignIn()
     }
+    fun cancelSearchEntry() {
+        vm.searchEntry.cancel(); keyboard?.hide()
+        if (originWatch) restorePlayer()
+        originWatch = false
+    }
     fun submitGlobalSearch() {
-        if (searchDraft.isBlank()) return
-        searchOpen = false; keyboard?.hide(); vm.cancelAccumulatedSeek()
-        if (vm.tab != "Search" || vm.route.isNotEmpty() || presentation.watch) {
-            originIndex = latestBrowseList.firstVisibleItemIndex; originOffset = latestBrowseList.firstVisibleItemScrollOffset; originWatch = presentation.watch
-        }
-        val link = ContentLinks.parse(searchDraft, vm.store.server)
+        val submission = vm.searchEntry.submit() ?: return
+        keyboard?.hide(); vm.cancelAccumulatedSeek()
+        val link = ContentLinks.parse(submission.text, vm.store.server)
         if (link != null) { if (vm.openContent(link)) openPlayer() else browsePlayer() }
-        else { browsePlayer(); vm.openGlobalSearch(searchDraft) }
+        else {
+            vm.searchEntry.remember(submission.text)
+            browsePlayer(); vm.openGlobalSearch(submission.text, submission.mode == SearchEntryMode.NEW)
+        }
     }
     fun openGlobalSearch() {
         vm.browsePosition(CommentPosition(latestBrowseList.firstVisibleItemIndex,latestBrowseList.firstVisibleItemScrollOffset))
         originWatch = presentation.watch
         originIndex = latestBrowseList.firstVisibleItemIndex; originOffset = latestBrowseList.firstVisibleItemScrollOffset
         authWatchId = ""; authSettings = ""; vm.cancelAccumulatedSeek(); browsePlayer()
-        searchDraft = vm.searchInput.value.submitted; vm.beginGlobalSearch(); searchOpen = true
+        vm.searchEntry.open(SearchEntryMode.NEW)
+    }
+    fun editGlobalSearch() {
+        originWatch = false
+        vm.searchEntry.open(SearchEntryMode.EDIT, vm.searchInput.value.submitted)
     }
     fun selectDestination(selected: AppDestination) {
         vm.browsePosition(CommentPosition(latestBrowseList.firstVisibleItemIndex,latestBrowseList.firstVisibleItemScrollOffset))
         authWatchId = ""; authSettings = ""; vm.cancelAccumulatedSeek(); browsePlayer()
-        searchOpen = false; keyboard?.hide(); vm.selectTab(selected.label)
+        vm.searchEntry.cancel(); keyboard?.hide(); vm.selectTab(selected.label)
     }
     fun play(video: Video, source: Playlist? = null) { openPlayer(); vm.playVideo(video, source) }
     LaunchedEffect(message, blockUndo) { message?.let {
@@ -312,7 +319,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     } }
     LaunchedEffect(settingsPage) { if (settingsPage.isNotEmpty()) vm.cancelAccumulatedSeek(); if (settingsPage == "Settings") vm.refreshSharedSettings() }
     BackHandler(settingsPage.isEmpty() && (fullscreen || watch || presentation.target == PlayerPresentation.WATCH || route.isNotBlank() || vm.hasBrowseBack)) { when { fullscreen -> { if (chat.open) vm.closeChat() else if (chapterPanel.open) chapterPanel.close() else collapsePlayer() }; watch || presentation.target == PlayerPresentation.WATCH -> backWatch(); else -> { vm.cancelAccumulatedSeek(); vm.backBrowse() } } }
-    BackHandler(searchOpen) { searchOpen = false; keyboard?.hide() }
+    BackHandler(searchOpen) { cancelSearchEntry() }
     BackHandler(accountBusy) { }
     val keyboardVisible = WindowInsets.isImeVisible
     val darkTheme = prefs.darkMode == "dark" || prefs.darkMode.isBlank() && isSystemInDarkTheme()
@@ -327,6 +334,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
       Box(Modifier.fillMaxSize()) {
         AppBackground(Modifier.fillMaxSize()) {
           Box(Modifier.fillMaxSize()) {
+          Box(Modifier.fillMaxSize().hiddenPlayerContent(searchOpen)) {
           PlayerPresentationHost(vm, playback, controller, presentation, pip, settingsPage.isNotEmpty() && !pip || clipEditor.open || keyboardVisible && !pip && !watch,
             downloadDialog.video != null || queuePanelOpen || fullscreen && chapterPanel.open || dialog.isNotEmpty() || sponsorEditor != null || saveSheet.video != null || contribution.open || rss.open || searchOpen || accountBusy || channelDescriptionOpen || postComments.open || linkResolution.link != null || clipEditor.open,
             queue.currentKey, ::closePlayer, ::collapsePlayer, ::restorePlayer, ::toggleFullscreen, { chapterPanel.close(); dialog = "player" }, ::openChapters, ::toggleChat) { openChatSettings ->
@@ -405,20 +413,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         }, controls = {
                             if (tab == "Trending") key(deviceContext) { TrendingControls(vm, prefs.region) }
                         })
-                        else if (searchPage) LibraryToolbar("Search", back={ searchOpen=false; keyboard?.hide(); if(vm.hasBrowseBack) vm.backBrowse() else vm.selectTab("Popular") }, backLabel="Close search", actions = {
-                            AppIconButton(Icons.Default.Tune, "Search filters") { dialog = "filters" }
-                        }, controls = {
-                            SearchField(searchDraft, {searchDraft=it}, "Search or paste a link", "main-search", Modifier.fillMaxWidth().focusRequester(searchFocus)) { submitGlobalSearch() }
-                            BrowseTabs(SearchType.entries, searchType, { it.label }, { "search-type-${it.apiValue}" }, select = vm::setSearchType)
-                            val filterLabels=listOfNotNull(
-                                vm.sort.takeIf {it!="relevance" && searchType!=SearchType.CHANNELS}?.let {"Sort: $it"},
-                                vm.date.takeIf {it.isNotBlank() && searchType.videoFilters}?.let {"Uploaded: $it"},
-                                vm.durationFilter.takeIf {it.isNotBlank() && searchType.videoFilters}?.let {"Duration: $it"},
-                                searchVisibility.showMembers?.let {if(it) "Members shown" else "Members hidden"},
-                                "Blocked included".takeIf {searchVisibility.includeBlocked})
-                            if(filterLabels.isNotEmpty()) Text(filterLabels.joinToString(" · "),Modifier.testTag("search-filter-summary"),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-
-                        })
+                        else if (searchPage) SearchResultsToolbar(vm, search.submitted, searchType, searchVisibility,
+                            close = { keyboard?.hide(); if(vm.hasBrowseBack) vm.backBrowse() else vm.selectTab("Popular") },
+                            edit = ::editGlobalSearch, newSearch = ::openGlobalSearch, filters = { dialog = "filters" })
                         else if (subscriptionFeed) SubscriptionFeedToolbar {
                             AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
                             if(account!=null) OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
@@ -533,11 +530,11 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             when (result) {
                                 is SearchResult.VideoItem -> VideoCard(vm, result.video, vm.store.server, { play(result.video) },
                                     { id -> navigate(tab, "channel:$id") }, { signIn() },
-                                    audioPlay = { openPlayer(); vm.playVideo(result.video, audio = true) })
-                                is SearchResult.ChannelItem -> RelatedChannelCard(result.channel, vm.store.server, prefs.thinMode) {
+                                    audioPlay = { openPlayer(); vm.playVideo(result.video, audio = true) }, largeArtwork = true)
+                                is SearchResult.ChannelItem -> SearchChannelCard(result.channel, vm.store.server, prefs.thinMode) {
                                     navigate(tab, "channel:${result.channel.id}")
                                 }
-                                is SearchResult.PlaylistItem -> PlaylistCard(vm, result.playlist,
+                                is SearchResult.PlaylistItem -> SearchPlaylistCard(vm, result.playlist,
                                     { browsePlayer(); vm.openPlaylist(result.playlist) }, { signIn() })
                             }
                         }
@@ -585,7 +582,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         if (!state.loading && state.error == null && state.videos.isEmpty() && state.lists.isEmpty() && state.posts.isEmpty() && state.channels.isEmpty() &&
                             state.clips.isEmpty() && route != "clips" && !(channelTab == ChannelTab.CLIPS && scopedSearch.submitted.isBlank())) item { EmptyState(
                             if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "No matches" else if (route == "history") "Your history is empty" else if (tab == "Search") "Find something to watch" else "Nothing here yet",
-                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", if (tab == "Search" && search.submitted.isBlank()) "" else "Refresh", if (discoveryPage || subscriptionFeed) vm::refreshFeed else vm::refresh) }
+                            if (scopedSearch.submitted.isNotBlank() || generalSearch && search.submitted.isNotBlank()) "Try another query or change the filters." else if (route == "history") "Videos you watch with history enabled will appear here." else if (tab == "Search") "Search for videos, channels and playlists, or paste a link." else "Refresh to check for videos.", if (tab == "Search" && search.submitted.isBlank()) "Search" else "Refresh", if (tab == "Search" && search.submitted.isBlank()) ::openGlobalSearch else if (discoveryPage || subscriptionFeed) vm::refreshFeed else vm::refresh) }
                         if (!state.end && !state.loading && state.error == null) item { LibraryActionButton("Load more", Modifier.fillMaxWidth(), onClick = vm::more) }
                     }
                 }
@@ -608,6 +605,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                   }
               }
             }
+          }
           }
             if (fullscreen && !pip && chapterPanel.open && chapters.isNotEmpty()) ChaptersSheet(chapters, playback, chapterPanel, vm::seekTo)
             val contextChange by vm.preferenceContextChange.collectAsStateWithLifecycle()
@@ -644,6 +642,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (downloadDialog.video != null && !pip) DownloadDialog(vm)
             if (saveSheet.video != null && route != "sign-in" && !pip) SavePlaylistSheet(vm) { signIn() }
             if (!pip) { ClipDialogs(vm); ClipEditor(vm) }
+            if (searchOpen && !pip) SearchEntryScreen(searchEditor, vm.searchEntry, ::cancelSearchEntry, ::submitGlobalSearch)
           }
         }
       }
@@ -658,13 +657,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
 internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
 internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
 @Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove", avatarOwner: String? = null,
-    removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true, aiGroup: AiPageGroup = vm.aiPageGroup(), libraryRow: Boolean = false) {
+    removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true, aiGroup: AiPageGroup = vm.aiPageGroup(), libraryRow: Boolean = false, largeArtwork: Boolean = false) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val watched by vm.watched.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
     val context = ApiContext(server, account, vm.store.contextGeneration)
     val indicator = WatchedIndicators.forVideo(video, watched.takeIf { it.context == context } ?: WatchedState())
-    val compact = prefs.uiDensity == "compact" || libraryRow
+    val compact = !largeArtwork && (prefs.uiDensity == "compact" || libraryRow)
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val warning = vm.aiDecision(video, aiGroup, aiState).warning
     val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
@@ -703,6 +702,7 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
 
         Row(metadataModifier, verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
+                if (largeArtwork && prefs.thinMode) Icon(Icons.Default.SmartDisplay, "Video", Modifier.size(24.dp).padding(bottom = 4.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (video.membersOnly) MembersBadge(video.id)
                 DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, Modifier.clickable(onClick = play), maxLines = 2)
                 if (prefs.thinMode) {
@@ -964,10 +964,15 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
         Column(body.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset,
             top = top + 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!visibilityOnly) {
+                Text("Result filters", style = MaterialTheme.typography.titleMedium)
                 if (searchType != SearchType.CHANNELS) Choice("Sort", listOf("relevance", "views"), sort) { if(it!=sort) {sort=it;vm.sort=it;refresh()} }
                 if (searchType.videoFilters) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { if(it!=date) {date=it;vm.date=it;refresh()} }
                 if (searchType.videoFilters) Choice("Duration", listOf("", "short", "long"), duration) { if(it!=duration) {duration=it;vm.durationFilter=it;refresh()} }
+                TextButton({ if (vm.api.context() == context) { sort = "relevance"; date = ""; duration = ""; vm.resetResultFilters() } },
+                    Modifier.testTag("search-reset-filters")) { Text("Reset result filters") }
+                HorizontalDivider()
             }
+            Text("Visibility on this device", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.fillMaxWidth().heightIn(min=48.dp).testTag("search-show-members")
                 .toggleable(visibility.showMembers ?: prefs.showMemberVideos,role=androidx.compose.ui.semantics.Role.Checkbox) {
                     vm.saveSearchVisibility(visibility.copy(showMembers=it),context)
@@ -992,5 +997,8 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
     }
 }
 @Composable private fun Choice(label: String, values: List<String>, selected: String, update: (String) -> Unit) {
-    DropdownChoiceRow(label, values.map { it to it.ifBlank { "Any" }.replace('_', ' ') }, selected, change = update)
+    DropdownChoiceRow(label, values.map { it to when (label) {
+        "Sort" -> searchSortLabel(it); "Uploaded" -> searchDateLabel(it); "Duration" -> searchDurationLabel(it)
+        else -> it.ifBlank { "Any" }.replace('_', ' ')
+    } }, selected, change = update)
 }

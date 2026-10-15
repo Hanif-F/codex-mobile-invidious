@@ -131,6 +131,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val linkResolution = MutableStateFlow(LinkResolutionState())
     private var linkResolutionJob: Job? = null
     val searchInput = MutableStateFlow(SearchInput())
+    val searchEntry = SearchEntryController(viewModelScope, api::context, store, { preferences.value.region },
+        api::searchSuggestions, { message.value = it })
     val scopedSearch = MutableStateFlow(SearchInput())
     val browseReset = MutableStateFlow(0L)
     val playback = MutableStateFlow(PlaybackState())
@@ -492,6 +494,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
         } }
         viewModelScope.launch { app.playbackContext.collect { changedContext ->
+            searchEntry.bind(api.context())
             preferenceContextChange.value = null
             preferenceSaves.bind(api.context())
             val it = changedContext?.account
@@ -735,20 +738,19 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
         else if (refreshSaved || saved.browse.loading || afterSignIn && saved.tab in listOf("You", "Subscriptions")) load(false, refreshChannel = false)
     }
-    fun beginGlobalSearch() {
-        if (tab == "Search" && route.isEmpty()) return
-        if(tab in PreferenceRules.tabs) { tabScreens[tab]=captureBrowse();tabBackStacks[tab]=browseReturns.toList() }
-        searchReturn = captureBrowse()
-        browseJob?.cancel(); browseGeneration++
-        navigate("Search", loadContent = false)
-        searchInput.value = SearchInput()
-        browse.value = BrowseState(title = "Search", end = true)
-    }
-    fun openGlobalSearch(text: String) {
+    fun openGlobalSearch(text: String, newSearch: Boolean = true) {
         if (text.isBlank()) return
-        if (tab != "Search" || route.isNotEmpty()) searchReturn = captureBrowse()
+        if (tab != "Search" || route.isNotEmpty()) {
+            if (tab in PreferenceRules.tabs) { tabScreens[tab] = captureBrowse(); tabBackStacks[tab] = browseReturns.toList() }
+            searchReturn = captureBrowse()
+        }
+        if (newSearch) resetResultFilters(refresh = false)
         searchInput.value = SearchInput(text, text.trim())
         navigate("Search")
+    }
+    fun resetResultFilters(refresh: Boolean = true) {
+        searchType.value = SearchType.ALL; sort = "relevance"; date = ""; durationFilter = ""
+        if (refresh && tab == "Search" && route.isEmpty() && query.isNotBlank()) refresh()
     }
     fun backBrowse() {
         val saved = searchReturn

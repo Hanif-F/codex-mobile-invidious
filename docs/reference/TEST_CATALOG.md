@@ -408,6 +408,16 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `feedAndHistoryRespectServerPageSizesAndNotificationFilter`
 - `streamProxyPreferenceReachesVideoApiAndSharedPatchesStaySparse`
 
+### SearchAssistanceTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/SearchAssistanceTest.kt) — Search assistance history, isolation, debounce, cancellation, failures and public API contracts.
+
+- `recentsTrimBoundDeduplicateAndExcludeLinks`
+- `entryCancelSubmitAndProfilePersistenceAreIndependent`
+- `debounceCancellationAndOlderResponsesCannotReplaceTheDraft`
+- `failuresAndOptOutNeverPreventManualSubmission`
+- `suggestionsUseTheInstanceRegionAndNoAuthorization`
+
 ### SeekAccumulatorTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/SeekAccumulatorTest.kt) — Seek Accumulator declared scenarios; exact cases are enumerated in the test catalog.
@@ -1103,6 +1113,17 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `keyboardTabAndEnterNavigateAndSubmitSearchExactlyOnce`
 - `authenticationFieldsAndSubmitRemainReachableAtNarrowLargeTextAndWideSizes`
 
+### SearchExperienceSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SearchExperienceSmokeTest.kt) — Search editor, history, suggestions, filters, profile isolation and mixed-result presentation acceptance.
+
+- `freshSearchEditCancelRecreationAndFiltersPreserveTheRightState`
+- `recentAndLiveRowsSubmitOnceAndSupportEditingRemovingAndClearing`
+- `suggestionFailuresAndDelayedResponsesNeverBlockOrReplaceTheCurrentQuery`
+- `historyAndOptionsAreLocalToTheActiveProfileAndSurviveRecreation`
+- `filtersResetAndRemovalKeepTheQueryAndVisibilityPreference`
+- `mixedCardsRemainDistinctInThemesThinModeNarrowLargeTextAndLandscape`
+
 ### SearchHistorySmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SearchHistorySmokeTest.kt) — Search History Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -1110,6 +1131,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `iconImeAndPhysicalEnterEachSubmitExactlyOnce`
 - `imeSubmissionPreservesPastedVideoTimestamps`
 - `channelSearchPaginationAndClearRestoreSelectedStreams`
+- `emptyScopedSubmissionRestoresTheSelectedChannelTab`
 - `subscriptionSearchLoadsBeyondHiddenPagesAndIgnoresFeedOnlyFilters`
 - `historySearchCoversLaterPagesAndDateGroupsKeepUnknownEntries`
 - `historyRemovalPreservesProgressAndClearRequiresConfirmation`
@@ -1283,4 +1305,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **756 declared test methods** (including ignored tests).
+Inventory total: **768 declared test methods** (including ignored tests).

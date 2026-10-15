@@ -145,6 +145,11 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         if (type.videoFilters) { query["date"] = date; query["duration"] = duration }
         return GeneralSearchPage.parse(JSONArray(scopedRead("api/v1/search", query, false, context)), type)
     }
+    suspend fun searchSuggestions(q: String, region: String, context: ApiContext = context()): List<String> {
+        val array = JSONObject(scopedRead("api/v1/search/suggestions", mapOf("q" to q, "region" to region), false, context,
+            allowCachedFallback = false)).getJSONArray("suggestions")
+        return (0 until array.length()).mapNotNull { array.opt(it) as? String }.filter(String::isNotBlank).distinct().take(8)
+    }
     suspend fun subscribePlaylist(list: Playlist, subscribe: Boolean, context: ApiContext): Playlist? {
         require(list.id.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid playlist ID" }
         val raw = scopedPlaylistWrite("api/v1/auth/saved_playlists/${list.id}", if (subscribe) "PUT" else "DELETE", context,

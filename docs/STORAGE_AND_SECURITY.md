@@ -10,7 +10,7 @@ Paths describe Android sandbox locations, not host repository paths.
 | --- | --- |
 | SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide accent settings; dormant legacy colored-background/adaptive-control keys. |
 | AndroidKeyStore alias `mobivious.session` | AES key for session encryption; the key is not a checked-in file. |
-| `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions and visibility snapshots. |
+| `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions, search assistance/recents and visibility snapshots. |
 | `cacheDir/feeds/` | Selected successful feed/search response snapshots, hashed keys, bounded count/age/size. |
 | SQLite `downloads.db`, schema version 1 | Table `downloads(id TEXT PRIMARY KEY, record TEXT NOT NULL)` storing JSON download journals. Upgrade hook currently has no migration logic. |
 | `getExternalFilesDir(null)/downloads/<UUID>/` | App-specific video/audio/caption/thumbnail/avatar assets; selected tracks plus unique attempt filenames. |
@@ -160,3 +160,20 @@ late responses from a previous account/server cannot change presentation.
 Reveal state is ephemeral and scoped to displayed/playing occurrences. Raw titles,
 descriptions, downloaded metadata and files remain intact: these are presentation
 preferences, not encryption or metadata access restrictions.
+
+## Search assistance
+
+Each existing device profile owns `search.assistance` (remember/live-suggestion
+booleans, both default true) and `search.recent` (up to 20 submitted text queries).
+Recent terms are trimmed, deduplicated case-insensitively, and moved to the front
+when reused. URL-like terms and recognized pasted content links are excluded.
+Search history is local and independent of server watch history. Turning saving
+off hides recents and pauses future writes without clearing them; confirmed Clear
+all removes saved terms even while hidden. These new keys need no legacy migration
+and participate in existing profile transfer and deletion.
+
+Live suggestions send nonblank, non-URL drafts and the configured region to the
+selected instance after 250ms without input. They carry no bearer token, are not
+persistently cached and are canceled when superseded or the editor closes.
+Draft/profile revisions fence responses; an optional lookup or local-history
+write failure cannot prevent manual searching.

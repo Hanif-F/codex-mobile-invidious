@@ -182,7 +182,8 @@ reset_home_subscriptions()
 
 def reset_search_history():
     state.update(searchTest=False, searchMixed=False, searchRequests=[], searchDelayNext=0, searchFailNext=False,
-                 historyRequests=[], historyEntries=[], historyToday='2026-10-04', historyLegacy=False)
+                 historyRequests=[], historyEntries=[], historyToday='2026-10-04', historyLegacy=False,
+                 suggestionRequests=[], suggestionDelayNext=0, suggestionFailNext=False, suggestionStatus=200)
 reset_search_history()
 
 def reset_accounts():
@@ -484,6 +485,18 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(error='Fixture block list unavailable') if state['failBlockedRead'] else
                          [dict(authorId=id, author=name) for id, name in sorted(state['blockedChannels'].items(), key=lambda x: (x[1], x[0]))],
                          503 if state['failBlockedRead'] else 200)
+        elif p == '/api/v1/search/suggestions':
+            params = parse_qs(url.query)
+            query = params.get('q', [''])[0]
+            event = dict(q=query, region=params.get('region', [None])[0], authorized=bool(self.headers.get('Authorization')), completed=False)
+            state['suggestionRequests'].append(event)
+            delay = state['suggestionDelayNext']; state['suggestionDelayNext'] = 0
+            fail = state['suggestionFailNext']; state['suggestionFailNext'] = False
+            status = 503 if fail else state['suggestionStatus']
+            if delay: time.sleep(delay / 1000)
+            event['completed'] = True
+            return self.respond(dict(error='Suggestions unavailable') if status != 200 else
+                                dict(query=query, suggestions=[query + ' music', query + ' videos', query + ' music']), status)
         elif p in ('/api/v1/popular', '/api/v1/trending', '/api/v1/search'):
             if p in ('/api/v1/popular', '/api/v1/trending'):
                 kind = p.rsplit('/', 1)[-1]
@@ -886,7 +899,7 @@ class Handler(BaseHTTPRequestHandler):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/search-history':
-            for key in ('searchTest', 'searchDelayNext', 'searchFailNext', 'historyEntries', 'historyToday', 'historyLegacy'):
+            for key in ('searchTest', 'searchDelayNext', 'searchFailNext', 'historyEntries', 'historyToday', 'historyLegacy', 'suggestionDelayNext', 'suggestionFailNext', 'suggestionStatus'):
                 if key in data: state[key] = data[key]
             if 'historyEntries' in data: state['watched'] = [entry['video_id'] for entry in data['historyEntries']]
             if 'max_results' in data: prefs['max_results'] = data['max_results']

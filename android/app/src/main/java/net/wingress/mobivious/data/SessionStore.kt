@@ -40,7 +40,7 @@ private class SharedProfilePersistence(private val prefs: SharedPreferences, pri
     }
 }
 
-class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
+class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore, SearchAssistanceStore {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
     val accentPreset = MutableStateFlow(AccentPreset.saved(prefs.all["appearance.accentPreset"] as? String))
     @Synchronized fun accentPreset(value: AccentPreset) {
@@ -87,6 +87,14 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore {
     fun trendingCategory(context: ApiContext) = TrendingCategory.saved(profiles.value(context, "discovery.category") as? String)
     @Synchronized fun trendingCategory(context: ApiContext, value: TrendingCategory) {
         current(context); profiles.write(context, "discovery.category", value.apiValue)
+    }
+    override fun searchAssistance(context: ApiContext) = SearchAssistanceSettings.parse(profiles.value(context, "search.assistance") as? String)
+    @Synchronized override fun saveSearchAssistance(context: ApiContext, value: SearchAssistanceSettings) {
+        current(context); profiles.write(context, "search.assistance", value.json().toString())
+    }
+    override fun recentSearches(context: ApiContext) = RecentSearches.parse(profiles.value(context, "search.recent") as? String)
+    @Synchronized override fun saveRecentSearches(context: ApiContext, value: List<String>) {
+        current(context); profiles.write(context, "search.recent", JSONArray(RecentSearches.normalize(value)).toString())
     }
     fun subscriptionSort(context: ApiContext) = SubscriptionSort.saved(profiles.value(context, "subscriptions.sort") as? String)
     @Synchronized fun subscriptionSort(context: ApiContext, value: SubscriptionSort) {

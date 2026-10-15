@@ -314,3 +314,26 @@ rejection. Screenshot names start with `spoiler-` under `/data/local/tmp/mobivio
 The local fixture exposes `/test/spoilers` controls and records only non-secret
 channel patches and publication IDs. The sibling account harness tests production
 route validation, scopes, CSRF, concurrent writes and cache-only date responses.
+
+## Search experience acceptance
+
+`SearchAssistanceTest` covers history normalization, bounded profile-local recents,
+opt-out, optional failures, debounce/cancellation, obsolete responses, single-use
+submission and the unauthenticated suggestions API contract.
+
+Run against an already running emulator with the disposable fixture:
+
+```sh
+scripts/test-android.sh --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.SearchExperienceSmokeTest,net.wingress.mobivious.SearchHistorySmokeTest,net.wingress.mobivious.DiscoverySearchSmokeTest,net.wingress.mobivious.NavigationHubSmokeTest
+```
+
+`SearchExperienceSmokeTest` checks blank new searches, edit/cancel/recreation,
+transient-filter resets, suggestion/recent actions, failed/unsupported/delayed
+suggestions, profile isolation, links and distinct mixed-result presentation.
+Screenshots go to `/data/local/tmp/mobivious-search-experience/`, including
+light/dark, thin mode, narrow large text and landscape. The test restores system
+font scale, density and orientation after presentation checks. Existing search
+journeys retain submission, scoped search, visibility, pagination/retry and
+navigation-return coverage. Fresh searches reset filters; edit submissions retain
+them. These tests establish emulator behavior, not physical-device performance.

@@ -111,6 +111,12 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt) | Directory statistics, local search/sort fallback and revision-fenced confirmed subscription mutations. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt](../../android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt) | Watched/progress models and indicators plus revision-fenced history/progress reconciliation and local fallback. | [LIBRARY](../../docs/LIBRARY.md) |
 
+## Data and persistence
+
+| File | Responsibility | Guide |
+| --- | --- | --- |
+| [android/app/src/main/java/net/wingress/mobivious/data/SearchAssistance.kt](../../android/app/src/main/java/net/wingress/mobivious/data/SearchAssistance.kt) | Profile-local search assistance settings, bounded recent queries and cancellable new/edit search entry state. | [STORAGE_AND_SECURITY](../../docs/STORAGE_AND_SECURITY.md) |
+
 ## File export
 
 | File | Responsibility | Guide |
@@ -178,7 +184,8 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/ui/PlaylistUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/PlaylistUi.kt) | Playlist cards/headers, subscribe state and owned title/privacy/description editor. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/PreferenceSaveController.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/PreferenceSaveController.kt) | ViewModel-owned revisioned preference intent, coalescing, debounce, serialization, failure recovery and context isolation. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/RssUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/RssUi.kt) | Feed link warning/copy/share/open and XML share/save sheet with scoped file permissions. | [LIBRARY](../../docs/LIBRARY.md) |
-| [android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt) | Reusable draft input with keyboard/search/physical Enter submission semantics. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/SearchResultCards.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SearchResultCards.kt) | Distinct circular-avatar channel cards and stacked playlist/mix search covers. | [UI](../../docs/UI.md) |
+| [android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SearchUi.kt) | Shared search input, transient suggestions/history editor and results toolbar with removable filters. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt) | Settings category routing, automatic per-field preference feedback, server confirmation and About content; integrates channel title/thumbnail rules. | [SETTINGS](../../docs/SETTINGS.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt) | Automatic global/channel skip settings, inherited modes, color validation, channel loading and reset controls. | [SETTINGS](../../docs/SETTINGS.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionBrowseUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionBrowseUi.kt) | Subscription/channel pinned toolbars, scoped inputs, tab and sort controls. | [UI](../../docs/UI.md) |
