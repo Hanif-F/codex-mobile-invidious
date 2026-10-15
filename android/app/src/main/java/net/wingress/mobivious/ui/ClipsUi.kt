@@ -80,10 +80,9 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val account by vm.account.collectAsStateWithLifecycle()
     val aiState by vm.aiFilter.state.collectAsStateWithLifecycle()
     val warning = vm.aiDecision(clip.video, AiPageGroup.OTHER, aiState).warning
-    Row(Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
+    MediaListLayout(prefs.uiDensity == "compact", Modifier.fillMaxWidth().clickable(onClickLabel = "Open clip", onClick = play)
         .padding(horizontal = AppTokens.inset, vertical = 9.dp).testTag("clip-card-${clip.id}"),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (!prefs.thinMode || warning != null) BoxWithConstraints(Modifier.width(if (prefs.uiDensity == "compact" || androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.3f) 80.dp else 112.dp)) {
+        artwork = if (!prefs.thinMode || warning != null) ({ modifier -> BoxWithConstraints(modifier) {
           val imageHeight = if (warning == null) maxWidth * 9f / 16f else maxOf(maxWidth * 9f / 16f, 96.dp * androidx.compose.ui.platform.LocalDensity.current.fontScale)
           Box(Modifier.fillMaxWidth().height(imageHeight).clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)) {
@@ -98,19 +97,21 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 Text(playerTime(clip.durationMs), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow))
             }
           }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            DeArrowTitle(vm, clip.video, MaterialTheme.typography.titleSmall, maxLines = 2, originalTitle = clip.title, useDeArrow = false)
-            Text("from ${clip.video.author.ifBlank { "Source video" }}",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOf(clip.creator.takeIf(String::isNotBlank), clippedDate(clip).takeIf(String::isNotBlank),
-                playerTime(clip.durationMs).takeIf { prefs.thinMode }).filterNotNull().joinToString(" · "),
-                style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-        }
-        OverflowMenu("Actions for clip ${maskedVideoTitle(vm, clip.video, clip.title)}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
-            DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } })
-            DropdownMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
-            if (clip.owned(vm.api.context())) DropdownMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
+        } }) else null) { modifier ->
+        Row(modifier) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                DeArrowTitle(vm, clip.video, MaterialTheme.typography.titleSmall, maxLines = 2, originalTitle = clip.title, useDeArrow = false)
+                Text("from ${clip.video.author.ifBlank { "Source video" }}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(listOf(clip.creator.takeIf(String::isNotBlank), clippedDate(clip).takeIf(String::isNotBlank),
+                    playerTime(clip.durationMs).takeIf { prefs.thinMode }).filterNotNull().joinToString(" · "),
+                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            }
+            OverflowMenu("Actions for clip ${maskedVideoTitle(vm, clip.video, clip.title)}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
+                DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } })
+                DropdownMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
+                if (clip.owned(vm.api.context())) DropdownMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
+            }
         }
     }
 }

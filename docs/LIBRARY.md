@@ -151,6 +151,12 @@ local artwork/captions, remove remote streams/recommendations/chat/storyboards a
 keep original saved title metadata. Local video/audio are merged for playback.
 No network metadata lookup is required to play a saved record.
 
+Tap a playable entry's artwork, title, status or padding to open offline playback.
+The trailing three-dot menu contains Details, Cancel/Retry when applicable, Save
+to files and Delete. Incomplete entries retain their progress and menu actions
+while playback is disabled. Details still opens the local panel, and spoiler
+artwork/title reveals keep their own actions without starting playback.
+
 ## Save to files / export
 
 Android CreateDocument supplies a `content://` destination. The foreground export

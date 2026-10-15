@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
@@ -136,40 +137,38 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
         items(records, key = { it.id }) { record ->
             val video = vm.downloads.localDetails(record).video
             var details by rememberSaveable(record.id) { mutableStateOf(false) }
-            Column(Modifier.fillMaxWidth().testTag("download-entry-${record.id}").padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val heading: @Composable () -> Unit = {
-                    Column(Modifier.fillMaxWidth()) {
-                        DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, maxLines = 3, offline = true)
-                        Text(video.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                    }
-                }
-                if (!prefs.thinMode) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Box(Modifier.width(if (prefs.uiDensity == "compact") 80.dp else 112.dp).aspectRatio(16f / 9f).clip(AppTokens.media), contentAlignment = Alignment.Center) {
+            val incomplete = record.assets.filterNot { it.artwork }.filter { it.status != DownloadStatus.COMPLETE }
+            val status = if (record.playable && incomplete.isEmpty()) "Downloaded" else if (incomplete.any { it.status == DownloadStatus.FAILED }) "Some files failed" else if (record.active) "Downloading" else "Cancelled"
+            Column(Modifier.fillMaxWidth().testTag("download-entry-${record.id}")
+                .clickable(enabled = record.playable, role = Role.Button, onClickLabel = "Open download") { play(record.id) }
+                .padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MediaListLayout(prefs.uiDensity == "compact", artwork = if (!prefs.thinMode) ({ modifier ->
+                    Box(modifier.aspectRatio(16f / 9f).clip(AppTokens.media).testTag("download-artwork-${record.id}"), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.OndemandVideo, null)
                         ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), offline = true) {
-                        if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         }
                     }
-                    Box(Modifier.weight(1f)) { heading() }
-                } else heading()
-                val incomplete = record.assets.filterNot { it.artwork }.filter { it.status != DownloadStatus.COMPLETE }
-                val status = if (record.playable && incomplete.isEmpty()) "Downloaded" else if (incomplete.any { it.status == DownloadStatus.FAILED }) "Some files failed" else if (record.active) "Downloading" else "Cancelled"
-                Text("$status · ${DisplayFormats.bytes(record.bytes)}${if (record.total > 0) " / ${DisplayFormats.bytes(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (record.active) { if (record.total > 0) LinearProgressIndicator(progress = { (record.bytes.toFloat() / record.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()) }
-                incomplete.firstOrNull { it.error.isNotBlank() }?.let { Text(it.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
-                Box {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), itemVerticalAlignment = Alignment.CenterVertically) {
-                        LibraryActionButton("Play", Modifier.testTag("download-play-${record.id}"), Icons.Default.PlayArrow, enabled = record.playable, prominent = true) { play(record.id) }
-                        if (record.active) TextButton(onClick = { vm.cancelDownload(record.id) }) { Text("Cancel") }
-                        if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L }) TextButton(onClick = { vm.retryDownload(record.id) }) { Text("Retry") }
-                        TextButton(onClick = { details = !details }, modifier = Modifier.testTag("download-details-${record.id}")) { Text("Details") }
+                }) else null) { modifier ->
+                    Row(modifier) {
+                        Column(Modifier.weight(1f)) {
+                            DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, maxLines = 3, offline = true)
+                            Text(video.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                        }
                         OverflowMenu("Actions for download ${maskedVideoTitle(vm, video, offline = true)}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->
+                            DropdownMenuItem(text = { Text("Details") }, modifier = Modifier.testTag("download-details-${record.id}"), onClick = { close(); details = true })
+                            if (record.active) DropdownMenuItem(text = { Text("Cancel") }, modifier = Modifier.testTag("download-cancel-${record.id}"), onClick = { close(); vm.cancelDownload(record.id) })
+                            if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L })
+                                DropdownMenuItem(text = { Text("Retry") }, modifier = Modifier.testTag("download-retry-${record.id}"), onClick = { close(); vm.retryDownload(record.id) })
                             DropdownMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
                             DropdownMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
                         }
                     }
                 }
+                Text("$status · ${DisplayFormats.bytes(record.bytes)}${if (record.total > 0) " / ${DisplayFormats.bytes(record.total)}" else ""}", Modifier.testTag("download-status-${record.id}"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (record.active) { if (record.total > 0) LinearProgressIndicator(progress = { (record.bytes.toFloat() / record.total).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth()) else LinearProgressIndicator(Modifier.fillMaxWidth()) }
+                incomplete.firstOrNull { it.error.isNotBlank() }?.let { Text(it.error, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 if (details) LibraryPanel("Download details",{details=false},closeLabel="Close download details") { body, _ ->
                     LazyColumn(body.testTag("download-details-sheet"),contentPadding=PaddingValues(AppTokens.inset),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                         item {DeArrowTitle(vm, video, MaterialTheme.typography.titleLarge, offline = true);Text(status,style=MaterialTheme.typography.bodyMedium)}

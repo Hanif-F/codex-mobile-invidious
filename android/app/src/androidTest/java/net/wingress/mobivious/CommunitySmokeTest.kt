@@ -100,8 +100,7 @@ class CommunitySmokeTest {
         compose.onNodeWithContentDescription("Verified channel").assertExists()
         compose.onNodeWithTag("channel-banner").assertExists()
         choose(ChannelTab.SHORTS)
-        compose.onNodeWithTag("channel-sort").performClick()
-        compose.onNodeWithTag("channel-sort-popular").performClick()
+        compose.chooseChannelSort("popular")
         until { !activity.model.browse.value.loading && activity.model.channelVideoSort.value == ChannelSort.POPULAR }
         more(); assertEquals(2, activity.model.browse.value.videos.size)
         choose(ChannelTab.STREAMS)

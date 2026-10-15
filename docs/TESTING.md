@@ -93,6 +93,15 @@ scripts/test-android.sh \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
 ```
 
+`MediaListPresentationTest` checks shared artwork dimensions, density, stacking,
+RTL and hidden-thumbnail layouts. `ChannelControlsPresentationTest` checks
+adaptive sorting, inline search focus/blur, explicit submission and restored
+drafts. The channel-search cases in `SearchHistorySmokeTest` also exercise real
+activity recreation and retained tab results. `DownloadsSmokeTest` covers entry
+tap targets, menu-only details, Cancel/Retry and disabled incomplete entries;
+`ChannelSpoilersSmokeTest` checks that local artwork/title reveals do not start
+playback. Library and clips journeys capture the corresponding screen layouts.
+
 `ServiceComposeRule.kt` and `AppNavigationTestActions.kt` provide device setup/
 cleanup and navigation helpers. Fixture `/test/*` controls reset scenario state,
 inject delays/failures/visibility/metadata, and expose captured requests. They are

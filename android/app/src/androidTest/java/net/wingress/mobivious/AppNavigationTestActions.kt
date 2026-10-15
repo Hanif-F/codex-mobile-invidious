@@ -35,6 +35,18 @@ internal fun ComposeTestRule.openGlobalSearch() {
     else onNodeWithTag("global-search").performClick()
 }
 
+internal fun ComposeTestRule.openChannelSearch() {
+    if (onAllNodesWithTag("channel-search-expand").fetchSemanticsNodes().isNotEmpty())
+        onNodeWithTag("channel-search-expand").performScrollTo().performClick()
+    onNodeWithTag("channel-search").assertIsDisplayed()
+}
+
+internal fun ComposeTestRule.chooseChannelSort(value: String) {
+    if (onAllNodesWithTag("channel-sort-$value").fetchSemanticsNodes().isEmpty())
+        onNodeWithTag("channel-sort").performClick()
+    onNodeWithTag("channel-sort-$value").performClick()
+}
+
 /** Leave a preference page after its automatic writes complete; entity editors keep submit buttons. */
 internal fun ComposeTestRule.finishAutomaticPreferencePage() {
     var activity: MainActivity?=null

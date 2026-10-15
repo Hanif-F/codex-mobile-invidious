@@ -230,7 +230,13 @@ class ChannelSpoilersSmokeTest {
         until { compose.onAllNodesWithTag("download-entry-$record").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(original).assertDoesNotExist()
         captureWatchScreenshot("spoiler-hidden-download")
-        compose.runOnUiThread { activity.model.playDownload(record) }
+        compose.onNodeWithTag("spoiler-thumbnail-testvideo01").performClick()
+        compose.onNodeWithTag("spoiler-thumbnail-testvideo01").assertDoesNotExist()
+        assertNull(activity.model.playback.value.downloadId)
+        compose.onNodeWithTag("spoiler-title-reveal-testvideo01").performClick()
+        compose.onNodeWithText(original).assertExists()
+        assertNull(activity.model.playback.value.downloadId)
+        compose.onNodeWithTag("download-entry-$record").performClick()
         until(60_000) { activity.model.playback.value.playerState == Player.STATE_READY && controllerTitle()?.startsWith("Title hidden") == true }
         compose.runOnUiThread { assertNull(activity.model.controller.value!!.mediaMetadata.artworkUri) }
     }

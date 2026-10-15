@@ -48,6 +48,28 @@ Channels/scoped search and uploads. Channel banner/identity precede tabs, sortin
 scoped search and results. The channel header uses the same explicit neutral
 surface in light/dark appearance, with or without banner artwork or thin mode.
 
+Media list rows share 16:9 artwork at 160×90dp in comfortable mode and 144×81dp
+in compact mode. This includes playlist/history videos, clips, playlist cards,
+downloads, compact feeds and queue items. Artwork stacks above metadata when the
+usable row width is below 320dp or font scale exceeds 1.3. Thin mode keeps the
+space available to text; spoiler controls, AI warnings and watched indicators
+retain their existing behavior.
+
+Channel tabs occupy their own row. Sorting shares the next row with a search
+icon: measured sort choices appear as pills when they fit, otherwise as a
+dropdown. Sort pills use fully rounded ends, smaller labels and a default 32dp visual
+height, below the page tabs' size, while retaining 48dp touch targets.
+Tapping search expands and focuses the field inline, reserving at
+least 160dp and condensing sorting as needed. An empty field collapses after
+focus leaves it; drafts and submitted queries stay visible. Opening and
+dismissing an empty field do not submit a search.
+
+Downloads open offline playback when any non-control part of a playable entry
+is tapped. A trailing three-dot menu contains Details, available Cancel/Retry
+actions, Save to files and Delete. Incomplete entries keep their status and
+actions available while playback is disabled. Spoiler reveals and menu actions
+keep their independent tap behavior.
+
 `AppWindowLayout` observes WindowManager folding features. An opaque separating
 hinge selects the larger contiguous pane. Watch stacks unless an expanded window
 can provide at least 480dp for the player and 320dp for its supporting pane.

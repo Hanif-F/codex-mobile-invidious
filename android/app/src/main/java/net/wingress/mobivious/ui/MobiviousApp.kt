@@ -729,10 +729,9 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
     }
     val cardModifier = Modifier.fillMaxWidth().padding(horizontal = AppTokens.inset, vertical = if (compact) 8.dp else 12.dp)
         .testTag("video-card-${video.id}").semantics { if (indicator.description.isNotEmpty()) stateDescription = indicator.description }
-    if (compact && (!libraryRow || LocalDensity.current.fontScale <= 1.3f)) Row(cardModifier, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        thumbnail(Modifier.width(if (libraryRow) if (prefs.uiDensity == "compact") 80.dp else 112.dp else if (LocalDensity.current.fontScale > 1.3f) 96.dp else 128.dp))
-        metadata(Modifier.weight(1f))
-    } else Column(cardModifier) {
+    if (compact) MediaListLayout(prefs.uiDensity == "compact", cardModifier,
+        artwork = thumbnail.takeIf { !prefs.thinMode || warning != null }, content = metadata)
+    else Column(cardModifier) {
         thumbnail(Modifier.fillMaxWidth())
         metadata(Modifier.padding(top = 10.dp))
     }

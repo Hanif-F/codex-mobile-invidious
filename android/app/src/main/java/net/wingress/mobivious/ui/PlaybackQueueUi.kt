@@ -54,6 +54,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
             watched.takeIf { it.context == ApiContext(vm.store.server, account, vm.store.contextGeneration) } ?: WatchedState())
         val eligible = QueueRules.eligible(entry, prefs.showMemberVideos)
         QueueVideoRow(entry, entry.key == state.currentKey, vm.store.server, prefs.thinMode, indicator, eligible,
+            compact = prefs.uiDensity == "compact",
             hiddenMember = entry.video.membersOnly && !prefs.showMemberVideos,
             aiWarning = if (entry.downloadId == null) vm.aiDecision(entry.video, AiPageGroup.OTHER, aiState).warning else null,
             artwork = { modifier -> ChannelSpoilerArtwork(vm, entry.video, modifier, { vm.selectQueue(entry.key) }, offline = entry.downloadId != null) { revealed ->
@@ -131,6 +132,7 @@ internal fun PlaybackQueueContent(state: PlaybackQueueSnapshot, expanded: Boolea
 @Composable
 internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: String, thinMode: Boolean,
     indicator: VideoIndicator, eligible: Boolean, hiddenMember: Boolean = false, aiWarning: AiListKind? = null,
+    compact: Boolean = false,
     play: () -> Unit, channel: (String) -> Unit,
     artwork: (@Composable (Modifier) -> Unit)? = null,
     title: @Composable (Modifier) -> Unit = { modifier -> Text(entry.video.title, modifier, maxLines = 2,
@@ -138,7 +140,7 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
         fontWeight = if (current) FontWeight.Bold else FontWeight.Medium) },
     actions: @Composable () -> Unit) {
     val video = entry.video
-    Row(Modifier.fillMaxWidth().background(if (current) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+    MediaListLayout(compact, Modifier.fillMaxWidth().background(if (current) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
         .testTag("queue-occurrence-${entry.key}")
         .semantics {
             selected = current
@@ -148,8 +150,8 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
         }
         .clickable(enabled = eligible, role = Role.Button, onClickLabel = "Play video", onClick = play)
         .heightIn(min = 96.dp).padding(start = 12.dp, top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (!thinMode || aiWarning != null) Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface)) {
+        verticalAlignment = Alignment.CenterVertically,
+        artwork = if (!thinMode || aiWarning != null) ({ modifier -> Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface)) {
             if (artwork != null) artwork(Modifier.fillMaxSize())
             else if (aiWarning != null) AiThumbnail(aiWarning, Modifier.fillMaxSize(), compact = true)
             else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
@@ -160,25 +162,27 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
                         progressBarRangeInfo = ProgressBarRangeInfo(indicator.percent?.div(100f) ?: 1f, 0f..1f)
                     }, gapSize = 0.dp, drawStopIndicator = {})
             }
-        }
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            if (current) Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-                Text("Now playing", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+        } }) else null) { modifier ->
+        Row(modifier, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                if (current) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                    Text("Now playing", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                }
+                title(Modifier.fillMaxWidth())
+                if (entry.removed) Text("Removed from queue", style = MaterialTheme.typography.labelSmall)
+                if (video.unavailable) Text("Unavailable video", style = MaterialTheme.typography.labelSmall)
+                else if (hiddenMember) Text("Hidden by members-only setting", style = MaterialTheme.typography.labelSmall)
+                if (video.membersOnly) MembersBadge(video.id)
+                if (video.author.isNotBlank() || video.channelId.isNotBlank()) ChannelAuthor(server, video.authorAvatar,
+                    video.author.ifBlank { "Unknown channel" }, Avatars.show(thinMode, video.channelId),
+                    tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null, maxLines = 1)
+                val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
+                if (duration.isNotBlank()) Text(duration, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (indicator.watched) Text("Watched", Modifier.testTag("video-watched-${video.id}"), style = MaterialTheme.typography.labelSmall)
+                if (thinMode) indicator.percent?.let { Text("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelSmall) }
             }
-            title(Modifier.fillMaxWidth())
-            if (entry.removed) Text("Removed from queue", style = MaterialTheme.typography.labelSmall)
-            if (video.unavailable) Text("Unavailable video", style = MaterialTheme.typography.labelSmall)
-            else if (hiddenMember) Text("Hidden by members-only setting", style = MaterialTheme.typography.labelSmall)
-            if (video.membersOnly) MembersBadge(video.id)
-            if (video.author.isNotBlank() || video.channelId.isNotBlank()) ChannelAuthor(server, video.authorAvatar,
-                video.author.ifBlank { "Unknown channel" }, Avatars.show(thinMode, video.channelId),
-                tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null, maxLines = 1)
-            val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
-            if (duration.isNotBlank()) Text(duration, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (indicator.watched) Text("Watched", Modifier.testTag("video-watched-${video.id}"), style = MaterialTheme.typography.labelSmall)
-            if (thinMode) indicator.percent?.let { Text("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelSmall) }
+            actions()
         }
-        actions()
     }
 }

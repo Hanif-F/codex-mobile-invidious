@@ -5,6 +5,8 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.*
 import org.json.JSONObject
 import org.junit.*
@@ -53,7 +55,7 @@ class SearchHistorySmokeTest {
     }
     private fun submit(tag: String, text: String) {
         if (tag == "main-search") compose.openGlobalSearch()
-        if (tag == "channel-search") compose.onNodeWithTag(tag).assertIsDisplayed()
+        if (tag == "channel-search") compose.openChannelSearch()
         compose.onNodeWithTag(tag).performTextReplacement(text)
         compose.onNodeWithTag(tag).performImeAction()
         until { !vm.browse.value.loading }
@@ -108,8 +110,12 @@ class SearchHistorySmokeTest {
         compose.runOnUiThread { vm.navigate("Popular", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
         until { !vm.browse.value.loading && vm.channel.value != null }
         choose(ChannelTab.STREAMS)
-        compose.onNodeWithTag("channel-search").assertIsDisplayed()
+        captureWatchScreenshot("channel-collapsed-search-and-sorting")
+        compose.openChannelSearch()
         compose.onNodeWithTag("channel-search").performTextReplacement("many")
+        compose.onNodeWithTag("channel-search").assertTextContains("many")
+        compose.waitForIdle()
+        captureWatchScreenshot("channel-expanded-inline-search")
         assertTrue(requests().isEmpty()); assertEquals("streamvid01", vm.browse.value.videos.single().id)
         compose.onNodeWithTag("channel-search").performImeAction()
         until { !vm.browse.value.loading && vm.browse.value.videos.size == 20 }
@@ -136,6 +142,39 @@ class SearchHistorySmokeTest {
         until { !vm.browse.value.loading && vm.scopedSearch.value.submitted.isBlank() }
         assertEquals(ChannelTab.STREAMS, vm.channelTab.value)
         assertEquals("streamvid01", vm.browse.value.videos.single().id)
+    }
+
+    @Test fun channelSearchOpeningBlurAndRecreationKeepSubmissionExplicit() {
+        compose.runOnUiThread { vm.navigate("Popular", "channel:UCaaaaaaaaaaaaaaaaaaaaaa") }
+        until { !vm.browse.value.loading && vm.channel.value != null }
+        val channelRequests = fixture().getJSONArray("channelRequests").length()
+        compose.openChannelSearch()
+        compose.onNodeWithTag("channel-tab-videos").performClick()
+        compose.onNodeWithTag("channel-search").assertDoesNotExist()
+        assertEquals(channelRequests, fixture().getJSONArray("channelRequests").length())
+        assertTrue(requests().isEmpty())
+
+        compose.openChannelSearch()
+        compose.onNodeWithTag("channel-search").performTextReplacement("many")
+        val previous = activity
+        compose.runOnUiThread { activity.recreate() }
+        until {
+            var restored = false
+            compose.runOnUiThread {
+                restored = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                    .any { it is MainActivity && it !== previous }
+            }
+            restored
+        }
+        compose.runOnUiThread {
+            activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                .filterIsInstance<MainActivity>().single()
+        }
+        compose.onNodeWithTag("channel-search").assertTextContains("many")
+        assertTrue(requests().isEmpty())
+        compose.onNodeWithTag("channel-search-submit").performClick()
+        until { !vm.browse.value.loading && vm.scopedSearch.value.submitted == "many" }
+        assertEquals(1, requests().size)
     }
 
     @Test fun subscriptionSearchLoadsBeyondHiddenPagesAndIgnoresFeedOnlyFilters() {

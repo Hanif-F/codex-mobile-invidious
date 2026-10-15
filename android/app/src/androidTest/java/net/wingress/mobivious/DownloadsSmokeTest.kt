@@ -5,6 +5,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
 import androidx.compose.ui.test.*
+import androidx.compose.ui.geometry.Offset
 import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -74,14 +75,69 @@ class DownloadsSmokeTest {
         command("downloads", """{"downloadDisabled":true}""")
         val requests=state().getJSONArray("downloadRequests").length()
         compose.runOnUiThread { activity.model.navigate("You","downloads",rememberOrigin=true) }
-        compose.onNodeWithTag("download-details-$id").performScrollTo().performClick()
+        compose.onNodeWithTag("download-details-$id").assertDoesNotExist()
+        compose.onNodeWithTag("download-actions-$id").performScrollTo().performClick()
+        compose.onNodeWithTag("download-details-$id").performClick()
         compose.onNodeWithTag("download-details-sheet").assertIsDisplayed()
+        assertNull(activity.model.playback.value.downloadId)
         compose.onNodeWithText("Downloaded").assertIsDisplayed()
         compose.onNodeWithContentDescription("Close download details").performClick()
         compose.onNodeWithTag("download-entry-$id").assertIsDisplayed()
         assertEquals(requests,state().getJSONArray("downloadRequests").length())
         assertTrue(app.downloads.find(id)!!.playable)
         captureWatchScreenshot("download-details-local-return")
+    }
+
+    @Test fun artworkTitleStatusAndPaddingOpenTheSameOfflineDownload() {
+        val id = create(DownloadSelection("v360", "aen")); ready(id)
+        until { app.downloads.find(id)!!.assets.all { it.status == DownloadStatus.COMPLETE } }
+        compose.runOnUiThread { activity.model.navigate("You", "downloads", rememberOrigin = true) }
+        compose.onNodeWithTag("download-entry-$id").assertIsDisplayed()
+        compose.waitForIdle()
+        captureWatchScreenshot("downloads-larger-artwork")
+        val requestsBefore = state().getJSONArray("videoDetailRequests").length()
+        for (target in listOf("artwork", "title", "status", "padding")) {
+            val entry = compose.onNodeWithTag("download-entry-$id")
+            entry.performScrollTo()
+            val bounds = entry.fetchSemanticsNode().boundsInRoot
+            val point = when (target) {
+                "artwork" -> compose.onNodeWithTag("download-artwork-$id", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+                "title" -> compose.onNode(hasText(app.downloads.localDetails(app.downloads.find(id)!!).video.title) and
+                    hasAnyAncestor(hasTestTag("download-entry-$id")), useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+                "status" -> compose.onNodeWithTag("download-status-$id", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.center
+                else -> Offset(bounds.left + 4, bounds.top + 4)
+            }
+            entry.performTouchInput { click(point - bounds.topLeft) }
+            until { activity.model.playback.value.downloadId == id && activity.model.playback.value.playerState == Player.STATE_READY }
+            compose.onNodeWithTag("watch-content").assertExists()
+            compose.runOnUiThread { activity.model.closePlayer() }
+            until { activity.model.playback.value.downloadId == null }
+        }
+        assertEquals(requestsBefore, state().getJSONArray("videoDetailRequests").length())
+    }
+
+    @Test fun incompleteEntriesKeepActionsAvailableWithoutStartingPlayback() {
+        command("downloads", """{"downloadSlow":true}""")
+        val id = create(DownloadSelection(video = "v360"))
+        until { app.downloads.find(id)!!.active }
+        compose.runOnUiThread { activity.model.navigate("You", "downloads", rememberOrigin = true) }
+        compose.onNodeWithTag("download-entry-$id").assertIsNotEnabled().performTouchInput { click(Offset(4f, 4f)) }
+        assertNull(activity.model.playback.value.downloadId)
+        compose.onNodeWithTag("download-actions-$id").assertIsEnabled().performClick()
+        compose.onNodeWithTag("download-save-$id").assertIsNotEnabled()
+        compose.onNodeWithTag("download-cancel-$id").performClick()
+        until { !app.downloads.find(id)!!.active }
+        compose.onNodeWithTag("download-actions-$id").performClick()
+        compose.onNodeWithTag("download-details-$id").performClick()
+        compose.onNodeWithTag("download-details-sheet").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close download details").performClick()
+        command("downloads", """{"downloadSlow":false}""")
+        compose.onNodeWithTag("download-actions-$id").performClick()
+        compose.onNodeWithTag("download-retry-$id").performClick()
+        ready(id)
+        assertNull(activity.model.playback.value.downloadId)
+        compose.onNodeWithTag("download-entry-$id").assertIsEnabled().performClick()
+        until { activity.model.playback.value.downloadId == id }
     }
 
     @Test fun downloadsOverAnHourUseAnHourTimestamp() {
@@ -141,7 +197,7 @@ class DownloadsSmokeTest {
         val originalBackground = app.store.background; val originalPip = app.store.pip
         try {
             compose.runOnUiThread { app.store.background = true; app.store.pip = false; activity.model.navigate("You", "downloads", rememberOrigin = true) }
-            compose.onNodeWithTag("download-play-$id").performClick()
+            compose.onNodeWithTag("download-entry-$id").performClick()
             until { activity.model.playback.value.downloadId == id && activity.model.playback.value.playing }
             compose.onNodeWithTag("watch-content").assertExists()
             compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.speed(1.5f); activity.model.seekTo(2000) }

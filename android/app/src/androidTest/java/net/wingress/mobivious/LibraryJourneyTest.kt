@@ -79,6 +79,8 @@ class LibraryJourneyTest {
             compose.onNodeWithTag("playlist-form-title").performTextInput("An afternoon collection")
             capture("playlist-editor-$appearance")
             compose.onNodeWithContentDescription("Close").performClick()
+            compose.onNodeWithText("Discard playlist changes?").assertIsDisplayed()
+            compose.onNodeWithText("Discard").performClick()
             val playlist = vm.playlists.value.first { it.owned }
             compose.runOnUiThread { vm.openPlaylist(playlist) }
             until { vm.playlist.value?.id == playlist.id && !vm.browse.value.loading }
@@ -121,8 +123,10 @@ class LibraryJourneyTest {
         until { vm.downloads.find(id)?.assets?.any { it.status == DownloadStatus.FAILED } == true }
         capture("downloads-failed-light")
         command("downloads", """{"downloadFailKey":""}""")
-        compose.onNodeWithText("Retry", substring = false).performClick()
+        compose.onNodeWithTag("download-actions-$id").performClick()
+        compose.onNodeWithTag("download-retry-$id").performClick()
         until { vm.downloads.find(id)?.playable == true }
+        compose.onNodeWithTag("download-actions-$id").performClick()
         compose.onNodeWithTag("download-details-$id").performClick()
         capture("downloads-details-light")
         compose.onNodeWithContentDescription("Close download details").performClick()
@@ -134,7 +138,7 @@ class LibraryJourneyTest {
         capture("download-delete-dark")
         compose.onNodeWithText("Cancel", substring = false).performClick()
         assertNotNull(vm.downloads.find(id))
-        compose.onNodeWithTag("download-play-$id").performClick()
+        compose.onNodeWithTag("download-entry-$id").performClick()
         until { vm.playback.value.downloadId == id && vm.playback.value.playing }
         assertTrue(vm.playback.value.details!!.video.thumbnail.startsWith("file:"))
     }

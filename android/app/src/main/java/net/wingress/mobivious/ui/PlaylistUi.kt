@@ -49,10 +49,11 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
     val content: @Composable () -> Unit = {
         Column(Modifier.fillMaxWidth().clickable(onClick = open).testTag("playlist-card-${list.id}")
             .padding(horizontal = if (embedded) 0.dp else AppTokens.inset, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
-                    Modifier.size(if (prefs.uiDensity == "compact") 80.dp else 112.dp, if (prefs.uiDensity == "compact") 45.dp else 63.dp).clip(AppTokens.media), contentScale = ContentScale.Crop)
-                Column(Modifier.weight(1f)) {
+            MediaListLayout(prefs.uiDensity == "compact", artwork = if (!prefs.thinMode && list.thumbnail.isNotBlank()) ({ modifier ->
+                AsyncImage(resolved(vm.store.server, list.thumbnail), null,
+                    modifier.aspectRatio(16f / 9f).clip(AppTokens.media), contentScale = ContentScale.Crop)
+            }) else null) { modifier ->
+                Column(modifier) {
                     Text(list.title, fontWeight = FontWeight.SemiBold)
                     Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
                         style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)

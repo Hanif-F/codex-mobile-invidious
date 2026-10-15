@@ -104,8 +104,7 @@ class SubscriptionPresentationTest {
             } }
         } }
         compose.onNodeWithTag("channel-tab-streams").performScrollTo().performClick().assertIsSelected()
-        compose.onNodeWithTag("channel-sort").performClick()
-        compose.onNodeWithTag("channel-sort-oldest").performClick()
+        compose.chooseChannelSort("oldest")
         assertEquals(ChannelSort.OLDEST, sort)
         compose.onNodeWithTag("channel-tab-channels").performScrollTo().performClick().assertIsSelected()
         compose.onNodeWithTag("channel-sort").assertDoesNotExist()

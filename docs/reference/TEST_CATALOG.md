@@ -700,6 +700,15 @@ Test support/helper file; no declared `@Test` methods.
 - `subscriptionsHistoryAndPlaylistCreatorsUseExistingPayloads`
 - `thinModeMakesNoAvatarRequestsAndFailuresKeepAuthorsUsable`
 
+### ChannelControlsPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChannelControlsPresentationTest.kt) — Adaptive channel sorting, inline search focus/blur, draft restoration, selection and explicit submission checks.
+
+- `emptySearchCollapsesOnBlurButDraftAndSubmittedQueriesRemain`
+- `sortingAdaptsWhileFocusedAndKeepsTheQueryAndSelection`
+- `restoredDraftStaysExpandedAndClearReturnsToTheSearchIcon`
+- `sortPillsUseSmallerLabelsThanPageTabsAndKeepTheirTouchTargets`
+
 ### ChannelDescriptionPresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChannelDescriptionPresentationTest.kt) — Channel Description Presentation declared scenarios; exact cases are enumerated in the test catalog.
@@ -908,6 +917,8 @@ Test support/helper file; no declared `@Test` methods.
 Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during accepted video conversion. Run on a physical device or fixed emulator."
 
 - `savedDownloadDetailsUseALocalOpaqueSheetAndKeepTheEntry`
+- `artworkTitleStatusAndPaddingOpenTheSameOfflineDownload`
+- `incompleteEntriesKeepActionsAvailableWithoutStartingPlayback`
 - `downloadsOverAnHourUseAnHourTimestamp`
 - `dialogRequiresMediaPreservesSelectionAndCreatesDuplicates`
 - `allModesAndCaptionsDecodeOfflineWithoutMediaOrMetadataRequests`
@@ -987,6 +998,13 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `pipAndBackgroundSuspendRequestsAndRestoreAtTheCurrentPosition`
 - `invalidFilterTextDoesNotBlockAnIndependentTimestampChoice`
 - `staleChatCallbacksCannotWriteIntoAnotherVideoOrAccount`
+
+### MediaListPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/MediaListPresentationTest.kt) — Shared media artwork dimensions, phone/tablet density, RTL, narrow/large-text stacking and hidden-thumbnail layout checks.
+
+- `phoneAndTabletRowsUseLargerArtworkInBothDensitiesAndDirections`
+- `narrowAndLargeTextRowsStackAndThinRowsReturnTheArtworkSpace`
 
 ### MetadataPresentationTest
 
@@ -1132,6 +1150,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `imeSubmissionPreservesPastedVideoTimestamps`
 - `channelSearchPaginationAndClearRestoreSelectedStreams`
 - `emptyScopedSubmissionRestoresTheSelectedChannelTab`
+- `channelSearchOpeningBlurAndRecreationKeepSubmissionExplicit`
 - `subscriptionSearchLoadsBeyondHiddenPagesAndIgnoresFeedOnlyFilters`
 - `historySearchCoversLaterPagesAndDateGroupsKeepUnknownEntries`
 - `historyRemovalPreservesProgressAndClearRequiresConfirmation`
@@ -1305,4 +1324,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **768 declared test methods** (including ignored tests).
+Inventory total: **777 declared test methods** (including ignored tests).
