@@ -68,8 +68,9 @@ def generate_rich():
     for group, (label, lang, role) in zip(audio, [('English', 'en', 'main'), ('English', 'en', 'main'),
                                               ('English Stable Volume', 'en', 'main'), ('Spanish', 'es', 'alternate')]):
         group.set('lang', lang)
-        ET.SubElement(group, f'{{{ns}}}Label').text = label
-        ET.SubElement(group, f'{{{ns}}}Role', {'schemeIdUri': 'urn:mpeg:dash:role:2011', 'value': role})
+        description = ET.Element(f'{{{ns}}}Label'); description.text = label
+        group.insert(0, description)
+        group.insert(1, ET.Element(f'{{{ns}}}Role', {'schemeIdUri': 'urn:mpeg:dash:role:2011', 'value': role}))
     tree.write(manifest, encoding='utf-8', xml_declaration=True)
     (directory / '.complete').touch()
 
@@ -128,6 +129,34 @@ def generate_codecs():
 
 generate_rich()
 generate_codecs()
+
+
+def generate_audio_variants():
+    ns = 'urn:mpeg:dash:schema:mpd:2011'
+    ET.register_namespace('', ns)
+    directory = args.media_dir / 'rich'
+    # Repair cached manifests too. Media3 reads roles while parsing each
+    # representation, so DASH descriptors must precede those representations.
+    base = ET.parse(directory / 'dash.mpd')
+    for group in base.findall(f'.//{{{ns}}}AdaptationSet[@contentType="audio"]'):
+        descriptors = [child for child in group if child.tag in (f'{{{ns}}}Label', f'{{{ns}}}Role')]
+        for child in reversed(descriptors):
+            group.remove(child); group.insert(0, child)
+    base.write(directory / 'dash.mpd', encoding='utf-8', xml_declaration=True)
+    for variant in ('no-stable', 'regional'):
+        tree = ET.parse(directory / 'dash.mpd')
+        for period in tree.findall(f'.//{{{ns}}}Period'):
+            for group in period.findall(f'{{{ns}}}AdaptationSet[@contentType="audio"]'):
+                label = group.find(f'{{{ns}}}Label')
+                if variant == 'no-stable' and label is not None and 'Stable Volume' in label.text:
+                    period.remove(group)
+                if variant == 'regional' and group.get('lang') == 'es':
+                    group.set('lang', 'pt-BR')
+                    label.text = 'Portuguese (Brazil)'
+        tree.write(directory / f'{variant}.mpd', encoding='utf-8', xml_declaration=True)
+
+
+generate_audio_variants()
 
 
 def generate_shapes():

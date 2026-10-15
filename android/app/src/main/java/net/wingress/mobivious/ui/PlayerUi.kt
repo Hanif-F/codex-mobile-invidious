@@ -325,7 +325,8 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     val captions = playback.trackChoices(C.TRACK_TYPE_TEXT)
     val selection = playback.selection
     val audioOnly = selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true
-    val audioAuto = selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_AUDIO } != false && selection?.preferredAudioLanguages.isNullOrEmpty()
+    val audioAuto = if (playback.audioSelection.enabled) playback.audioSelection.manual == null else
+        selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_AUDIO } != false && selection?.preferredAudioLanguages.isNullOrEmpty()
     val selectedCaption = if (selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) == true) null else captions.firstOrNull { it.selected }
     val qualityAuto = playback.videoSelection.mode == net.wingress.mobivious.player.VideoSelectionMode.AUTO
     val selectedVideo = if (qualityAuto) null else playback.videoSelection.fixed(video)

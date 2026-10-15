@@ -51,7 +51,9 @@ class PlaybackService : MediaSessionService() {
         const val QUEUE_SETTINGS = "mobivious.queue.settings"
         const val VIDEO_AUTO = "mobivious.video.auto"
         const val VIDEO_SELECT = "mobivious.video.select"
-        val QUEUE_COMMANDS = listOf(DOWNLOAD_START, CLIP_FULL_VIDEO, QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_REFRESH, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT)
+        const val AUDIO_AUTO = "mobivious.audio.auto"
+        const val AUDIO_SELECT = "mobivious.audio.select"
+        val QUEUE_COMMANDS = listOf(DOWNLOAD_START, CLIP_FULL_VIDEO, QUEUE_START, QUEUE_INSERT, QUEUE_REMOVE, QUEUE_DELETE_SOURCE, QUEUE_RETRY, QUEUE_REFRESH, QUEUE_MORE, QUEUE_CLOSE, QUEUE_STATE, QUEUE_SETTINGS, VIDEO_AUTO, VIDEO_SELECT, AUDIO_AUTO, AUDIO_SELECT)
     }
     private lateinit var player: ExoPlayer
     private lateinit var session: MediaSession
@@ -207,10 +209,13 @@ class PlaybackService : MediaSessionService() {
             QUEUE_CLOSE -> queue.close()
             QUEUE_SETTINGS -> queue.settings(AccountPreferences.parse(JSONObject(args.getString("settings") ?: "{}")))
             VIDEO_AUTO -> if (!queue.autoVideo(args.getString("occurrence").orEmpty())) return SessionResult(SessionError.ERROR_INVALID_STATE)
-            VIDEO_SELECT -> {
+            AUDIO_AUTO -> if (!queue.autoAudio(args.getString("occurrence").orEmpty())) return SessionResult(SessionError.ERROR_INVALID_STATE)
+            VIDEO_SELECT, AUDIO_SELECT -> {
                 val format = runCatching { Format.fromBundle(args.getBundle("format") ?: return SessionResult(SessionError.ERROR_BAD_VALUE)) }.getOrNull()
                     ?: return SessionResult(SessionError.ERROR_BAD_VALUE)
-                if (!queue.manualVideo(args.getString("occurrence").orEmpty(), StreamKey.of(format))) return SessionResult(SessionError.ERROR_INVALID_STATE)
+                val selected = if (action == AUDIO_SELECT) queue.manualAudio(args.getString("occurrence").orEmpty(), StreamKey.of(format))
+                    else queue.manualVideo(args.getString("occurrence").orEmpty(), StreamKey.of(format))
+                if (!selected) return SessionResult(SessionError.ERROR_INVALID_STATE)
             }
         }
         return SessionResult(SessionResult.RESULT_SUCCESS)

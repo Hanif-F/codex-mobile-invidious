@@ -100,9 +100,24 @@ Manual choices use a `StreamKey` containing representation identity and format
 properties instead of retaining stale TrackGroup objects. Reload restores keys
 when available; missing manual video falls back to captured defaults. The selector
 applies capability/codec decisions before the first DASH video segment request.
-Audio/text overrides are similarly reapplied after tracks become ready. Auto
-audio clears explicit overrides and preferred language; caption Off disables text.
+Text overrides are reapplied after tracks become ready; caption Off disables text.
 Online speed changes update the shared/guest default; offline speed changes do not.
+
+`AudioSelection` captures `preferred_audio` per online occurrence. Original selects
+regular original audio; Original (Stable Volume) selects its processed variant.
+Languages select regular audio with exact tags first; only a general language can
+fall back to regional tags. Matching candidates prefer highest bitrate, then
+manifest order. Missing choices fall back to regular original audio; unknown
+original identity preserves Media3's playable default. Legacy manifest language
+tags (for example `in` for Indonesian) canonicalize before matching.
+
+The selector applies audio policy before the first segment and the coordinator
+reapplies it when tracks change. Manual choices retain logical audio identity,
+language, processing, codec and bitrate across refresh/retry and UI reconnection;
+a vanished track falls back to regular original audio. Auto restores the captured
+preference. Later saved defaults apply to the next occurrence. Audio-only mode
+uses the same policy. Progressive embedded audio and downloaded tracks keep their
+existing behavior; native playback does not use `/latest_version` audio selectors.
 
 ## Link playback and bounded ranges
 

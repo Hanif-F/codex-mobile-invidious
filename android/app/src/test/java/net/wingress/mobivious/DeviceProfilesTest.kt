@@ -48,6 +48,16 @@ class DeviceProfilesTest {
         reopened.purge(alice)
         assertNull(p.value(alice, "pip")); assertEquals(false, p.value(guest, "background")); assertEquals("bob", p.value(bob, "chat.appearance"))
     }
+    @Test fun guestAudioPreferencesSurviveRecreationAndStayWithinTheirInstanceAndProfile() {
+        val memory = Memory(); val profiles = DeviceProfiles(memory)
+        profiles.write(guest, "preferences", AccountPreferences(preferredAudio = "pt-BR").json().toString())
+        val other = guest.copy(server = "https://other.test")
+        profiles.write(other, "preferences", AccountPreferences(preferredAudio = "id").json().toString())
+        val reopened = DeviceProfiles(memory)
+        assertEquals("pt-BR", LocalPreferences.read(JSONObject(reopened.value(guest, "preferences") as String)).preferredAudio)
+        assertEquals("id", LocalPreferences.read(JSONObject(reopened.value(other, "preferences") as String)).preferredAudio)
+        assertNull(reopened.value(alice, "preferences")); assertNull(reopened.value(bob, "preferences"))
+    }
     @Test fun legacyUnownedValuesGoOnlyToGuestsAndMigrationIsRepeatable() {
         val m = Memory(); val p = DeviceProfiles(m)
         m.data.putAll(mapOf("background" to false, "pip" to false, "speed" to 1.5f, "region" to "ID",

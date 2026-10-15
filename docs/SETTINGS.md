@@ -30,6 +30,7 @@ opened occurrence; current player controls are described separately below.
 | Speed | `speed` | 1 | 0.25–2 inclusive; UI offers quarter steps. Shared. |
 | Quality / `qualityDash` | `quality_dash` | `auto` | Auto, Best, Worst, 4320/2160/1440/1080/720/480/360/240/144p. Shared. |
 | Codec / `videoCodec` | `video_codec` | `auto` | Auto, AV1 (`av1`), H.264 (`h264`). Preference applies to DASH. Shared. |
+| Preferred audio / `preferredAudio` | `preferred_audio` | `original` | Original Audio, Original Audio (Stable Volume), or a supported language/region tag. Shared. |
 | Caption priority | `captions` | three empty strings | First available language among three priorities; empty means None. Accepts web English names or language tags. Shared. |
 | Background playback | local `background` | true | Profile-local, saves immediately. |
 | Picture in picture | local `pip` | true | Profile-local, saves immediately; device must support PiP. |
@@ -38,6 +39,14 @@ Invalid/non-finite saved speed becomes 1. Unsupported codec becomes Auto. A fixe
 resolution selects the best supported representation at or below that height;
 codec preference is resolved within that height. Auto remains bandwidth adaptive.
 Defaults do not create tracks missing from the manifest or unsupported by the device.
+
+Preferred audio selects the highest-bitrate supported matching track. General
+languages can match regional tracks; regional preferences require an exact match.
+Missing choices fall back to regular original audio, or retain the playable
+default when original identity is unknown. Playback defaults apply to the next
+occurrence. In-player manual audio lasts for the current occurrence, including
+refresh/retry; Auto restores its captured preference. Guests save per instance.
+Progressive sources retain embedded audio; downloads keep their saved tracks.
 
 ## Appearance and browsing
 

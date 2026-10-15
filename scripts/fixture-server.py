@@ -43,7 +43,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
              authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
 default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
-                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', video_codec='auto', captions=['', '', ''],
+                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', video_codec='auto', preferred_audio='original', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
                      related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
@@ -557,7 +557,8 @@ class Handler(BaseHTTPRequestHandler):
             if p.endswith('othervideo1'): selected = visibility_other
             if p.endswith('membervid01'): selected = visibility_member
             codec_manifest = {'codec': 'dash.mpd', 'codec-unsupported': 'unsupported.mpd', 'codec-missing': 'missing.mpd'}.get(state['stream'])
-            dash = f'/media/codec/{codec_manifest}' if codec_manifest else '/media/rich/dash.mpd' if state['stream'] == 'rich' else '/media/dash.mpd'
+            audio_manifest = {'rich': 'dash.mpd', 'rich-legacy': 'dash.mpd', 'rich-no-stable': 'no-stable.mpd', 'rich-regional': 'regional.mpd'}.get(state['stream'])
+            dash = f'/media/codec/{codec_manifest}' if codec_manifest else f'/media/rich/{audio_manifest}' if audio_manifest else '/media/dash.mpd'
             state['videoDetailRequests'].append(dict(videoId=selected['videoId'], query=parse_qs(urlparse(self.path).query)))
             info = dict(description='A generated test video. No YouTube access is involved.')
             if state['videoInformation']:
@@ -573,7 +574,7 @@ class Handler(BaseHTTPRequestHandler):
                             storyboardWidth=5, storyboardHeight=5, storyboardCount=1)])
             self.respond(dict(**selected, **info,
                               dashUrl='' if state['stream'] == 'mp4' else dash, formatStreams=[dict(url='/media/fixture.mp4', type='video/mp4', quality='medium')] if state['stream'] == 'mp4' else [],
-                              adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or state['stream'] == 'rich' else [],
+                              adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or audio_manifest and state['stream'] != 'rich-legacy' else [],
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
                               recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
                                                  if state['duplicateRecommendations'] else browse_videos() if state.get('performance') else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),

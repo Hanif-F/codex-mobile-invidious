@@ -180,6 +180,7 @@ and all writes have no offline mutation queue. See [Storage](STORAGE_AND_SECURIT
 | Capability | Server requirement / fallback |
 | --- | --- |
 | Public browsing/playback | Standard compatible Invidious metadata/media APIs; optional fields can be omitted. |
+| Preferred audio | Shared `preferred_audio` field and native PATCH validation from the matching server update; playback uses existing manifests/audio metadata, with manifest fallback. No migration or new scopes. |
 | Native login/registration/account management | Mobile/account extensions; old server explains update. New permission groups may require renewed sign-in. |
 | History/progress, blocks, subscription search | Fork extensions and matching native scopes. Renew old tokens after scope additions. |
 | Saved playlists/RSS | Fork APIs/scopes and migration 20 for per-account bookmarks/backfill. |
@@ -195,6 +196,13 @@ These are requirements recorded by this repository, not a live capability probe
 of any production instance. Install/update/migrate the sibling server separately
 using [Deployment](../deploy/README.md). Public API availability does not by itself
 prove the corresponding account permission or upstream content availability.
+
+Preferred audio uses `original`, `original_stable`, or a canonical supported
+language tag such as `id` or `pt-BR` in preference GET and sparse PATCH. Invidious
+commit `2ea80795` supplies the web field; its native PATCH allowlist also needs
+the accompanying extension. Older servers default missing values to original;
+rejected account saves retain normal Retry/Revert feedback. Android builds and
+local fixture tests need no deployed server update. Production account sync does.
 
 ## Channel title and thumbnail hiding
 

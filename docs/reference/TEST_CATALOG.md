@@ -35,6 +35,23 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `aLateBatchCannotRestoreAnOlderListSnapshot`
 - `pauseAndInstanceChangesCancelOldWorkAndDoNotScheduleDisabledLists`
 
+### AudioSelectionTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/AudioSelectionTest.kt) — Preferred-audio parsing, API patches, regional matching, original/DRC fallback and manual restoration scenarios.
+
+- `preferenceCatalogNormalizesAndKeepsRegionalChoicesWithoutCaptionVariants`
+- `storedPreferencesRoundTripAndOnlyPatchAudio`
+- `accountAudioPatchesAreAuthenticatedSparseAndReadsUseTheSameField`
+- `originalsStableAndDubsIgnoreManifestOrderingAndSelectHighestBitrate`
+- `regionalChoicesAreExactAndGeneralLanguagesPreferExactBeforeRegionalTracks`
+- `duplicateItagsAreMatchedUsingLanguageProcessingAndBitrate`
+- `processedDubsAreNotUsedForStableOriginalOrLanguagePreferences`
+- `unknownOriginalMetadataRetainsDefaultAndUnsupportedTracksAreExcluded`
+- `bitrateTiesRetainManifestOrderAcrossLanguageSortedMenus`
+- `manualTrackSurvivesRenditionIdChangesFallsBackAndAutoRestoresCapturedDefault`
+- `reusedRenditionIdCannotRestoreAnotherLanguage`
+- `legacyManifestLanguageTagsMatchCanonicalPreferences`
+
 ### AvatarsTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/AvatarsTest.kt) — Avatars declared scenarios; exact cases are enumerated in the test catalog.
@@ -206,6 +223,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 - `identitiesNormalizeInstancesAndIgnoreSessionsButDistinguishReusedNames`
 - `savesSurviveRecreationAndRemainIndependentForGuestAndTwoAccounts`
+- `guestAudioPreferencesSurviveRecreationAndStayWithinTheirInstanceAndProfile`
 - `legacyUnownedValuesGoOnlyToGuestsAndMigrationIsRepeatable`
 - `existingDestinationWinsAndOtherInstanceGuestPreferencesRemainSeparate`
 - `failedMigrationAndTransferDoNotDeleteSourcesOrAdvanceMarker`
@@ -1120,6 +1138,7 @@ Test support/helper file; no declared `@Test` methods.
 - `guestPlaybackDefaultsAndLocalResumeReachPlayer`
 - `failedAutomaticSaveKeepsRequestedValueAcrossNavigationRecreationAndRetry`
 - `codecSettingPrecedesQualityAndSyncsInBothDirections`
+- `preferredAudioSavesForGuestsAndAccountsAndRetainsFailedEdits`
 
 ### SponsorBlockSmokeTest
 
@@ -1137,6 +1156,8 @@ Test support/helper file; no declared `@Test` methods.
 
 - `exactTracksMenusRefreshRetryAndReconnection`
 - `savedQualityDefaultsSelectActualSupportedTracks`
+- `preferredAudioSelectsTheFirstSegmentIncludingFallbacksRegionsAndAudioOnly`
+- `manualAudioAndAutoSurviveRefreshRetryReconnectionAndNextVideoDefaults`
 - `codecPreferencesReachTheFirstDashSegmentAndFallbackWithinTheResolution`
 - `codecAutoAndManualChoicesSurviveRefreshRetryAndReconnection`
 - `nextQueueOccurrenceUsesSavedDefaultsAndMenusRetainAtMostFourPerGroup`
@@ -1252,4 +1273,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **735 declared test methods** (including ignored tests).
+Inventory total: **751 declared test methods** (including ignored tests).

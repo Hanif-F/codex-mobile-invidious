@@ -237,4 +237,34 @@ class SettingsSmokeTest {
         option("Auto").performClick(); save("Playback")
         assertEquals("auto", state().getJSONObject("preferences").getString("video_codec"))
     }
+    @Test fun preferredAudioSavesForGuestsAndAccountsAndRetainsFailedEdits() {
+        fun option(label: String) = compose.onNode(hasText(label) and hasAnyAncestor(isPopup()))
+        open("Playback")
+        compose.onNodeWithText("Preferred audio track").performScrollTo().performClick()
+        option("Original Audio").assertIsSelected()
+        option("Original Audio (Stable Volume)").performClick(); save("Playback")
+        assertEquals("original_stable", SessionStore(activity).guestPreferences().preferredAudio)
+        compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
+        open("Playback")
+        command("sponsorblock", """{"failPreferences":true}""")
+        compose.onNodeWithText("Preferred audio track").performScrollTo().performClick()
+        option("Original Audio").assertIsSelected()
+        option("Original Audio (Stable Volume)").performClick()
+        until { activity.model.preferenceSaves.edits.value["preferred_audio"]?.error != null }
+        assertEquals("original", activity.model.preferences.value.preferredAudio)
+        recreate()
+        compose.onNodeWithText("Preferred audio track").performScrollTo().performClick()
+        option("Original Audio (Stable Volume)").assertIsSelected()
+        option("Original Audio (Stable Volume)").performClick()
+        command("sponsorblock", """{"failPreferences":false}""")
+        compose.onNodeWithText("Retry").performScrollTo().performClick(); save("Playback")
+        assertEquals("original_stable", state().getJSONObject("preferences").getString("preferred_audio"))
+        assertEquals("preserved", state().getJSONObject("preferences").getString("unrelated_setting"))
+        command("preferences", """{"preferred_audio":"pt-BR"}""")
+        compose.runOnUiThread { activity.model.refreshSharedSettings() }
+        until { activity.model.preferences.value.preferredAudio == "pt-BR" }
+        open("Playback")
+        compose.onNodeWithText("Portuguese (Brazil)").performScrollTo().assertExists()
+    }
 }

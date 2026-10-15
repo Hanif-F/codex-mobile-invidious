@@ -6,6 +6,7 @@ import androidx.media3.common.TrackGroup
 import androidx.media3.common.Tracks
 import androidx.media3.common.TrackSelectionParameters
 import net.wingress.mobivious.data.StreamFormat
+import net.wingress.mobivious.data.AudioPreferences
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -22,7 +23,8 @@ data class StreamKey(val id: String?, val language: String?, val label: String?,
 }
 data class StreamChoice(val group: TrackGroup, val index: Int, val key: StreamKey, val primary: String,
     val secondary: String, val selected: Boolean, val height: Int, val fps: Float, val bitrate: Long,
-    val section: AudioSection = AudioSection.OTHER, val identity: String = "", val codec: String = "", val originalIndex: Int = 0) {
+    val section: AudioSection = AudioSection.OTHER, val identity: String = "", val codec: String = "", val originalIndex: Int = 0,
+    val language: String = "", val original: Boolean = false, val stable: Boolean = false, val audioTrackId: String = "") {
     fun explicitlySelected(parameters: TrackSelectionParameters?) = parameters?.overrides?.get(group)?.trackIndices?.contains(index) == true
 }
 
@@ -30,7 +32,21 @@ data class StreamChoice(val group: TrackGroup, val index: Int, val key: StreamKe
 object StreamCatalog {
     private val qualifier = Regex("\\[\\s*\\d+(?:\\.\\d+)?k\\s*]|\\b(?:stable volume|drc|original audio|original)\\b", RegexOption.IGNORE_CASE)
     private fun normalized(name: String) = name.replace(qualifier, " ").replace(Regex("[·|]"), " ").trim().replace(Regex("\\s+"), " ").lowercase(Locale.ROOT)
-    private fun language(f: StreamFormat) = f.audio?.id?.substringBefore('.')?.lowercase(Locale.ROOT).orEmpty()
+    private val audioLanguageAliases by lazy {
+        (AudioPreferences.languages.map { (tag, _) ->
+            androidx.media3.common.util.Util.normalizeLanguageCode(tag).orEmpty() to tag.lowercase(Locale.ROOT)
+        } + listOf("in" to "id", "iw" to "he", "ji" to "yi", "tl" to "fil"))
+            .filter { it.first.isNotEmpty() && it.first != it.second }.sortedByDescending { it.first.length }
+    }
+    fun audioLanguage(value: String?): String {
+        val tag = value.orEmpty().substringBefore('.').replace('_', '-').lowercase(Locale.ROOT)
+        if (tag == "und") return ""
+        // Media3 expands some tags (id -> ms-ind, nb -> no-nob). Restore the
+        // preference catalog's tags while retaining real region/script suffixes.
+        val alias = audioLanguageAliases.firstOrNull { tag == it.first || tag.startsWith("${it.first}-") }
+        return if (alias == null) tag else alias.second + tag.removePrefix(alias.first)
+    }
+    private fun language(f: StreamFormat) = audioLanguage(f.audio?.id)
     private fun stable(f: StreamFormat) = f.drc == true || Regex("stable volume|\\bdrc\\b", RegexOption.IGNORE_CASE).containsMatchIn(f.audio?.name.orEmpty())
 
     /** Only use unambiguous metadata; itags alone are not audio identities. */
@@ -41,20 +57,22 @@ object StreamCatalog {
         val pool = ids.ifEmpty { candidates }
         val label = format.label.orEmpty()
         val name = normalized(label)
-        val lang = format.language?.lowercase(Locale.ROOT)?.takeUnless { it == "und" }.orEmpty()
+        val lang = audioLanguage(format.language)
+        fun matchesLanguage(f: StreamFormat) = lang.isEmpty() || language(f).isEmpty() || language(f) == lang ||
+            ('-' !in lang && language(f).startsWith("$lang-"))
         val drcHint = Regex("stable volume|\\bdrc\\b", RegexOption.IGNORE_CASE).containsMatchIn(label)
         val matching = pool.filter { f ->
             if (!audio) (format.height <= 0 || f.height == format.height || f.width == format.width) &&
                 (format.bitrate <= 0 || f.bitrate == format.bitrate.toLong()) &&
                 (format.codecs.isNullOrBlank() || codecLabel(format.codecs.orEmpty(), format.sampleMimeType.orEmpty()) == codecLabel(f.codec, f.mimeType))
-            else (lang.isEmpty() || language(f).isEmpty() || language(f) == lang) &&
+            else matchesLanguage(f) &&
                 (name.isEmpty() || f.audio?.name.isNullOrBlank() || normalized(f.audio.name) == name) &&
                 (label.isEmpty() || stable(f) == drcHint) &&
                 (format.bitrate <= 0 || f.bitrate <= 0 || f.bitrate == format.bitrate.toLong())
         }
         // A unique representation ID is sufficient when the manifest omits labels/details.
         return matching.singleOrNull() ?: ids.singleOrNull()?.takeIf { !audio ||
-            (lang.isEmpty() || language(it).isEmpty() || language(it) == lang) && (label.isEmpty() || stable(it) == drcHint) }
+            matchesLanguage(it) && (label.isEmpty() || stable(it) == drcHint) }
     }
 
     fun choices(tracks: Tracks, type: Int, formats: List<StreamFormat> = emptyList()): List<StreamChoice> {
@@ -84,12 +102,14 @@ object StreamCatalog {
                     else -> listOf(codec, bitrateLabel(bitrate), bytesLabel(meta?.bytes ?: 0)).filter { it.isNotEmpty() }.joinToString(" · ")
                 }
                 StreamChoice(group.mediaTrackGroup, index, StreamKey.of(f), primary, secondary, group.isTrackSelected(index),
-                    height, fps, bitrate, section, meta?.audio?.id ?: f.language ?: name, codec)
+                    height, fps, bitrate, section, meta?.audio?.id?.takeIf { it.isNotBlank() } ?: f.language ?: name, codec,
+                    language = meta?.let(::language)?.takeIf { it.isNotEmpty() } ?: audioLanguage(f.language),
+                    original = original, stable = isStable, audioTrackId = meta?.audio?.id.orEmpty())
             }
         }
         val indexed = raw.mapIndexed { index, entry -> entry.copy(originalIndex = index) }
         val ordered = if (type == C.TRACK_TYPE_VIDEO) rank(indexed) else if (type == C.TRACK_TYPE_AUDIO)
-            raw.sortedWith(compareBy<StreamChoice> { it.section.ordinal }.thenBy { it.identity }.thenByDescending { it.bitrate }) else raw
+            indexed.sortedWith(compareBy<StreamChoice> { it.section.ordinal }.thenBy { it.identity }.thenByDescending { it.bitrate }) else indexed
         if (type == C.TRACK_TYPE_VIDEO) return ordered
         return ordered.map { entry ->
             val peers = ordered.filter { if (type == C.TRACK_TYPE_VIDEO) it.height == entry.height && it.fps.roundToInt() == entry.fps.roundToInt() && it.codec == entry.codec

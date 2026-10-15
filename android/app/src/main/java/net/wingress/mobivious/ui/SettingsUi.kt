@@ -34,6 +34,7 @@ private val settingsPreferenceKeys = mapOf(
     "Autoplay opened videos" to "autoplay", "Next recommendation" to "continue", "Autoplay next video" to "continue_autoplay",
     "Loop videos by default" to "video_loop", "Audio only by default" to "listen", "Proxy video streams" to "local",
     "Default speed" to "speed", "Preferred video codec" to "video_codec", "Default quality" to "quality_dash",
+    "Preferred audio track" to "preferred_audio",
     "Caption priority 1" to "captions", "Caption priority 2" to "captions", "Caption priority 3" to "captions",
     "Default homepage" to "default_home", "Trending region" to "region", "Show related videos" to "related_videos",
     "Expand descriptions by default" to "extend_desc", "Show YouTube comments" to "comments",
@@ -200,6 +201,8 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString()) { update(value.copy(speed = it.toFloat())) }
                         SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec) { update(value.copy(videoCodec = it)) }
                         SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash) { update(value.copy(qualityDash = it)) }
+                        SettingsChoice("Preferred audio track", AudioPreferences.choices, value.preferredAudio) { update(value.copy(preferredAudio = it)) }
+                        Text("Use original audio if your choice is unavailable. General languages can match regional tracks; a regional choice requires an exact match.", style = MaterialTheme.typography.bodySmall)
                         Text("Playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
                     } }
                     item { AppSection {

@@ -40,6 +40,7 @@ import net.wingress.mobivious.player.SeekAccumulator
 import net.wingress.mobivious.player.PendingSeek
 import net.wingress.mobivious.player.StreamCatalog
 import net.wingress.mobivious.player.VideoSelection
+import net.wingress.mobivious.player.AudioSelection
 import net.wingress.mobivious.player.VideoGeometry
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
@@ -60,6 +61,7 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val speed: Float = 1f, val tracks: Tracks = Tracks.EMPTY, val selection: TrackSelectionParameters? = null,
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
     val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection(),
+    val audioSelection: AudioSelection = AudioSelection(),
     val geometry: VideoGeometry = VideoGeometry(), val clip: Clip? = null, val downloadId: String? = null)
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
@@ -473,7 +475,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (clipEditor.value.open && clipEditor.value.occurrence != state.currentKey) closeClipEditor()
             requestedVideo = state.current?.video?.id
             val old = playback.value.details?.video?.id
-            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection, clip = state.current?.clip, downloadId = state.current?.downloadId)
+            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection, audioSelection = state.audioSelection, clip = state.current?.clip, downloadId = state.current?.downloadId)
             if (old != state.details?.video?.id) {
                 playback.value = playback.value.copy(geometry = VideoGeometry())
                 cancelAccumulatedSeek(false)
@@ -1458,13 +1460,22 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             queueCommand(PlaybackService.VIDEO_SELECT) { putString("occurrence", queue.value.currentKey); putBundle("format", group.getFormat(index).toBundle()) }
             return
         }
+        if (group.type == C.TRACK_TYPE_AUDIO && queue.value.audioSelection.enabled) {
+            queueCommand(PlaybackService.AUDIO_SELECT) { putString("occurrence", queue.value.currentKey); putBundle("format", group.getFormat(index).toBundle()) }
+            return
+        }
         val builder = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(group.type, false)
             .setOverrideForType(TrackSelectionOverride(group, index))
         if (group.type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(group.getFormat(index).language)
         else if (group.type == C.TRACK_TYPE_TEXT) builder.setPreferredTextLanguage(group.getFormat(index).language)
         p.trackSelectionParameters = builder.build()
     } }
-    fun autoAudio() { controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
+    fun autoAudio() {
+        if (queue.value.audioSelection.enabled) {
+            queueCommand(PlaybackService.AUDIO_AUTO) { putString("occurrence", queue.value.currentKey) }
+            return
+        }
+        controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
         .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build() } }
     private fun syncComments() = if (queue.value.current?.downloadId != null) commentController.bind(null, false) else commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
     fun openComments() { closeChat(); syncComments(); commentController.open() }

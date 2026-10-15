@@ -100,6 +100,14 @@ local test contracts, not production app endpoints. The fixture server supplies
 account/queue/search/community/chat/clip/optional-tool responses and Range/slow/
 failed media transfers without real accounts or upstream YouTube calls.
 
+Preferred-audio checks in `AudioSelectionTest`, `StreamControlsSmokeTest` and
+`SettingsSmokeTest` cover preference normalization/sparse saves, first-segment
+selection, Stable Volume and regional fallback, legacy manifest-only metadata,
+audio-only mode, manual refresh/retry/reconnection, next-occurrence defaults and
+failed account saves. Rich media variants reuse generated segments; the server
+repository's native preference specs and disposable account harness verify the
+real PATCH validator and web/native synchronization separately.
+
 `AppThemePresentationTest` checks appearance migration, twelve palette galleries,
 opaque components and preservation of open menus/focused field drafts.
 `AppThemeTest` checks enabled text and control-boundary contrast numerically;

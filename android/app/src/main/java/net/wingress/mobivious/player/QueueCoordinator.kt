@@ -111,8 +111,9 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         beforeChange(); player.pause()
         val details = app.downloads.localDetails(record)
         update(state.copy(currentKey = entry.key, details = details, loading = true, error = null,
-            videoSelection = VideoSelection(occurrence = entry.key)))
+            videoSelection = VideoSelection(occurrence = entry.key), audioSelection = AudioSelection(occurrence = entry.key)))
         trackSelector.configure(state.videoSelection)
+        trackSelector.configureAudio(state.audioSelection)
         player.trackSelectionParameters = (snapshot?.parameters ?: player.trackSelectionParameters).buildUpon()
             .clearOverrides().setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, record.assets.none { it.choice.kind == DownloadKind.VIDEO } || snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true)
@@ -281,12 +282,14 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         val videoPolicy = if (sameOccurrence) state.videoSelection else VideoSelection.open(entry.key, prefs,
             item.localConfiguration?.mimeType == MimeTypes.APPLICATION_MPD, state.videoSelection.revision + 1)
         configureVideo(videoPolicy)
+        configureAudio(if (sameOccurrence) state.audioSelection else AudioSelection.open(entry.key, prefs,
+            item.localConfiguration?.mimeType in listOf(MimeTypes.APPLICATION_MPD, MimeTypes.APPLICATION_M3U8)))
         player.trackSelectionParameters = (snapshot?.parameters ?: player.trackSelectionParameters).buildUpon()
             .clearOverridesOfType(C.TRACK_TYPE_AUDIO).clearOverridesOfType(C.TRACK_TYPE_TEXT).clearOverridesOfType(C.TRACK_TYPE_VIDEO)
             .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, if (fresh) audio || prefs.listen else snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) ?: prefs.listen)
             .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false)
             .setMaxVideoSize(Int.MAX_VALUE, Int.MAX_VALUE)
-            .setPreferredAudioLanguage(snapshot?.parameters?.preferredAudioLanguages?.firstOrNull())
+            .setPreferredAudioLanguage(null)
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, snapshot?.parameters?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) ?: (caption == null))
             .setPreferredTextLanguage(snapshot?.parameters?.preferredTextLanguages?.firstOrNull() ?: caption?.language).build()
         player.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
@@ -303,12 +306,14 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     }
     fun applySelection() {
         applyVideoSelection()
+        applyAudioSelection()
         if (!selectionPending || state.loading || player.playbackState != Player.STATE_READY || player.currentTracks.groups.isEmpty() ||
             player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return
         selectionPending = false
         val snapshot = pendingSelection; pendingSelection = null
         val builder = player.trackSelectionParameters.buildUpon()
         for (type in listOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_TEXT)) {
+            if (type == C.TRACK_TYPE_AUDIO && state.audioSelection.enabled) continue
             val choices = StreamCatalog.choices(player.currentTracks, type)
             val key = if (type == C.TRACK_TYPE_AUDIO) snapshot?.audio else snapshot?.text
             val choice = StreamCatalog.find(choices, key)
@@ -316,6 +321,35 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             else if (key != null && type == C.TRACK_TYPE_AUDIO) builder.setPreferredAudioLanguage(null)
         }
         player.trackSelectionParameters = builder.build()
+    }
+    private fun configureAudio(value: AudioSelection) {
+        trackSelector.configureAudio(value, state.details?.formats.orEmpty())
+        update(state.copy(audioSelection = value))
+    }
+    private fun audioChoices() = StreamCatalog.choices(player.currentTracks, C.TRACK_TYPE_AUDIO, state.details?.formats.orEmpty())
+    private fun applyAudioSelection() {
+        val policy = state.audioSelection
+        if (!policy.enabled || state.loading || player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != policy.occurrence) return
+        val choices = audioChoices()
+        if (choices.isEmpty()) return
+        val choice = policy.fixed(choices)
+        val builder = player.trackSelectionParameters.buildUpon().clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null)
+        if (choice != null) builder.setOverrideForType(TrackSelectionOverride(choice.group, choice.index))
+        val parameters = builder.build()
+        if (parameters != player.trackSelectionParameters) player.trackSelectionParameters = parameters
+    }
+    fun autoAudio(occurrence: String): Boolean {
+        if (state.loading || !state.audioSelection.enabled || occurrence != state.currentKey || occurrence != state.audioSelection.occurrence) return false
+        configureAudio(state.audioSelection.auto())
+        applyAudioSelection()
+        return true
+    }
+    fun manualAudio(occurrence: String, key: StreamKey): Boolean {
+        if (state.loading || !state.audioSelection.enabled || occurrence != state.currentKey || occurrence != state.audioSelection.occurrence) return false
+        val choice = StreamCatalog.find(audioChoices(), key) ?: return false
+        configureAudio(state.audioSelection.select(choice))
+        applyAudioSelection()
+        return true
     }
     private fun configureVideo(value: VideoSelection) {
         trackSelector.configure(value)

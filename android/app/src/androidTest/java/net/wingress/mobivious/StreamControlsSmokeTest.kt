@@ -129,6 +129,74 @@ class StreamControlsSmokeTest {
         }
     }
     private fun state() = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
+    private fun audioStart(preference: String, source: String = "rich", audioOnly: Boolean = false) {
+        compose.runOnUiThread { activity.model.closePlayer() }
+        until { activity.model.queue.value.token.isEmpty() }
+        command("stream", """{"type":"$source"}"""); command("media-reset")
+        compose.runOnUiThread {
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, preferredAudio = preference))
+            activity.model.play("testvideo01", 0, audio = audioOnly)
+        }
+        try {
+            until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_AUDIO) != null }
+        } catch (e: Throwable) {
+            val playback = activity.model.playback.value
+            throw AssertionError("$preference/$source audioOnly=$audioOnly loading=${playback.loading} state=${playback.playerState} error=${playback.error} policy=${playback.audioSelection} selection=${playback.selection} choices=${StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, playback.details?.formats.orEmpty())}", e)
+        }
+    }
+    private fun firstAudioSegment(): String {
+        val pattern = Regex("/media/rich/chunk-stream([4-7])-")
+        until { state().getJSONArray("mediaPaths").let { paths -> (0 until paths.length()).any { pattern.containsMatchIn(paths.getString(it)) } } }
+        val paths = state().getJSONArray("mediaPaths")
+        return (0 until paths.length()).firstNotNullOf { pattern.find(paths.getString(it))?.groupValues?.get(1) }
+    }
+    @Test fun preferredAudioSelectsTheFirstSegmentIncludingFallbacksRegionsAndAudioOnly() {
+        for ((preference, source, expected) in listOf(
+            Triple("original", "rich", "4"), Triple("original_stable", "rich", "6"), Triple("es", "rich", "7"),
+            Triple("fr", "rich", "4"), Triple("original_stable", "rich-no-stable", "4"),
+            Triple("pt", "rich-regional", "7"), Triple("pt-BR", "rich-regional", "7"), Triple("pt-PT", "rich-regional", "4"),
+            Triple("original_stable", "rich-legacy", "6"))) {
+            audioStart(preference, source)
+            assertEquals("$preference/$source", expected, firstAudioSegment())
+            assertNull(activity.model.playback.value.audioSelection.manual)
+            assertNull(activity.model.playback.value.error)
+        }
+        audioStart("es", audioOnly = true)
+        assertEquals("7", firstAudioSegment())
+        assertTrue(activity.model.playback.value.selection!!.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO))
+    }
+    @Test fun manualAudioAndAutoSurviveRefreshRetryReconnectionAndNextVideoDefaults() {
+        audioStart("es")
+        val stable = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_AUDIO,
+            activity.model.playback.value.details!!.formats).first { it.stable }
+        compose.runOnUiThread { activity.model.selectTrack(stable.group, stable.index) }
+        until { activity.model.playback.value.audioSelection.manual != null && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        compose.runOnUiThread { activity.model.refreshBuffer() }
+        until { activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        compose.runOnUiThread { activity.model.retryPlayback() }
+        until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        command("stream", """{"type":"rich-no-stable"}""")
+        compose.runOnUiThread { activity.model.retryPlayback() }
+        until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_AUDIO)?.original == true && selected(C.TRACK_TYPE_AUDIO)?.stable == false }
+        command("stream", """{"type":"rich"}""")
+        compose.runOnUiThread { activity.model.retryPlayback() }
+        until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        recreate(); until { selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        assertEquals("es", activity.model.store.guestPreferences().preferredAudio)
+        compose.runOnUiThread {
+            activity.model.store.guestPreferences(AccountPreferences(preferredAudio = "original"))
+            activity.model.refreshSharedSettings(); activity.model.autoAudio()
+        }
+        until { activity.model.playback.value.audioSelection.manual == null && selected(C.TRACK_TYPE_AUDIO)?.language == "es" }
+        assertEquals("es", activity.model.playback.value.audioSelection.preference)
+        compose.runOnUiThread { activity.model.insertQueue(Video("testvideo02", "Successor"), true) }
+        until { activity.model.queue.value.items.size == 2 }
+        compose.runOnUiThread { activity.model.controller.value!!.seekToNextMediaItem() }
+        until { activity.model.playback.value.mediaId == "testvideo02" && !activity.model.playback.value.loading &&
+            activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_AUDIO)?.original == true }
+        assertEquals("original", activity.model.playback.value.audioSelection.preference)
+        assertNull(activity.model.playback.value.audioSelection.manual)
+    }
     private fun codecStart(codec: String, quality: String = "auto", source: String = "codec") {
         compose.runOnUiThread { activity.model.closePlayer() }
         until { activity.model.queue.value.token.isEmpty() }
