@@ -11,6 +11,8 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -21,12 +23,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.motionEventSpy
+import android.view.MotionEvent
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.positionInRoot
@@ -61,7 +66,7 @@ internal fun playerTime(ms: Long): String {
 internal fun speedLabel(speed: Float) = "${speed.toString().removeSuffix(".0")}×"
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalComposeUiApi::class)
 @Composable
 internal fun VideoPlayer(
     vm: AppViewModel, playback: PlaybackState, controller: MediaController?, modifier: Modifier,
@@ -74,17 +79,24 @@ internal fun VideoPlayer(
     pictureOverlay: @Composable BoxScope.() -> Unit = {},
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
+    val preferences by vm.preferences.collectAsStateWithLifecycle()
+    val seekSeconds = PreferenceRules.seekSeconds(preferences.seekSeconds)
     val spoilerQueue by vm.queue.collectAsStateWithLifecycle()
     val current by rememberUpdatedState(playback)
     val currentDrag by rememberUpdatedState(drag)
     val pendingSeek by vm.pendingSeek.collectAsStateWithLifecycle()
+    val scrubSession by vm.scrubSeek.collectAsStateWithLifecycle()
+    val preview by vm.seekPreviews.state.collectAsStateWithLifecycle()
+    val spoilers by vm.channelSpoilers.state.collectAsStateWithLifecycle()
     val sponsorState by vm.sponsorBlock.collectAsStateWithLifecycle()
     val replay by vm.chatReplay.collectAsStateWithLifecycle()
     val sponsor = sponsorState.takeIf { it.mediaId == playback.mediaId } ?: SponsorBlockPlayback()
     val chapters = playback.chapters
     var visible by remember(playback.mediaId, controls) { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
-    var scrub by remember(playback.mediaId, gestureKey, controls) { mutableStateOf<Float?>(null) }
+    val scrub = scrubSession?.targetMs?.toFloat()
+    val timelineInteractions = remember { MutableInteractionSource() }
+    val timelinePointerActive = remember { mutableStateOf(false) }
     var feedback by remember(playback.mediaId, controls) { mutableStateOf<Long?>(null) }
     var feedbackGeneration by remember { mutableIntStateOf(0) }
     var focused by remember { mutableStateOf(false) }
@@ -104,11 +116,37 @@ internal fun VideoPlayer(
             interact()
         }
     }
+    DisposableEffect(vm, gestureKey, controls) {
+        onDispose {
+            // A pending tap batch already survives Activity recreation. Losing a pointer cancels
+            // only dragging; its eventual tap commit still belongs to the retained ViewModel.
+            if (activity?.isChangingConfigurations == true) { vm.cancelScrub(); vm.seekPreviews.cancel() }
+            else vm.cancelAccumulatedSeek()
+        }
+    }
+    LaunchedEffect(timelineInteractions) {
+        timelineInteractions.interactions.collect { interaction ->
+            when (interaction) {
+                is DragInteraction.Start -> timelinePointerActive.value = true
+                is DragInteraction.Stop -> { timelinePointerActive.value = false; vm.finishScrub() }
+                is DragInteraction.Cancel -> { timelinePointerActive.value = false; vm.cancelAccumulatedSeek() }
+            }
+        }
+    }
+    LaunchedEffect(controls, chromeVisible, gesturesEnabled, settingsOpen, presentation, playback.details,
+        playback.mediaId, playback.duration, playback.seekable, playback.live, playback.loading, playback.error,
+        playback.downloadId, playback.videoEnabled, spoilerQueue.currentKey, spoilerQueue.context, spoilers) {
+        vm.configureSeekPreview(controls && chromeVisible && gesturesEnabled && !settingsOpen &&
+            presentation in listOf(PlayerPresentation.WATCH, PlayerPresentation.FULLSCREEN))
+    }
     LaunchedEffect(playback.playWhenReady, playback.playerState, playback.error, playback.loading, controls) {
         if (playback.error != null) vm.cancelAccumulatedSeek(false)
         if (!playback.playWhenReady || playback.playerState == Player.STATE_ENDED || playback.error != null || playback.loading) visible = true
     }
-    LaunchedEffect(settingsOpen, controls) { if (settingsOpen || !controls) vm.cancelAccumulatedSeek() }
+    LaunchedEffect(settingsOpen, controls, gesturesEnabled, chromeVisible) {
+        if (settingsOpen || !controls) vm.cancelAccumulatedSeek()
+        else if (!gesturesEnabled || !chromeVisible) vm.cancelScrub()
+    }
     LaunchedEffect(pendingSeek) { if (pendingSeek != null) interact() }
     LaunchedEffect(visible, interaction, playback.playWhenReady, playback.playerState, playback.error, playback.loading, scrub != null, settingsOpen, overflowOpen, exploring, focused, controls, pendingSeek) {
         if (controls && visible && playback.playWhenReady && playback.playerState != Player.STATE_ENDED && playback.error == null &&
@@ -133,6 +171,7 @@ internal fun VideoPlayer(
                 Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
             }
         }
+        if (controls && chromeVisible) PlayerSeekPreview(preview, Modifier.matchParentSize())
         PlayerControlsDim(controls && visible && chromeVisible, Modifier.matchParentSize())
         Box(Modifier.matchParentSize().testTag("player-gestures")
         .pointerInput(playback.mediaId, controls, presentation, gesturesEnabled, exploring, gestureKey) {
@@ -176,8 +215,8 @@ internal fun VideoPlayer(
             if (controls && chromeVisible && !settingsOpen) {
                 onClick(label = if (visible) "Hide player controls" else "Show player controls") { toggleControls(); true }
                 customActions = listOf(
-                    CustomAccessibilityAction("Back 10 seconds") { if (current.seekable) { seek(-10_000); true } else false },
-                    CustomAccessibilityAction("Forward 10 seconds") { if (current.seekable) { seek(10_000); true } else false },
+                    CustomAccessibilityAction("Back $seekSeconds seconds") { if (current.seekable) { seek(-seekSeconds * 1000L); true } else false },
+                    CustomAccessibilityAction("Forward $seekSeconds seconds") { if (current.seekable) { seek(seekSeconds * 1000L); true } else false },
                 ) + listOfNotNull(onCollapse?.let { collapse -> CustomAccessibilityAction(if (fullscreen) "Exit full screen" else "Minimize player") { collapse(); true } }) + if (sponsor.active != null) listOf(CustomAccessibilityAction("Skip ${sponsor.active.category.label}") {
                     vm.sponsorCommand(PlaybackService.SPONSOR_SKIP, sponsor.active.id); true
                 }) else emptyList()
@@ -192,7 +231,7 @@ internal fun VideoPlayer(
         // An overlay covering the footer must not intercept fullscreen or seeking taps.
         pictureOverlay()
         if (controls) {
-            val timelinePosition = scrub?.toLong() ?: playback.position
+            val timelinePosition = scrubSession?.targetMs ?: pendingSeek?.target(playback.duration) ?: playback.position
             val sponsorLabels = sponsor.segments.filter { it.start <= timelinePosition && timelinePosition < it.end }
                 .map { it.category.label }.distinct()
             val notice: (@Composable () -> Unit)? = if (!settingsOpen && playback.error == null && !playback.loading &&
@@ -214,9 +253,15 @@ internal fun VideoPlayer(
                 timeline = { timelineModifier, trackOffset ->
                     Box(timelineModifier) {
                             Slider(
-                                value = scrub ?: playback.position.coerceAtMost(playback.duration).toFloat(),
-                                onValueChange = { vm.cancelAccumulatedSeek(); scrub = it; interact() },
-                                onValueChangeFinished = { scrub?.let { vm.seekTo(it.toLong()) }; scrub = null; interact() },
+                                value = timelinePosition.coerceAtMost(playback.duration).toFloat(),
+                                onValueChange = { vm.updateScrub(it.toLong()); interact() },
+                                onValueChangeFinished = {
+                                    // Drag completion also runs on cancellation. Its Stop/Cancel interaction
+                                    // owns finishing; only native releases or non-pointer actions commit here.
+                                    if (!timelinePointerActive.value) vm.finishScrub()
+                                    interact()
+                                },
+                                interactionSource = timelineInteractions,
                                 valueRange = 0f..playback.duration.coerceAtLeast(1).toFloat(),
                                 enabled = playback.seekable && playback.duration > 0 && !playback.loading && playback.error == null,
                                 thumb = {
@@ -244,12 +289,22 @@ internal fun VideoPlayer(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp).testTag("player-timeline").semantics {
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 10.dp).testTag("player-timeline")
+                                    .motionEventSpy { event ->
+                                        when (event.actionMasked) {
+                                            MotionEvent.ACTION_DOWN -> timelinePointerActive.value = true
+                                            MotionEvent.ACTION_UP -> timelinePointerActive.value = false
+                                            MotionEvent.ACTION_CANCEL -> {
+                                                timelinePointerActive.value = false
+                                                vm.cancelAccumulatedSeek()
+                                            }
+                                        }
+                                    }.semantics {
                                     contentDescription = "Playback position"
                                     stateDescription = (listOfNotNull(ChapterRules.current(chapters, timelinePosition)?.title) + sponsorLabels).joinToString(", ")
                                 },
                             )
-                            if (scrub != null) PlayerSeekSponsorLabels(sponsorLabels,
+                            if (scrub != null || pendingSeek != null) PlayerSeekSponsorLabels(sponsorLabels,
                                 Modifier.align(Alignment.TopCenter).offset(y = (-24).dp))
                     }
                 })

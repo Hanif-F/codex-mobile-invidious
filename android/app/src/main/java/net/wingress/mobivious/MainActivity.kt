@@ -55,12 +55,13 @@ class MainActivity : ComponentActivity() {
         if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
         val active = watching && model.playback.value.details != null && model.playback.value.error == null && model.store.pip
         val playing = model.controller.value?.playWhenReady == true
+        val seekSeconds = net.wingress.mobivious.data.PreferenceRules.seekSeconds(model.preferences.value.seekSeconds)
         fun action(name: String, icon: Int, command: String, code: Int) = RemoteAction(Icon.createWithResource(this, icon), name, name,
             PendingIntent.getService(this, code, Intent(this, PlaybackService::class.java).setAction(command), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
         val params = PictureInPictureParams.Builder().setAspectRatio(pipAspectRatio())
-            .setActions(listOf(action("Back 10 seconds", android.R.drawable.ic_media_rew, "mobivious.rewind", 1),
+            .setActions(listOf(action("Back $seekSeconds seconds", android.R.drawable.ic_media_rew, "mobivious.rewind", 1),
                 action(if (playing) "Pause" else "Play", if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play, "mobivious.toggle", 2),
-                action("Forward 10 seconds", android.R.drawable.ic_media_ff, "mobivious.forward", 3)))
+                action("Forward $seekSeconds seconds", android.R.drawable.ic_media_ff, "mobivious.forward", 3)))
         pipSource?.let { params.setSourceRectHint(it) }
         params.setAutoEnterEnabled(active && playing).setSeamlessResizeEnabled(true)
         setPictureInPictureParams(params.build())

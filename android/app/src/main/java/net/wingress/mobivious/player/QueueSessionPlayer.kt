@@ -47,6 +47,11 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
         when (seekCommand) {
             Player.COMMAND_SEEK_TO_NEXT, Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> queue.advance()
             Player.COMMAND_SEEK_TO_PREVIOUS, Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> queue.advance(-1)
+            Player.COMMAND_SEEK_BACK, Player.COMMAND_SEEK_FORWARD -> {
+                // ForwardingSimpleBasePlayer repeats the relative command and ignores the
+                // supplied position. Commit the already calculated, bounded target instead.
+                player.seekTo(queue.clampSeek(positionMs))
+            }
             Player.COMMAND_SEEK_TO_MEDIA_ITEM -> {
                 val state = snapshot()
                 val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0

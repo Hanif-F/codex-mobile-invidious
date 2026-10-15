@@ -221,6 +221,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/DeviceProfilesTest.kt) — Device Profiles declared scenarios; exact cases are enumerated in the test catalog.
 
+- `seekPreferencesSurviveRecreationAndStayWithinTheirGuestAccountAndInstance`
 - `identitiesNormalizeInstancesAndIgnoreSessionsButDistinguishReusedNames`
 - `savesSurviveRecreationAndRemainIndependentForGuestAndTwoAccounts`
 - `guestAudioPreferencesSurviveRecreationAndStayWithinTheirInstanceAndProfile`
@@ -398,6 +399,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/PreferencesTest.kt) — Preferences declared scenarios; exact cases are enumerated in the test catalog.
 
+- `seekIntervalsRoundTripAndStaySparseForAccountsAndGuests`
 - `codecPreferencesRoundTripAndProduceSparseAccountPatches`
 - `webPreferencesParseAndRoundTrip`
 - `sparseDeltasPreserveOtherSettingsAndNestedSponsorBlock`
@@ -422,10 +424,30 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/SeekAccumulatorTest.kt) — Seek Accumulator declared scenarios; exact cases are enumerated in the test catalog.
 
+- `everyIntervalIsCapturedPerBatchIncludingReversalsAndClipBounds`
 - `repeatedTapsKeepFrozenPositionAndExtendDeadline`
 - `oppositeDirectionReplacesRatherThanSubtractsAndRetainsAnchor`
 - `pausedPlaybackStaysPausedAndTargetsAreBounded`
 - `cancellationAndMediaReplacementCannotCommitStaleSeeks`
+
+### SeekPreviewTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/SeekPreviewTest.kt) — Storyboard and seek-preview rules, virtual-clock download throttling, cache reuse, clip offsets, failures and cancellation.
+
+- `highestResolutionAndClipEditorTrackSelectionAreIndependent`
+- `cueBoundariesClipOffsetsEndClampAndCropBoundsAreExact`
+- `vttRejectsForeignAssetsInvalidTimesAndInvalidRectanglesAndSortsCues`
+- `indexLoadingIsLazyAndCachedSheetCropsFollowEveryTap`
+- `tapTimerDownloadsOnlyTheNewestTargetAt250Milliseconds`
+- `tapBurstsShareTheirDownloadTimerAndFinishingDropsQueuedDownloads`
+- `draggingBypassesTapTimerAndDoesNotRedownloadTheSameSheet`
+- `cachedFramesCanChangeWhileAnotherSheetIsDownloadingAndLateSheetsCannotReplaceThem`
+- `manyChangesDuringOneDownloadAreDeduplicatedAndUseTheLatestCrop`
+- `newOccurrenceAndDisabledBindingRejectLateImagesEvenFromUncancellableLoads`
+- `clipPreviewSelectsTheSourceFrameAndFailuresDoNotLoop`
+- `playerAndClipEditorShareCompletedIndexesButSeparateInstancesDoNot`
+- `temporarilyDisablingPreviewsDoesNotResetTheTapBudgetButANewOccurrenceDoes`
+- `failedIndexesRetryOnTheNextInteractionWithoutLoopingWithinTheCurrentOne`
 
 ### SessionTimelineTest
 
@@ -767,7 +789,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChaptersSmokeTest.kt) — Chapters Smoke declared scenarios; exact cases are enumerated in the test catalog.
 
-- `selectingAndScrubbingPreservePlaybackAndMakeNoPreviewOrMetadataRequests`
+- `chapterSelectionNeedsNoExtraRequestsAndScrubbingPreservesPlayback`
 - `fullWidthTimelineAndCenteredPlaybackStayInPlaceAcrossFullscreen`
 - `fullscreenUsesChapterSheetAndBackClosesItBeforeLeavingFullscreen`
 - `chapterDrawerSurvivesRecreationAndWatchFullscreenTransitions`
@@ -1170,6 +1192,24 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `guestSubscribeCompletesAfterSignInAndReturnsToTheCreator`
 - `canceledSubscribeSignInDoesNotChangeALaterAccount`
 
+### SeekPreviewsSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SeekPreviewsSmokeTest.kt) — Storyboard previews, 250 ms request timing, configurable tap batches, accessibility/Media3/PiP seeks, video/clip bounds and lifecycle rendering.
+
+- `draggingShowsFullPlayerHighestResolutionAndRestoresPlayingOrPausedIntent`
+- `dragCancellationAndFullscreenTransitionClearPreviewsWithoutCommitting`
+- `tapDownloadsUpdateWithin250MillisecondsAndReuseSheetsAcrossBursts`
+- `everyIntervalReachesAccessibilityMediaAndPipActionsAtEveryPlaybackSpeed`
+- `tapBatchCapturesItsIntervalAndNextBatchUsesRefreshedSettings`
+- `mediaSeekCommandsRespectExplicitVideoEndBounds`
+- `pipLabelsAndButtonsUseTheSelectedInterval`
+- `clipsUseSourceOffsetsButKeepRelativeTimelineLabelsAndBounds`
+- `unavailableAndInvalidCropsLeaveSeekingUsableAndNeverShowTheSpriteSheet`
+- `hiddenThumbnailsAndAudioOnlyPlaybackDoNotRequestPreviews`
+- `slowImagesCannotAppearAfterCancellationOrARepeatedVideoOccurrenceChange`
+- `minimizationAndPipCancelPreviewsAndRestorePlayingIntent`
+- `liveVideoMetadataSuppressesPreviewRequestsEvenWhenTheFixtureTimelineIsSeekable`
+
 ### ServiceComposeRule
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ServiceComposeRule.kt) — Service-aware Compose/device setup and cleanup support.
@@ -1180,6 +1220,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Automatic per-field saves and invalid/failed edits, playback/codec settings, device appearance persistence, recreation/account isolation and System mode updates.
 
+- `seekIntervalPersistsForGuestsAndAccountsAndPreservesFailedSaves`
 - `outstandingChatValidationLinksToTheActualControlsAndReverts`
 - `deviceAccentSavesImmediatelyAndSurvivesRecreationAndAccountChange`
 - `retiredDeviceOptionsStayAbsentInAppearanceAndPlayerSettings`
@@ -1324,4 +1365,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **777 declared test methods** (including ignored tests).
+Inventory total: **808 declared test methods** (including ignored tests).

@@ -196,11 +196,22 @@ class DownloadsSmokeTest {
         until { app.downloads.find(id)!!.assets.all { it.status == DownloadStatus.COMPLETE } }
         val originalBackground = app.store.background; val originalPip = app.store.pip
         try {
+            compose.runOnUiThread {
+                activity.model.store.guestPreferences(activity.model.preferences.value.copy(seekSeconds = 5))
+                activity.model.refreshSharedSettings()
+            }
+            until { activity.model.preferences.value.seekSeconds == 5 }
             compose.runOnUiThread { app.store.background = true; app.store.pip = false; activity.model.navigate("You", "downloads", rememberOrigin = true) }
             compose.onNodeWithTag("download-entry-$id").performClick()
             until { activity.model.playback.value.downloadId == id && activity.model.playback.value.playing }
             compose.onNodeWithTag("watch-content").assertExists()
             compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.speed(1.5f); activity.model.seekTo(2000) }
+            until { activity.model.playback.value.position == 2000L }
+            until { var ready = false; compose.runOnUiThread { ready = activity.model.controller.value!!.seekForwardIncrement == 5000L }; ready }
+            compose.runOnUiThread { activity.model.controller.value!!.seekForward() }
+            until { activity.model.playback.value.position == 7000L }
+            assertEquals(0, state().getJSONArray("previewImageRequests").length())
+            compose.runOnUiThread { activity.model.seekTo(2000) }
             until { activity.model.playback.value.position == 2000L }
             // A controller reload keeps local files, selections and the chosen position.
             compose.runOnUiThread { activity.model.refreshBuffer() }

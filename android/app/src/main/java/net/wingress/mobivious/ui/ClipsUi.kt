@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import android.view.LayoutInflater
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -57,7 +56,6 @@ import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size as CoilSize
-import coil.transform.Transformation
 import kotlinx.coroutines.delay
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.R
@@ -338,14 +336,6 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     }
 }
 
-private class StoryboardCrop(private val frame: StoryboardFrame) : Transformation {
-    override val cacheKey = "clip-crop:${frame.x}:${frame.y}:${frame.width}:${frame.height}"
-    override suspend fun transform(input: Bitmap, size: CoilSize): Bitmap {
-        if (frame.x < 0 || frame.y < 0 || frame.x + frame.width > input.width || frame.y + frame.height > input.height) return input
-        return Bitmap.createBitmap(input, frame.x, frame.y, frame.width, frame.height)
-    }
-}
-
 @Composable private fun ClipFilmstrip(vm: AppViewModel, editor: ClipEditorState, change: (Long, Long) -> Unit) {
     val context = LocalContext.current
     val spoilers by vm.channelSpoilers.state.collectAsStateWithLifecycle()
@@ -374,9 +364,9 @@ private class StoryboardCrop(private val frame: StoryboardFrame) : Transformatio
             if (hidden) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text(decision.thumbnailLabel) }
             else Row(Modifier.fillMaxSize()) { repeat(6) { n ->
                 val time = viewport + window * (2 * n + 1) / 12
-                val frame = editor.frames.firstOrNull { time in it.startMs until it.endMs }
+                val frame = StoryboardRules.frame(editor.frames, time)
                 val request = frame?.let { ImageRequest.Builder(context).data(it.url).size(CoilSize.ORIGINAL).transformations(StoryboardCrop(it)).build() }
-                AsyncImage(request ?: resolved(editor.context?.server.orEmpty(), editor.details?.video?.thumbnail.orEmpty()), null,
+                AsyncImage(request ?: resolved(editor.context?.server.orEmpty(), editor.details?.video?.thumbnail.orEmpty()), null, imageLoader = vm.storyboardImages.loader,
                     Modifier.weight(1f).fillMaxHeight(), contentScale = ContentScale.Crop)
             } }
             Canvas(Modifier.fillMaxSize().semantics {

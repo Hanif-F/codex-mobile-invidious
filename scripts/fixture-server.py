@@ -43,7 +43,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
              authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
 default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
-                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, quality_dash='auto', video_codec='auto', preferred_audio='original', captions=['', '', ''],
+                     autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, seek_seconds=10, quality_dash='auto', video_codec='auto', preferred_audio='original', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
                      related_videos=True, extend_desc=False, comments=['youtube', ''], max_results=40,
@@ -101,6 +101,11 @@ def reset_chapters():
     state.update(chapters=False, chapterAssetRequests=[],
                  chapterDescription='0:00 Introduction\n0:30 日本語 & details\n1:00 Final section')
 reset_chapters()
+
+def reset_seek_previews():
+    state.update(seekPreviews=False, previewKey=str(time.monotonic_ns()), previewIndexRequests=[], previewImageRequests=[],
+                 previewDelay=0, previewIndexDelay=0, previewFail=False, previewBadCrop=False)
+reset_seek_previews()
 
 def fixture_comment(id, author='Viewer', text=None, **extra):
     return dict(commentId=id, author=author, authorId=video['authorId'], authorUrl='/channel/' + video['authorId'],
@@ -356,6 +361,34 @@ class Handler(BaseHTTPRequestHandler):
             if state['aiDelay']: time.sleep(state['aiDelay'] / 1000)
             return self.respond(dict(lists=lists, channels={id: dict(matches=[kind for kind in kinds if kind in state['aiMatches'].get(id, []) and lists[kind]['available']],
                                                                   resolved=id not in state['aiPending'] and all(lists[kind]['available'] for kind in kinds)) for id in set(ids)}))
+        if p.startswith('/api/v1/storyboards/') and state['seekPreviews']:
+            width = int(parse_qs(url.query).get('width', ['320'])[0]); height = width * 9 // 16
+            state['previewIndexRequests'].append(dict(path=self.path, time=time.monotonic(), authorized=bool(self.headers.get('Authorization'))))
+            if state['previewIndexDelay']: time.sleep(min(state['previewIndexDelay'], 5000) / 1000)
+            if state['previewFail']: return self.respond(dict(error='No storyboard'), 404)
+            cues = ['WEBVTT', '']
+            for n in range(6):
+                def ts(seconds): return f'00:{seconds // 60:02d}:{seconds % 60:02d}.000'
+                x = 99999 if state['previewBadCrop'] else n % 2 * width
+                cues.extend([f'{ts(n * 20)} --> {ts((n + 1) * 20)}',
+                             f'/sb/fixture/{state["previewKey"]}/{p.rsplit("/", 1)[-1]}/{width}/{n // 2}.jpg#xywh={x},0,{width},{height}', ''])
+            return self.xml('\n'.join(cues), content_type='text/vtt')
+        if p.startswith('/sb/fixture/') and state['seekPreviews']:
+            state['previewImageRequests'].append(dict(path=p, time=time.monotonic(), authorized=bool(self.headers.get('Authorization'))))
+            if state['previewDelay']: time.sleep(min(state['previewDelay'], 5000) / 1000)
+            if state['previewFail']: return self.respond({}, 404)
+            parts = p.split('/')
+            file = args.media_dir / f'seek-storyboard-{parts[-2]}-{parts[-1]}'
+            if not file.is_file(): return self.respond({}, 404)
+            data = file.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Cache-Control', 'public, max-age=86400')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            try: self.wfile.write(data)
+            except (BrokenPipeError, ConnectionResetError): pass
+            return
         if p.startswith('/api/v1/storyboards/') and state['clipsEnabled']:
             state['storyboardRequests'].append(dict(path=p, authorized=bool(self.headers.get('Authorization') or self.headers.get('Cookie'))))
             if state.get('clipStoryboardFail', False): return self.respond(dict(error='No storyboard'), 404)
@@ -585,6 +618,9 @@ class Handler(BaseHTTPRequestHandler):
                 info.update(description=state['chapterDescription'], storyboards=[dict(url='/api/v1/storyboards/' + selected['videoId'],
                             templateUrl='/sb/fixture/M$M.jpg', width=160, height=90, count=12, interval=10000,
                             storyboardWidth=5, storyboardHeight=5, storyboardCount=1)])
+            if state['seekPreviews']:
+                info['storyboards'] = [dict(url=f'/api/v1/storyboards/{selected["videoId"]}?width={width}&key={state["previewKey"]}',
+                                           width=width, height=width * 9 // 16) for width in (160, 320)]
             self.respond(dict(**selected, **info,
                               dashUrl='' if state['stream'] == 'mp4' else dash, formatStreams=[dict(url='/media/fixture.mp4', type='video/mp4', quality='medium')] if state['stream'] == 'mp4' else [],
                               adaptiveFormats=rich_formats(args.media_dir / dash.removeprefix('/media/')) if codec_manifest or audio_manifest and state['stream'] != 'rich-legacy' else [],
@@ -821,12 +857,18 @@ class Handler(BaseHTTPRequestHandler):
             reset_chat()
             reset_content_links()
             reset_chapters()
+            reset_seek_previews()
             reset_clips()
             reset_accounts()
             return self.respond({})
         if p == '/test/chat':
             state['chatReplay'] = data.get('chatReplay', True)
             for key in ('chatFailNext', 'chatDelayNext', 'chatTimingDelayNext', 'chatSaveFail', 'chatUnavailable', 'chatRepeatCursor', 'chatSparse', 'chatScopeFail', 'chatTimings', 'chatAuthor', 'chatText'):
+                if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/seek-previews':
+            state['seekPreviews'] = data.get('enabled', True)
+            for key in ('previewDelay', 'previewIndexDelay', 'previewFail', 'previewBadCrop'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/chapters':
@@ -1023,6 +1065,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond(dict(offsetMs=offset))
         elif p == '/api/v1/auth/preferences':
             if state.get('performancePatchDelay'): time.sleep(state['performancePatchDelay']/1000)
+            if 'seek_seconds' in data and (type(data['seek_seconds']) is not int or data['seek_seconds'] not in (5, 10, 20, 30)):
+                return self.respond(dict(error='Invalid seek interval'), 400)
             if state.get('performanceFailPatchNext'):
                 state['performanceFailPatchNext'] = False
                 return self.respond(dict(error='Fixture settings could not be saved'), 503)

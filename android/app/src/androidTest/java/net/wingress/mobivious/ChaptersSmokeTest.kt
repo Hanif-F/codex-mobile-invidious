@@ -73,7 +73,7 @@ class ChaptersSmokeTest {
     }
     @After fun close() { if (::activity.isInitialized) ui { activity.model.closePlayer(); activity.finishAndRemoveTask() } }
 
-    @Test fun selectingAndScrubbingPreservePlaybackAndMakeNoPreviewOrMetadataRequests() {
+    @Test fun chapterSelectionNeedsNoExtraRequestsAndScrubbingPreservesPlayback() {
         incoming("/watch?v=testvideo01&autoplay=0"); ready()
         val occurrence = activity.model.queue.value.currentKey
         val metadata = metadataRequests(); val imageCount = images()
@@ -83,6 +83,8 @@ class ChaptersSmokeTest {
         assertFalse(activity.model.playback.value.playWhenReady)
         compose.onNodeWithTag("chapter-30000").assertIsSelected()
         compose.onNodeWithTag("chapters-panel").assertExists()
+        assertEquals(metadata, metadataRequests()); assertEquals(imageCount, images())
+        assertEquals(0, fixture().getJSONArray("chapterAssetRequests").length())
         ui { activity.model.togglePlay() }
         until { activity.model.playback.value.playing }
         compose.onNodeWithTag("chapter-60000").performClick()
@@ -94,7 +96,8 @@ class ChaptersSmokeTest {
         compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertTextEquals("日本語 & details")
         assertEquals(occurrence, activity.model.queue.value.currentKey)
         assertEquals(metadata, metadataRequests()); assertEquals(imageCount, images())
-        assertEquals(0, fixture().getJSONArray("chapterAssetRequests").length())
+        // The legacy chapter fixture advertises unavailable storyboards; preview failure must not block seeking.
+        compose.onNodeWithTag("player-seek-preview").assertDoesNotExist()
     }
 
     @Test fun fullWidthTimelineAndCenteredPlaybackStayInPlaceAcrossFullscreen() {

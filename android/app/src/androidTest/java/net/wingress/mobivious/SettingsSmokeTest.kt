@@ -56,6 +56,36 @@ class SettingsSmokeTest {
         until {var ready=false;compose.runOnUiThread {ready=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any {it is MainActivity && it!==previous}};ready}
         compose.runOnUiThread {activity=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single()}
     }
+    @Test fun seekIntervalPersistsForGuestsAndAccountsAndPreservesFailedSaves() {
+        fun option(label: String) = compose.onNode(hasText(label) and hasAnyAncestor(isPopup()))
+        open("Playback")
+        compose.onNodeWithText("Seek interval").performScrollTo().performClick()
+        option("10 seconds").assertIsSelected()
+        for (seconds in listOf(5, 10, 20, 30)) option("$seconds seconds").assertExists()
+        option("20 seconds").performClick(); save("Playback")
+        assertEquals(20, SessionStore(activity).guestPreferences().seekSeconds)
+        recreate(); open("Playback")
+        compose.onNodeWithText("Seek interval").performScrollTo().performClick(); option("20 seconds").assertIsSelected()
+        option("30 seconds").performClick(); save("Playback")
+        compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
+        until { activity.model.account.value != null && activity.model.dearrowIdentity.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value }
+        open("Playback")
+        command("sponsorblock", """{"failPreferences":true}""")
+        compose.onNodeWithText("Seek interval").performScrollTo().performClick(); option("10 seconds").assertIsSelected()
+        option("5 seconds").performClick()
+        until { activity.model.preferenceSaves.edits.value["seek_seconds"]?.error != null }
+        assertEquals(10, activity.model.preferences.value.seekSeconds)
+        recreate()
+        command("sponsorblock", """{"failPreferences":false}""")
+        compose.onNodeWithText("Retry").performScrollTo().performClick(); save("Playback")
+        assertEquals(5, state().getJSONObject("preferences").getInt("seek_seconds"))
+        assertEquals("preserved", state().getJSONObject("preferences").getString("unrelated_setting"))
+        command("preferences", """{"seek_seconds":20}""")
+        compose.runOnUiThread { activity.model.refreshSharedSettings() }
+        until { activity.model.preferences.value.seekSeconds == 20 }
+        open("Playback"); compose.onNodeWithText("Seek interval").performScrollTo().performClick()
+        option("20 seconds").assertIsSelected(); option("10 seconds").performClick(); save("Playback")
+    }
     @Test fun outstandingChatValidationLinksToTheActualControlsAndReverts() {
         compose.runOnUiThread {
             val model=activity.model

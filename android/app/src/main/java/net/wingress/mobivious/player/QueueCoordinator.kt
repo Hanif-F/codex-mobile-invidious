@@ -19,6 +19,12 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private val state get() = app.playbackQueue.value
     private var job: Job? = null
     private var prefs = app.store.initialPreferences()
+        set(value) { field = value; applySeekInterval() }
+    val seekIncrementMs get() = PreferenceRules.seekSeconds(prefs.seekSeconds) * 1000L
+    private fun applySeekInterval() {
+        player.setSeekBackIncrementMs(seekIncrementMs)
+        player.setSeekForwardIncrementMs(seekIncrementMs)
+    }
     private var prefsContext: ApiContext? = null
     private var settingsVersion = 0L
     private var selection: Selection? = null
@@ -33,6 +39,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private val playlistWrites = Mutex()
     private val mixContinuations = mutableSetOf<String>()
     var changed: () -> Unit = {}
+    init { applySeekInterval() }
     fun update(value: PlaybackQueueSnapshot) {
         app.playbackQueue.value = value
         app.channelSpoilers.bindPlayback(value.currentKey)
@@ -49,6 +56,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         }
         if (state.current?.downloadId == null && value.dearrowEnabled) state.current?.video?.id?.let { app.dearrowTitles.ensure(it) }
         syncDisplayTitle()
+        changed()
     }
     fun syncDisplayTitle() {
         val item = player.currentMediaItem ?: return

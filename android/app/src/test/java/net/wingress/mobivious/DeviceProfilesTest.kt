@@ -18,6 +18,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DeviceProfilesTest {
+    @Test fun seekPreferencesSurviveRecreationAndStayWithinTheirGuestAccountAndInstance() {
+        val memory = Memory(); val profiles = DeviceProfiles(memory)
+        val other = guest.copy(server = "https://other.test")
+        for ((context, seconds) in listOf(guest to 5, other to 20, alice to 30, bob to 10))
+            profiles.write(context, "preferences", AccountPreferences(seekSeconds = seconds).json().toString())
+        val reopened = DeviceProfiles(memory)
+        for ((context, seconds) in listOf(guest to 5, other to 20, alice to 30, bob to 10))
+            assertEquals(seconds, LocalPreferences.read(JSONObject(reopened.value(context, "preferences") as String)).seekSeconds)
+    }
     private val address = "https://example.test"
     private val guest = ApiContext(address, null)
     private val alice = ApiContext(address, Account("first", "Alice", Long.MAX_VALUE, address, "a".repeat(64)))

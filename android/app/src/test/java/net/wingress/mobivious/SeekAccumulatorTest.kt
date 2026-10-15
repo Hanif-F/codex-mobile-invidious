@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class SeekAccumulatorTest {
+    @Test fun everyIntervalIsCapturedPerBatchIncludingReversalsAndClipBounds() {
+        for (seconds in listOf(5, 10, 20, 30)) for (playing in listOf(false, true)) {
+            val a = SeekAccumulator()
+            val step = seconds * 1000L
+            assertEquals(step, a.tap(1, "clip", 4000, playing, 0, step).offset)
+            val repeated = a.tap(1, "clip", 8000, false, 100, 5000)
+            assertEquals(step * 2, repeated.offset)
+            assertEquals(24_000L.coerceAtMost(4000 + step * 2), repeated.target(24_000))
+            val reversed = a.tap(-1, "clip", 10_000, false, 200, 30_000)
+            assertEquals(-step, reversed.offset); assertEquals(0L, reversed.target(24_000))
+            assertEquals(playing, a.finish("clip", 800)!!.resume)
+            assertEquals(20_000L, a.tap(1, "clip", 0, playing, 900, 20_000).offset)
+            a.cancel()
+        }
+    }
     @Test fun repeatedTapsKeepFrozenPositionAndExtendDeadline() {
         val a = SeekAccumulator()
         a.tap(1, "video", 40_000, true, 0)

@@ -140,6 +140,44 @@ refresh. Player presentation tests sample known backgrounds to verify a uniform
 25% dim layer, transparent individual controls and an unobscured picture after
 controls hide; they also retain their layout and interaction checks.
 
+`SeekPreviewTest` exercises storyboard parsing, quality selection, clip offsets,
+cache reuse, cancellation, stale results and the tap-only 250 ms download
+timer with a virtual clock. `SeekPreviewsSmokeTest` uses multiple locally generated
+storyboard sheets/resolutions and timestamped request logs to check actual caching,
+full-player fit, pause/resume, drag cancellation, clips, fullscreen, miniplayer/PiP,
+spoilers, audio-only/live playback and delayed/failed images on the connected emulator. Run with
+`scripts/test-android.sh -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.SeekPreviewsSmokeTest`.
+The `/test/seek-previews` fixture mode accepts delay/failure/bad-crop controls;
+its index and image request arrays record URL, start time and authentication.
+
+Seek interval coverage checks all four choices, batch capture during settings
+changes, reversed taps, clip bounds, account sparse patches, older-server errors,
+per-instance guest persistence and profile isolation. Connected journeys cover
+Settings save/retry/recreation, runtime Media3/PiP/accessibility actions at 0.5×
+and 2×, and fixed jumps during offline playback. The sibling server fixture harness
+checks the shared JSON/YAML/cookie/account/backup contract and browser shortcuts.
+
+Seek interval acceptance on 15 October 2026 passed all 396 JVM tests and 26 focused
+Android 16 emulator journeys, plus debug/instrumentation APK builds and lint.
+The final set includes real PiP labels/actions, explicit video end bounds, clips,
+offline playback, runtime setting changes, accessibility, tap cancellation and
+recreation, all storyboard scenarios and seven chapter regressions. The existing
+chapter system-PiP expansion test below remains excluded. The sibling backend
+passed linked GUI/API-only builds, 28 focused Crystal specs, six browser journeys,
+production fixtures and the full guarded PostgreSQL account harness. Its full
+Crystal suite has a separate existing playlist test-helper compilation error,
+reproduced against unchanged HEAD and recorded in the sibling development guide.
+
+The initial seek-preview acceptance on 15 October 2026 passed 393 JVM tests and 27 focused
+device scenarios on the Android 16 `emulator-5554`, including all nine new preview
+scenarios, tap recreation/gesture regressions, chapters, clips, spoilers and offline
+playback. Debug/instrumentation APK builds, lint, the chapter fixture contract and
+documentation checks passed. The existing chapter system-PiP expansion test still
+times out at the OS expand-action lookup, matching the baseline failure documented
+in [Cleanup](CLEANUP.md); it was excluded from the final focused rerun. Preview PiP
+cancellation and playback restoration passed. Captures are saved under
+`/data/local/tmp/mobivious-ui/seek-preview-*.png` on the device.
+
 Standalone checks:
 
 ```sh

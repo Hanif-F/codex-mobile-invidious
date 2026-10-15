@@ -57,6 +57,10 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Background playback, audio-only mode, system media controls, fullscreen,
   picture in picture and a mini-player while browsing.
 - Playlists, mixes, Play next and Add to queue, with previous/next and repeat.
+- Full-player scene previews during timeline dragging and tap seeking, including
+  saved clips; cached images update immediately and tap downloads use a 250 ms limit.
+- Shared Seek interval choices of 5, 10, 20 or 30 video seconds for taps,
+  accessibility, PiP and media controls; guests save per instance on the device.
 - Rich descriptions, clickable timestamps, manual description chapters,
   read-only video comments and recommendations.
 
@@ -166,8 +170,7 @@ without chat. Chat is read-only.
 
 ### Current limitations
 
-Casting, upload notifications and timeline
-thumbnail previews are not implemented. Comments, polls and quizzes are read-only;
+Casting and upload notifications are not implemented. Comments, polls and quizzes are read-only;
 RSS support provides links and exports rather than an in-app feed reader.
 
 Native interaction and playback checks run on an already started emulator. See the

@@ -33,7 +33,7 @@ private val settingsPreferenceKeys = mapOf(
     "Color mode" to "dark_mode", "Video list density" to "ui_density", "Hide thumbnails" to "thin_mode",
     "Autoplay opened videos" to "autoplay", "Next recommendation" to "continue", "Autoplay next video" to "continue_autoplay",
     "Loop videos by default" to "video_loop", "Audio only by default" to "listen", "Proxy video streams" to "local",
-    "Default speed" to "speed", "Preferred video codec" to "video_codec", "Default quality" to "quality_dash",
+    "Default speed" to "speed", "Seek interval" to "seek_seconds", "Preferred video codec" to "video_codec", "Default quality" to "quality_dash",
     "Preferred audio track" to "preferred_audio",
     "Caption priority 1" to "captions", "Caption priority 2" to "captions", "Caption priority 3" to "captions",
     "Default homepage" to "default_home", "Trending region" to "region", "Show related videos" to "related_videos",
@@ -200,11 +200,12 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsToggle("Audio only by default", "Disable video tracks when opening a video", value.listen) { update(value.copy(listen = it)) }
                         SettingsToggle("Proxy video streams", "Route streams through your Invidious instance", value.local) { update(value.copy(local = it)) }
                         SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString()) { update(value.copy(speed = it.toFloat())) }
+                        SettingsChoice("Seek interval", PreferenceRules.seekIntervals.map { it.toString() to "$it seconds" }, value.seekSeconds.toString()) { update(value.copy(seekSeconds = it.toInt())) }
                         SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec) { update(value.copy(videoCodec = it)) }
                         SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash) { update(value.copy(qualityDash = it)) }
                         SettingsChoice("Preferred audio track", AudioPreferences.choices, value.preferredAudio) { update(value.copy(preferredAudio = it)) }
                         Text("Use original audio if your choice is unavailable. General languages can match regional tracks; a regional choice requires an exact match.", style = MaterialTheme.typography.bodySmall)
-                        Text("Playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
+                        Text("Seek interval applies to the next seek, in video seconds at any playback speed. Other playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
                     } }
                     item { AppSection {
                         SettingsHeading("On this device")

@@ -168,7 +168,40 @@ overflowing values, duplicate start times and starts at/after duration, then sor
 by start. At least two valid chapters and a known non-live duration are required;
 there is no requirement that the first start be zero. The active chapter is the
 last start at/before position. The chapter panel seeks the current occurrence;
-it does not fetch automatic chapters or ordinary timeline-preview thumbnails.
+chapter navigation does not fetch automatic chapters or preview assets.
+
+`SeekPreviewController` binds instance/account context, video, queue occurrence,
+duration and optional clip start. Timeline dragging pauses video/audio and commits
+one seek on release, restoring the original playing intent; cancellation does not
+commit. Tap accumulation captures the selected 5/10/20/30-second step at batch
+start and retains the 600 ms quiet interval. The shared `seek_seconds` preference
+defaults to 10 and also controls accessibility, PiP and Media3 seek-back/forward
+commands. Jumps use video seconds at every playback speed. Queue Settings updates
+the service increments immediately; subsequent batches use the new value.
+Media3 relative commands commit their calculated target through the same bounded
+seek path, including explicit video end times and clip-relative timelines.
+Both show previews over the existing video surface, below controls and gestures,
+with opaque black letterboxing and aspect-ratio fit. Time/chapter/SponsorBlock
+labels follow the requested target. The overlay disappears on commit/cancel.
+
+Indexes load lazily through `StoryboardRepository`; player previews choose the
+largest frame area, while the clip editor keeps its near-160px choice. Original
+sheets use shared URL-keyed 32 MiB memory/64 MiB disk caches; crop changes reuse
+the sheet. Invalid crop bounds never expose a whole sprite sheet. Cached frames
+can change on every input, including while another image downloads. Tap-initiated
+downloads start at least 250 monotonic milliseconds apart across bursts in the
+same occurrence. The first is immediate, only the latest pending target is kept,
+and ending the interaction cancels queued work. Dragging bypasses that timer.
+Late responses cannot replace a newer target or another occurrence's image.
+
+Clip preview selection adds the source clip start to the bounded relative target;
+UI labels and actual seeking remain relative. No previews are requested for hidden
+thumbnails until revealed, local downloads, audio-only/live/non-seekable playback,
+miniplayer or PiP. Missing or failed images leave the paused video or the last
+preview from that interaction visible. Lifecycle and competing actions cancel the
+interaction using the existing playback restoration policy.
+Activity recreation cancels pointer dragging while retaining a pending tap batch
+in the ViewModel so its existing delayed seek can finish.
 
 Video and community-post comments have separate `CommentsController` instances.
 Each target retains a main feed, independent reply feeds, sort and scroll positions.

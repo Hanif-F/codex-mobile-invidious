@@ -28,6 +28,7 @@ opened occurrence; current player controls are described separately below.
 | Audio only / `listen` | `listen` | false | Disable video tracks when opening media. Shared. |
 | Proxy streams / `local` | `local` | true | Ask the instance to proxy streams. Shared. |
 | Speed | `speed` | 1 | 0.25–2 inclusive; UI offers quarter steps. Shared. |
+| Seek interval / `seekSeconds` | `seek_seconds` | 10 | 5, 10, 20 or 30 video seconds. Shared; applies to the next seek without reopening playback. |
 | Quality / `qualityDash` | `quality_dash` | `auto` | Auto, Best, Worst, 4320/2160/1440/1080/720/480/360/240/144p. Shared. |
 | Codec / `videoCodec` | `video_codec` | `auto` | Auto, AV1 (`av1`), H.264 (`h264`). Preference applies to DASH. Shared. |
 | Preferred audio / `preferredAudio` | `preferred_audio` | `original` | Original Audio, Original Audio (Stable Volume), or a supported language/region tag. Shared. |
@@ -39,6 +40,12 @@ Invalid/non-finite saved speed becomes 1. Unsupported codec becomes Auto. A fixe
 resolution selects the best supported representation at or below that height;
 codec preference is resolved within that height. Auto remains bandwidth adaptive.
 Defaults do not create tracks missing from the manifest or unsupported by the device.
+
+Invalid or absent `seek_seconds` values become 10. Accounts use existing shared
+preferences; guests save on this device per instance. The service receives the
+interval through Queue Settings for media/PiP controls. A tap batch captures its
+interval until the 600 ms commitment; the next batch uses refreshed settings.
+Web account changes arrive on the existing refresh schedule, without live push.
 
 Preferred audio selects the highest-bitrate supported matching track. General
 languages can match regional tracks; regional preferences require an exact match.

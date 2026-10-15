@@ -9,6 +9,35 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PreferencesTest {
+    @Test fun seekIntervalsRoundTripAndStaySparseForAccountsAndGuests() = runBlocking {
+        val before = AccountPreferences()
+        for (seconds in PreferenceRules.seekIntervals) {
+            val value = before.copy(seekSeconds = seconds)
+            assertEquals(seconds, AccountPreferences.parse(value.json()).seekSeconds)
+            assertEquals(seconds, LocalPreferences.read(value.json()).seekSeconds)
+            assertEquals(seconds, value.merge(JSONObject().put("speed", 2)).seekSeconds)
+            if (seconds != 10) assertEquals(setOf("seek_seconds"), value.changesFrom(before).keys().asSequence().toSet())
+        }
+        for (raw in listOf("0", "15", "-5", "5.0", "5.5", "null", "true", "\"20\"", "[]", "{}")) {
+            val malformed = JSONObject("""{"seek_seconds":$raw}""")
+            assertEquals(10, AccountPreferences.parse(malformed).seekSeconds)
+            assertEquals(10, LocalPreferences.read(malformed).seekSeconds)
+        }
+        assertEquals(10, AccountPreferences.parse(JSONObject()).seekSeconds)
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val api = InvidiousApi({ address }, { Account("token", "Alice", Long.MAX_VALUE, address) })
+            server.enqueue(MockResponse().setBody(before.copy(seekSeconds = 30).json().toString()))
+            assertEquals(30, api.preferences(before.copy(seekSeconds = 30).changesFrom(before), api.context()).seekSeconds)
+            val patch = server.takeRequest()
+            assertEquals("PATCH", patch.method); assertEquals("""{"seek_seconds":30}""", patch.body.readUtf8())
+            server.enqueue(MockResponse().setBody("{}"))
+            assertEquals(10, api.preferences().seekSeconds)
+            server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"Unsupported native preference"}"""))
+            try { api.preferences(JSONObject().put("seek_seconds", 20), api.context()); fail("Older server must reject unsupported saves") }
+            catch (_: java.io.IOException) { }
+        }
+    }
     @Test fun codecPreferencesRoundTripAndProduceSparseAccountPatches() = runBlocking {
         val before = AccountPreferences()
         for (codec in listOf("auto", "av1", "h264")) {

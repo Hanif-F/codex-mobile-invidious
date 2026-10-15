@@ -12,7 +12,7 @@ data class AccountPreferences(
     val channelSpoilers: Map<String, ChannelSpoilerRule> = emptyMap(),
     val autoplay: Boolean = true, val listen: Boolean = false, val local: Boolean = true,
     val continueNext: Boolean = false, val continueAutoplay: Boolean = true, val videoLoop: Boolean = false,
-    val speed: Float = 1f, val qualityDash: String = "auto", val videoCodec: String = "auto", val preferredAudio: String = "original", val captions: List<String> = listOf("", "", ""),
+    val speed: Float = 1f, val seekSeconds: Int = 10, val qualityDash: String = "auto", val videoCodec: String = "auto", val preferredAudio: String = "original", val captions: List<String> = listOf("", "", ""),
     val darkMode: String = "", val uiDensity: String = "balanced", val thinMode: Boolean = false,
     val defaultHome: String = "Popular", val feedMenu: List<String> = listOf("Popular", "Trending", "Subscriptions", "Playlists"),
     val region: String = "US", val relatedVideos: Boolean = true, val extendDescription: Boolean = false,
@@ -29,6 +29,7 @@ data class AccountPreferences(
         put("continue", continueNext); put("continue_autoplay", continueAutoplay); put("video_loop", videoLoop)
         put("speed", speed); put("quality_dash", qualityDash); put("video_codec", PreferenceRules.videoCodec(videoCodec)); put("captions", JSONArray(captions))
         put("preferred_audio", AudioPreferences.normalize(preferredAudio))
+        put("seek_seconds", PreferenceRules.seekSeconds(seekSeconds))
         put("dark_mode", darkMode); put("ui_density", uiDensity); put("thin_mode", thinMode)
         put("default_home", defaultHome); put("feed_menu", JSONArray(feedMenu)); put("region", region)
         put("related_videos", relatedVideos); put("extend_desc", extendDescription); put("comments", JSONArray(comments))
@@ -74,6 +75,7 @@ data class AccountPreferences(
                 continueNext = j.optBoolean("continue", false), continueAutoplay = j.optBoolean("continue_autoplay", true), videoLoop = j.optBoolean("video_loop", false),
                 speed = rawSpeed.takeIf { it.isFinite() && it in .25f..2f } ?: 1f, qualityDash = j.text("quality_dash", "auto"), videoCodec = PreferenceRules.videoCodec(j.opt("video_codec")),
                 preferredAudio = AudioPreferences.normalize(j.opt("preferred_audio")),
+                seekSeconds = PreferenceRules.seekSeconds(j.opt("seek_seconds")),
                 captions = strings("captions", defaults.captions), darkMode = j.text("dark_mode").takeIf { it in listOf("", "light", "dark") } ?: "",
                 uiDensity = j.text("ui_density", "balanced").takeIf { it == "compact" } ?: "balanced", thinMode = j.optBoolean("thin_mode"),
                 defaultHome = j.text("default_home", "Popular"), feedMenu = strings("feed_menu", defaults.feedMenu), region = j.text("region", "US"),
@@ -85,6 +87,10 @@ data class AccountPreferences(
 }
 
 object PreferenceRules {
+    val seekIntervals = listOf(5, 10, 20, 30)
+    fun seekSeconds(value: Any?): Int = (value as? Number)?.takeIf { it is Int || it is Long }?.let { number ->
+        seekIntervals.firstOrNull { it.toDouble() == number.toDouble() }
+    } ?: 10
     val videoCodecs = listOf("auto" to "Auto", "av1" to "AV1", "h264" to "H.264")
     fun videoCodec(value: Any?) = (value as? String)?.takeIf { codec -> videoCodecs.any { it.first == codec } } ?: "auto"
     val homes = listOf("", "Popular", "Trending", "Subscriptions", "Playlists")

@@ -42,6 +42,9 @@ import net.wingress.mobivious.player.StreamCatalog
 import net.wingress.mobivious.player.VideoSelection
 import net.wingress.mobivious.player.AudioSelection
 import net.wingress.mobivious.player.VideoGeometry
+import net.wingress.mobivious.player.SeekPreviewBinding
+import net.wingress.mobivious.player.SeekPreviewController
+import net.wingress.mobivious.player.SeekPreviewKind
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
     val refreshing: Boolean = false,
@@ -66,6 +69,8 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
+
+internal data class ScrubSeek(val context: ApiContext, val mediaId: String, val occurrence: String?, val resume: Boolean, val targetMs: Long)
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class AppViewModel(application: Application) : AndroidViewModel(application) {
@@ -138,6 +143,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val playback = MutableStateFlow(PlaybackState())
     val controller = MutableStateFlow<MediaController?>(null)
     val pendingSeek = MutableStateFlow<PendingSeek?>(null)
+    internal val scrubSeek = MutableStateFlow<ScrubSeek?>(null)
+    internal val storyboardImages = app.storyboardImages
+    internal val seekPreviews = SeekPreviewController(viewModelScope, app.storyboards::frames,
+        { storyboardImages.sheet(it, true) }, { storyboardImages.sheet(it, false) },
+        { sheet, frame -> StoryboardRules.fits(frame, sheet.width, sheet.height) }, SystemClock::elapsedRealtime)
     private val seekAccumulator = SeekAccumulator()
     private var seekJob: Job? = null
     private var seekContext: ApiContext? = null
@@ -473,6 +483,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (route == "playlist:${state.source.id}") refresh()
                 if (account.value != null) refreshAccount()
             }
+            if (previous.currentKey != state.currentKey || previous.context != state.context) cancelAccumulatedSeek(false)
             previous = state
             if (clipEditor.value.open && clipEditor.value.occurrence != state.currentKey) closeClipEditor()
             requestedVideo = state.current?.video?.id
@@ -1213,11 +1224,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         else ClipEditorState(true, details, context, occurrence, wasPlaying, startMs = range.first, endMs = range.last,
             startText = ClipRules.timestamp(range.first, range.last >= 3_600_000), endText = ClipRules.timestamp(range.last))
         clipEditorJob?.cancel()
-        val track = details.storyboards.filter { it.width > 0 }.minByOrNull { kotlin.math.abs(it.width - 160) }
+        val track = StoryboardRules.track(details.storyboards, sharpest = false)
         if (track != null && clipEditor.value.frames.isEmpty()) {
             clipEditor.value = clipEditor.value.copy(loadingFrames = true)
             clipEditorJob = viewModelScope.launch {
-                val frames = try { api.storyboard(track, context) } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyList() }
+                val frames = try { app.storyboards.frames(track, context) } catch (e: CancellationException) { throw e } catch (_: Exception) { emptyList() }
                 if (clipEditor.value.open && context == api.context() && clipEditor.value.occurrence == occurrence)
                     clipEditor.value = clipEditor.value.copy(frames = frames, loadingFrames = false)
             }
@@ -1382,24 +1393,72 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     } }
     fun seekBy(offset: Long) { controller.value?.let { seekTo(it.currentPosition + offset) } }
+    internal fun configureSeekPreview(visible: Boolean) {
+        val state = playback.value
+        val details = state.details
+        val spoilers = channelSpoilers.state.value
+        val decision = details?.video?.let { spoilers.decision(it) }
+        val hidden = decision == null || decision.pending || decision.thumbnail &&
+            !(spoilers.playback.occurrence == queue.value.currentKey && spoilers.playback.thumbnail)
+        val track = details?.storyboards?.let { StoryboardRules.track(it) }
+        val binding = if (visible && details != null && !hidden && state.videoEnabled && state.seekable && state.duration > 0 &&
+            !state.live && !details.video.live && !state.loading && state.error == null && state.downloadId == null &&
+            details.video.id == state.mediaId && track != null)
+            SeekPreviewBinding(api.context(), state.mediaId, queue.value.currentKey.orEmpty(), track, state.duration, state.clip?.startMs ?: 0)
+            else null
+        seekPreviews.bind(binding)
+        val drag = scrubSeek.value
+        val tap = pendingSeek.value
+        if (binding != null) when {
+            drag != null -> seekPreviews.begin(SeekPreviewKind.DRAG, drag.targetMs)
+            tap != null -> seekPreviews.begin(SeekPreviewKind.TAP, tap.target(state.duration))
+        }
+    }
+    internal fun updateScrub(targetMs: Long) {
+        val p = controller.value ?: return
+        val state = playback.value
+        if (!state.seekable || !state.canPlay || state.duration <= 0 || state.loading || state.error != null) return
+        if (scrubSeek.value == null) {
+            val resume = pendingSeek.value?.resume ?: p.playWhenReady
+            cancelAccumulatedSeek(false)
+            scrubSeek.value = ScrubSeek(api.context(), state.mediaId, queue.value.currentKey, resume, targetMs)
+            p.pause()
+        }
+        val value = scrubSeek.value ?: return
+        val target = PlaybackRules.seek(targetMs, state.duration)
+        scrubSeek.value = value.copy(targetMs = target)
+        seekPreviews.begin(SeekPreviewKind.DRAG, target)
+    }
+    internal fun finishScrub() {
+        val value = scrubSeek.value ?: return
+        scrubSeek.value = null; seekPreviews.finish()
+        val p = controller.value ?: return
+        if (value.context != api.context() || value.mediaId != p.currentMediaItem?.mediaId || value.occurrence != queue.value.currentKey || p.playerError != null) return
+        if (p.isCurrentMediaItemSeekable && p.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) p.seekTo(PlaybackRules.seek(value.targetMs, p.duration))
+        p.playWhenReady = value.resume
+        updatePlayback()
+    }
     fun accumulateSeek(direction: Int) {
         val p = controller.value ?: return
         val state = playback.value
         if (!state.seekable || !state.canPlay || state.loading || state.error != null) return
         val id = p.currentMediaItem?.mediaId ?: return
+        if (scrubSeek.value != null) cancelAccumulatedSeek()
         val first = seekAccumulator.pending == null
-        val value = seekAccumulator.tap(direction, id, p.currentPosition, p.playWhenReady, SystemClock.elapsedRealtime())
+        val value = seekAccumulator.tap(direction, id, p.currentPosition, p.playWhenReady, SystemClock.elapsedRealtime(), PreferenceRules.seekSeconds(preferences.value.seekSeconds) * 1000L)
         seekContext = api.context()
         pendingSeek.value = value
         if (first) p.pause()
         // A synchronous external discontinuity can cancel the batch during pause.
         if (seekAccumulator.pending != value) return
+        seekPreviews.begin(SeekPreviewKind.TAP, value.target(state.duration))
         seekJob?.cancel()
         seekJob = viewModelScope.launch {
             delay(SeekAccumulator.DELAY)
             if (api.context() != seekContext || p.currentMediaItem?.mediaId != id || p.playerError != null || playback.value.error != null) { cancelAccumulatedSeek(false); return@launch }
             val finished = seekAccumulator.finish(id, SystemClock.elapsedRealtime()) ?: return@launch
             pendingSeek.value = null
+            seekPreviews.finish()
             seekContext = null
             if (p.isCurrentMediaItemSeekable && p.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) {
                 p.seekTo(finished.target(p.duration))
@@ -1408,7 +1467,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             updatePlayback()
         }
     }
+    internal fun cancelScrub(restore: Boolean = true) {
+        val scrub = scrubSeek.value
+        scrubSeek.value = null
+        if (scrub != null) seekPreviews.cancel()
+        if (restore && scrub != null && scrub.context == api.context() && scrub.occurrence == queue.value.currentKey)
+            controller.value?.takeIf { it.currentMediaItem?.mediaId == scrub.mediaId && it.playerError == null }?.playWhenReady = scrub.resume
+    }
     fun cancelAccumulatedSeek(restore: Boolean = true) {
+        cancelScrub(restore); seekPreviews.cancel()
         seekJob?.cancel(); seekJob = null
         val value = seekAccumulator.cancel()
         pendingSeek.value = null
@@ -1432,7 +1499,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             putFloat("speed", speed.speed); putFloat("pitch", speed.pitch)
         }
     }
-    fun audioOnly(value: Boolean) { controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
+    fun audioOnly(value: Boolean) { cancelAccumulatedSeek(); controller.value?.let { it.trackSelectionParameters = it.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, value).build() } }
     fun autoQuality() { queueCommand(PlaybackService.VIDEO_AUTO) { putString("occurrence", queue.value.currentKey) } }
     // Resolution callers select one current-video representation; defaults are edited in Settings.
     fun quality(height: Int) { if (height == Int.MAX_VALUE) autoQuality() else controller.value?.let { p ->

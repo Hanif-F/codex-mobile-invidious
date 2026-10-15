@@ -4,7 +4,6 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.Locale
 import org.json.JSONObject
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 
 /** Clip bounds always use absolute source milliseconds; the player exposes relative milliseconds. */
 data class Clip(val id: String, val title: String, val startMs: Long, val endMs: Long,
@@ -72,22 +71,4 @@ object ClipRules {
         BigDecimal(hours).multiply(BigDecimal(3600)).add(BigDecimal(minutes).multiply(BigDecimal(60))).add(seconds)
             .multiply(BigDecimal(1000)).longValueExact()
     }.getOrNull()
-}
-data class StoryboardTrack(val url: String, val width: Int, val height: Int)
-data class StoryboardFrame(val startMs: Long, val endMs: Long, val url: String, val x: Int, val y: Int, val width: Int, val height: Int)
-object StoryboardVtt {
-    fun parse(text: String, base: String): List<StoryboardFrame> {
-        val timing = Regex("(\\d{2,}:\\d{2}:\\d{2}\\.\\d{3})\\s+-->\\s+(\\d{2,}:\\d{2}:\\d{2}\\.\\d{3})")
-        fun ms(s: String): Long = s.split(':').let { p -> (p[0].toLong() * 3600 + p[1].toLong() * 60) * 1000 + BigDecimal(p[2]).multiply(BigDecimal(1000)).longValueExact() }
-        return text.replace("\r", "").split(Regex("\n\\s*\n")).mapNotNull { block -> runCatching {
-            val lines = block.lines(); val index = lines.indexOfFirst { timing.containsMatchIn(it) }
-            if (index < 0) return@runCatching null
-            val range = timing.find(lines[index])!!; val asset = lines.getOrNull(index + 1)?.trim() ?: return@runCatching null
-            val rect = Regex("#xywh=(\\d+),(\\d+),(\\d+),(\\d+)").find(asset) ?: return@runCatching null
-            val url = base.toHttpUrlOrNull()?.resolve(asset.substringBefore('#')) ?: return@runCatching null
-            val r = rect.groupValues.drop(1).map(String::toInt)
-            require(r[2] in 1..4096 && r[3] in 1..4096 && ms(range.groupValues[2]) > ms(range.groupValues[1]))
-            StoryboardFrame(ms(range.groupValues[1]), ms(range.groupValues[2]), url.toString(), r[0], r[1], r[2], r[3])
-        }.getOrNull() }.take(100_000)
-    }
 }

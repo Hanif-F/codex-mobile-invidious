@@ -36,6 +36,11 @@ def generate_base():
         if not target.exists():
             subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error',
                             '-i', str(video), *options, '-frames:v', '1', str(target)], check=True)
+    for width in (160, 320):
+        if not all((directory / f'seek-storyboard-{width}-{n}.jpg').exists() for n in range(3)):
+            subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', str(video),
+                            '-vf', f'fps=1/20,scale={width}:{width * 9 // 16},tile=2x1',
+                            '-frames:v', '3', '-start_number', '0', str(directory / f'seek-storyboard-{width}-%d.jpg')], check=True)
     captions = directory / 'captions.vtt'
     if not captions.exists():
         captions.write_text('WEBVTT\n\n00:00.000 --> 00:30.000\nMobivious caption test\n')

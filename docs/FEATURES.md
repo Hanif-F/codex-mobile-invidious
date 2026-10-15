@@ -59,10 +59,21 @@ the instance proxy and fall back to a Unicode initial or generic icon.
 ## Watch and listen
 
 Open a video to enter the expanded watch page. Tap to show controls, use Play/Pause
-or Replay, drag the timeline or double-tap either side to seek in 10-second steps.
+or Replay, drag the timeline or double-tap either side to seek by the selected
+interval: 5, 10 (default), 20 or 30 video seconds, at every playback speed.
 Repeated seek taps accumulate until a 600 ms quiet interval. The current chapter
 and fullscreen controls sit above the full-width timeline. Loading, buffering,
 errors and Retry remain actionable within the controls.
+
+Dragging the timeline pauses playback and shows scene previews across the player,
+using the sharpest available storyboard images. Releasing seeks once and restores
+the previous playing/paused state; cancelling restores it without seeking. Tap
+seeking shows the same previews, with cached frames following every tap and new
+image-sheet downloads limited to one every 250 ms across tap bursts.
+Saved clips use source-video images while retaining clip-relative times. Images
+fit without stretching, and controls remain above them. Missing previews leave
+seeking usable. Hidden thumbnails, offline/audio-only/live playback, miniplayer
+and PiP do not request previews.
 
 Player settings offer supported Quality, Audio and Caption tracks, speed from
 0.25× to 2×, Audio only, Picture in picture and Refresh buffer.
@@ -85,7 +96,7 @@ up; scrolling back near the top expands it. Fullscreen hides system bars; the to
 edge remains available for Android's reveal gesture.
 
 Playback can continue in the background, with system media controls. PiP supports
-back 10 seconds, play/pause and forward 10 seconds. Automatic PiP depends on the
+back/forward by the selected seek interval and play/pause. Automatic PiP depends on the
 device feature, local PiP setting and active watch/play state. Disabling background
 playback pauses when leaving outside PiP. Audio only disables video decoding tracks.
 
@@ -100,8 +111,8 @@ counts gain exact-total presentation; rounded or unverified counts stay qualifie
 
 Manual chapters are derived from timestamp lines in the supplied description.
 At least two valid chapters within a known non-live duration are required.
-The chapter panel seeks without replacing the queue occurrence. This is separate
-from upstream automatic chapters and from timeline preview thumbnails.
+The chapter panel seeks without replacing the queue occurrence. Automatic
+chapters remain unsupported; seek previews are independent of manual chapters.
 
 Video comments load on demand when the entry is opened. Choose Top or Newest,
 load additional comments, open replies and return to retained positions. Rows
@@ -222,8 +233,8 @@ failures leave ordinary playback usable. [Settings](SETTINGS.md) records all def
 
 ## Deliberate limits
 
-Casting, Android upload alerts and ordinary seek-timeline thumbnail previews are
-not implemented. Clip-editor storyboards are a separate supported feature. The
+Casting and Android upload alerts are not implemented. Clip-editor filmstrips
+and full-player seek previews share storyboard loading support. The
 client does not add YouTube account access, membership entitlements, uploads,
 comment writing, poll voting or a local RSS reader. Queue shuffle and durable
 queue restoration after process death are not implemented. Compatibility on

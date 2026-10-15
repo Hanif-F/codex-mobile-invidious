@@ -325,8 +325,8 @@ class PlaybackService : MediaSessionService() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             "mobivious.toggle" -> if (player.playWhenReady) player.pause() else { if (app.playbackQueue.value.current?.clip != null && player.playbackState == Player.STATE_ENDED) player.seekTo(0); val bound = app.playbackQueue.value.current?.linkPlayback; if (bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0); player.play() }
-            "mobivious.rewind" -> player.seekTo(queue.clampSeek(player.currentPosition - 10_000))
-            "mobivious.forward" -> player.seekTo(queue.clampSeek(player.currentPosition + 10_000))
+            "mobivious.rewind" -> player.seekTo(queue.clampSeek(player.currentPosition - queue.seekIncrementMs))
+            "mobivious.forward" -> player.seekTo(queue.clampSeek(player.currentPosition + queue.seekIncrementMs))
             else -> return super.onStartCommand(intent, flags, startId)
         }
         return START_NOT_STICKY

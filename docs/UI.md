@@ -139,6 +139,11 @@ and the former play-triangle icon are no longer used.
 
 ## Saving and editing
 
+**You → Settings → Playback → Seek interval** offers 5, 10, 20 and 30 seconds,
+with 10 selected by default. Saved changes update subsequent seek actions while
+the video remains open. Accessibility and PiP labels use the selected distance.
+The interval represents video timeline seconds, including at different speeds.
+
 Preferences save automatically. Choices commit immediately, sliders commit on
 release, and valid text commits after 500ms, blur, Done, page exit or backgrounding.
 `PreferenceSaveController` owns confirmed/requested values, revisions, pending,
@@ -169,6 +174,13 @@ Tiny pictures put secondary controls and SponsorBlock prompts in More player
 controls; opening this popup keeps controls visible. Queue opens as a full-height
 phone sheet or wide supporting pane. Comments, chapters, queue and docked chat
 are mutually exclusive; closing a tool preserves playback and occurrence identity.
+
+While dragging the timeline or accumulating seek taps, scene previews replace the
+visible picture inside the existing player bounds. Images retain their aspect
+ratio with black letterboxing; controls and gesture targets remain above the
+image. Preview drawing covers native captions from the old playback position.
+Time, chapter and SponsorBlock labels follow the pending target. Releasing or
+cancelling seeking removes the image; unavailable previews preserve usable controls.
 
 ## Accessibility and verification
 

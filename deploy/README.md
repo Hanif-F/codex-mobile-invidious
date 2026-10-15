@@ -8,6 +8,14 @@ Postgres 14, and `postgresdata` / `companioncache` volumes. Both hostnames serve
 the same backend and database. It builds the sibling fork in `../invidious` by
 default; Android never connects directly to Postgres or Companion.
 
+Deploy the shared `seek_seconds` preference addition before distributing the
+Android seek-interval update. Verify account GET/PATCH accepts integer 5/10/20/30,
+an unrelated sparse save retains it, and website Playback preferences retain the
+same choice. Guest web choices use PREFS; Android guests save per instance on the
+device. This uses existing preferences JSON and scopes without a migration or new
+endpoint. Older servers read as 10 seconds and report unsupported settings when
+an account save fails. Synchronization follows existing refresh/page-load behavior.
+
 The native download addition requires the sibling server routes
 `GET /api/v1/videos/:id/downloads` and `GET /api/v1/videos/:id/download?key=…`.
 Deploy both before distributing the new APK. They use the existing media/Companion

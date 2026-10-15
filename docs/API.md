@@ -128,7 +128,7 @@ not imply Android upload notifications are implemented.
 | GET `/api/v1/auth/clips` | Account My Clips, numeric page. |
 | POST `/api/v1/auth/clips` | `{videoId,title,startTime,endTime}` in seconds, preserving millisecond precision. |
 | DELETE `/api/v1/auth/clips/:id` | Owned native clip only. |
-| GET storyboard VTT URL | Public same-instance-host validation, text/vtt; sprite `#xywh` cues. |
+| GET storyboard VTT URL | Public same-instance-host validation, text/vtt; shared lazy index cache for player/clip editor; same-origin image URLs and validated `#xywh` cues. |
 | GET `/api/v1/videos/:id/downloads` | Public `{video,choices,allowed,reason}`; choices include key/kind/url/stream metadata. |
 | GET `/api/v1/videos/:id/download?key=…` | Origin-bound download URLs supplied by catalog, consumed by DownloadManager. |
 | GET `/api/v1/sponsorblock/:id` | Public segments with id/category/start/end seconds. |
@@ -182,6 +182,7 @@ and all writes have no offline mutation queue. See [Storage](STORAGE_AND_SECURIT
 | --- | --- |
 | Public browsing/playback | Standard compatible Invidious metadata/media APIs; optional fields can be omitted. |
 | Preferred audio | Shared `preferred_audio` field and native PATCH validation from the matching server update; playback uses existing manifests/audio metadata, with manifest fallback. No migration or new scopes. |
+| Seek interval | Shared integer `seek_seconds`: 5, 10, 20 or 30; default/fallback 10. Existing GET/PATCH preferences and scopes. Deploy server support before distributing Android. An older server omits the field and rejects unsupported saves through the existing update-required flow. No migration or endpoint. |
 | Native login/registration/account management | Mobile/account extensions; old server explains update. New permission groups may require renewed sign-in. |
 | History/progress, blocks, subscription search | Fork extensions and matching native scopes. Renew old tokens after scope additions. |
 | Saved playlists/RSS | Fork APIs/scopes and migration 20 for per-account bookmarks/backfill. |
