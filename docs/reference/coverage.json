@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "10b3268e93edaf3422b958b543e0335cb60bb652",
+  "reviewedSourceCommit": "1bfba0f585e0d330fce644252794a491322b0305",
   "reviewedDate": "2026-10-15",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "documents": [
     "README.md",
     "deploy/README.md",
@@ -46,7 +46,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "d55553524fd749da18372de7ace45a2dc337e149afb4d1fadce42202dc1c8229"
+      "sha256": "c2a8663e64e41b5fd2318e4c67f1021dc3b28c6854fb9f8496562845e0e7d892"
     },
     "android/app/proguard-rules.pro": {
       "area": "Build configuration",
