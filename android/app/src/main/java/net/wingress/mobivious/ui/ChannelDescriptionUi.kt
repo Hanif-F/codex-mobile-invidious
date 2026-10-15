@@ -7,8 +7,6 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.Channel
@@ -17,11 +15,9 @@ import net.wingress.mobivious.data.Comment
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ChannelDescriptionSheet(channel: Channel, server: String = "", link: (String) -> Unit = {}, dismiss: () -> Unit) {
-    val maxHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
-    ModalBottomSheet(onDismissRequest = dismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        BrowseAppSurface(Modifier.fillMaxWidth().height(maxHeight).testTag("channel-description-sheet"), toolbar = {
+    AppModalSheet(onDismissRequest = dismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        PanelScaffold(Modifier.fillMaxWidth().fillMaxHeight().testTag("channel-description-sheet"), toolbar = {
             BrowsePanelToolbar("Channel description", "Close channel description", dismiss, channel.name)
         }) { contentModifier, topInset ->
             Column(contentModifier.verticalScroll(rememberScrollState()).testTag("channel-description-scroll")

@@ -16,8 +16,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.font.FontWeight
@@ -87,8 +85,8 @@ internal fun ChaptersPanel(chapters: List<VideoChapter>, positionMs: Long, state
         }
     }
     WatchPanelSurface(modifier.testTag("chapters-panel")) {
-            WatchPanelToolbar("Chapters", "Close chapters", close, Icons.Default.FormatListNumbered,
-                detail = "${chapters.size} chapters")
+            WatchPanelToolbar("Chapters", "Close chapters", close,
+                detail = "${chapters.size} ${if (chapters.size == 1) "chapter" else "chapters"}")
             LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("chapters-list"), state = state.list,
                 contentPadding = PaddingValues(bottom = 24.dp)) {
                 items(chapters, key = VideoChapter::startMs) { chapter ->
@@ -97,7 +95,7 @@ internal fun ChaptersPanel(chapters: List<VideoChapter>, positionMs: Long, state
                         .background(if (active) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
                         .clickable(enabled = enabled, role = Role.Button, onClickLabel = "Seek to ${playerTime(chapter.startMs)}") { seek(chapter.startMs) }
                         .semantics { selected = active; if (active) stateDescription = "Current chapter" }
-                        .testTag("chapter-${chapter.startMs}").padding(horizontal = 24.dp, vertical = 12.dp)) {
+                        .testTag("chapter-${chapter.startMs}").padding(horizontal = 16.dp, vertical = 12.dp)) {
                         Text(chapter.title, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
                             color = if (active) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodyLarge)
@@ -113,11 +111,9 @@ internal fun ChaptersPanel(chapters: List<VideoChapter>, positionMs: Long, state
 @Composable
 internal fun ChaptersSheet(chapters: List<VideoChapter>, playback: PlaybackState, state: ChapterPanelState, seek: (Long) -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
-    ModalBottomSheet(onDismissRequest = state::close, sheetState = sheetState, sheetMaxWidth = 640.dp,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    AppModalSheet(onDismissRequest = state::close, sheetState = sheetState) {
         BackHandler { state.close() }
         ChaptersPanel(chapters, playback.position, state, playback.seekable && !playback.loading && playback.error == null,
-            state::close, seek, Modifier.fillMaxWidth().height(height))
+            state::close, seek, Modifier.fillMaxWidth().fillMaxHeight())
     }
 }

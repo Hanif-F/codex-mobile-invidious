@@ -63,6 +63,23 @@ class SecondaryScreensJourneyTest {
         until { vm.account.value != null && vm.subscriptionChannels.value.loaded && !vm.accountBusy.value }
     }
 
+    @Test fun modalChannelSettingsKeepInputAndCloseWhenInputMethodOpens() {
+        compose.runOnUiThread { vm.openChannelSpoilers() }
+        until { compose.onAllNodesWithTag("spoiler-channel-input").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("spoiler-channel-input").performClick().performTextInput(channelId)
+        // Floating/handwriting keyboards may report no bottom inset even while input is shown.
+        until { shell("dumpsys input_method").contains("mInputShown=true") }
+        compose.onNodeWithTag("spoiler-channel-input").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Close channel title and thumbnail settings").assertIsDisplayed()
+        val body = compose.onNodeWithTag("modal-panel-body").fetchSemanticsNode().boundsInRoot
+        val input = compose.onNodeWithTag("spoiler-channel-input").fetchSemanticsNode().boundsInRoot
+        assertTrue("The input stays inside the sheet viewport", input.bottom <= body.bottom)
+        assertTrue("The sheet keeps usable content space", body.height > 0)
+        capture("drawer-modal-keyboard")
+        compose.onNodeWithContentDescription("Close channel title and thumbnail settings").performClick()
+        compose.onNodeWithTag("modal-panel-body").assertDoesNotExist()
+    }
+
     @Test fun settingsFormsMenusAndAuthenticationStayReachable() {
         capture("discover-light")
         settings(); capture("settings-light")

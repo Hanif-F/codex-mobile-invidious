@@ -73,7 +73,7 @@ internal fun LibraryToolbar(title: String, back: (() -> Unit)? = null, statusIns
 
 @Composable
 internal fun LibraryPanel(title: String, close: () -> Unit, enabled: Boolean = true,
-    closeLabel: String = "Close", actions: @Composable RowScope.() -> Unit = {},
+    closeLabel: String = "Close", actions: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable (Modifier, Dp) -> Unit) {
     Dialog(onDismissRequest = { if (enabled) close() }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         val view = LocalView.current
@@ -86,13 +86,10 @@ internal fun LibraryPanel(title: String, close: () -> Unit, enabled: Boolean = t
             val phone = maxWidth < 600.dp
             Surface(Modifier.then(if (phone) Modifier.fillMaxSize() else Modifier.widthIn(max = 720.dp).fillMaxHeight(.95f)),
                 shape = if (phone) androidx.compose.foundation.shape.RoundedCornerShape(0.dp) else AppTokens.card,
-                tonalElevation=3.dp,shadowElevation=3.dp) {
+                color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation=0.dp,shadowElevation=3.dp) {
                 CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                BrowseAppSurface(Modifier.fillMaxSize(), toolbar = {
-                    LibraryToolbar(title, statusInset = false, actions = {
-                        actions()
-                        AppIconButton(Icons.Default.Close, closeLabel, enabled = enabled) { close() }
-                    })
+                PanelScaffold(Modifier.fillMaxSize(), toolbar = {
+                    PanelHeader(title, closeLabel, close, enabled = enabled, actions = actions)
                 }, content = content)
                 }
             }

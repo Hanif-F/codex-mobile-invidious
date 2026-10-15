@@ -45,7 +45,8 @@ languages can match regional tracks; regional preferences require an exact match
 Missing choices fall back to regular original audio, or retain the playable
 default when original identity is unknown. Playback defaults apply to the next
 occurrence. In-player manual audio lasts for the current occurrence, including
-refresh/retry; Auto restores its captured preference. Guests save per instance.
+refresh/retry. The Audio menu displays and checks the active track directly;
+there is no Audio Auto option. Guests save per instance.
 Progressive sources retain embedded audio; downloads keep their saved tracks.
 
 ## Appearance and browsing

@@ -108,6 +108,12 @@ failed account saves. Rich media variants reuse generated segments; the server
 repository's native preference specs and disposable account harness verify the
 real PATCH validator and web/native synchronization separately.
 
+Audio menu assertions check the active track name and selected row for saved
+preferences, original-audio fallback, manual refresh/retry/reconnection and the
+next occurrence. Progressive playback verifies the active label without an
+explicit override. The Audio menu contains no Auto option; the existing quality
+menu scenarios still exercise adaptive video Auto.
+
 `AppThemePresentationTest` checks appearance migration, twelve palette galleries,
 opaque components and preservation of open menus/focused field drafts.
 `AppThemeTest` checks enabled text and control-boundary contrast numerically;
@@ -138,6 +144,18 @@ python3 scripts/check-community-fixture.py --media-dir .tools/test-media
 Avatar/community checks require generated thumbnail media. Each checker manages
 its disposable fixture on a free local port. They cover their fixture contracts,
 not Android screen rendering or live service compatibility.
+
+## Drawer and panel verification
+
+`PanelPresentationTest` covers pinned drawer headers, large-text/RTL navigation
+and form actions, scrolling to the final modal option, and disabled dismissal
+while a library action is busy. `SecondaryScreensJourneyTest` also checks a modal
+channel settings form with the real software keyboard open. Run these alongside `WatchCommentsPresentationTest`,
+`ChaptersPresentationTest`, `PlaybackQueuePresentationTest`,
+`ChannelDescriptionPresentationTest` and `LibraryPresentationTest` for panel UI
+changes. Review the captured drawer screenshots in portrait and landscape;
+`StreamControlsSmokeTest` checks player-settings selection and playback continuity
+against the local media fixture.
 
 ## Download restart and conversion acceptance
 

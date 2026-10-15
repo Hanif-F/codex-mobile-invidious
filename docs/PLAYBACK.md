@@ -114,9 +114,10 @@ tags (for example `in` for Indonesian) canonicalize before matching.
 The selector applies audio policy before the first segment and the coordinator
 reapplies it when tracks change. Manual choices retain logical audio identity,
 language, processing, codec and bitrate across refresh/retry and UI reconnection;
-a vanished track falls back to regular original audio. Auto restores the captured
-preference. Later saved defaults apply to the next occurrence. Audio-only mode
-uses the same policy. Progressive embedded audio and downloaded tracks keep their
+a vanished track falls back to regular original audio. The Audio menu names and
+checks the active track, including preference-selected and fallback tracks, and
+offers only concrete tracks. Later saved defaults apply to the next occurrence.
+Audio-only mode uses the same policy. Progressive embedded audio and downloaded tracks keep their
 existing behavior; native playback does not use `/latest_version` audio selectors.
 
 ## Link playback and bounded ranges

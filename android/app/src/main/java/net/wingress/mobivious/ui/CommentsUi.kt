@@ -16,12 +16,10 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -118,36 +116,25 @@ internal fun CommentsPanel(state: CommentsState, thinMode: Boolean, modifier: Mo
                 }
             }
     }
-    if (watchStyle) WatchCommentsSurface(modifier.testTag("comments-drawer"), toolbar = {
+    WatchCommentsSurface(modifier.testTag("comments-drawer"), toolbar = {
         WatchPanelToolbar(if (thread != null) "Replies" else "Comments", "Close comments", close,
-            Icons.Default.ChatBubbleOutline, detail = if (thread == null) state.feed.page.count?.let { commentCount(it) } else null,
-            backLabel = "Back to comments", back = if (thread != null) back else null)
+            detail = if (thread == null) state.feed.page.count?.let { DisplayFormats.audience(it, "comment") } else null,
+            backLabel = "Back to comments", back = if (thread != null) back else null, divider = thread != null)
         if (thread == null) WatchCommentSort(state.sort, changeSort)
     }) { listModifier, topPadding -> reading(listModifier, PaddingValues(top = topPadding, bottom = 24.dp)) }
-    else Surface(modifier.testTag("comments-drawer"), shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 2.dp) {
-        Column(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (thread != null) AppInsetIconButton(onClick = back, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to comments") }
-                else Icon(Icons.Default.ChatBubbleOutline, null, Modifier.padding(12.dp), tint = MaterialTheme.colorScheme.primary)
-                Text(if (thread != null) "Replies" else "Comments", Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
-                if (thread == null) state.feed.page.count?.let { Text(commentCount(it), style = MaterialTheme.typography.labelLarge) }
-                AppInsetIconButton(onClick = close, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Icon(Icons.Default.Close, "Close comments") }
-            }
-            if (thread == null) Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CommentSort.entries.forEach { sort -> AppFilterChip(selected = state.sort == sort,
-                    onClick = { changeSort(sort) }, label = { Text(sort.label) }, modifier = Modifier.testTag("comments-sort-${sort.apiValue}")) }
-            }
-            HorizontalDivider()
-            reading(Modifier.weight(1f), PaddingValues(bottom = 24.dp))
-        }
-    }
 }
 
 @Composable
 private fun WatchCommentSort(selected: CommentSort, changeSort: (CommentSort) -> Unit) {
-    AppSegments(CommentSort.entries, selected, { it.label }, Modifier.padding(horizontal = 16.dp),
-        tag = { "comments-sort-${it.apiValue}" }, select = changeSort)
+    SecondaryTabRow(selectedTabIndex = CommentSort.entries.indexOf(selected),
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        divider = { PanelDivider() }) {
+        CommentSort.entries.forEach { sort ->
+            Tab(selected = selected == sort, onClick = { changeSort(sort) },
+                modifier = Modifier.heightIn(min = 48.dp).testTag("comments-sort-${sort.apiValue}"),
+                text = { Text(sort.label) })
+        }
+    }
 }
 
 @Composable

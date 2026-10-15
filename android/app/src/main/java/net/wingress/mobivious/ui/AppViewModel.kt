@@ -1470,13 +1470,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         else if (group.type == C.TRACK_TYPE_TEXT) builder.setPreferredTextLanguage(group.getFormat(index).language)
         p.trackSelectionParameters = builder.build()
     } }
-    fun autoAudio() {
-        if (queue.value.audioSelection.enabled) {
-            queueCommand(PlaybackService.AUDIO_AUTO) { putString("occurrence", queue.value.currentKey) }
-            return
-        }
-        controller.value?.let { p -> p.trackSelectionParameters = p.trackSelectionParameters.buildUpon()
-        .clearOverridesOfType(C.TRACK_TYPE_AUDIO).setPreferredAudioLanguage(null).setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build() } }
     private fun syncComments() = if (queue.value.current?.downloadId != null) commentController.bind(null, false) else commentController.bind(queue.value.current?.video?.id ?: playback.value.details?.video?.id, queue.value.effective(preferences.value).showYoutubeComments)
     fun openComments() { closeChat(); syncComments(); commentController.open() }
     private fun syncChat() {

@@ -16,7 +16,6 @@ data class AudioTrackKey(val identity: String, val language: String, val stable:
 /** Defaults and manual choices belong to an occurrence, including refreshed manifests. */
 data class AudioSelection(val occurrence: String = "", val preference: String = "original", val enabled: Boolean = false,
     val manual: AudioTrackKey? = null) {
-    fun auto() = copy(manual = null)
     fun select(choice: StreamChoice) = copy(manual = AudioTrackKey.of(choice))
     fun fixed(choices: List<StreamChoice>): StreamChoice? {
         if (!enabled) return null

@@ -125,37 +125,39 @@ import kotlin.math.roundToInt
 
 @Composable private fun ChatPanelHeader(settings: () -> Unit, close: () -> Unit, adjustOverlay: (() -> Unit)?, watchStyle: Boolean = false) {
     var menu by remember { mutableStateOf(false) }
-    val header: @Composable () -> Unit = {
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val compact = maxWidth < 200.dp
-        Row(Modifier.fillMaxWidth().heightIn(min = if (watchStyle) 56.dp else 48.dp).padding(start = if (compact) 0.dp else 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            // Keep a narrow overlay's menu away from the player's trailing controls.
-            horizontalArrangement = if (compact && adjustOverlay == null) Arrangement.End else Arrangement.Start) {
-            if (!compact) Text("Chat replay", Modifier.weight(1f).semantics { heading() },
-                style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Box {
-                AppInsetIconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
-                    Icon(Icons.Default.MoreVert, "Chat menu")
-                }
-                AppDropdownMenu(expanded = menu, dismiss = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
-                        onClick = { menu = false; settings() }, modifier = Modifier.testTag("chat-settings"))
-                    if (adjustOverlay != null) DropdownMenuItem(text = { Text("Adjust overlay") },
-                        leadingIcon = { Icon(Icons.Default.OpenInFull, null) }, onClick = { menu = false; adjustOverlay() },
-                        modifier = Modifier.testTag("chat-overlay-edit"))
-                    DropdownMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
-                        onClick = { menu = false; close() }, modifier = Modifier.testTag("chat-menu-close"))
-                }
+    val menuContent: @Composable RowScope.() -> Unit = {
+        Box {
+            AppInsetIconButton(onClick = { menu = true }, modifier = Modifier.size(48.dp).testTag("chat-menu")) {
+                Icon(Icons.Default.MoreVert, "Chat menu")
             }
-            if (!compact) AppInsetIconButton(onClick = close, modifier = Modifier.size(48.dp).testTag("chat-close")) {
-                Icon(Icons.Default.Close, "Close chat replay")
+            AppDropdownMenu(expanded = menu, dismiss = { menu = false }) {
+                DropdownMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
+                    onClick = { menu = false; settings() }, modifier = Modifier.testTag("chat-settings"))
+                if (adjustOverlay != null) DropdownMenuItem(text = { Text("Adjust overlay") },
+                    leadingIcon = { Icon(Icons.Default.OpenInFull, null) }, onClick = { menu = false; adjustOverlay() },
+                    modifier = Modifier.testTag("chat-overlay-edit"))
+                DropdownMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
+                    onClick = { menu = false; close() }, modifier = Modifier.testTag("chat-menu-close"))
             }
         }
     }
+    if (watchStyle) {
+        PanelHeader("Chat replay", "Close chat replay", close, closeTag = "chat-close", actions = menuContent)
+    } else Box(Modifier.background(MaterialTheme.colorScheme.surfaceContainer)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val compact = maxWidth < 200.dp
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = if (compact) 0.dp else 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = if (compact && adjustOverlay == null) Arrangement.End else Arrangement.Start) {
+                if (!compact) Text("Chat replay", Modifier.weight(1f).semantics { heading() },
+                    style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                menuContent()
+                if (!compact) AppInsetIconButton(onClick = close, modifier = Modifier.size(48.dp).testTag("chat-close")) {
+                    Icon(Icons.Default.Close, "Close chat replay")
+                }
+            }
+        }
     }
-    if (watchStyle) AppSurface(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), shape = AppTokens.card) { header() }
-    else Box(Modifier.background(MaterialTheme.colorScheme.surfaceContainer)) { header() }
 }
 
 /** Owned by the player host so hiding the surface during recreation retains the draft. */

@@ -52,6 +52,22 @@ moves between embedded, mini, fullscreen and PiP modes.
 
 ## Theme and components
 
+Drawers, modal sheets and full-screen action panels share a flat panel header and
+one opaque `surfaceContainerLow` background. Headers keep a readable title,
+optional supporting label, trailing Close and leading Back on nested pages.
+They stay pinned above independently scrolling content, use 48dp control targets
+and 16dp content alignment, and move form actions to another row at large text
+sizes. Counts include their noun, such as “31 comments.” Comments sorting uses
+flat Material tabs. Settings values stack beneath their labels at large text.
+
+`PanelComponents` owns this styling locally; ordinary browse toolbars and section
+cards keep their existing roles. Inside panels, section cards become flat groups
+and action rows use dividers. Embedded watch tools, wide queue panes and modal
+tools use the same header. Modal sheets retain a single outer rounded shape and
+drag handle on the same background; their 85% safe-window height cap includes
+the handle and content insets. Fullscreen playback uses the same sheet styling.
+Floating chat overlays retain their adjustable opacity and geometry.
+
 `AppTheme` supplies exact light/dark neutral Material 3 roles, standard typography
 and shape sizes. Six device-wide accent presets have stable IDs: blue (default),
 teal, green, violet, amber and rose. Unknown IDs resolve to blue. Color mode keeps

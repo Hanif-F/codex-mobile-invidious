@@ -48,7 +48,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `processedDubsAreNotUsedForStableOriginalOrLanguagePreferences`
 - `unknownOriginalMetadataRetainsDefaultAndUnsupportedTracksAreExcluded`
 - `bitrateTiesRetainManifestOrderAcrossLanguageSortedMenus`
-- `manualTrackSurvivesRenditionIdChangesFallsBackAndAutoRestoresCapturedDefault`
+- `manualTrackSurvivesRenditionIdChangesAndFallbackWithoutChangingCapturedDefaults`
 - `reusedRenditionIdCannotRestoreAnotherLanguage`
 - `legacyManifestLanguageTagsMatchCanonicalPreferences`
 
@@ -1005,6 +1005,14 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 - `ordinarySurfacesRemainOpaqueOverChangingScenery`
 
+### PanelPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PanelPresentationTest.kt) — Drawer header, modal scrolling and busy library-action layout and behavior scenarios.
+
+- `narrowLargeTextHeaderKeepsNavigationActionsAndRowsReachable`
+- `modalSheetKeepsHeaderPinnedAndLastOptionReachable`
+- `libraryPanelKeepsBusyDismissalAndActionSemantics`
+
 ### PlaybackQueuePresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlaybackQueuePresentationTest.kt) — Playback Queue Presentation declared scenarios; exact cases are enumerated in the test catalog.
@@ -1113,6 +1121,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SecondaryScreensJourneyTest.kt) — Settings, account, community and other secondary-screen interaction coverage. Exact cases appear in the test catalog.
 
+- `modalChannelSettingsKeepInputAndCloseWhenInputMethodOpens`
 - `settingsFormsMenusAndAuthenticationStayReachable`
 - `everySettingsCategoryUsesOpaqueSurfacesAndKeepsControlsReachable`
 - `accountManagementUsesQuietFormsAndExplicitConfirmations`
@@ -1157,7 +1166,8 @@ Test support/helper file; no declared `@Test` methods.
 - `exactTracksMenusRefreshRetryAndReconnection`
 - `savedQualityDefaultsSelectActualSupportedTracks`
 - `preferredAudioSelectsTheFirstSegmentIncludingFallbacksRegionsAndAudioOnly`
-- `manualAudioAndAutoSurviveRefreshRetryReconnectionAndNextVideoDefaults`
+- `progressiveAudioDisplaysItsActiveTrackWithoutAnExplicitOverride`
+- `manualAudioSurvivesRefreshRetryReconnectionAndNextVideoUsesSavedDefaults`
 - `codecPreferencesReachTheFirstDashSegmentAndFallbackWithinTheResolution`
 - `codecAutoAndManualChoicesSurviveRefreshRetryAndReconnection`
 - `nextQueueOccurrenceUsesSavedDefaultsAndMenusRetainAtMostFourPerGroup`
@@ -1273,4 +1283,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **751 declared test methods** (including ignored tests).
+Inventory total: **756 declared test methods** (including ignored tests).

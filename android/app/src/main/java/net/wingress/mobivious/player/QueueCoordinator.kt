@@ -338,12 +338,6 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         val parameters = builder.build()
         if (parameters != player.trackSelectionParameters) player.trackSelectionParameters = parameters
     }
-    fun autoAudio(occurrence: String): Boolean {
-        if (state.loading || !state.audioSelection.enabled || occurrence != state.currentKey || occurrence != state.audioSelection.occurrence) return false
-        configureAudio(state.audioSelection.auto())
-        applyAudioSelection()
-        return true
-    }
     fun manualAudio(occurrence: String, key: StreamKey): Boolean {
         if (state.loading || !state.audioSelection.enabled || occurrence != state.currentKey || occurrence != state.audioSelection.occurrence) return false
         val choice = StreamCatalog.find(audioChoices(), key) ?: return false

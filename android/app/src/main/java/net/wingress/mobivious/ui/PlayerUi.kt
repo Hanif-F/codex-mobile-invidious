@@ -33,7 +33,6 @@ import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
@@ -325,33 +324,29 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     val captions = playback.trackChoices(C.TRACK_TYPE_TEXT)
     val selection = playback.selection
     val audioOnly = selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_VIDEO) == true
-    val audioAuto = if (playback.audioSelection.enabled) playback.audioSelection.manual == null else
-        selection?.overrides?.values?.none { it.type == C.TRACK_TYPE_AUDIO } != false && selection?.preferredAudioLanguages.isNullOrEmpty()
+    val selectedAudio = audio.firstOrNull { it.selected && it.explicitlySelected(selection) }
+        ?: audio.firstOrNull { it.selected }
     val selectedCaption = if (selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) == true) null else captions.firstOrNull { it.selected }
     val qualityAuto = playback.videoSelection.mode == net.wingress.mobivious.player.VideoSelectionMode.AUTO
     val selectedVideo = if (qualityAuto) null else playback.videoSelection.fixed(video)
     val available = !playback.loading && playback.canSelectTracks
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val sheetHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     // Handle system Back in the sheet's dialog before the watch screen's handler.
     fun back() { if (page == "Player settings") dismiss() else page = "Player settings" }
-    ModalBottomSheet(onDismissRequest = dismiss, sheetState = sheetState, sheetMaxWidth = 640.dp,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    AppModalSheet(onDismissRequest = dismiss, sheetState = sheetState) {
         BackHandler { back() }
-        WatchContent(Modifier.fillMaxWidth()) {
-          Column(Modifier.fillMaxWidth().heightIn(max = sheetHeight)) {
-            WatchPanelToolbar(page, "Close player settings", dismiss, Icons.Default.Settings,
+        PanelSurface(Modifier.fillMaxWidth()) {
+            WatchPanelToolbar(page, "Close player settings", dismiss,
                 backLabel = "Back to player settings", back = if (page != "Player settings") ({ page = "Player settings" }) else null)
             Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
-                .testTag("player-settings-list").padding(horizontal = 12.dp, vertical = 12.dp)) {
-              AppSection {
+                .testTag("player-settings-list").padding(vertical = 8.dp)) {
                 if (page == "Player settings") {
                     run { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
-                    run { SettingRow("Audio", if (audio.isEmpty()) "Unavailable" else if (audioAuto) "Auto · ${audio.firstOrNull { it.selected }?.primary ?: "Default"}" else audio.firstOrNull { it.explicitlySelected(selection) }?.primary ?: "Auto", available && audio.isNotEmpty()) { page = "Audio" } }
+                    run { SettingRow("Audio", selectedAudio?.primary ?: "Unavailable", available && audio.isNotEmpty()) { page = "Audio" } }
                     run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
                     run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
                     run {
-                        Row(Modifier.fillMaxWidth().clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 24.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("Audio only", Modifier.weight(1f), color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))
                             Switch(checked = audioOnly, onCheckedChange = vm::audioOnly, enabled = available)
                         }
@@ -369,12 +364,11 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                         SettingChoice(speedLabel(speed), playback.speed == speed, playback.canSetSpeed) { vm.speed(speed); page = "Player settings" }
                     }
                     "Audio" -> {
-                        run { SettingChoice("Auto", audioAuto, available) { vm.autoAudio(); page = "Player settings" } }
                         AudioSection.entries.forEach { section ->
                             val choices = audio.filter { it.section == section }
                             if (choices.isNotEmpty()) {
-                                run { Text(section.title, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp), style = MaterialTheme.typography.titleSmall) }
-                                choices.forEach { track -> SettingChoice(track.primary, !audioAuto && track.explicitlySelected(selection), available, track.secondary) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
+                                run { Text(section.title, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                                choices.forEach { track -> SettingChoice(track.primary, track == selectedAudio, available, track.secondary) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
                             }
                         }
                     }
@@ -384,14 +378,19 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     }
                 }
             }
-            }
-        } }
+        }
     }
 }
 
 @Composable
 private fun SettingRow(label: String, value: String = "", enabled: Boolean = true, click: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = click).padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+    val stacked = LocalDensity.current.fontScale > 1.3f
+    val modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = click)
+        .padding(horizontal = 16.dp, vertical = 12.dp)
+    if (stacked) Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
+        if (value.isNotEmpty()) Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f), style = MaterialTheme.typography.bodyMedium)
+    } else Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
         if (value.isNotEmpty()) Text(value, Modifier.padding(start = 16.dp).widthIn(max = 200.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
@@ -400,7 +399,8 @@ private fun SettingRow(label: String, value: String = "", enabled: Boolean = tru
 @Composable
 private fun SettingChoice(label: String, selected: Boolean, enabled: Boolean, detail: String = "", click: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = click)
-        .semantics { this.selected = selected }.padding(horizontal = 24.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        .semantics { this.selected = selected }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) {
             Text(label, color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
             if (detail.isNotBlank()) Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)

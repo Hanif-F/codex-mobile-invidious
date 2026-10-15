@@ -109,13 +109,13 @@ class AudioSelectionTest {
         val second = audio("second", "pt-BR", "Alpha", roles = C.ROLE_FLAG_ALTERNATE)
         assertEquals("first", policy("pt").fixed(choices(first, second))?.key?.id)
     }
-    @Test fun manualTrackSurvivesRenditionIdChangesFallsBackAndAutoRestoresCapturedDefault() {
+    @Test fun manualTrackSurvivesRenditionIdChangesAndFallbackWithoutChangingCapturedDefaults() {
         val all = choices(original, stable, dub)
         val manual = policy("id").select(all.first { it.stable })
         val replaced = choices(original, stable.buildUpon().setId("replacement").build(), dub)
         assertEquals("replacement", manual.fixed(replaced)?.key?.id)
         assertEquals("original", manual.fixed(choices(original, dub))?.key?.id)
-        assertEquals("dub", manual.auto().fixed(all)?.key?.id)
+        assertEquals("stable", manual.fixed(all)?.key?.id)
         assertEquals("id", manual.preference)
         assertEquals("original", AudioSelection.open("next", AccountPreferences(), true).fixed(all)?.key?.id)
     }

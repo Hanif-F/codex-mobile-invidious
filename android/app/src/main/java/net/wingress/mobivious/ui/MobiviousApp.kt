@@ -869,8 +869,8 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
         val detailsContent: @Composable ColumnScope.(WatchPane) -> Unit = { pane ->
             val tools=pane!=WatchPane.PRIMARY
             val information=pane!=WatchPane.SUPPORTING
-            if (tools && queueOpen && sideBySide) Column(Modifier.weight(1f).fillMaxWidth()) {
-                LibraryToolbar("Playback queue", statusInset = false, actions = { AppIconButton(Icons.Default.Close, "Close playback queue") { vm.queueExpanded.value = false } })
+            if (tools && queueOpen && sideBySide) PanelSurface(Modifier.weight(1f).fillMaxWidth()) {
+                PanelHeader("Playback queue", "Close playback queue", { vm.queueExpanded.value = false })
                 PlaybackQueuePanel(vm, signIn, channel, fullHeight = true)
             }
             else if (tools && chapterPanel.open) ChaptersPanel(chapters, playback.position, chapterPanel,

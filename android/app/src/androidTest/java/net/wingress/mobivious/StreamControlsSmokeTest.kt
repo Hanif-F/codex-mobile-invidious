@@ -63,6 +63,25 @@ class StreamControlsSmokeTest {
     }
     private fun selected(type: Int) = StreamCatalog.choices(activity.model.playback.value.tracks, type, activity.model.playback.value.details?.formats.orEmpty())
         .singleOrNull { it.explicitlySelected(activity.model.playback.value.selection) }
+    private fun assertAudioMenuShowsActiveTrack(capture: String? = null) {
+        until {
+            val playback = activity.model.playback.value
+            val choices = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, playback.details?.formats.orEmpty())
+            choices.firstOrNull { it.explicitlySelected(playback.selection) }?.selected ?: choices.any { it.selected }
+        }
+        val playback = activity.model.playback.value
+        val choices = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, playback.details?.formats.orEmpty())
+        val active = choices.firstOrNull { it.selected && it.explicitlySelected(playback.selection) }
+            ?: choices.first { it.selected }
+        showControls(); compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNode(hasText("Audio") and hasText(active.primary)).assertExists()
+        compose.onNodeWithText("Audio").performClick()
+        compose.onAllNodesWithText("Auto").assertCountEquals(0)
+        compose.onNode(hasText(active.primary) and isSelected()).performScrollTo().assertIsDisplayed()
+        compose.onAllNodes(isSelected() and hasAnyAncestor(hasTestTag("player-settings-list"))).assertCountEquals(1)
+        capture?.let(::screenshot)
+        compose.onNodeWithContentDescription("Close player settings").performClick()
+    }
     private fun recreate() {
         val old = activity
         compose.runOnUiThread { activity.recreate() }
@@ -160,17 +179,34 @@ class StreamControlsSmokeTest {
             assertEquals("$preference/$source", expected, firstAudioSegment())
             assertNull(activity.model.playback.value.audioSelection.manual)
             assertNull(activity.model.playback.value.error)
+            assertAudioMenuShowsActiveTrack(if (preference == "original_stable" && source == "rich") "preferred-audio-selected" else null)
         }
         audioStart("es", audioOnly = true)
         assertEquals("7", firstAudioSegment())
         assertTrue(activity.model.playback.value.selection!!.disabledTrackTypes.contains(C.TRACK_TYPE_VIDEO))
+        assertAudioMenuShowsActiveTrack()
     }
-    @Test fun manualAudioAndAutoSurviveRefreshRetryReconnectionAndNextVideoDefaults() {
+    @Test fun progressiveAudioDisplaysItsActiveTrackWithoutAnExplicitOverride() {
+        compose.runOnUiThread { activity.model.closePlayer() }
+        until { activity.model.queue.value.token.isEmpty() }
+        command("stream", """{"type":"mp4"}""")
+        compose.runOnUiThread {
+            activity.model.store.guestPreferences(AccountPreferences(autoplay = false, preferredAudio = "original_stable"))
+            activity.model.play("testvideo01", 0)
+        }
+        until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
+            activity.model.playback.value.tracks.isTypeSelected(C.TRACK_TYPE_AUDIO) }
+        assertFalse(activity.model.playback.value.audioSelection.enabled)
+        assertNull(selected(C.TRACK_TYPE_AUDIO))
+        assertAudioMenuShowsActiveTrack()
+    }
+    @Test fun manualAudioSurvivesRefreshRetryReconnectionAndNextVideoUsesSavedDefaults() {
         audioStart("es")
         val stable = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_AUDIO,
             activity.model.playback.value.details!!.formats).first { it.stable }
         compose.runOnUiThread { activity.model.selectTrack(stable.group, stable.index) }
         until { activity.model.playback.value.audioSelection.manual != null && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        assertAudioMenuShowsActiveTrack()
         compose.runOnUiThread { activity.model.refreshBuffer() }
         until { activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
         compose.runOnUiThread { activity.model.retryPlayback() }
@@ -178,16 +214,20 @@ class StreamControlsSmokeTest {
         command("stream", """{"type":"rich-no-stable"}""")
         compose.runOnUiThread { activity.model.retryPlayback() }
         until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_AUDIO)?.original == true && selected(C.TRACK_TYPE_AUDIO)?.stable == false }
+        assertAudioMenuShowsActiveTrack()
         command("stream", """{"type":"rich"}""")
         compose.runOnUiThread { activity.model.retryPlayback() }
         until { !activity.model.playback.value.loading && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
         recreate(); until { selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        assertAudioMenuShowsActiveTrack()
         assertEquals("es", activity.model.store.guestPreferences().preferredAudio)
         compose.runOnUiThread {
             activity.model.store.guestPreferences(AccountPreferences(preferredAudio = "original"))
-            activity.model.refreshSharedSettings(); activity.model.autoAudio()
+            activity.model.refreshSharedSettings(); activity.model.refreshBuffer()
         }
-        until { activity.model.playback.value.audioSelection.manual == null && selected(C.TRACK_TYPE_AUDIO)?.language == "es" }
+        until { activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_AUDIO)?.stable == true }
+        assertNotNull(activity.model.playback.value.audioSelection.manual)
+        assertAudioMenuShowsActiveTrack()
         assertEquals("es", activity.model.playback.value.audioSelection.preference)
         compose.runOnUiThread { activity.model.insertQueue(Video("testvideo02", "Successor"), true) }
         until { activity.model.queue.value.items.size == 2 }
@@ -196,6 +236,7 @@ class StreamControlsSmokeTest {
             activity.model.playback.value.playerState == Player.STATE_READY && selected(C.TRACK_TYPE_AUDIO)?.original == true }
         assertEquals("original", activity.model.playback.value.audioSelection.preference)
         assertNull(activity.model.playback.value.audioSelection.manual)
+        assertAudioMenuShowsActiveTrack()
     }
     private fun codecStart(codec: String, quality: String = "auto", source: String = "codec") {
         compose.runOnUiThread { activity.model.closePlayer() }

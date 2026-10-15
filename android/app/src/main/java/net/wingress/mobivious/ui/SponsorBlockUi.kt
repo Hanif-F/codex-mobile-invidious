@@ -15,9 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -53,7 +51,6 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, dismiss
     }
     DisposableEffect(context) {onDispose {vm.leavePreferencePage("SponsorBlock")}}
     val uri = LocalUriHandler.current
-    val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .9f }
     LaunchedEffect(channelId, page, account) {
         if (page == "Channel SponsorBlock settings" && channelId.isNotBlank() && channelId !in prefs.sponsorBlock.channels) {
             loading = true; error = null
@@ -73,10 +70,10 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, dismiss
     }
     val content: @Composable () -> Unit = {
         BackHandler { back() }
-        BrowseAppSurface((if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.fillMaxWidth().height(height))
+        PanelScaffold((if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.fillMaxSize())
             .imePadding().testTag("sponsorblock-sheet"), toolbar = {
             BrowsePanelToolbar(page, "Close SponsorBlock settings", dismiss,
-                back = if (fullScreen || page != "Global SponsorBlock settings") ::back else null)
+                back = if (fullScreen || page != "Global SponsorBlock settings") ::back else null, backLabel = "Back to SponsorBlock settings")
         }) { contentModifier, topInset ->
         Column(contentModifier) {
             LazyColumn(Modifier.weight(1f, fill = fullScreen).fillMaxWidth().testTag("sponsorblock-settings-list"), contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topInset, bottom = 16.dp)) {
@@ -154,7 +151,6 @@ internal fun SponsorBlockSheet(vm: AppViewModel, initialChannel: String, dismiss
         }
         }
     }
-    if (fullScreen) Surface { content() }
-    else ModalBottomSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        sheetMaxWidth = 640.dp, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) { content() }
+    if (fullScreen) content()
+    else AppModalSheet(onDismissRequest = dismiss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) { content() }
 }

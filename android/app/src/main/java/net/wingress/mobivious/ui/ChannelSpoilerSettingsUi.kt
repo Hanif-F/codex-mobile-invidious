@@ -57,10 +57,10 @@ internal fun ChannelSpoilerSettings(vm: AppViewModel, initialChannel: String, di
     fun back() { if (id.isEmpty() || initialChannel.isNotEmpty()) dismiss() else { vm.flushPreferenceEdits(); id = "" } }
     val content: @Composable () -> Unit = {
         BackHandler { back() }
-        BrowseAppSurface(Modifier.fillMaxWidth().then(if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.heightIn(max = 700.dp))
+        PanelScaffold(Modifier.fillMaxWidth().then(if (fullScreen) Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing) else Modifier.fillMaxHeight())
             .imePadding().testTag("channel-spoiler-settings"), toolbar = {
             BrowsePanelToolbar(if (id.isEmpty()) channelSpoilerSettingsPage else "Channel settings", "Close channel title and thumbnail settings", dismiss,
-                back = if (id.isNotEmpty()) ::back else null)
+                back = if (id.isNotEmpty()) ::back else null, backLabel = "Back to channel settings")
         }) { body, _ ->
             LazyColumn(body, contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 item { Text(if (context.account == null) "Saved on this device for this instance." else "Shared with your Invidious account on the website.") }
@@ -105,6 +105,6 @@ internal fun ChannelSpoilerSettings(vm: AppViewModel, initialChannel: String, di
             }
         }
     }
-    if (fullScreen) content() else ModalBottomSheet(onDismissRequest = dismiss,
-        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), sheetMaxWidth = 640.dp) { content() }
+    if (fullScreen) content() else AppModalSheet(onDismissRequest = dismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) { content() }
 }

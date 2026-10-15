@@ -67,6 +67,10 @@ internal fun AppForeground(color: Color = MaterialTheme.colorScheme.onSurface, c
 
 @Composable
 internal fun AppSection(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    if (LocalInsidePanel.current) {
+        Column(modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        return
+    }
     Surface(modifier.fillMaxWidth(), shape=MaterialTheme.shapes.large,
         color=MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation=0.dp) {
         CompositionLocalProvider(LocalInsideAppSection provides true) {

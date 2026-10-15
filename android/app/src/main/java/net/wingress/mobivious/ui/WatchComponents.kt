@@ -4,8 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,7 +14,6 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,14 +53,14 @@ internal fun WatchDisclosureRow(title: String, icon: ImageVector, modifier: Modi
 
 @Composable
 internal fun WatchPanelSurface(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    WatchContent(modifier.clip(AppTokens.card)) { Column(Modifier.fillMaxSize(), content = content) }
+    PanelSurface(if (LocalInsidePanel.current) modifier else modifier.clip(AppTokens.card), content)
 }
 
 
 @Composable
 internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () -> Unit,
     content: @Composable (Modifier, Dp) -> Unit) {
-    BrowseAppSurface(modifier.clip(AppTokens.card), toolbar = {
+    PanelScaffold(if (LocalInsidePanel.current) modifier else modifier.clip(AppTokens.card), toolbar = {
         Column(Modifier.testTag("comments-toolbar")) { toolbar() }
     }, content = content)
 }
@@ -71,22 +68,6 @@ internal fun WatchCommentsSurface(modifier: Modifier, toolbar: @Composable () ->
 
 @Composable
 internal fun WatchPanelToolbar(title: String, closeLabel: String, close: () -> Unit,
-    icon: ImageVector, detail: String? = null, backLabel: String = "Back", back: (() -> Unit)? = null,
-    actions: @Composable RowScope.() -> Unit = {}) {
-    AppForeground {
-
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).appControl()
-        .heightIn(min = 56.dp).padding(start = if (back == null) 16.dp else 4.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (back != null) AppInsetIconButton(onClick = back, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, backLabel) }
-        else Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
-        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
-            detail?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        actions()
-        AppInsetIconButton(onClick = close, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, closeLabel) }
-    }
-
-    }
+    detail: String? = null, backLabel: String = "Back", back: (() -> Unit)? = null, divider: Boolean = true) {
+    PanelHeader(title, closeLabel, close, detail, back, backLabel, divider = divider)
 }

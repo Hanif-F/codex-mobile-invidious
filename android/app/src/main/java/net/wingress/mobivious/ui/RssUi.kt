@@ -76,10 +76,8 @@ internal fun RssSheet(vm: AppViewModel) {
             } catch (e: Exception) { if (selected.context == vm.api.context()) vm.message.value = e.message ?: "Could not export this feed." }
         }
     }
-    ModalBottomSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
-        val maxHeight = with(androidx.compose.ui.platform.LocalDensity.current) { androidx.compose.ui.platform.LocalWindowInfo.current.containerSize.height.toDp() * .85f }
-        BrowseAppSurface(Modifier.fillMaxWidth().height(480.dp.coerceAtMost(maxHeight)).testTag("rss-sheet"), toolbar = {
+    AppModalSheet(onDismissRequest = vm::dismissRss, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        PanelScaffold(Modifier.fillMaxWidth().heightIn(max = 480.dp).fillMaxHeight().testTag("rss-sheet"), toolbar = {
             BrowsePanelToolbar(state.title, "Close feed", vm::dismissRss)
         }) { contentModifier, topInset ->
         Column(contentModifier.verticalScroll(rememberScrollState()).padding(start = AppTokens.inset, end = AppTokens.inset, top = topInset, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

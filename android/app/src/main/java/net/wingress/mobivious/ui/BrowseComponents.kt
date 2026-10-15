@@ -9,7 +9,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
@@ -93,21 +92,8 @@ internal fun BrowsePageTitle(title: String, back: (() -> Unit)? = null, statusIn
 
 @Composable
 internal fun BrowsePanelToolbar(title: String, closeLabel: String, close: () -> Unit,
-    detail: String? = null, back: (() -> Unit)? = null, enabled: Boolean = true) {
-    AppForeground {
-
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp).appControl()
-        .heightIn(min = 56.dp).padding(start = if (back == null) 16.dp else 4.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        back?.let { AppInsetIconButton(onClick = it, enabled = enabled, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to SponsorBlock settings") } }
-        Column(Modifier.weight(1f).padding(vertical = 8.dp)) {
-            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium)
-            detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        AppInsetIconButton(onClick = close, enabled = enabled, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Close, closeLabel) }
-    }
-
-    }
+    detail: String? = null, back: (() -> Unit)? = null, enabled: Boolean = true, backLabel: String = "Back") {
+    PanelHeader(title, closeLabel, close, detail, back, backLabel, enabled)
 }
 
 @Composable

@@ -22,8 +22,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -164,18 +162,17 @@ internal fun PostDetailScreen(vm: AppViewModel, state: PostDetailState, list: La
 @Composable
 internal fun PostCommentsSheet(vm: AppViewModel, state: CommentsState, channel: (String) -> Unit, link: (String) -> Unit) {
     val prefs by vm.preferences.collectAsStateWithLifecycle()
-    val height = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() * .85f }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    ModalBottomSheet(onDismissRequest = {
+    AppModalSheet(onDismissRequest = {
         if (vm.postComments.value.threadKey != null) {
             vm.backPostComments()
             // Platform dismissal may already have hidden the sheet; returning from replies keeps it open.
             scope.launch { sheetState.show() }
         } else vm.closePostComments()
-    }, sheetState = sheetState, sheetMaxWidth = 640.dp, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) {
+    }, sheetState = sheetState) {
         BackHandler(state.threadKey != null) { vm.backPostComments() }
-        CommentsPanel(state, prefs.thinMode, Modifier.fillMaxWidth().height(height).testTag("post-comments-sheet"),
+        CommentsPanel(state, prefs.thinMode, Modifier.fillMaxWidth().fillMaxHeight().testTag("post-comments-sheet"),
             vm::closePostComments, { vm.backPostComments() }, vm::sortPostComments, vm::loadPostComments,
             vm::openPostReplies, vm::postCommentPosition, channel, link)
     }
