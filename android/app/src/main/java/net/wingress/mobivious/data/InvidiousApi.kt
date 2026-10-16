@@ -40,7 +40,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         .addPathSegments(path.removePrefix("/")).apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
     suspend fun request(path: String, method: String = "GET", data: JSONObject? = null, auth: Boolean = false,
         query: Map<String, String> = emptyMap(), context: ApiContext? = null, accept: String = "application/json",
-        allowCachedFallback: Boolean = true): String = withContext(Dispatchers.IO) {
+        allowCachedFallback: Boolean = true, maxResponseBytes: Long = Long.MAX_VALUE): String = withContext(Dispatchers.IO) {
         val target = context ?: this@InvidiousApi.context()
         if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context())
             throw CancellationException("Account or instance changed")
@@ -63,7 +63,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val cacheKey = if (method == "GET" && path in listOf("api/v1/popular", "api/v1/trending", "api/v1/search", "api/v1/auth/feed")) "$address|${if (auth) target.account?.token else "public"}" else null
         val transport = if (method != "GET") contributionClient else client
         try {
-            val response = transport.newCall(builder.build()).awaitBody()
+            val response = transport.newCall(builder.build()).awaitBody(maxResponseBytes)
             coroutineContext.ensureActive()
             val body = response.body
             if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
@@ -148,11 +148,22 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         context: ApiContext = context(), allowCachedFallback: Boolean = true) = ApiParser.videos(JSONArray(scopedRead("api/v1/$kind",
         if (kind == "trending") mapOf("region" to region, "type" to category.apiValue) else emptyMap(), false, context, allowCachedFallback)))
     suspend fun searchResults(q: String, page: Int, type: SearchType, sort: String, date: String, duration: String,
-        context: ApiContext = context()): GeneralSearchPage {
+        context: ApiContext = context(), features: Set<SearchFeature> = emptySet()): GeneralSearchPage {
         val order = if (type != SearchType.CHANNELS && sort in listOf("views", "view_count")) "views" else "relevance"
         val query = mutableMapOf("q" to q, "page" to page.toString(), "sort" to order, "type" to type.apiValue)
-        if (type.videoFilters) { query["date"] = date; query["duration"] = duration }
+        if (type.videoFilters) {
+            query["date"] = date; query["duration"] = duration
+            if (features.isNotEmpty()) query["features"] = SearchFeature.query(features)
+        }
         return GeneralSearchPage.parse(JSONArray(scopedRead("api/v1/search", query, false, context)), type)
+    }
+    suspend fun annotations(id: String, context: ApiContext = context()): List<LegacyAnnotation> {
+        require(SponsorBlockRules.validVideo(id))
+        return try {
+            val xml = request("api/v1/annotations/$id", context = context, accept = "text/xml",
+                allowCachedFallback = false, maxResponseBytes = AnnotationParser.MAX_BYTES.toLong())
+            withContext(Dispatchers.Default) { AnnotationParser.parse(xml) }
+        } catch (e: ApiException) { if (e.status == 404) emptyList() else throw e }
     }
     suspend fun searchSuggestions(q: String, region: String, context: ApiContext = context()): List<String> {
         val array = JSONObject(scopedRead("api/v1/search/suggestions", mapOf("q" to q, "region" to region), false, context,

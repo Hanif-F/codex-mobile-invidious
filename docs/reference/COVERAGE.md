@@ -8,11 +8,11 @@ The current guides describe Mobivious **0.12.2** (version code **26**). This rep
 
 | Maintained files | Count |
 | --- | ---: |
-| Main application Kotlin | 109 |
-| JVM test Kotlin | 42 |
-| Android device test/support Kotlin | 72 |
+| Main application Kotlin | 113 |
+| JVM test Kotlin | 43 |
+| Android device test/support Kotlin | 73 |
 | Build, benchmark, resources, scripts, deployment and repository support | 53 |
-| **Total** | **276** |
+| **Total** | **282** |
 
 Every maintained file has a reviewed SHA-256 fingerprint, responsibility and owning guide in `coverage.json`. The source map indexes implementations; the test catalog lists every declared JVM/device test and explicit Ignore.
 
@@ -26,7 +26,7 @@ Ignored builds, caches, IDE files, SDK paths, fixture media and release artifact
 
 ## Verification and freshness
 
-`python3 scripts/check-documentation.py` checks inventory completeness, guide assignments, reviewed fingerprints and all three generated catalogs. It checks local file links in **all 19 repository Markdown documents**, including the cleanup report. Remote URLs and Markdown section anchors are outside this local check.
+`python3 scripts/check-documentation.py` checks inventory completeness, guide assignments, reviewed fingerprints and all three generated catalogs. It checks local file links in **all 20 repository Markdown documents**, including the cleanup report. Remote URLs and Markdown section anchors are outside this local check.
 
 After reviewing changed sources and updating their guides, run `python3 scripts/check-documentation.py --refresh`, then the checker without refresh. New sources and documents require explicit inventory registration first. [Testing](../TESTING.md#documentation-checks) explains the review workflow.
 

@@ -24,8 +24,20 @@ object ContentRegions {
 }
 
 enum class SearchType(val apiValue: String, val label: String) {
-    ALL("all", "All"), VIDEOS("video", "Videos"), CHANNELS("channel", "Channels"), PLAYLISTS("playlist", "Playlists & mixes");
-    val videoFilters get() = this == ALL || this == VIDEOS
+    ALL("all", "All"), VIDEOS("video", "Videos"), CHANNELS("channel", "Channels"), PLAYLISTS("playlist", "Playlists & mixes"),
+    MOVIES("movie", "Movies"), SHOWS("show", "Shows");
+    val videoFilters get() = this in listOf(ALL, VIDEOS, MOVIES, SHOWS)
+    val tab get() = if (this == MOVIES || this == SHOWS) VIDEOS else this
+    companion object { val tabs = listOf(ALL, VIDEOS, CHANNELS, PLAYLISTS) }
+}
+
+enum class SearchFeature(val apiValue: String, val label: String) {
+    LIVE("live", "Live"), FOUR_K("4k", "4K"), HD("hd", "HD"), CAPTIONS("subtitles", "Captions"),
+    COMMONS("commons", "Creative Commons"), SPHERICAL("360", "360°"), VR180("vr180", "VR180"),
+    THREE_D("3d", "3D"), HDR("hdr", "HDR"), LOCATION("location", "Location"), PURCHASED("purchased", "Purchased");
+    companion object {
+        fun query(selected: Set<SearchFeature>) = entries.filter { it in selected }.joinToString(",") { it.apiValue }
+    }
 }
 
 sealed interface SearchResult {
@@ -67,7 +79,7 @@ data class GeneralSearchPage(val items: List<SearchResult>, val sourceKeys: Set<
                 }
                 keys += result?.key ?: "unknown:$json"
                 result?.takeIf { type == SearchType.ALL || when (it) {
-                    is SearchResult.VideoItem -> type == SearchType.VIDEOS
+                    is SearchResult.VideoItem -> type.videoFilters
                     is SearchResult.ChannelItem -> type == SearchType.CHANNELS
                     is SearchResult.PlaylistItem -> type == SearchType.PLAYLISTS
                 } }

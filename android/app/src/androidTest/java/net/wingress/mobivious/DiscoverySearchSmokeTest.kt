@@ -168,6 +168,52 @@ class DiscoverySearchSmokeTest {
         assertTrue(requests().all { !it.getBoolean("authorized") })
     }
 
+    @Test fun completeFilterControlsChipsRestorationAndNewSearchReset() {
+        search()
+        compose.onNodeWithContentDescription("Search filters").performClick()
+        compose.onNodeWithText("Result type").performClick(); compose.onNodeWithText("Movies").performClick()
+        until { vm.searchType.value == SearchType.MOVIES && !vm.browse.value.loading }
+        compose.onNodeWithText("Duration").performScrollTo().performClick(); compose.onNodeWithText("4–20 minutes").performClick()
+        SearchFeature.entries.forEach { feature ->
+            compose.onNodeWithTag("search-feature-${feature.apiValue}").performScrollTo().performClick()
+            until { !vm.browse.value.loading && feature in vm.searchFeatures.value }
+        }
+        compose.onNodeWithContentDescription("Close search filters").performClick()
+        val request = requests().last()
+        assertEquals("movie", request.getString("type")); assertEquals("medium", request.getJSONArray("duration").getString(0))
+        assertEquals(SearchFeature.query(SearchFeature.entries.toSet()), request.getJSONArray("features").getString(0))
+        assertTrue(vm.browse.value.searchResults.single() is SearchResult.VideoItem)
+        compose.onNodeWithTag("search-filter-type").assertExists()
+        compose.onNodeWithTag("search-filter-4k").performClick()
+        until { !vm.browse.value.loading && SearchFeature.FOUR_K !in vm.searchFeatures.value }
+        recreate(); assertEquals(SearchType.MOVIES, vm.searchType.value); assertEquals("medium", vm.durationFilter)
+        assertEquals(10, vm.searchFeatures.value.size)
+        compose.onNodeWithTag("search-type-channel").performClick(); until { !vm.browse.value.loading }
+        assertTrue(requests().last().isNull("features")); assertTrue(requests().last().isNull("duration"))
+        compose.onNodeWithTag("search-type-video").performClick(); until { !vm.browse.value.loading }
+        assertEquals(10, vm.searchFeatures.value.size); assertEquals("medium", vm.durationFilter)
+        screenshot("complete-search-filters")
+        compose.onNodeWithTag("search-query").performClick()
+        compose.onNodeWithTag("main-search").performTextReplacement("edited")
+        compose.onNodeWithTag("main-search").performImeAction(); until { !vm.browse.value.loading && vm.query == "edited" }
+        assertEquals(10, vm.searchFeatures.value.size)
+        search("new"); assertTrue(vm.searchFeatures.value.isEmpty()); assertEquals("", vm.durationFilter)
+    }
+
+    @Test fun obsoleteFeatureResponseCannotReplaceNewTypeAndPaginationRetainsFeatures() {
+        search("filter-echo")
+        command("""{"searchDelayNext":1500}""")
+        compose.runOnUiThread { vm.setSearchFeature(SearchFeature.LIVE, true) }
+        until { requests().any { !it.isNull("features") } }
+        compose.runOnUiThread { vm.setSearchType(SearchType.SHOWS) }
+        until { !vm.browse.value.loading && vm.browse.value.videos.firstOrNull()?.title == "show live" }
+        Thread.sleep(1700)
+        assertEquals("show live", vm.browse.value.videos.first().title)
+        compose.runOnUiThread { vm.more() }; until { !vm.browse.value.loading && vm.browse.value.page == 2 }
+        assertEquals("live", requests().last().getJSONArray("features").getString(0))
+        assertEquals("show", requests().last().getString("type"))
+    }
+
     @Test fun searchTypesUseCorrectFiltersAndKeepVideoChoices() {
         search()
         compose.runOnUiThread { vm.sort = "views"; vm.date = "week"; vm.durationFilter = "short"; vm.setSearchType(SearchType.CHANNELS) }

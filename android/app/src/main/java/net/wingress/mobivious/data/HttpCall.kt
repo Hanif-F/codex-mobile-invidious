@@ -15,13 +15,21 @@ internal data class HttpResponse(val code: Int, val headers: Headers, val body: 
 }
 
 /** Cancellation closes the socket even while the body is still being read. */
-internal suspend fun Call.awaitBody(): HttpResponse = suspendCancellableCoroutine { continuation ->
+internal suspend fun Call.awaitBody(maxBytes: Long = Long.MAX_VALUE): HttpResponse = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) { continuation.resumeWithException(e) }
         override fun onResponse(call: Call, response: Response) {
             try {
-                val result = response.use { HttpResponse(it.code, it.headers, it.body?.string().orEmpty()) }
+                val result = response.use {
+                    val body = it.body
+                    if (body != null && maxBytes < Long.MAX_VALUE) {
+                        if (body.contentLength() > maxBytes) throw IOException("Response is too large")
+                        body.source().request(maxBytes + 1)
+                        if (body.source().buffer.size > maxBytes) throw IOException("Response is too large")
+                    }
+                    HttpResponse(it.code, it.headers, body?.string().orEmpty())
+                }
                 continuation.resume(result)
             } catch (e: Exception) {
                 continuation.resumeWithException(e)

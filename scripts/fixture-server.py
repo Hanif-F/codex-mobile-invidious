@@ -42,7 +42,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
              authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
-default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True, show_original_title=True,
+default_prefs = dict(annotations=False, annotations_subscribed=False, vr_mode=True, chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True, show_original_title=True,
                      autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, seek_seconds=10, quality_dash='auto', video_codec='auto', preferred_audio='original', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
@@ -51,7 +51,7 @@ default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_wor
                      default_playlist=None, channel_spoiler_settings={}, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
 default_prefs.update(ai_filter_enabled=False, **{f'ai_{kind}_{group}_action': 'off' for kind in ('blocklist', 'warnlist') for group in ('feeds', 'search', 'recommendations', 'other_pages')})
-state = dict(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
+state = dict(annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
 def reset_comments():
@@ -325,7 +325,7 @@ class Handler(BaseHTTPRequestHandler):
         page = int(params.get('page', ['1'])[0])
         kind = params.get('type', ['all'])[0]
         event = dict(scope=scope, q=q, page=page, type=kind, sort=params.get('sort', ['relevance'])[0],
-                     date=params.get('date'), duration=params.get('duration'), authorized=bool(self.headers.get('Authorization')), completed=False)
+                     date=params.get('date'), duration=params.get('duration'), features=params.get('features'), authorized=bool(self.headers.get('Authorization')), completed=False)
         state['searchRequests'].append(event)
         delay = state['searchDelayNext']; state['searchDelayNext'] = 0
         items = []
@@ -342,13 +342,14 @@ class Handler(BaseHTTPRequestHandler):
             elif q != 'missing':
                 items = [dict(video, type='video'), channel, playlist] if page == 1 else [dict(video, type='video'), related,
                          dict(recommended, type='video'), dict(source_playlist('RDopaque'), type='playlist')] if page == 2 else []
-            if kind != 'all': items = [item for item in items if item.get('type') == kind]
+            if kind != 'all': items = [item for item in items if item.get('type') == ('video' if kind in ('movie', 'show') else kind)]
         elif q.strip() and q != 'missing':
             if q == 'hidden':
                 items = [dict(visibility_member, videoId=f'member{i:05d}') for i in range(20)] if page == 1 else [video] if page == 2 else []
             elif q == 'many':
                 items = [dict(video, videoId=f'scope{i:06d}', title=f'Search result {i}') for i in range(20)] if page == 1 else [recommended] if page == 2 else []
             else: items = [recommended if q == 'second' else video] if page == 1 else []
+        if q == 'filter-echo': items = [dict(item, title=kind + ' ' + params.get('features', [''])[0]) if item.get('type') == 'video' else item for item in items]
         fail = state['searchFailNext']; state['searchFailNext'] = False
         if delay: time.sleep(min(5000, max(0, delay)) / 1000)
         try:
@@ -466,7 +467,11 @@ class Handler(BaseHTTPRequestHandler):
             if state.get('performance'): metadata.update(videoId=p.split('/')[4], title='Benchmark download')
             state['downloadRequests'].append(dict(kind='catalog', path=p))
             disabled = state.get('downloadDisabled', False)
-            return self.respond(dict(video=metadata, allowed=not disabled, reason='Downloads are disabled by this instance.' if disabled else '', choices=[] if disabled else download_choices()))
+            choices = download_choices()
+            if '/spherevid01/' in p:
+                metadata.update(videoId='spherevid01', projectionType='EQUIRECTANGULAR')
+                choices = [dict(choices[0], url='/media/projection/equirectangular.mp4', filename='equirectangular.mp4', size='640x320')]
+            return self.respond(dict(video=metadata, allowed=not disabled, reason='Downloads are disabled by this instance.' if disabled else '', choices=[] if disabled else choices))
         elif p.endswith('/download') and p.startswith('/api/v1/videos/'):
             key = parse_qs(url.query).get('key', [''])[0]
             state['downloadRequests'].append(dict(kind='file', key=key))
@@ -596,6 +601,32 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(error='Fixture feed temporarily unavailable') if fail else
                          dict(notifications=[], videos=[v for v in browse_videos() if not prefs['unseen_only'] or v['videoId'] not in state['watched']]),
                          503 if fail else 200)
+        elif p.startswith('/api/v1/annotations/'):
+            video_id = p.rsplit('/', 1)[-1]
+            state['annotationRequests'].append(dict(videoId=video_id, authorized=bool(self.headers.get('Authorization'))))
+            delay = state['annotationDelayNext']; state['annotationDelayNext'] = 0
+            status = state['annotationStatus']
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            if status != 200: return self.respond(dict(error='No archive' if status == 404 else 'Archive unavailable'), status)
+            styles = ['popup', 'speech', 'label', 'title', 'highlight']
+            annotations = ''.join(f"""<annotation id="fixture-{i}" type="text" style="{style}">
+              <TEXT>Archived {style}</TEXT><segment><movingRegion type="rect">
+              <rectRegion t="0:00:00" x="{5+i*17}" y="25" w="16" h="30" sx="45" sy="70"/>
+              <rectRegion t="0:00:08" x="{5+i*17}" y="25" w="16" h="30"/></movingRegion></segment>
+              <appearance bgColor="16711680" fgColor="16777215" bgAlpha="0.85" textSize="5"/>
+              <action type="openUrl"><url value="https://www.youtube.com/watch?v={video_id}&amp;src_vid={video_id}#t=9s"/></action>
+              </annotation>""" for i, style in enumerate(styles))
+            body = ('<document><annotations>' + annotations + '</annotations></document>').encode()
+            self.send_response(200); self.send_header('Content-Type', 'text/xml'); self.send_header('Content-Length', str(len(body))); self.end_headers()
+            try: self.wfile.write(body)
+            except (BrokenPipeError, ConnectionResetError): pass
+        elif p in ('/api/v1/videos/spherevid01', '/api/v1/videos/cubemap0001'):
+            sphere = p.endswith('spherevid01')
+            return self.respond(dict(video, videoId=p.rsplit('/', 1)[-1], lengthSeconds=12,
+                projectionType='EQUIRECTANGULAR' if sphere else 'MESH', title='Labeled 360 projection fixture',
+                formatStreams=[dict(url='/media/projection/' + ('equirectangular' if sphere else 'eac') + '.mp4', type='video/mp4', quality='medium')],
+                captions=[dict(label='English', language_code='en', url='/media/projection/captions.vtt')],
+                description='Synthetic 360° directions: green front, blue right, yellow left, cyan up, magenta down.', recommendedVideos=[recommended]))
         elif p.rsplit('/', 1)[-1] in ('portrait001', 'square00001', 'landscape01', 'ultrawide01') and p.startswith('/api/v1/videos/'):
             name = {'portrait001':'portrait', 'square00001':'square', 'landscape01':'landscape', 'ultrawide01':'ultrawide'}[p.rsplit('/', 1)[-1]]
             return self.respond(dict(video, videoId=p.rsplit('/', 1)[-1], title=name + ' geometry fixture',
@@ -869,7 +900,7 @@ class Handler(BaseHTTPRequestHandler):
             state['avatarRequests'] = []
             return self.respond(status=204)
         elif p == '/test/reset':
-            state.update(position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
+            state.update(annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,
                          downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='',
@@ -970,6 +1001,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({})
         if p == '/test/home-subscriptions':
             for key in ('subscriptionChannels', 'subscriptionDelayNext', 'failSubscriptionRead', 'subscriptionStatsMode', 'subscriptionStats', 'subscriptionWriteDelayNext', 'failSubscriptionWrite', 'discoveryDelayNext', 'discoveryDistinct', 'discoveryFailNext', 'discoveryEmpty', 'feedDelayNext', 'feedFailNext'):
+                if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/player-tools':
+            for key in ('annotationStatus', 'annotationDelayNext'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/discovery-search':

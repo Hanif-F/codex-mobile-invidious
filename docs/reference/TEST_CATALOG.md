@@ -35,6 +35,17 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `aLateBatchCannotRestoreAnOlderListSnapshot`
 - `pauseAndInstanceChangesCancelOldWorkAndDoNotScheduleDisabledLists`
 
+### AnnotationsViewingTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/AnnotationsViewingTest.kt) — Annotation XML safety/timing/isolation and public API limits; preference/link/projection and sensor math contracts.
+
+- `archivePreservesAppearanceActionsAndAbsoluteTiming`
+- `unsafeXmlAndOversizedArchivesAreRejectedAndUnsafeLinksAreInert`
+- `suspensionCancellationDismissalAndOccurrenceIsolation`
+- `annotationsApiIsPublicBoundedAndMissingArchivesAreEmpty`
+- `preferenceDefaultsSparseSavesLinksAndProjectionMetadataRoundTrip`
+- `projectionResolutionPanningClampingAndKnownDirections`
+
 ### AudioSelectionTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/AudioSelectionTest.kt) — Preferred-audio parsing, API patches, regional matching, original/DRC fallback and manual restoration scenarios.
@@ -249,6 +260,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/DiscoverySearchTest.kt) — Discovery Search declared scenarios; exact cases are enumerated in the test catalog.
 
+- `everyFeatureAndMediumDurationUseCanonicalParametersOnlyOnVideoTypes`
 - `discoverySendsCategoryAndRegionOnlyToTrending`
 - `eachSearchTypeUsesItsOwnFiltersWithoutAuthorization`
 - `mixedParserPreservesOrderChannelMetadataAndMixSeed`
@@ -667,6 +679,19 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `unavailableServerExplainsCompatibilityAndKeepsVideoCardsAccessible`
 - `failedAccountSaveRetainsDraftAndListStatusExplainsStaleData`
 
+### AnnotationsViewingSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AnnotationsViewingSmokeTest.kt) — Decoded projection pixels, gestures, annotation interaction, clip time, defaults and lifecycle/offline device journeys.
+
+- `equirectangularDecodedDirectionsDragRecenterAndCaptions`
+- `eacDecodedDirectionsMatchIndependentFfmpegConversion`
+- `viewingSurvivesFullscreenRecreationAndResetsForNextOccurrence`
+- `annotationsRenderDismissSeekSuspendAndRestoreWithoutAffectingPlayback`
+- `unavailableEmptyAndDelayedArchivesStayIsolatedAndRetryable`
+- `annotationAndVrDefaultsPersistForGuestsAndSyncAsSparseAccountChanges`
+- `clipAnnotationTimingAndActionsUseAbsoluteSourceTime`
+- `miniPipBackgroundAndOfflineKeepProjectionAndSuspendAnnotations`
+
 ### AppControlPresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppControlPresentationTest.kt) — Native control target, semantics, state and surface presentation scenarios. Exact cases appear in the test catalog.
@@ -962,6 +987,8 @@ Test support/helper file; no declared `@Test` methods.
 - `settingsCountryPickerSavesAutomaticallyAndRetainsConfirmedRegion`
 - `failedAccountRegionSaveRetainsPreviousSelectionAndCanRetry`
 - `mixedSearchPreservesOrderChannelBackScrollRecreationAndRetry`
+- `completeFilterControlsChipsRestorationAndNewSearchReset`
+- `obsoleteFeatureResponseCannotReplaceNewTypeAndPaginationRetainsFeatures`
 - `searchTypesUseCorrectFiltersAndKeepVideoChoices`
 - `hiddenMixedPageStillLoadsChannelsAndVisibilityOverrideIncludesBlockedResults`
 - `unsupportedOnlyAndRepeatedPagesHaveCorrectEndBehavior`
@@ -1419,4 +1446,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **837 declared test methods** (including ignored tests).
+Inventory total: **854 declared test methods** (including ignored tests).

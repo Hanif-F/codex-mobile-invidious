@@ -65,6 +65,32 @@ internal interface PlayerDragHandler {
     fun cancel()
 }
 
+/** Immersive drags pan in either axis and never fall through to seek or minimize. */
+internal suspend fun AwaitPointerEventScope.viewingGesture(down: PointerInputChange, pan: (Float, Float) -> Unit,
+    claim: () -> Unit): PointerInputChange? {
+    var previous = down.position
+    var dragging = false
+    while (true) {
+        val event = awaitPointerEvent()
+        if (event.changes.any { it.id != down.id && it.pressed }) return null
+        val change = event.changes.firstOrNull { it.id == down.id } ?: return null
+        if (change.isConsumed) return null
+        if (!dragging && (change.position - down.position).getDistance() > viewConfiguration.touchSlop) {
+            dragging = true; claim()
+        }
+        if (dragging) {
+            val delta = change.position - previous
+            pan(-delta.x * 180 / size.width.coerceAtLeast(1), delta.y * 90 / size.height.coerceAtLeast(1))
+            change.consume()
+        }
+        previous = change.position
+        if (!change.pressed) {
+            if (dragging || change.uptimeMillis - down.uptimeMillis >= viewConfiguration.longPressTimeoutMillis) return null
+            change.consume(); return change
+        }
+    }
+}
+
 /** Returns an up only for a tap. A claimed drag never falls through to a tap or double-tap. */
 internal suspend fun AwaitPointerEventScope.playerGesture(
     down: PointerInputChange,

@@ -202,12 +202,15 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsToggle("Audio only by default", "Disable video tracks when opening a video", value.listen) { update(value.copy(listen = it)) }
                         SettingsToggle("Proxy video streams", "Route streams through your Invidious instance", value.local) { update(value.copy(local = it)) }
                         SettingsChoice("Default speed", PreferenceRules.speeds.map { it.toString() to "${it}×" }, value.speed.toString()) { update(value.copy(speed = it.toFloat())) }
+                        SettingsToggle("Legacy annotations", "Show archived annotation overlays", value.annotations) { update(value.copy(annotations = it)) }
+                        SettingsToggle("Annotations on subscriptions", "Show annotations on videos from subscribed channels", value.annotationsSubscribed) { update(value.copy(annotationsSubscribed = it)) }
+                        SettingsToggle("Automatic 360° viewing", "Use immersive projection when video metadata supports it", value.vrMode) { update(value.copy(vrMode = it)) }
                         SettingsChoice("Seek interval", PreferenceRules.seekIntervals.map { it.toString() to "$it seconds" }, value.seekSeconds.toString()) { update(value.copy(seekSeconds = it.toInt())) }
                         SettingsChoice("Preferred video codec", PreferenceRules.videoCodecs, value.videoCodec) { update(value.copy(videoCodec = it)) }
                         SettingsChoice("Default quality", PreferenceRules.qualities.map { it to PreferenceRules.qualityLabel(it) }, value.qualityDash) { update(value.copy(qualityDash = it)) }
                         SettingsChoice("Preferred audio track", AudioPreferences.choices, value.preferredAudio) { update(value.copy(preferredAudio = it)) }
                         Text("Use original audio if your choice is unavailable. General languages can match regional tracks; a regional choice requires an exact match.", style = MaterialTheme.typography.bodySmall)
-                        Text("Seek interval applies to the next seek, in video seconds at any playback speed. Other playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
+                        Text("Seek interval applies to the next seek, in video seconds at any playback speed. Annotation and automatic 360° defaults apply immediately unless overridden. Other playback defaults apply to the next video. DASH playback prefers the selected codec when available. A resolution selects the best available stream at or below it, then prefers the codec at that resolution.", style = MaterialTheme.typography.bodySmall)
                     } }
                     item { AppSection {
                         SettingsHeading("On this device")

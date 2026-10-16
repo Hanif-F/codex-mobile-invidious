@@ -10,18 +10,18 @@ data class PlaybackLinkOptions(val listen: Boolean? = null, val speed: Float? = 
     val autoplay: Boolean? = null, val continueNext: Boolean? = null, val continueAutoplay: Boolean? = null,
     val loop: Boolean? = null, val quality: String? = null, val codec: String? = null, val captions: List<String>? = null,
     val region: String? = null, val comments: List<String>? = null, val related: Boolean? = null,
-    val description: Boolean? = null, val savePosition: Boolean? = null) {
+    val description: Boolean? = null, val savePosition: Boolean? = null, val annotations: Boolean? = null, val vrMode: Boolean? = null) {
     fun apply(base: AccountPreferences) = base.copy(listen = listen ?: base.listen, speed = speed ?: base.speed,
         local = local ?: base.local, autoplay = autoplay ?: base.autoplay, continueNext = continueNext ?: base.continueNext,
         continueAutoplay = continueAutoplay ?: base.continueAutoplay, videoLoop = loop ?: base.videoLoop,
         qualityDash = quality ?: base.qualityDash, videoCodec = codec ?: base.videoCodec, captions = captions ?: base.captions,
         region = region ?: base.region, comments = comments ?: base.comments, relatedVideos = related ?: base.relatedVideos,
-        extendDescription = description ?: base.extendDescription, savePosition = savePosition ?: base.savePosition)
+        extendDescription = description ?: base.extendDescription, savePosition = savePosition ?: base.savePosition, annotations = annotations ?: base.annotations, vrMode = vrMode ?: base.vrMode)
     fun carried() = PlaybackLinkOptions(listen, speed, local)
     fun json() = JSONObject().apply {
         listOf("listen" to listen, "speed" to speed, "local" to local, "autoplay" to autoplay, "continue" to continueNext,
             "continue_autoplay" to continueAutoplay, "loop" to loop, "quality_dash" to quality, "video_codec" to codec,
-            "region" to region, "related_videos" to related, "extend_desc" to description, "save_player_pos" to savePosition)
+            "region" to region, "related_videos" to related, "extend_desc" to description, "save_player_pos" to savePosition, "annotations" to annotations, "vr_mode" to vrMode)
             .forEach { (key, value) -> if (value != null) put(key, value) }
         captions?.let { put("subtitles", it.joinToString(",")) }; comments?.let { put("comments", it.joinToString(",")) }
     }
@@ -35,7 +35,8 @@ data class PlaybackLinkOptions(val listen: Boolean? = null, val speed: Float? = 
                 (j.opt("video_codec") as? String)?.takeIf { value -> PreferenceRules.videoCodecs.any { it.first == value } },
                 choices("subtitles")?.take(3), (j.opt("region") as? String)?.uppercase()?.takeIf { it.matches(Regex("[A-Z]{2}")) },
                 choices("comments")?.takeIf { values -> values.all { it.lowercase() in listOf("youtube", "reddit") } }?.map { it.lowercase() },
-                bool("related_videos"), bool("extend_desc"), bool("save_player_pos"))
+                bool("related_videos"), bool("extend_desc"), bool("save_player_pos"),
+                bool("annotations") ?: when (j.opt("iv_load_policy")?.toString()) { "1" -> true; "3" -> false; else -> null }, bool("vr_mode"))
         }
         fun parse(url: HttpUrl) = parse(JSONObject().apply { url.queryParameterNames.forEach { key -> put(key, url.queryParameter(key)) } })
     }

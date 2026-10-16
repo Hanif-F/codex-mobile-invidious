@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
     }
     private fun pipAspectRatio(): Rational {
         // Preserve the exact Android boundaries; rounding below 1 / 2.39 is rejected.
-        val (numerator, denominator) = model.playback.value.geometry.pipFraction
+        val (numerator, denominator) = model.playback.value.displayGeometry.pipFraction
         return Rational(numerator, denominator)
     }
     fun enterPip() { model.cancelAccumulatedSeek(); if (model.playback.value.details != null && supportsPip()) { updatePip(pipWatching); enterPictureInPictureMode(PictureInPictureParams.Builder().setAspectRatio(pipAspectRatio()).build()) } }
@@ -97,6 +97,10 @@ class MainActivity : ComponentActivity() {
         updatePip(pipWatching)
     }
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) { super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig); pipMode.value = isInPictureInPictureMode }
+    override fun onPause() {
+        model.configurePlayerTools(false)
+        super.onPause()
+    }
     override fun onStop() {
         model.flushPreferenceEdits()
         super.onStop()

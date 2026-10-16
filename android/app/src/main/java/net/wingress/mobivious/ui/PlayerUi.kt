@@ -53,6 +53,9 @@ import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.wingress.mobivious.data.SponsorBlockPlayback
+import net.wingress.mobivious.player.Projection
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import net.wingress.mobivious.player.PlaybackService
 import net.wingress.mobivious.player.StreamCatalog
 import net.wingress.mobivious.player.AudioSection
@@ -80,6 +83,13 @@ internal fun VideoPlayer(
 ) {
     val activity = androidx.activity.compose.LocalActivity.current as? net.wingress.mobivious.MainActivity
     val preferences by vm.preferences.collectAsStateWithLifecycle()
+    val viewing by vm.viewing.collectAsStateWithLifecycle()
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val immersive = playback.projection != Projection.FLAT
+    LaunchedEffect(controls, presentation, lifecycle, playback.videoEnabled, playback.details, viewing.annotations) {
+        vm.configurePlayerTools(controls && presentation != PlayerPresentation.MINI && lifecycle.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    DisposableEffect(vm) { onDispose { vm.configurePlayerTools(false) } }
     val seekSeconds = PreferenceRules.seekSeconds(preferences.seekSeconds)
     val spoilerQueue by vm.queue.collectAsStateWithLifecycle()
     val current by rememberUpdatedState(playback)
@@ -163,8 +173,12 @@ internal fun VideoPlayer(
             val bounds = it.boundsInWindow()
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
-        if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller,
-            Modifier.fillMaxSize(), rememberCaptionAppearance(vm))
+        if (playback.videoEnabled || presentation != PlayerPresentation.MINI) {
+            if (immersive && playback.videoEnabled) ProjectedVideoSurface(playback, controller, Modifier.fillMaxSize(),
+                rememberCaptionAppearance(vm), viewing, controls && presentation != PlayerPresentation.MINI,
+                failure = { if (vm.queue.value.currentKey == viewing.occurrence && vm.api.context() == viewing.context) vm.viewingFailed() }, pan = vm::panViewing)
+            else PlaybackVideoSurface(playback, controller, Modifier.fillMaxSize(), rememberCaptionAppearance(vm))
+        }
         else playback.details?.video?.let { video ->
             ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), playbackOccurrence = spoilerQueue.currentKey, offline = playback.downloadId != null) {
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
@@ -174,7 +188,7 @@ internal fun VideoPlayer(
         if (controls && chromeVisible) PlayerSeekPreview(preview, Modifier.matchParentSize())
         PlayerControlsDim(controls && visible && chromeVisible, Modifier.matchParentSize())
         Box(Modifier.matchParentSize().testTag("player-gestures")
-        .pointerInput(playback.mediaId, controls, presentation, gesturesEnabled, exploring, gestureKey) {
+        .pointerInput(playback.mediaId, controls, presentation, gesturesEnabled, exploring, gestureKey, immersive) {
             if (!gesturesEnabled) return@pointerInput
             if (controls || presentation == PlayerPresentation.MINI) coroutineScope {
                 var single: Job? = null
@@ -183,10 +197,14 @@ internal fun VideoPlayer(
                 fun zone(x: Float) = when { x < size.width / 3f -> -1; x > size.width * 2 / 3f -> 1; else -> 0 }
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    val up = playerGesture(down, presentation, if (exploring) null else currentDrag,
+                    val claim = { single?.cancel(); firstTime = Long.MIN_VALUE; vm.cancelAccumulatedSeek() }
+                    val up = (if (immersive && presentation != PlayerPresentation.MINI && !exploring) {
+                        if (!PlayerGestureRules.acceptsStart(presentation, down.position.y + inputOrigin.y, fullscreenTopEdge)) null
+                        else viewingGesture(down, vm::panViewing, claim)
+                    } else playerGesture(down, presentation, if (exploring) null else currentDrag,
                         position = { it + inputOrigin }, fullscreenTopEdge = fullscreenTopEdge) {
                         single?.cancel(); firstTime = Long.MIN_VALUE; vm.cancelAccumulatedSeek()
-                    } ?: return@awaitEachGesture
+                    }) ?: return@awaitEachGesture
                     if (presentation == PlayerPresentation.MINI) { onRestore?.invoke(); return@awaitEachGesture }
                     val direction = zone(up.position.x)
                     if (vm.pendingSeek.value != null) {
@@ -229,6 +247,7 @@ internal fun VideoPlayer(
         })
         // Picture overlays stay above the decoder and gestures, below playback controls.
         // An overlay covering the footer must not intercept fullscreen or seeking taps.
+        if (controls && presentation != PlayerPresentation.MINI) AnnotationOverlays(vm, playback, Modifier.matchParentSize())
         pictureOverlay()
         if (controls) {
             val timelinePosition = scrubSession?.targetMs ?: pendingSeek?.target(playback.duration) ?: playback.position
@@ -401,6 +420,8 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     run { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
                     run { SettingRow("Audio", selectedAudio?.primary ?: "Unavailable", available && audio.isNotEmpty()) { page = "Audio" } }
                     run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off") { page = "Captions" } }
+                    run { SettingRow("Annotations", if (vm.annotations.collectAsStateWithLifecycle().value.enabled) "On" else "Off") { page = "Annotations" } }
+                    run { SettingRow("Viewing mode", vm.viewing.collectAsStateWithLifecycle().value.mode.label, !audioOnly) { page = "Viewing mode" } }
                     run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
                     run {
                         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -411,6 +432,8 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                     run { SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device", supportsPip && playback.details != null && playback.error == null && !playback.loading) { dismiss(); pip() } }
                     run { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
                 } else when (page) {
+                    "Annotations" -> AnnotationSettings(vm, playback)
+                    "Viewing mode" -> ViewingSettings(vm, playback)
                     "Quality" -> {
                         run { SettingChoice("Auto", qualityAuto, available && !audioOnly) { vm.autoQuality(); page = "Player settings" } }
                         StreamCatalog.qualityMenu(video).forEach { track -> SettingChoice(track.primary, !qualityAuto && track == selectedVideo, available && !audioOnly, track.secondary) {
@@ -468,7 +491,7 @@ private fun SettingRow(label: String, value: String = "", enabled: Boolean = tru
 }
 
 @Composable
-private fun SettingChoice(label: String, selected: Boolean, enabled: Boolean, detail: String = "", click: () -> Unit) {
+internal fun SettingChoice(label: String, selected: Boolean, enabled: Boolean, detail: String = "", click: () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = click)
         .semantics { this.selected = selected }.padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {

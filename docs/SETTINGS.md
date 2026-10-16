@@ -32,6 +32,9 @@ opened occurrence; current player controls are described separately below.
 | Quality / `qualityDash` | `quality_dash` | `auto` | Auto, Best, Worst, 4320/2160/1440/1080/720/480/360/240/144p. Shared. |
 | Codec / `videoCodec` | `video_codec` | `auto` | Auto, AV1 (`av1`), H.264 (`h264`). Preference applies to DASH. Shared. |
 | Preferred audio / `preferredAudio` | `preferred_audio` | `original` | Original Audio, Original Audio (Stable Volume), or a supported language/region tag. Shared. |
+| Legacy annotations / `annotations` | `annotations` | false | Show archived overlays. Shared; current occurrence/menu and link overrides take precedence. |
+| Annotations on subscriptions / `annotationsSubscribed` | `annotations_subscribed` | false | Enable overlays for subscribed channels once the current account directory is loaded. Shared. |
+| Automatic 360° viewing / `vrMode` | `vr_mode` | true | Automatic uses supplied equirectangular/EAC metadata. Shared. |
 | Caption priority | `captions` | three empty strings | First available language among three priorities; empty means None. Accepts web English names or language tags. Shared. |
 | Caption appearance | local `caption.appearance` | device font/color/edge, 100% size and text opacity, transparent backgrounds | Profile-local editor in Playback settings and the player's Captions menu; size, eight colors, three opacities, seven font families and five edge styles. Changes apply immediately, including offline playback. Reset restores defaults; failed saves offer Retry/Revert. |
 | Background playback | local `background` | true | Profile-local, saves immediately. |
@@ -206,7 +209,13 @@ that changes server capabilities.
 For a new online occurrence, defaults are combined in this order: base preferences,
 current link options, then carried session options (listen/speed/local). A null
 link option inherits; false and empty subtitle/comment lists are explicit values.
-These link options never patch saved account defaults. Ordinary quality/audio/
+These link options never patch saved account defaults. Annotation and automatic
+360° defaults apply to the active video unless a link or menu overrides them.
+The Annotations menu offers a per-occurrence override and Use playback default.
+Viewing mode, device motion (initially off), yaw/pitch and dismissed annotations
+are session state; they survive Activity recreation and reset on occurrence changes.
+`annotations` overrides `iv_load_policy` (`1` on, `3` off); `vr_mode` is a boolean
+link override. These options remain local to their linked occurrence. Ordinary quality/audio/
 caption menu selections belong to the occurrence and are restored by stable
 representation identity after reload when still available. Online speed changes
 also update the saved default. Offline playback does not rewrite online defaults.

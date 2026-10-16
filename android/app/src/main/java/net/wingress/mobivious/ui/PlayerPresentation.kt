@@ -203,7 +203,7 @@ internal fun PlayerPresentationHost(
                 pictureOverlay = {
                   if (chatVisible && replay.open && !state.active && appearance.overlay) {
                     // Anchor normalized geometry to the fitted picture, excluding letterbox bars.
-                    val ratio = playback.geometry.ratio ?: 16f / 9f
+                    val ratio = playback.displayGeometry.ratio ?: 16f / 9f
                     val fittedWidth = minOf(rect.width, rect.height * ratio)
                     val fittedHeight = minOf(rect.height, rect.width / ratio)
                     ChatOverlay(vm, Modifier.offset { IntOffset(((rect.width - fittedWidth) / 2).roundToInt(),

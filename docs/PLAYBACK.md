@@ -149,7 +149,8 @@ Timestamps accept numeric seconds, decimal seconds, clock format, h/m/s/ms units
 and supported query/fragment forms. YouTube playlist index is converted from one-
 based; Invidious indexes stay zero-based. Link options include listen, speed,
 local, autoplay, continue, continue_autoplay, loop, quality_dash, video_codec,
-subtitles, region, comments, related_videos, extend_desc and save_player_pos.
+subtitles, region, comments, related_videos, extend_desc, save_player_pos,
+annotations (or legacy iv_load_policy) and vr_mode.
 Only listen/speed/local carry to successor occurrences. Saved preferences are
 unchanged by link options.
 
@@ -288,3 +289,26 @@ position, queue and track choices. Actual video frames and autoplay remain avail
 Offline downloads use locally stored publication dates. Clip filmstrip thumbnails
 stay hidden while the current source artwork is hidden; clip-range controls remain
 available. See [channel settings](SETTINGS.md#channel-title-and-thumbnail-settings).
+
+
+## Archived annotations and projected video surfaces
+
+`AnnotationsController` binds XML loading, dismissal and timing data to account,
+instance and queue occurrence. The visible overlay uses source time: normal
+service position plus a clip's source start. Link actions subtract that start
+before seeking the current clip. The bounded SAX parser renders plain text and
+supported shapes, skips invalid entries and never resolves XML entities.
+
+The GLES surface consumes the existing service decoder's `SurfaceTexture` through
+`MediaController.setVideoSurface`; it does not create another player or reload
+streams when the viewing mode changes. Equirectangular UVs and the rotated 3×2
+YouTube EAC atlas are sampled with a perspective camera. Decoder geometry stays
+separate from the projected 16:9 watch/PiP geometry. Captions use the existing
+native subtitle appearance on a sibling view above GL.
+
+Lifecycle observers detach the video surface and pause GL on Stop, and unregister
+motion sensors on Pause. Mini-player/PiP disable motion while retaining yaw/pitch.
+Device motion uses relative changes in the back-facing camera direction from
+Android's rotation-vector sensor; touch and accessible buttons add camera offsets.
+The initial sensor sample establishes a baseline. Annotation suspension also runs
+directly from Activity Pause so it does not depend on a background recomposition.

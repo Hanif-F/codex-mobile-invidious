@@ -10,6 +10,7 @@ data class AccountPreferences(
     val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings(),
     val aiFilter: AiFilterSettings = AiFilterSettings(),
     val channelSpoilers: Map<String, ChannelSpoilerRule> = emptyMap(),
+    val annotations: Boolean = false, val annotationsSubscribed: Boolean = false, val vrMode: Boolean = true,
     val autoplay: Boolean = true, val listen: Boolean = false, val local: Boolean = true,
     val continueNext: Boolean = false, val continueAutoplay: Boolean = true, val videoLoop: Boolean = false,
     val speed: Float = 1f, val seekSeconds: Int = 10, val qualityDash: String = "auto", val videoCodec: String = "auto", val preferredAudio: String = "original", val captions: List<String> = listOf("", "", ""),
@@ -26,6 +27,7 @@ data class AccountPreferences(
         put("watch_history", watchHistory); put("save_player_pos", savePosition)
         put("dearrow_enabled", dearrowEnabled); put("dearrow_show_original", dearrowShowOriginal)
         put("show_original_title", showOriginalTitle)
+        put("annotations", annotations); put("annotations_subscribed", annotationsSubscribed); put("vr_mode", vrMode)
         put("autoplay", autoplay); put("listen", listen); put("local", local)
         put("continue", continueNext); put("continue_autoplay", continueAutoplay); put("video_loop", videoLoop)
         put("speed", speed); put("quality_dash", qualityDash); put("video_codec", PreferenceRules.videoCodec(videoCodec)); put("captions", JSONArray(captions))
@@ -73,6 +75,7 @@ data class AccountPreferences(
                 showOriginalTitle = j.opt("show_original_title") as? Boolean ?: true,
                 aiFilter = AiFilterSettings.parse(j),
                 channelSpoilers = ChannelSpoilerRules.parse(j.optJSONObject("channel_spoiler_settings")),
+                annotations = j.optBoolean("annotations"), annotationsSubscribed = j.optBoolean("annotations_subscribed"), vrMode = j.optBoolean("vr_mode", true),
                 autoplay = j.optBoolean("autoplay", true), listen = j.optBoolean("listen", false), local = j.optBoolean("local", true),
                 continueNext = j.optBoolean("continue", false), continueAutoplay = j.optBoolean("continue_autoplay", true), videoLoop = j.optBoolean("video_loop", false),
                 speed = rawSpeed.takeIf { it.isFinite() && it in .25f..2f } ?: 1f, qualityDash = j.text("quality_dash", "auto"), videoCodec = PreferenceRules.videoCodec(j.opt("video_codec")),

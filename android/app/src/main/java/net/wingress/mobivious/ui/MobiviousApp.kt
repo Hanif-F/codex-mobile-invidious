@@ -302,9 +302,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         if (result == SnackbarResult.ActionPerformed && undo != null) vm.undoBlock(undo)
         if (vm.message.value == it) vm.message.value = null
     } }
-    LaunchedEffect(watch, playback.playWhenReady, playback.error, playback.details, playback.geometry, prefs, vm.store.pip, settingsPage, clipEditor.open) { activity.updatePip(watch && settingsPage.isEmpty() && !clipEditor.open) }
-    DisposableEffect(fullscreen, pip, playback.geometry.orientation) {
-        activity.requestedOrientation = if (fullscreen && !pip) when (playback.geometry.orientation) {
+    LaunchedEffect(watch, playback.playWhenReady, playback.error, playback.details, playback.displayGeometry, prefs, vm.store.pip, settingsPage, clipEditor.open) { activity.updatePip(watch && settingsPage.isEmpty() && !clipEditor.open) }
+    DisposableEffect(fullscreen, pip, playback.displayGeometry.orientation) {
+        activity.requestedOrientation = if (fullscreen && !pip) when (playback.displayGeometry.orientation) {
             1 -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             -1 -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -860,10 +860,10 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
         }) {
         val sideBySide = maxWidth >= 840.dp && maxWidth * .62f >= 480.dp && maxWidth * .38f >= 320.dp
         val playerWidth = (if (sideBySide) maxWidth * .62f - 16.dp else maxWidth - 16.dp).value
-        val expandedHeight = playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false).let { if(sideBySide) minOf(it,maxHeight.value*.6f) else it }
-        val compactHeight = minOf(expandedHeight,playback.geometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f))
+        val expandedHeight = playback.displayGeometry.embeddedHeight(playerWidth, maxHeight.value, false).let { if(sideBySide) minOf(it,maxHeight.value*.6f) else it }
+        val compactHeight = minOf(expandedHeight,playback.displayGeometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f))
         val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight > compactHeight && !drawerOpen)
-        val playerHeight = if(sideBySide) (expandedHeight+(compactHeight-expandedHeight)*resize.progress).dp else if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.geometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
+        val playerHeight = if(sideBySide) (expandedHeight+(compactHeight-expandedHeight)*resize.progress).dp else if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.displayGeometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
         val supportingList = key(queue.token,queue.currentKey) { rememberLazyListState() }
         val detailsContent: @Composable ColumnScope.(WatchPane) -> Unit = { pane ->
             val tools=pane!=WatchPane.PRIMARY
@@ -949,6 +949,7 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
 @Composable private fun FiltersDialog(vm: AppViewModel, dismiss: () -> Unit, visibilityOnly: Boolean = false) {
     val context = remember { vm.api.context() }
     val searchType by vm.searchType.collectAsStateWithLifecycle()
+    val features by vm.searchFeatures.collectAsStateWithLifecycle()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val savedVisibility by vm.searchVisibility.collectAsStateWithLifecycle()
     val edits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
@@ -964,11 +965,26 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
             top = top + 16.dp, bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!visibilityOnly) {
                 Text("Result filters", style = MaterialTheme.typography.titleMedium)
-                if (searchType != SearchType.CHANNELS) Choice("Sort", listOf("relevance", "views"), sort) { if(it!=sort) {sort=it;vm.sort=it;refresh()} }
-                if (searchType.videoFilters) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { if(it!=date) {date=it;vm.date=it;refresh()} }
-                if (searchType.videoFilters) Choice("Duration", listOf("", "short", "long"), duration) { if(it!=duration) {duration=it;vm.durationFilter=it;refresh()} }
                 TextButton({ if (vm.api.context() == context) { sort = "relevance"; date = ""; duration = ""; vm.resetResultFilters() } },
                     Modifier.testTag("search-reset-filters")) { Text("Reset result filters") }
+                Choice("Result type", SearchType.entries.map { it.apiValue }, searchType.apiValue) {
+                    if (vm.api.context() == context) vm.setSearchType(SearchType.entries.first { type -> type.apiValue == it })
+                }
+                if (searchType != SearchType.CHANNELS) Choice("Sort", listOf("relevance", "views"), sort) { if(it!=sort) {sort=it;vm.sort=it;refresh()} }
+                if (searchType.videoFilters) Choice("Uploaded", listOf("", "hour", "today", "week", "month", "year"), date) { if(it!=date) {date=it;vm.date=it;refresh()} }
+                if (searchType.videoFilters) Choice("Duration", listOf("", "short", "medium", "long"), duration) { if(it!=duration) {duration=it;vm.durationFilter=it;refresh()} }
+                if (searchType.videoFilters) {
+                    Text("Features", style = MaterialTheme.typography.titleSmall)
+                    SearchFeature.entries.forEach { feature ->
+                        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("search-feature-${feature.apiValue}")
+                            .toggleable(feature in features, role = androidx.compose.ui.semantics.Role.Checkbox) {
+                                if (vm.api.context() == context) vm.setSearchFeature(feature, it)
+                            }, verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(feature in features, null)
+                            Text(feature.label)
+                        }
+                    }
+                }
                 HorizontalDivider()
             }
             Text("Visibility on this device", style = MaterialTheme.typography.titleMedium)
@@ -997,6 +1013,7 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
 }
 @Composable private fun Choice(label: String, values: List<String>, selected: String, update: (String) -> Unit) {
     DropdownChoiceRow(label, values.map { it to when (label) {
+        "Result type" -> SearchType.entries.first { type -> type.apiValue == it }.label
         "Sort" -> searchSortLabel(it); "Uploaded" -> searchDateLabel(it); "Duration" -> searchDurationLabel(it)
         else -> it.ifBlank { "Any" }.replace('_', ' ')
     } }, selected, change = update)

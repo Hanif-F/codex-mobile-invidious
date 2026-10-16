@@ -425,3 +425,36 @@ font scale, density and orientation after presentation checks. Existing search
 journeys retain submission, scoped search, visibility, pagination/retry and
 navigation-return coverage. Fresh searches reset filters; edit submissions retain
 them. These tests establish emulator behavior, not physical-device performance.
+
+
+## Complete search filters, archived annotations and phone 360° viewing
+
+`DiscoverySearchTest` checks all six search types and canonical feature query
+values. `AnnotationsViewingTest` checks bounded XML, disabled entities, unsupported
+entries, appearance/timing/actions, cancellation and occurrence isolation, public
+archive requests, preference/link round-trips, projection mapping and sensor math.
+
+Use the existing emulator and disposable fixture:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AnnotationsViewingSmokeTest,net.wingress.mobivious.DiscoverySearchSmokeTest,net.wingress.mobivious.SearchExperienceSmokeTest
+```
+
+The eight player scenarios cover independent FFmpeg-converted EAC and labeled
+spherical directions, actual composed-screen pixel colors, drag/recenter,
+captions, fullscreen/recreation, annotation styles/dismissal/links, source-relative
+clip timing, failures/404/retry/obsolete responses, guest/account defaults and link
+overrides, mini-player/PiP/background and downloaded projection metadata. Compose
+view captures omit the GL surface; use `UiAutomation.takeScreenshot` with the
+player's window bounds for decoded pixel assertions. Captures use
+`/data/local/tmp/mobivious-ui/360-*.png` and `annotations-styles.png`.
+
+Search acceptance also covers all eleven feature controls, Medium, Movies/Shows,
+chips, retained inactive filters, new/edit reset rules, recreation, pagination and
+obsolete feature responses. Reset stays above the long feature list.
+
+These checks verify emulator rendering and interactions. Physical-device motion
+accuracy, broad live archive availability, production server deployment and
+headset viewing are not established by the fixture. Results and emulator recovery
+are recorded in [VERIFICATION.md](../VERIFICATION.md).

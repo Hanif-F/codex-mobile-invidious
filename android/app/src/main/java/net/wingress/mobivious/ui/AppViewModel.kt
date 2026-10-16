@@ -1,5 +1,8 @@
 package net.wingress.mobivious.ui
 
+import net.wingress.mobivious.player.Projection
+import net.wingress.mobivious.player.ViewingState
+import net.wingress.mobivious.player.ViewingMode
 import net.wingress.mobivious.player.QueueRepeat
 import android.app.Application
 import android.content.ComponentName
@@ -65,7 +68,9 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
     val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection(),
     val audioSelection: AudioSelection = AudioSelection(),
-    val geometry: VideoGeometry = VideoGeometry(), val clip: Clip? = null, val downloadId: String? = null)
+    val geometry: VideoGeometry = VideoGeometry(), val projection: Projection = Projection.FLAT, val clip: Clip? = null, val downloadId: String? = null) {
+    val displayGeometry get() = if (projection == Projection.FLAT) geometry else VideoGeometry(mediaId, 16, 9)
+}
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
     val titles: List<DeArrowSubmission> = emptyList(), val busy: Boolean = false, val loaded: Boolean = false,
     val draft: String = "", val review: Boolean = false, val acknowledgements: Set<Int> = emptySet(), val status: String? = null)
@@ -159,6 +164,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val playlistErrors = MutableStateFlow<Map<String, String>>(emptyMap())
     val rss = MutableStateFlow(RssState())
     val searchType = MutableStateFlow(SearchType.ALL)
+    val searchFeatures = MutableStateFlow<Set<SearchFeature>>(emptySet())
     val trendingCategory = MutableStateFlow(store.trendingCategory(api.context()))
     val channelPlaylistSort = MutableStateFlow("last")
     val channelVideoSort = MutableStateFlow(ChannelSort.NEWEST)
@@ -194,6 +200,37 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val chatAppearance = MutableStateFlow(store.chatAppearance())
     val captionAppearance = MutableStateFlow(store.captionAppearance())
     val captionFailure = app.captionFailure
+    val viewing = MutableStateFlow(ViewingState())
+    private val annotationsController = AnnotationsController(viewModelScope, api::context, api::annotations)
+    val annotations = annotationsController.state
+    private var toolsVisible = false
+    fun configurePlayerTools(visible: Boolean) {
+        toolsVisible = visible
+        val q = queue.value
+        val effective = q.effective(preferences.value)
+        val subscription = subscriptionChannels.value
+        val explicit = viewing.value.annotations ?: q.current?.linkPlayback?.options?.annotations
+        val enabled = explicit ?: (effective.annotations || effective.annotationsSubscribed &&
+            subscription.context == api.context() && subscription.channels.any { it.id == q.details?.video?.channelId })
+        val binding = q.currentKey?.let { key -> q.details?.video?.id?.let { AnnotationBinding(api.context(), key, it) } }
+            .takeIf { q.context == api.context() && q.current?.downloadId == null }
+        annotationsController.bind(binding, enabled, visible && playback.value.videoEnabled)
+        if (visible && effective.annotationsSubscribed && explicit == null && api.context().account != null &&
+            (!subscription.loaded || subscription.context != api.context()) && !subscription.loading && subscription.error == null) refreshSubscriptions()
+    }
+    fun setAnnotations(enabled: Boolean?) { viewing.value = viewing.value.copy(annotations = enabled); configurePlayerTools(toolsVisible) }
+    fun retryAnnotations() = annotationsController.retry()
+    fun dismissAnnotation(id: String) = annotationsController.dismiss(id)
+    fun setViewingMode(mode: ViewingMode) { viewing.value = viewing.value.copy(mode = mode, error = null) }
+    fun setViewingMotion(enabled: Boolean) { viewing.value = viewing.value.copy(motion = enabled) }
+    fun panViewing(yaw: Float, pitch: Float) { viewing.value = viewing.value.pan(yaw, pitch) }
+    fun recenterViewing() { viewing.value = viewing.value.copy(yaw = 0f, pitch = 0f) }
+    fun viewingFailed() {
+        val error = "360° rendering unavailable. Playing flat; select a viewing mode to retry."
+        viewing.value = viewing.value.copy(error = error, motion = false)
+        message.value = error
+    }
+
     private val chatController = ChatReplayController(viewModelScope, api::context, api::chatReplay,
         { id, ctx -> if (ctx.account == null) store.chatTiming(id, ctx) else api.chatTiming(id, ctx) },
         { id, offset, ctx -> if (ctx.account == null) store.chatTiming(id, offset, ctx) else api.chatTiming(id, offset, ctx) }, ::friendly)
@@ -381,12 +418,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val scopedSearch: SearchInput, val discovery: String, val context: ApiContext,
         val channelSearchOrigin: BrowseReturn?, val subscriptionParent: Boolean, val playlistLink: VideoLink?,
         val preferences: AccountPreferences, val category: TrendingCategory, val search: SearchInput,
-        val searchType: SearchType, val searchSort: String, val searchDate: String, val searchDuration: String,
+        val searchType: SearchType, val searchSort: String, val searchDate: String, val searchDuration: String, val searchFeatures: Set<SearchFeature>,
         val librarySection: String)
     private fun captureBrowse() = BrowseReturn(tab, route, browse.value, channel.value, channelTab.value,
         playlist.value, playlistSeed, channelPlaylistSort.value, channelVideoSort.value, postDetail.value,
         postComments.value, scopedSearch.value, discovery.value, api.context(), channelSearchOrigin, subscriptionChannelParent, playlistLink, preferences.value,
-        trendingCategory.value, searchInput.value, searchType.value, sort, date, durationFilter, playlistLibrarySection.value)
+        trendingCategory.value, searchInput.value, searchType.value, sort, date, durationFilter, searchFeatures.value, playlistLibrarySection.value)
     val playlistLibrarySection = MutableStateFlow("owned")
     private val playlistLibraryPositions = mutableMapOf<String, CommentPosition>()
     fun selectPlaylistLibrary(section: String) {
@@ -481,6 +518,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }.onFailure { message.value = "Unable to connect to the player." }
         }, ContextCompat.getMainExecutor(application))
+        viewModelScope.launch {
+            combine(queue, preferences, viewing) { q, prefs, view ->
+                view.projection(q.details?.projectionType, q.effective(prefs).vrMode)
+            }.distinctUntilChanged().collect { projection -> playback.value = playback.value.copy(projection = projection) }
+        }
+        viewModelScope.launch { preferences.collect { configurePlayerTools(toolsVisible) } }
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
         viewModelScope.launch { var previous = queue.value; queue.collect { state ->
             preferenceSaves.discardKeys { it.startsWith("chat_delay:") && it.substringAfter(':')!=state.current?.video?.id }
@@ -491,6 +534,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (account.value != null) refreshAccount()
             }
             if (previous.currentKey != state.currentKey || previous.context != state.context) cancelAccumulatedSeek(false)
+            if (viewing.value.occurrence != state.currentKey || viewing.value.context != state.context)
+                viewing.value = ViewingState(state.context, state.currentKey)
             previous = state
             if (clipEditor.value.open && clipEditor.value.occurrence != state.currentKey) closeClipEditor()
             requestedVideo = state.current?.video?.id
@@ -501,9 +546,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 cancelAccumulatedSeek(false)
                 contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState()
             }
+            configurePlayerTools(toolsVisible)
             syncComments(); syncChat(); if (state.current?.downloadId == null) state.details?.video?.id?.let(::ensureDeArrow); syncSponsorSettings()
         } }
         viewModelScope.launch { subscriptionChannels.collect { state ->
+            configurePlayerTools(toolsVisible)
             val pending = pendingChannelSubscription ?: return@collect
             if (pending.first != api.context().server) { pendingChannelSubscription = null; return@collect }
             if (state.context == api.context() && state.context.account != null && state.loaded) {
@@ -541,7 +588,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             }
             app.blocked.reset(); searchVisibility.value = store.searchVisibility(api.context())
             searchInput.value = SearchInput(); scopedSearch.value = SearchInput()
-            searchType.value = SearchType.ALL; sort = "relevance"; date = ""; durationFilter = ""
+            searchType.value = SearchType.ALL; sort = "relevance"; date = ""; durationFilter = ""; searchFeatures.value = emptySet()
             trendingCategory.value = store.trendingCategory(api.context())
             cancelAccumulatedSeek(false)
             sponsorSettingsChannel.value = null
@@ -750,7 +797,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         scopedSearch.value = saved.scopedSearch; discovery.value = saved.discovery
         if (saved.tab == "Search" && saved.route.isEmpty()) {
             searchInput.value = saved.search; searchType.value = saved.searchType
-            sort = saved.searchSort; date = saved.searchDate; durationFilter = saved.searchDuration
+            sort = saved.searchSort; date = saved.searchDate; durationFilter = saved.searchDuration; searchFeatures.value = saved.searchFeatures
         }
         browse.value = saved.browse.copy(loading = false, refreshing = false)
         navigation.value = tab to route; restoredBrowse.value++
@@ -769,7 +816,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         navigate("Search")
     }
     fun resetResultFilters(refresh: Boolean = true) {
-        searchType.value = SearchType.ALL; sort = "relevance"; date = ""; durationFilter = ""
+        searchType.value = SearchType.ALL; sort = "relevance"; date = ""; durationFilter = ""; searchFeatures.value = emptySet()
         if (refresh && tab == "Search" && route.isEmpty() && query.isNotBlank()) refresh()
     }
     fun backBrowse() {
@@ -883,6 +930,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             catch (e: Exception) { if (context == api.context()) playlistErrors.value += list.id to friendly(e) }
             finally { if (context == api.context()) playlistBusy.value -= list.id }
         }
+    }
+    fun setSearchFeature(value: SearchFeature, selected: Boolean) {
+        searchFeatures.value = if (selected) searchFeatures.value + value else searchFeatures.value - value
+        refresh()
     }
     fun setSearchType(value: SearchType) { if (searchType.value != value) { searchType.value = value; refresh() } }
     fun selectTrendingCategory(value: TrendingCategory) {
@@ -1028,7 +1079,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
         val selectedDiscovery = discovery.value; val selectedRegion = preferences.value.region; val selectedCategory = trendingCategory.value
-        val selectedSearchType = searchType.value; val selectedSort = sort; val selectedDate = date; val selectedDuration = durationFilter
+        val selectedSearchType = searchType.value; val selectedSort = sort; val selectedDate = date; val selectedDuration = durationFilter; val selectedFeatures = searchFeatures.value
         val listSort = channelPlaylistSort.value; val videoSort = channelVideoSort.value; val revision = playlistRevision
         val scopedQuery = scopedSearch.value.submitted
         val context = api.context()
@@ -1133,7 +1184,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     selectedTab == "Search" && selectedRoute.isEmpty() -> {
                         val response = if (selectedQuery.isBlank()) GeneralSearchPage(emptyList(), emptySet()) else
-                            api.searchResults(selectedQuery, page, selectedSearchType, selectedSort, selectedDate, selectedDuration, context)
+                            api.searchResults(selectedQuery, page, selectedSearchType, selectedSort, selectedDate, selectedDuration, context, selectedFeatures)
                         searchResults = response.items; searchKeys = response.sourceKeys
                         hasMore = !response.exhausted(old.searchKeys)
                         lists = searchResults.filterIsInstance<SearchResult.PlaylistItem>().map { it.playlist }

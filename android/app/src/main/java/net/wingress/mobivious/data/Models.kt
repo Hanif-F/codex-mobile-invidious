@@ -22,7 +22,7 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
     val listed: Boolean? = null, val genre: String = "", val genreUrl: String = "", val license: String? = null,
     val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
     val music: List<MusicCredit> = emptyList(), val notice: String = "", val liveChatReplay: Boolean = false, val storyboards: List<StoryboardTrack> = emptyList(),
-    val likeCountPrecision: CountPrecision = CountPrecision.UNVERIFIED) {
+    val likeCountPrecision: CountPrecision = CountPrecision.UNVERIFIED, val projectionType: String = "") {
     val chatAvailable: Boolean get() = liveChatReplay && !video.live && upcoming != true
     val chapters: List<VideoChapter> = ChapterRules.parse(description, video.duration, video.live)
 }
@@ -97,7 +97,10 @@ object ApiParser {
         music = json.optJSONArray("musicTracks")?.objects().orEmpty().map { MusicCredit(it.text("song"), it.text("artist"), it.text("album"), it.text("license")) }
             .filter { it.song.isNotBlank() || it.artist.isNotBlank() || it.album.isNotBlank() }, notice = json.text("error"), liveChatReplay = json.opt("liveChatReplay") == true, storyboards = json.optJSONArray("storyboards")?.objects().orEmpty().mapNotNull { sb ->
             sb.text("url").takeIf(String::isNotBlank)?.let { StoryboardTrack(it, sb.optInt("width"), sb.optInt("height")) } },
-        likeCountPrecision = CountPrecision.parse(json.text("likeCountPrecision")))
+        likeCountPrecision = CountPrecision.parse(json.text("likeCountPrecision")),
+        projectionType = json.text("projectionType").ifBlank {
+            json.optJSONArray("adaptiveFormats")?.objects().orEmpty().firstOrNull { it.text("projectionType") in listOf("EQUIRECTANGULAR", "MESH") }?.text("projectionType").orEmpty()
+        })
     fun streamFormat(j: JSONObject): StreamFormat {
         val size = j.text("size").split('x')
         val type = j.text("type", j.text("mimeType"))

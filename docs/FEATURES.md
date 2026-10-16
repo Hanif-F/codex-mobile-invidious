@@ -34,11 +34,15 @@ Search accepts words or a supported URL. Submit through the keyboard, physical
 Enter or search action. Results preserve the server's ordering and may contain
 videos, channels, playlists and mixes. Select All, Videos, Channels or Playlists
 & mixes. Sort choices are Relevance and Views where supported; date/duration
-filters apply to All/Videos. Search visibility can override members-only display
+filters apply to All/Videos/Movies/Shows. Movies and Shows are available in the filter sheet.
+Duration includes 4–20 minutes; feature checkboxes support Live, 4K, HD, captions,
+Creative Commons, 360°, VR180, 3D, HDR, location and purchased content. Active
+filters have individual removal chips and retain selections when temporarily
+switching to Channels or Playlists. Search visibility can override members-only display
 and include blocked channels. Closing search returns to its originating page.
 Hidden results do not prevent loading subsequent raw pages. Tap the query to edit
 it with its filters retained, or New search to start blank. New submissions reset
-type/sort/date/duration; persistent visibility preferences are retained. Canceling
+type/sort/date/duration/features; persistent visibility preferences are retained. Canceling
 the editor leaves the previous page/results/position unchanged. Large video
 thumbnails, circular-avatar channel cards and stacked playlist/mix covers make
 mixed result types visually distinct without regrouping relevance order.
@@ -103,6 +107,30 @@ Playback can continue in the background, with system media controls. PiP support
 back/forward by the selected seek interval and play/pause. Automatic PiP depends on the
 device feature, local PiP setting and active watch/play state. Disabling background
 playback pauses when leaving outside PiP. Audio only disables video decoding tracks.
+
+## Legacy annotations and phone 360° viewing
+
+Player settings → Annotations enables archived overlays for the current queue
+occurrence. Available text boxes, speech bubbles, labels, titles and highlights
+follow playback time, seeks, speed and clip bounds. Tap links to navigate or seek;
+use the close icon to dismiss an annotation. Missing archives show an empty state;
+failed archive loads offer Retry while playback continues. Requests go through
+the selected instance, without account credentials. Mini-player, PiP, background,
+audio-only and downloaded playback suspend annotation loading and overlays.
+
+Player settings → Viewing mode offers Automatic, Flat, 360° equirectangular and
+360° EAC. Automatic recognizes video projection metadata and the shared automatic
+360° preference. Drag to look around, use the directional buttons for accessible
+navigation, and Recenter to reset the view. Device motion is optional and starts
+off. Mini-player and PiP preserve the viewpoint while motion tracking pauses.
+Captions and player controls remain available; the projected watch/PiP viewport
+is 16:9. A rendering failure switches to flat playback and reports how to retry.
+
+Viewing choices and annotation dismissals survive Activity recreation and reset
+for a new queue occurrence. Settings → Playback controls shared annotation,
+subscribed-channel annotation and automatic 360° defaults. Phone viewing supports
+monoscopic equirectangular and YouTube EAC projection; headset stereo is outside
+this scope. VR180 and 3D remain available as search filters.
 
 ## Watch information and discussions
 

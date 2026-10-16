@@ -11,6 +11,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DiscoverySearchTest {
+    @Test fun everyFeatureAndMediumDurationUseCanonicalParametersOnlyOnVideoTypes() = runBlocking {
+        MockWebServer().use { server ->
+            server.start(); val api = InvidiousApi({ server.url("/").toString() }, { null })
+            val selected = SearchFeature.entries.reversed().toSet()
+            for (type in SearchType.entries) {
+                server.enqueue(MockResponse().setBody(mixed))
+                val page = api.searchResults("mixed", 3, type, "views", "month", "medium", features = selected)
+                val url = server.takeRequest().requestUrl!!
+                assertEquals(if (type.videoFilters) "medium" else null, url.queryParameter("duration"))
+                assertEquals(if (type.videoFilters) "live,4k,hd,subtitles,commons,360,vr180,3d,hdr,location,purchased" else null, url.queryParameter("features"))
+                if (type in listOf(SearchType.MOVIES, SearchType.SHOWS)) assertTrue(page.items.single() is SearchResult.VideoItem)
+            }
+        }
+    }
     private val channel = "UC" + "a".repeat(22)
     private val mixed = """[{"type":"video","videoId":"abcdefghijk","authorId":"$channel","isMember":true},
         {"type":"channel","authorId":"$channel","author":"Creator","subCount":42,"videoCount":7,"channelHandle":"@creator","authorVerified":true},

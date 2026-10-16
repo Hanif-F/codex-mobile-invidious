@@ -132,13 +132,14 @@ internal fun searchSortLabel(value: String) = if (value in listOf("views", "view
 internal fun searchDateLabel(value: String) = when(value) {
     "hour" -> "Last hour"; "today" -> "Today"; "week" -> "This week"; "month" -> "This month"; "year" -> "This year"; else -> "Any time"
 }
-internal fun searchDurationLabel(value: String) = when(value) { "short" -> "Under 4 minutes"; "long" -> "Over 20 minutes"; else -> "Any duration" }
+internal fun searchDurationLabel(value: String) = when(value) { "short" -> "Under 4 minutes"; "medium" -> "4–20 minutes"; "long" -> "Over 20 minutes"; else -> "Any duration" }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun SearchResultsToolbar(vm: AppViewModel, query: String, type: SearchType, visibility: SearchVisibility,
     close: () -> Unit, edit: () -> Unit, newSearch: () -> Unit, filters: () -> Unit) {
     val browse by vm.browse.collectAsStateWithLifecycle()
+    val features by vm.searchFeatures.collectAsStateWithLifecycle()
     Column(Modifier.statusBarsPadding().padding(bottom = 8.dp)) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             AppIconButton(Icons.AutoMirrored.Filled.ArrowBack, "Close search", onClick = close)
@@ -154,12 +155,16 @@ internal fun SearchResultsToolbar(vm: AppViewModel, query: String, type: SearchT
         }
         if (query.isNotBlank()) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                BrowseTabs(SearchType.entries, type, { it.label }, { "search-type-${it.apiValue}" }, Modifier.weight(1f), select = vm::setSearchType)
+                BrowseTabs(SearchType.tabs, type.tab, { it.label }, { "search-type-${it.apiValue}" }, Modifier.weight(1f), select = vm::setSearchType)
                 AppIconButton(Icons.Default.Tune, "Search filters", enabled = !browse.refreshing, onClick = filters)
             }
-            val hasResultFilters = vm.sort != "relevance" && type != SearchType.CHANNELS || type.videoFilters && (vm.date.isNotBlank() || vm.durationFilter.isNotBlank())
+            val hasResultFilters = vm.sort != "relevance" && type != SearchType.CHANNELS || type.videoFilters && (vm.date.isNotBlank() || vm.durationFilter.isNotBlank() || features.isNotEmpty() || type != type.tab)
             if (hasResultFilters || visibility.showMembers != null || visibility.includeBlocked) {
                 FlowRow(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("search-filter-summary"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (type != type.tab) RemovableSearchFilter(type.label, "type") { vm.setSearchType(SearchType.VIDEOS) }
+                    if (type.videoFilters) SearchFeature.entries.filter { it in features }.forEach { feature ->
+                        RemovableSearchFilter(feature.label, feature.apiValue) { vm.setSearchFeature(feature, false) }
+                    }
                     if (vm.sort != "relevance" && type != SearchType.CHANNELS) RemovableSearchFilter("Sort: ${searchSortLabel(vm.sort)}", "sort") { vm.sort = "relevance"; vm.refresh() }
                     if (type.videoFilters && vm.date.isNotBlank()) RemovableSearchFilter(searchDateLabel(vm.date), "date") { vm.date = ""; vm.refresh() }
                     if (type.videoFilters && vm.durationFilter.isNotBlank()) RemovableSearchFilter(searchDurationLabel(vm.durationFilter), "duration") { vm.durationFilter = ""; vm.refresh() }

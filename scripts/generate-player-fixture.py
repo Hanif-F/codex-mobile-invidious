@@ -207,3 +207,36 @@ def generate_downloads():
         subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', str(directory / 'video144.mp4'), '-an', '-c:v', 'libvpx', '-deadline', 'realtime', '-cpu-used', '8', '-threads', '2', str(target)], check=True)
 
 generate_downloads()
+
+
+
+def generate_projection():
+    """Independent FFmpeg EAC conversion verifies the native atlas orientation."""
+    directory = args.media_dir / 'projection'
+    directory.mkdir(parents=True, exist_ok=True)
+    sphere = directory / 'equirectangular.mp4'
+    if not sphere.exists():
+        ppm = directory / 'directions.ppm'
+        with ppm.open('wb') as output:
+            output.write(b'P6\n640 320\n255\n')
+            for y in range(320):
+                row = bytearray()
+                for x in range(640):
+                    color = (0, 220, 220) if y < 80 else (220, 0, 220) if y >= 240 else (
+                        (220, 0, 0) if x < 80 or x >= 560 else (220, 220, 0) if x < 240 else (0, 220, 0) if x < 400 else (0, 0, 220))
+                    row.extend(color)
+                output.write(row)
+        filters = ','.join(f"drawtext=text='{label}':x={x}:y={y}:fontsize=20:fontcolor=white" for label, x, y in
+                           [('BACK', 5, 150), ('LEFT', 130, 150), ('FRONT', 285, 150), ('RIGHT', 450, 150), ('UP', 300, 25), ('DOWN', 285, 285)])
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-loop', '1', '-i', str(ppm),
+                        '-vf', filters, '-t', '12', '-r', '12', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2',
+                        '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(sphere)], check=True)
+    target = directory / 'eac.mp4'
+    if not target.exists():
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', str(sphere),
+                        '-vf', 'v360=input=equirect:output=eac:w=768:h=512', '-c:v', 'libx264', '-preset', 'ultrafast', '-threads', '2',
+                        '-pix_fmt', 'yuv420p', '-movflags', '+faststart', str(target)], check=True)
+    (directory / 'captions.vtt').write_text('WEBVTT\n\n00:00:00.000 --> 00:00:12.000\n360 CAPTION\n')
+
+
+generate_projection()

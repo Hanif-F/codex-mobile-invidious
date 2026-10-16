@@ -29,7 +29,7 @@ Every request is fenced against a changed live context before accepting its body
 | --- | --- |
 | GET `/api/v1/popular` | Array of video rows; single discovery snapshot. |
 | GET `/api/v1/trending` | `region`, `type=livestreams|gaming`; array of videos. |
-| GET `/api/v1/search` | `q`, `page`, `sort=relevance|views`, `type=all|video|channel|playlist`; `date`/`duration` only for video-capable types. Ordered mixed array with raw source keys. |
+| GET `/api/v1/search` | `q`, `page`, `sort=relevance|views`, `type=all|video|channel|playlist|movie|show`; `date`/`duration`/`features` only for All, Videos, Movies and Shows. Duration supports `medium`; features use a comma-separated canonical list. Ordered mixed array with raw source keys. |
 | GET `/api/v1/search/suggestions` | Public `q`, `region`; `{query, suggestions: [string]}`. Optional, uncached assistance; unavailable instances retain manual search. |
 | GET `/api/v1/videos/:id` | `local=true|false`, optional link `region`; VideoDetails and stream/caption metadata. |
 | GET `/api/v1/channels/:id` | Channel metadata, advertised tabs, banner/avatar and optional fields. |
@@ -253,3 +253,28 @@ source dates and retains results/misses for the current content load. Missing or
 older-server endpoints leave upload dates unknown and content hidden. Ordinary
 public metadata retains its original values. Account saves require the companion
 native API update; unsupported servers show the existing shared-settings error.
+
+
+## Annotation archives and projection metadata
+
+Public `GET /api/v1/annotations/:id` returns XML through the selected instance.
+The app sends `Accept: text/xml` without Authorization, bounds the decoded body
+to 2 MiB, cancels suspended/obsolete loads and disables DTD/external entities.
+The sibling route preserves direct archive responses even without a redirect
+header. 404 means no archive; other failures offer an independent Retry. Archives are
+kept only for the current playback occurrence, and are not downloaded offline.
+
+Video JSON adds optional top-level `projectionType`, also included in download
+catalog metadata. `EQUIRECTANGULAR` selects spherical projection; `MESH` selects
+YouTube EAC. Older responses can supply the existing adaptive-format field.
+Absent or unknown metadata stays flat in Automatic mode; manual projection
+selection remains available. The native app performs no YouTube extraction.
+
+The native preference PATCH allowlist now accepts boolean `annotations`,
+`annotations_subscribed` and `vr_mode`, using existing preference scopes and
+storage. Deploy the sibling server addition before relying on account saves;
+no migration or token renewal is needed. Older instances retain playback and
+show their existing save errors with Retry/Revert.
+
+Search feature values, in canonical order, are `live,4k,hd,subtitles,commons,360,vr180,3d,hdr,location,purchased` (one comma-separated query value without spaces
+or newlines). Shows is a legacy upstream filter and can return no results.

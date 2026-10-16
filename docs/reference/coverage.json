@@ -22,7 +22,8 @@
     "docs/UI.md",
     "docs/reference/COVERAGE.md",
     "docs/reference/SOURCE_MAP.md",
-    "docs/reference/TEST_CATALOG.md"
+    "docs/reference/TEST_CATALOG.md",
+    "VERIFICATION.md"
   ],
   "files": {
     ".env.example": {
@@ -239,7 +240,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Discovery Search Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "261e3df7c66213b2f0b7b5b8bcdb6fb1b81a94bc4789f6e6d40fc17a1586beb4"
+      "sha256": "739e7b8d44de73e43150ec4d3f230c3b1564f53424b583c563e72c2fa27f8cfa"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/DownloadsPersistenceSmokeTest.kt": {
       "area": "Android device tests",
@@ -521,7 +522,7 @@
       "area": "Application entry points",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Activity lifecycle, incoming share/app links, fullscreen system bars and PiP actions/bounds.",
-      "sha256": "af7925ba9f5fd64620b684aff931abe0363342d27287867495daf389f01d69ac"
+      "sha256": "156a70007bf3de01e408cb147918f235a5aec4a32d1f16ff6ed0933d5e2d298f"
     },
     "android/app/src/main/java/net/wingress/mobivious/MobiviousApplication.kt": {
       "area": "Application entry points",
@@ -551,7 +552,7 @@
       "area": "Data and domain",
       "guide": "docs/SETTINGS.md",
       "description": "All shared preference defaults, JSON parsing, sparse patches/merges, homepage/caption/codec rules; integrates channel title/thumbnail rules.",
-      "sha256": "439e231a3341c534a834d7d5c54bed7fe4ed2d20527e26568f1f6dac6ec6535f"
+      "sha256": "b1ea74e0c782f1fb7d88d47b060139b2d8a7eabb842a10a65bdc1525d3b57bb4"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/AudioPreferences.kt": {
       "area": "Data and domain",
@@ -611,7 +612,7 @@
       "area": "Data and domain",
       "guide": "docs/PLAYBACK.md",
       "description": "Native/external link targets, validated URL/timestamps/indexes, nullable playback overrides/bounds and share URLs.",
-      "sha256": "b82d69176aad71786799e7f55b3b9a6becedeed53f4127c02bdac13177ebfc9d"
+      "sha256": "4e23ebbfac89f7d12b38d5c970480055dbbd149fc1f46f99bffe90b5a99002c2"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/ContentVisibility.kt": {
       "area": "Data and domain",
@@ -635,7 +636,7 @@
       "area": "Data and domain",
       "guide": "docs/FEATURES.md",
       "description": "Trending categories, localized region catalog and typed mixed-search parsing/visibility/exhaustion.",
-      "sha256": "016ed6cb74be1f4e394d27fbde39447ddf8f956ec52428047e1ef6e5c2df637c"
+      "sha256": "b9581de8391b9c7d15e8c06bba965577be8e61a29d7d9ed69d49bd529f88d4ba"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/DisplayFormats.kt": {
       "area": "Data and domain",
@@ -671,13 +672,13 @@
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "Cancellable asynchronous OkHttp response-body adapter and closed-response transport snapshot.",
-      "sha256": "c17c507555127be0056e3baae97d7f5ed23ff1860084793ef9699ae5792ae402"
+      "sha256": "2130cda0093878cf22915fb49fbdf5a3d9408fe6ea8e3a06f6c56786c5928f95"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt": {
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "Complete instance HTTP client, auth/error/cache semantics and consumed API endpoint methods.",
-      "sha256": "00eb4442ac2e435a29eb08cf0e0e97b1c4cef244fdbde0990d287889cd0fc438"
+      "sha256": "2346763d0e6126764a82ff8f9e9f628472144c55febd6c262bb29370914b61f2"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/LiveChat.kt": {
       "area": "Data and domain",
@@ -689,7 +690,7 @@
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "API/domain models and parsers, source queue pages, library action state, stream/caption metadata and validated video links; integrates channel title/thumbnail rules.",
-      "sha256": "bac4d04051b3c345ba13895ab84e3ab46b8cac1f6e77339be95c7e05bee941fd"
+      "sha256": "71b65b11263df214ff1c6b9c27ebc4a3a76048854629d34fef3d27fd47079b1f"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/OriginalTitlePreferences.kt": {
       "area": "Data and domain",
@@ -899,7 +900,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination.",
-      "sha256": "8f6b3de905fdd36596d3a130523504298e1a1fbc7f9426d98bd5ecc586a1f66b"
+      "sha256": "b5d9c2a734865adfd2814bec5b27266a0cba5d5dcbe11a6094e8ada0e5486f38"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1025,7 +1026,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "3a5f61ec701eef0f019f3c9ccb74bc5253d49c1a34c9bcfa867001033d834fab"
+      "sha256": "f69251abc1b12e1c7d48506f017d83c686573ea5917b9a104af9feabe4c164e5"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
       "area": "Compose UI",
@@ -1055,19 +1056,19 @@
       "area": "Compose UI",
       "guide": "docs/PLAYBACK.md",
       "description": "Presentation modes, touch-exploration observation, density-independent drag arbitration and cancellation.",
-      "sha256": "7f234ad77774c1c2ba898bac85506d1cae073b4bc4a23d8e174994b1faa895c2"
+      "sha256": "a3723f55b20c9bd337776024094253d4b0b0d928b82d2878c6f5c5abd6675cf6"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlayerPresentation.kt": {
       "area": "Compose UI",
       "guide": "docs/PLAYBACK.md",
       "description": "Single-surface mini/watch/fullscreen host, animations, modality/lifecycle gates and chat integration.",
-      "sha256": "4e086829e28a8a7232124e9db42db251b5dbc8ebfc13db6e24f009de86247353"
+      "sha256": "995562e8dc1cb05293eca766617185297663ff504b04da6a36f291ca0d89a898"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlayerUi.kt": {
       "area": "Compose UI",
       "guide": "docs/PLAYBACK.md",
       "description": "Player gestures, native track settings, seek interactions, full-player previews, chapter and SponsorBlock timeline rendering.",
-      "sha256": "83c027b6756ab6413b8c269067bb6c2a7f5bdeee991679c7fcfb1f96e7bab532"
+      "sha256": "d56f83e9a27f1e5912d10da336baac38b6eedffb12f273b206598b0e5d9e133b"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlaylistUi.kt": {
       "area": "Compose UI",
@@ -1097,13 +1098,13 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Shared search input, transient suggestions/history editor and results toolbar with removable filters.",
-      "sha256": "94ad5fe063a493eacc5310cd9b2708e3014d3be5456ffd14a958b44a9eee657b"
+      "sha256": "d5f0bbdd0da035ccd84c1f23d5f4cbdc11389bed5db39a902b478c0a7d8a0491"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt": {
       "area": "Compose UI",
       "guide": "docs/SETTINGS.md",
       "description": "Settings category routing, automatic per-field preference feedback, server confirmation and About content; integrates channel title/thumbnail rules.",
-      "sha256": "132ead860f4dfd9d247fedd9c448e5f483a77d5ba874cfdccc6c5f4b160f7dc7"
+      "sha256": "a9ca8f5d110684523bee9823943b833cee06c9bda1435f75b5f70d46f75fa8ea"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SponsorBlockUi.kt": {
       "area": "Compose UI",
@@ -1337,7 +1338,7 @@
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
       "description": "Discovery Search declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "2c94767ce5c49e5ceabf754a02092534f6fe8cd9ef6d74a92104c1e93b54b818"
+      "sha256": "de1cd6c0b66457f0c6c8ed422fa2317ed131b5809918844d7bfdb5569c22969b"
     },
     "android/app/src/test/java/net/wingress/mobivious/DisplayFormatsTest.kt": {
       "area": "JVM tests",
@@ -1625,7 +1626,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic account/content APIs and media/Range/failure responses.",
-      "sha256": "5a00297a58875ba121de5e797b0ce2ca02618a7662bf5a7c16812d280a0346d6"
+      "sha256": "530d323db4b04d77bdabe92a0ff70c3760c31547977fa2b89ee280a1c92754f4"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1637,7 +1638,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Canonical base audiovisual/DASH/HLS/caption/artwork fixtures plus codec, geometry and separate download tracks.",
-      "sha256": "d4e4323f2b436518be9f6d040885f8723b7fe8487e53384a4c799f134ce5465c"
+      "sha256": "c88da0419faa3206ee6d7c6319f03e14b1308fde92d3ac4f3c56df69a8cb3542"
     },
     "scripts/lib/android-fixture.sh": {
       "area": "Scripts",
@@ -1680,6 +1681,42 @@
       "guide": "docs/TESTING.md",
       "description": "Disposable regression checks for fixture ownership, device/port conflicts, signals, release signing and R8 mapping archival/preservation safeguards.",
       "sha256": "834dd7445f0b91e35051ef713c9505b7ee31a906c235ae67a7abac8ee3b9819a"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/data/Annotations.kt": {
+      "area": "Data and domain",
+      "guide": "docs/PLAYBACK.md",
+      "description": "Bounded archived-annotation XML parsing, occurrence-scoped loading/cancellation, timing and dismissal state.",
+      "sha256": "b290b96fe4b42a96184153b8190ac0eb33da42fb671319f9cb4decbfd21f465f"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/player/Viewing.kt": {
+      "area": "Playback and media sessions",
+      "guide": "docs/PLAYBACK.md",
+      "description": "Projection resolution, occurrence viewing state, camera bounds and tested spherical/EAC/sensor mapping.",
+      "sha256": "905a7cdcc1bea7507fdcf747f5beba90c5b77423605aebb32122d310306154d2"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/ui/AnnotationsUi.kt": {
+      "area": "Compose UI",
+      "guide": "docs/FEATURES.md",
+      "description": "Native archived annotation overlays, link/dismiss actions and annotation/viewing mode player settings.",
+      "sha256": "1e941c074f52b57aff89408f58b4125e77829ef62906ca58c3dc6a1b7fd1b49c"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/ui/ProjectionVideoSurface.kt": {
+      "area": "Compose UI",
+      "guide": "docs/PLAYBACK.md",
+      "description": "Service decoder surface projected with GLES, native captions, relative device motion and direct lifecycle cleanup.",
+      "sha256": "10c961a622a7a0b9b84e4d4e92034e1e9366c9606d971fe3fd5e861d900570b3"
+    },
+    "android/app/src/test/java/net/wingress/mobivious/AnnotationsViewingTest.kt": {
+      "area": "JVM tests",
+      "guide": "docs/TESTING.md",
+      "description": "Annotation XML safety/timing/isolation and public API limits; preference/link/projection and sensor math contracts.",
+      "sha256": "5d6d8a4b74bc274cbe3046ff289894382f463337f30ca7fdbb09d20064966fa3"
+    },
+    "android/app/src/androidTest/java/net/wingress/mobivious/AnnotationsViewingSmokeTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Decoded projection pixels, gestures, annotation interaction, clip time, defaults and lifecycle/offline device journeys.",
+      "sha256": "b3c75ad3d92c3452b5aea47bf6500c75e3025a0159a2cb0ec4592c26f7e15e80"
     }
   },
   "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md.",

@@ -43,7 +43,8 @@ An `OK` result confirms the APK matches the supplied checksum.
 - Search-focused feed bars and pull-to-refresh in Popular, Trending and Subscriptions;
   app Settings lives in You.
 - Search videos, channels and playlists together, or choose a specific result
-  type; open channel results directly in the app.
+  type; open channel results directly in the app. Filters include Movies/Shows,
+  Medium duration and eleven video features, with individually removable chips.
 - Available channel tabs for videos, Shorts, streams, podcasts, releases,
   courses, playlists, clips, community posts and related channels.
 - Native community posts with images, galleries, attachments and read-only
@@ -61,6 +62,8 @@ An `OK` result confirms the APK matches the supplied checksum.
   saved clips; cached images update immediately and tap downloads use a 250 ms limit.
 - Shared Seek interval choices of 5, 10, 20 or 30 video seconds for taps,
   accessibility, PiP and media controls; guests save per instance on the device.
+- Legacy annotation overlays and phone 360° equirectangular/EAC viewing with
+  drag, optional device motion and recenter controls.
 - Rich descriptions, clickable timestamps, manual description chapters,
   read-only video comments and recommendations.
 
