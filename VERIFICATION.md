@@ -1,5 +1,49 @@
 # Focused implementation verification
 
+## Mobivious 0.12.3 release — 16 October 2026
+
+Application source: `76b5a09` plus the version-only Android configuration change
+to **0.12.3 / code 27**, published as `v0.12.3`. Release documentation was updated
+after verification; the verified application sources remained unchanged.
+
+- `scripts/build-release.sh` passed: 418 JVM/API tests, no failures/errors/skips,
+  signed optimized release APK, and release lint (0 errors, 32 warnings).
+- `scripts/test-ui-performance.sh --record --label release-0_12_3-watch --journey watch`
+  passed its ordinary-speed optimized watch journey on Android 16
+  `emulator-5554` (Pixel_8_Pro), including fixture connection/sign-in and playing
+  media. Source drift was empty. This was a runtime smoke check, not a performance
+  measurement.
+- Direct ordinary-UI checks on `0.12.3-benchmark` passed: all five archived
+  annotation styles, individual dismissal, captions over spherical video,
+  accessible directional controls and recentering, independently generated EAC
+  video, a new occurrence's front viewpoint, and viewpoint retention after
+  mini-player and background restoration. System screenshot pixel samples
+  confirmed green front and blue right directions after decoding and rendering.
+- Optimized search UI checks passed Movies, Medium duration, simultaneous 4K/360°
+  filters and individual chip removal. Fixture logs confirmed canonical `type`,
+  `duration` and comma-separated `features` requests.
+- Package `net.wingress.mobivious`, Android 13 minimum, version/name, uncompressed
+  DEX/native entries, APK checksum and retained R8 mapping/checksums were verified.
+  Signing certificate SHA-256 is
+  `5673702abf411cf4aa9b85e2fe952a658b0611e813c9689603b47c475204ff87`, matching
+  the published 0.12.2 APK. The prior local APK also matched GitHub's asset digest.
+- APK: 7,171,083 bytes (6.84 MiB), +1.16% from 0.12.2's 7,089,159 bytes.
+  Uncompressed DEX: 6,160,680 bytes, previously 6,071,256 bytes.
+  APK SHA-256:
+  `50c992fd914733adea250d66b74de2a72ca7217dc01e64577589db0e20176f70`.
+- All 24 Python documentation/workflow regression tests and documentation
+  inventory/fingerprint/link checks passed. Git whitespace checks passed.
+
+Raw release evidence is in ignored `.tools/release-0.12.3/`; the recorded watch
+journey is in `.tools/ui-performance/release-0_12_3-watch/`. The release-key app and
+its data were preserved; UI checks used the isolated optimized benchmark package.
+The earlier 25 focused feature scenarios and sibling server checks below cover
+the feature implementation before this version-only bump. The full device suite
+was not repeated for this release. Physical-device motion accuracy and the
+existing emulator video-conversion limitation remain unverified. The backend was
+recompiling during this run, so these release checks used local fixtures and do
+not establish production server rollout or archive availability.
+
 ## Search filters, archived annotations and phone 360° viewing — 16 October 2026
 
 Source bases: Android `f313166`, sibling Invidious `be5609ad`, with the local
