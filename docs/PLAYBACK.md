@@ -87,7 +87,12 @@ SQLite; process death is not a durable queue restore feature.
 metadata. It excludes trick-play video tracks, displays resolution/fps/codec/
 bitrate/size and groups audio into Original, Stable Volume, Dubbed and Other.
 Repeated itags alone cannot establish audio identity; language/label/default/DRC
-metadata disambiguate them. The quality menu limits each height/fps group to at
+metadata disambiguate them. An explicit DASH dub role takes precedence over an
+original label; original labels from either DASH or matched API metadata take
+precedence over `audioIsDefault`. That upstream flag can identify a default dub,
+independently of the user's `preferred_audio` setting. Without explicit identity,
+the existing API default/main-role fallbacks remain in use.
+The quality menu limits each height/fps group to at
 most four representative choices without pruning the selection catalog.
 
 `VideoSelection` belongs to one occurrence and records Auto, Preset or Manual.

@@ -31,6 +31,7 @@ data class StreamChoice(val group: TrackGroup, val index: Int, val key: StreamKe
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 object StreamCatalog {
     private val qualifier = Regex("\\[\\s*\\d+(?:\\.\\d+)?k\\s*]|\\b(?:stable volume|drc|original audio|original)\\b", RegexOption.IGNORE_CASE)
+    private val originalAudio = Regex("\\boriginal\\b", RegexOption.IGNORE_CASE)
     private fun normalized(name: String) = name.replace(qualifier, " ").replace(Regex("[·|]"), " ").trim().replace(Regex("\\s+"), " ").lowercase(Locale.ROOT)
     private val audioLanguageAliases by lazy {
         (AudioPreferences.languages.map { (tag, _) ->
@@ -89,9 +90,15 @@ object StreamCatalog {
                 val name = meta?.audio?.name?.takeIf { it.isNotBlank() } ?: f.label?.takeIf { it.isNotBlank() } ?: displayLanguage
                     ?: "${if (type == C.TRACK_TYPE_AUDIO) "Audio" else "Caption"} track ${index + 1}"
                 val isStable = meta?.let(::stable) == true || Regex("stable volume|\\bdrc\\b", RegexOption.IGNORE_CASE).containsMatchIn(name)
-                val original = if (meta?.audio?.default != null) meta.audio.default == true else
-                    f.roleFlags and C.ROLE_FLAG_MAIN != 0 || Regex("\\boriginal\\b", RegexOption.IGNORE_CASE).containsMatchIn(name)
-                val knownDub = meta?.audio?.default == false || f.roleFlags and C.ROLE_FLAG_ALTERNATE != 0
+                val explicitDub = f.roleFlags and C.ROLE_FLAG_DUB != 0
+                // Upstream's default can be an auto-dub; explicit recording identity takes precedence.
+                val original = when {
+                    explicitDub -> false
+                    originalAudio.containsMatchIn(name) || originalAudio.containsMatchIn(f.label.orEmpty()) -> true
+                    meta?.audio?.default != null -> meta.audio.default == true
+                    else -> f.roleFlags and C.ROLE_FLAG_MAIN != 0
+                }
+                val knownDub = explicitDub || meta?.audio?.default == false || f.roleFlags and C.ROLE_FLAG_ALTERNATE != 0
                 val section = when { isStable -> AudioSection.STABLE; original -> AudioSection.ORIGINAL; knownDub -> AudioSection.DUBBED; else -> AudioSection.OTHER }
                 val primary = if (type == C.TRACK_TYPE_VIDEO) {
                     (if (height > 0) "${height}p${if (fps > 0) fps.roundToInt() else ""}" else "Video track ${index + 1}") + " · ${codec.ifBlank { "Unknown codec" }}"

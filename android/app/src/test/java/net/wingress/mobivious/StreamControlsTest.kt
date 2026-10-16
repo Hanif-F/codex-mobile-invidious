@@ -97,6 +97,21 @@ class StreamControlsTest {
         val choices = StreamCatalog.choices(tracks(audio(lang = "es", label = "Spanish", roles = C.ROLE_FLAG_MAIN)), C.TRACK_TYPE_AUDIO, listOf(dub))
         assertEquals(AudioSection.DUBBED, choices.single().section)
     }
+    @Test fun originalMarkerFromEitherSourceOverridesNonDefaultMetadata() {
+        for ((label, name) in listOf("Indonesian" to "Indonesian original", "Indonesian original" to "Indonesian")) {
+            val meta = metadata("140", name, false, lang = "id")
+            val choice = StreamCatalog.choices(tracks(audio(lang = "id", label = label, roles = C.ROLE_FLAG_ALTERNATE)),
+                C.TRACK_TYPE_AUDIO, listOf(meta)).single()
+            assertTrue(choice.original)
+            assertEquals(AudioSection.ORIGINAL, choice.section)
+        }
+    }
+    @Test fun explicitDubRoleOverridesDefaultMetadataWithoutAnAlternateRole() {
+        val meta = metadata("140", "English", true)
+        val choice = StreamCatalog.choices(tracks(audio(roles = C.ROLE_FLAG_DUB)), C.TRACK_TYPE_AUDIO, listOf(meta)).single()
+        assertFalse(choice.original)
+        assertEquals(AudioSection.DUBBED, choice.section)
+    }
 
     private fun videos(vararg formats: Format) = StreamCatalog.choices(tracks(*formats), C.TRACK_TYPE_VIDEO)
     private fun mixed() = videos(video("av-middle", 1080, 30f, 2_000_000, "av01"), video("h-low", 1080, 30f, 6_000_000),

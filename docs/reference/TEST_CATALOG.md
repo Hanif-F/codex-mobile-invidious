@@ -45,6 +45,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `originalsStableAndDubsIgnoreManifestOrderingAndSelectHighestBitrate`
 - `regionalChoicesAreExactAndGeneralLanguagesPreferExactBeforeRegionalTracks`
 - `duplicateItagsAreMatchedUsingLanguageProcessingAndBitrate`
+- `originalLanguageAndDubRolesOverrideConflictingUpstreamDefaults`
 - `processedDubsAreNotUsedForStableOriginalOrLanguagePreferences`
 - `unknownOriginalMetadataRetainsDefaultAndUnsupportedTracksAreExcluded`
 - `bitrateTiesRetainManifestOrderAcrossLanguageSortedMenus`
@@ -490,6 +491,8 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `originalStableDubbedAndUnlabeledAudioRemainSelectable`
 - `audioTiersAndFileSizeUseKnownValuesOnly`
 - `explicitDubMetadataTakesPrecedenceOverManifestDefaultRole`
+- `originalMarkerFromEitherSourceOverridesNonDefaultMetadata`
+- `explicitDubRoleOverridesDefaultMetadataWithoutAnAlternateRole`
 - `smallMenuGroupsRetainEveryRepresentationIncludingDuplicates`
 - `largeMenusKeepCodecExtremesWithoutPruningTheFullCatalog`
 - `equalExtremesUseOriginalOrderAndUnknownRatesDoNotBecomeLowVariants`
@@ -1249,6 +1252,7 @@ Test support/helper file; no declared `@Test` methods.
 - `savedQualityDefaultsSelectActualSupportedTracks`
 - `preferredAudioSelectsTheFirstSegmentIncludingFallbacksRegionsAndAudioOnly`
 - `progressiveAudioDisplaysItsActiveTrackWithoutAnExplicitOverride`
+- `originalAudioIgnoresAnUpstreamDefaultDubAndManualDubSurvivesRefresh`
 - `manualAudioSurvivesRefreshRetryReconnectionAndNextVideoUsesSavedDefaults`
 - `codecPreferencesReachTheFirstDashSegmentAndFallbackWithinTheResolution`
 - `codecAutoAndManualChoicesSurviveRefreshRetryAndReconnection`
@@ -1365,4 +1369,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **808 declared test methods** (including ignored tests).
+Inventory total: **812 declared test methods** (including ignored tests).

@@ -91,6 +91,32 @@ class AudioSelectionTest {
         assertEquals("en-US.10", policy("original_stable").fixed(all)?.audioTrackId)
         assertEquals("en-US.4", policy("original").fixed(all)?.audioTrackId)
     }
+    @Test fun originalLanguageAndDubRolesOverrideConflictingUpstreamDefaults() {
+        // gzUjw3jNB88: the upstream default is the English dub, not the original recording.
+        val formats = listOf(
+            StreamFormat("140", "audio/mp4", "mp4a.40.2", 0, 0, 0f, 131338, 0, AudioIdentity("en-US.10", "English (US)", true), false),
+            StreamFormat("140", "audio/mp4", "mp4a.40.2", 0, 0, 0f, 131284, 0, AudioIdentity("id.4", "Indonesian original", false), true),
+            StreamFormat("140", "audio/mp4", "mp4a.40.2", 0, 0, 0f, 131284, 0, AudioIdentity("id.4", "Indonesian original", false), false))
+        val english = audio("140-en-US.10", "en-US", "English (US)", 131338, C.ROLE_FLAG_ALTERNATE or C.ROLE_FLAG_DUB)
+        val indonesian = audio("140-id.4", "id", "Indonesian original", 131284)
+        val processed = audio("140-id.4-drc", "id", "Indonesian original (Stable Volume)", 131284)
+        for (metadata in listOf(formats, emptyList())) {
+            for (inputs in listOf(listOf(english, processed, indonesian), listOf(indonesian, english, processed))) {
+                val all = choices(*inputs.toTypedArray(), metadata = metadata)
+                val dubChoice = all.single { it.key.id == english.id }
+                assertEquals(AudioSection.DUBBED, dubChoice.section)
+                assertFalse(dubChoice.original)
+                assertEquals(AudioSection.ORIGINAL, all.single { it.key.id == indonesian.id }.section)
+                assertEquals(AudioSection.STABLE, all.single { it.key.id == processed.id }.section)
+                assertEquals(indonesian.id, policy("original").fixed(all)?.key?.id)
+                assertEquals(processed.id, policy("original_stable").fixed(all)?.key?.id)
+                assertEquals(english.id, policy("en-US").fixed(all)?.key?.id)
+                assertEquals(indonesian.id, policy("fr").fixed(all)?.key?.id)
+                assertEquals(english.id, policy("original").select(dubChoice).fixed(all.reversed())?.key?.id)
+                assertEquals(indonesian.id, policy("original_stable").fixed(all.filterNot { it.stable })?.key?.id)
+            }
+        }
+    }
     @Test fun processedDubsAreNotUsedForStableOriginalOrLanguagePreferences() {
         val processedDub = audio("dub", "id", "Indonesian Stable Volume", roles = C.ROLE_FLAG_ALTERNATE)
         assertEquals("original", policy("original_stable").fixed(choices(original, processedDub))?.key?.id)

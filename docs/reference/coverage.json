@@ -388,7 +388,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Stream Controls Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "198be3a21c43c22116f07c28bd65e28577e60826c029bdb13b40ff125a32fe9e"
+      "sha256": "2c9eb37207159f7004c6887da3daf6660f32af645ac1086e669edc797fd7ebd7"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionJourneyTest.kt": {
       "area": "Android device tests",
@@ -778,7 +778,7 @@
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "Supported representation identity, API metadata matching, audio grouping, menu pruning and codec/quality selection.",
-      "sha256": "1e385bf19ba59a5217ebd2d86d1b0baba0e7eb7de879a0a1e6cf412847d50212"
+      "sha256": "76ae00fbe902e68dc7624583952d45f4dc153d2031b276a8b63196971c28c105"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/VideoGeometry.kt": {
       "area": "Playback",
@@ -1186,7 +1186,7 @@
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
       "description": "Preferred-audio parsing, API patches, regional matching, original/DRC fallback and manual restoration scenarios.",
-      "sha256": "becc200947441c4c57c67f614a9ca9cb0ecdb42b5aa804a7543b57c11327a1c8"
+      "sha256": "241a2fb74bce910c2f2bb9209896ff480040aaabbe1a083e9a04b3cfa9da49f1"
     },
     "android/app/src/test/java/net/wingress/mobivious/AvatarsTest.kt": {
       "area": "JVM tests",
@@ -1354,7 +1354,7 @@
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
       "description": "Stream Controls declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "370978a22f7b9be3f6b8b2dae944fe63ae5a40f4a956afddfc853a69657d4178"
+      "sha256": "514fa7bf2a5272aa3c6520d565a1daee2791a9f39e23537df1dcbcac6b687ecc"
     },
     "android/app/src/test/java/net/wingress/mobivious/SubscriptionsTest.kt": {
       "area": "JVM tests",
@@ -1540,7 +1540,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic account/content APIs and media/Range/failure responses.",
-      "sha256": "b49cd6c3b7e508e26f4b64b64a51dc3f978a0697fd35b82be0f6449ae2604e44"
+      "sha256": "4b0e5e613df908aeec56ccdaf11a230f255613b7cd8a32e197a14ca81bd47433"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1552,7 +1552,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Canonical base audiovisual/DASH/HLS/caption/artwork fixtures plus codec, geometry and separate download tracks.",
-      "sha256": "462c56692a1f271aff597c47957c14529b0d6b052b8f03808b5df7e088047391"
+      "sha256": "d4e4323f2b436518be9f6d040885f8723b7fe8487e53384a4c799f134ce5465c"
     },
     "scripts/lib/android-fixture.sh": {
       "area": "Scripts",

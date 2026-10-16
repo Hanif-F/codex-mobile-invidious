@@ -200,6 +200,30 @@ class StreamControlsSmokeTest {
         assertNull(selected(C.TRACK_TYPE_AUDIO))
         assertAudioMenuShowsActiveTrack()
     }
+    @Test fun originalAudioIgnoresAnUpstreamDefaultDubAndManualDubSurvivesRefresh() {
+        for ((preference, expected) in listOf("original" to "4", "original_stable" to "6", "en-US" to "7")) {
+            audioStart(preference, "rich-original-conflict")
+            assertEquals(preference, expected, firstAudioSegment())
+            val playback = activity.model.playback.value
+            val choices = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, playback.details!!.formats)
+            assertEquals(setOf(AudioSection.ORIGINAL), choices.filter { it.language == "id" && !it.stable }.map { it.section }.toSet())
+            assertEquals(AudioSection.STABLE, choices.single { it.stable }.section)
+            val english = choices.single { it.language == "en-us" }
+            assertEquals(AudioSection.DUBBED, english.section)
+            assertFalse(english.original)
+            assertAudioMenuShowsActiveTrack(if (preference == "original") "indonesian-original-default" else null)
+            if (preference == "original") {
+                compose.runOnUiThread { activity.model.selectTrack(english.group, english.index) }
+                until { selected(C.TRACK_TYPE_AUDIO)?.key == english.key }
+                compose.runOnUiThread { activity.model.refreshBuffer() }
+                until { !activity.model.playback.value.loading && activity.model.playback.value.playerState == Player.STATE_READY &&
+                    selected(C.TRACK_TYPE_AUDIO)?.key == english.key }
+                assertEquals("original", activity.model.playback.value.audioSelection.preference)
+                assertNotNull(activity.model.playback.value.audioSelection.manual)
+                assertAudioMenuShowsActiveTrack()
+            }
+        }
+    }
     @Test fun manualAudioSurvivesRefreshRetryReconnectionAndNextVideoUsesSavedDefaults() {
         audioStart("es")
         val stable = StreamCatalog.choices(activity.model.playback.value.tracks, C.TRACK_TYPE_AUDIO,

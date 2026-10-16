@@ -148,7 +148,7 @@ def generate_audio_variants():
         for child in reversed(descriptors):
             group.remove(child); group.insert(0, child)
     base.write(directory / 'dash.mpd', encoding='utf-8', xml_declaration=True)
-    for variant in ('no-stable', 'regional'):
+    for variant in ('no-stable', 'regional', 'original-conflict'):
         tree = ET.parse(directory / 'dash.mpd')
         for period in tree.findall(f'.//{{{ns}}}Period'):
             for group in period.findall(f'{{{ns}}}AdaptationSet[@contentType="audio"]'):
@@ -158,6 +158,16 @@ def generate_audio_variants():
                 if variant == 'regional' and group.get('lang') == 'es':
                     group.set('lang', 'pt-BR')
                     label.text = 'Portuguese (Brazil)'
+                if variant == 'original-conflict':
+                    if group.get('lang') == 'en':
+                        group.set('lang', 'id')
+                        label.text = 'Indonesian original' + (' (Stable Volume)' if 'Stable Volume' in label.text else '')
+                    else:
+                        group.set('lang', 'en-US')
+                        label.text = 'English (US)'
+                        role = group.find(f'{{{ns}}}Role')
+                        group.insert(list(group).index(role) + 1, ET.Element(f'{{{ns}}}Role',
+                            {'schemeIdUri': 'urn:mpeg:dash:role:2011', 'value': 'dub'}))
         tree.write(directory / f'{variant}.mpd', encoding='utf-8', xml_declaration=True)
 
 
