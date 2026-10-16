@@ -106,6 +106,10 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore, 
     @Synchronized fun chatAppearance(value: ChatAppearance, context: ApiContext = positionContext()) {
         current(context); profiles.write(context, "chat.appearance", value.bounded().json().toString())
     }
+    fun captionAppearance(context: ApiContext = positionContext()) = CaptionAppearance.parse(profiles.value(context, "caption.appearance") as? String)
+    @Synchronized fun captionAppearance(value: CaptionAppearance, context: ApiContext = positionContext()) {
+        current(context); profiles.write(context, "caption.appearance", value.normalized().json().toString())
+    }
     fun chatTiming(videoId: String, context: ApiContext): Int = (profiles.value(context, "chat.timing." + videoId) as? Int)?.takeIf { it in -3_600_000..3_600_000 } ?: 0
     @Synchronized fun chatTiming(videoId: String, value: Int, context: ApiContext) {
         current(context); require(context.account == null && SponsorBlockRules.validVideo(videoId) && value in -3_600_000..3_600_000)

@@ -102,6 +102,17 @@ class DocumentationTest(unittest.TestCase):
         self.assertIn('| **Total** | **2** |', report)
         self.assertIn('all 5 repository Markdown documents', report)
 
+    def test_registered_historical_snapshot_keeps_original_broken_links(self):
+        snapshot = self.root / 'FEATURE_PARITY.md'
+        original = b'[Historical verification](VERIFICATION.md)\n'
+        snapshot.write_bytes(original)
+        manifest = json.loads(self.manifest.read_text())
+        manifest['documents'].append('FEATURE_PARITY.md')
+        manifest['historicalDocuments'] = ['FEATURE_PARITY.md']
+        self.manifest.write_text(json.dumps(manifest))
+        self.assertEqual(0, self.run_checker(refresh=True)[0])
+        self.assertEqual(original, snapshot.read_bytes())
+
 
 if __name__ == '__main__':
     unittest.main()

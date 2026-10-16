@@ -68,6 +68,14 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `existingApiResponsesNeedNoAvatarMetadataRequests`
 - `imageClientNeverFollowsRedirectsOrSendsCredentials`
 
+### CaptionAppearanceTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/CaptionAppearanceTest.kt) — Caption appearance serialization, supported choices, corruption defaults and profile storage failure/isolation.
+
+- `defaultsAndEverySupportedChoiceRoundTrip`
+- `corruptAndUnsupportedValuesRestoreSafeDefaults`
+- `profilesKeepStylesAcrossRecreationAndFailedWritesDoNotReplaceThem`
+
 ### ChannelSpoilersTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/ChannelSpoilersTest.kt) — Channel rule normalization, expiry, sparse changes, lookup isolation and reveal state tests.
@@ -597,6 +605,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/ui/PreferenceSaveControllerTest.kt) — Automatic-save ordering, newer intent preservation, debounce, retry/revert and context isolation.
 
+- `rapidCaptionEditsAndResetKeepTheLatestWholeStyleAndRetryTheFailedSave`
 - `slowResponseNeverOverwritesNewerIntentAndIndependentFieldsRemainOrdered`
 - `failuresKeepIntentRetryUsesLatestAndRevertDoesNotWrite`
 - `invalidTextNeverReachesSinkAndBlurOrBackgroundFlushesValidDebounce`
@@ -724,6 +733,24 @@ Test support/helper file; no declared `@Test` methods.
 - `commentsRepliesAndCreatorHeartsDisplayAvatars`
 - `subscriptionsHistoryAndPlaylistCreatorsUseExistingPayloads`
 - `thinModeMakesNoAvatarRequestsAndFailuresKeepAuthorsUsable`
+
+### CaptionAppearancePresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CaptionAppearancePresentationTest.kt) — Native caption text/background/window pixels, transparent reset and large RTL multiline preview.
+
+- `explicitColorsAndWindowsRenderAndResetRemovesTheBoxes`
+- `transparentTextAndLargeRtlMultilinePreviewRemainUsable`
+
+### CaptionsSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CaptionsSmokeTest.kt) — Decoded caption cues and painted text, selection, gaps, reload/recreation, shared editing, failures, fullscreen and offline playback.
+
+- `decodedCaptionsPaintAndSurviveLanguageOffGapsRefreshRetryAndRecreation`
+- `appearanceEditorIsSharedAndChangesPreservePlaybackAndSelection`
+- `networkErrorsAreReportedForCaptionsAndRetryRecovers`
+- `hlsProgressiveFullscreenAndOfflineUseTheSameVisibleStyle`
+- `miniPlayerAndPipRetainCaptionCuesAndAppearance`
+- `clipPreviewInheritsSelectedLanguageAndUsesTheSharedStyle`
 
 ### ChannelControlsPresentationTest
 
@@ -1369,4 +1396,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **812 declared test methods** (including ignored tests).
+Inventory total: **824 declared test methods** (including ignored tests).

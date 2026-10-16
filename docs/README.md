@@ -5,6 +5,8 @@ The current guides describe the opaque Material 3 implementation in this working
 tree. Current release version is **0.12.2**, code **26**.
 The [testing guide](TESTING.md) defines repeatable validation; the
 [cleanup report](CLEANUP.md) records the latest audit results and known failures.
+The recovered [feature parity checklist](../FEATURE_PARITY.md) is an unchanged
+9 October historical snapshot; its original links and status counts are retained.
 
 ## Start here
 

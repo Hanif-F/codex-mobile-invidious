@@ -275,6 +275,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable private fun ClipPreview(vm: AppViewModel, editor: ClipEditorState) {
+    val appearance = rememberCaptionAppearance(vm)
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val keyboard = LocalSoftwareKeyboardController.current
@@ -304,6 +305,11 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
         delay(120)
         val details = editor.details ?: return@LaunchedEffect
         val server = editor.context?.server ?: return@LaunchedEffect
+        val currentText = vm.controller.value?.trackSelectionParameters
+        val preferredCaption = PreferenceRules.caption(vm.preferences.value.captions, details.captions)
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, currentText?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) ?: (preferredCaption == null))
+            .setPreferredTextLanguage(currentText?.preferredTextLanguages?.firstOrNull() ?: preferredCaption?.language).build()
         val local = vm.queue.value.effective(vm.preferences.value).local
         val raw = details.hls.ifBlank { details.dash }.ifBlank { details.fallback }.ifBlank { "/api/manifest/dash/id/${details.video.id}?local=$local" }
         val uri = resolved(server, raw)
@@ -319,7 +325,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             AndroidView(factory = { (LayoutInflater.from(it).inflate(R.layout.clip_preview, android.widget.FrameLayout(it), false) as PlayerView).apply {
                 removeBlackUiBackgrounds()
                 this.player = player; setShowNextButton(false); setShowPreviousButton(false)
-            } }, update = { it.player = player }, modifier = Modifier.fillMaxWidth().height(minOf(maxWidth * 9 / 16, 210.dp))
+            } }, update = { it.player = player; it.subtitleView?.applyCaptionAppearance(appearance) }, modifier = Modifier.fillMaxWidth().height(minOf(maxWidth * 9 / 16, 210.dp))
                 .clip(RoundedCornerShape(12.dp)).testTag("clip-preview"))
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

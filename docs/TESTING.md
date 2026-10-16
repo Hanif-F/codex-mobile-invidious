@@ -22,6 +22,24 @@ connected suite is not yet green.
 
 ## Build and unit/static checks
 
+Caption appearance acceptance on 16 October 2026 passed 403 JVM tests, nine
+focused Android 16 emulator cases, app/test APK builds and debug lint. Run the
+`CaptionsSmokeTest`, `CaptionAppearancePresentationTest` and existing
+`AppFoundationTest#nativeCaptionsIgnoreBlackCueWindowsAndBackgroundSpans` cases
+through the fixture runner below. Coverage includes decoded cues and visible
+pixels, an on/off comparison against the same paused video frame, languages,
+normal cue gaps, failures/retry, recreation, both editor entry points/reset,
+HLS/progressive/offline playback, fullscreen, mini-player, system PiP and clip
+preview. Native presentation cases verify explicit backgrounds/windows,
+transparency and large RTL/multiline text. Captures are under
+`/data/local/tmp/mobivious-ui/caption-*.png` on the emulator.
+
+The sibling server passed 19 focused specs, its isolated production caption-route
+harness, a linked GUI build and an API-only compile check. The live public
+caption API returned header-only VTT before deployment, while its Companion
+returned timed English/Indonesian cues. Server deployment remains necessary for
+live-instance recovery; local fixture acceptance does not establish deployment.
+
 From the repository root, with JDK and SDK paths appropriate to the host:
 
 ```sh

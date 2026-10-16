@@ -192,6 +192,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val comments = commentController.state
     val preferences = MutableStateFlow(store.initialPreferences())
     val chatAppearance = MutableStateFlow(store.chatAppearance())
+    val captionAppearance = MutableStateFlow(store.captionAppearance())
+    val captionFailure = app.captionFailure
     private val chatController = ChatReplayController(viewModelScope, api::context, api::chatReplay,
         { id, ctx -> if (ctx.account == null) store.chatTiming(id, ctx) else api.chatTiming(id, ctx) },
         { id, offset, ctx -> if (ctx.account == null) store.chatTiming(id, offset, ctx) else api.chatTiming(id, offset, ctx) }, ::friendly)
@@ -256,6 +258,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     "device:accent" -> store.accentPreset(AccentPreset.saved(patch.getString("value")))
                     "profile:background" -> store.background(patch.getBoolean("value"),edit.context)
                     "profile:pip" -> store.pip(patch.getBoolean("value"),edit.context)
+                    CaptionAppearance.SAVE_KEY -> {
+                        val value = CaptionAppearance.parse(patch.getJSONObject("value"))
+                        store.captionAppearance(value, edit.context)
+                        if (api.context() == edit.context) captionAppearance.value = value
+                    }
                     "profile:searchVisibility" -> {
                         val value = SearchVisibility.parse(patch.getJSONObject("value"))
                         store.saveSearchVisibility(edit.context,value); searchVisibility.value=value
@@ -546,6 +553,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             preferencesContext = if (it == null) api.context() else null
             preferences.value = store.initialPreferences()
             chatAppearanceContext = api.context(); chatAppearance.value = store.chatAppearance(chatAppearanceContext)
+            captionAppearance.value = store.captionAppearance(api.context())
             if (it != null) refreshAccount() else playlists.value = emptyList()
             refresh()
         } }
@@ -1570,6 +1578,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         return true
     }
+    fun setCaptionAppearance(value: CaptionAppearance, context: ApiContext = api.context()) {
+        requestLocalPreference(CaptionAppearance.SAVE_KEY, CaptionAppearance.PAGE, captionAppearance.value.json(), value.normalized().json(), context)
+    }
+    internal fun requestedCaptionAppearance() = CaptionAppearance.parse(
+        localPreferenceValue(CaptionAppearance.SAVE_KEY, captionAppearance.value.json()) as JSONObject)
     suspend fun saveChatGeometry(value: ChatAppearance, context: ApiContext) = preferenceWrites.withLock {
         if (context != api.context()) throw CancellationException("Account or instance changed")
         val saved = chatAppearance.value.copy(x=value.x,y=value.y,width=value.width,height=value.height).bounded()

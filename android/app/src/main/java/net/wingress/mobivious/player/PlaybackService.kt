@@ -88,6 +88,28 @@ class PlaybackService : MediaSessionService() {
             setWakeMode(PowerManager.PARTIAL_WAKE_LOCK)
         }
         queue = QueueCoordinator(app, player, trackSelector, scope) { persist() }
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            private fun subtitle(info: androidx.media3.exoplayer.source.LoadEventInfo) = player.currentMediaItem?.localConfiguration
+                ?.subtitleConfigurations?.firstOrNull { it.uri == info.uri || it.uri == info.dataSpec.uri }
+            private fun occurrence(event: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime): String? =
+                if (event.windowIndex in 0 until event.timeline.windowCount) event.timeline.getWindow(event.windowIndex, androidx.media3.common.Timeline.Window())
+                    .mediaItem.mediaMetadata.extras?.getString("occurrence") else null
+            override fun onLoadError(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo, mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
+                error: java.io.IOException, wasCanceled: Boolean) {
+                if (wasCanceled) return
+                val track = subtitle(loadEventInfo) ?: return
+                val key = occurrence(eventTime) ?: return
+                if (key != app.playbackQueue.value.currentKey) return
+                app.captionFailure.value = CaptionLoadFailure(key, track.uri.toString(), track.language, track.label,
+                    "Captions could not be loaded. Try another track or retry.")
+            }
+            override fun onLoadCompleted(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo, mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData) {
+                val track = subtitle(loadEventInfo) ?: return
+                if (occurrence(eventTime) == app.captionFailure.value?.occurrence && track.uri.toString() == app.captionFailure.value?.uri) app.captionFailure.value = null
+            }
+        })
         sessionPlayer = QueueSessionPlayer(player, queue) { app.playbackQueue.value }
         queue.changed = { sessionPlayer.refresh() }
         session = MediaSession.Builder(this, sessionPlayer)
@@ -128,6 +150,7 @@ class PlaybackService : MediaSessionService() {
                 val metadataOnly = current?.mediaMetadata?.extras?.getString("occurrence") == mediaItem?.mediaMetadata?.extras?.getString("occurrence") && current?.mediaId == mediaItem?.mediaId && mediaItem?.mediaMetadata?.extras?.getBoolean("dearrowMetadataOnly") == true && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
                 current = mediaItem
                 if (metadataOnly) return
+                app.captionFailure.value = null
                 owner = app.store.account.value
                 ownerContext = app.api.context()
                 history = mediaItem?.mediaMetadata?.extras?.getBoolean("history") ?: false

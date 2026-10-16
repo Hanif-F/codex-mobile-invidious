@@ -106,6 +106,16 @@ properties instead of retaining stale TrackGroup objects. Reload restores keys
 when available; missing manual video falls back to captured defaults. The selector
 applies capability/codec decisions before the first DASH video segment request.
 Text overrides are reapplied after tracks become ready; caption Off disables text.
+Subtitle load failures are scoped to the current occurrence and track and shown
+in the Captions menu with Retry captions; normal gaps between cues are not errors.
+Standalone VTT tracks retain stable URL identities across refresh/retry.
+
+`CaptionAppearance` is profile-local. The watch, fullscreen, mini-player, PiP,
+offline player and clip preview use the same native SubtitleView style adapter.
+Size scales with the player viewport. Embedded styles/font sizes cannot override
+the selected appearance; default backgrounds stay transparent, while explicitly
+chosen background/window colors and opacity are honored. Device-default font,
+foreground and edge settings retain the previous Android caption treatment.
 Online speed changes update the shared/guest default; offline speed changes do not.
 
 `AudioSelection` captures `preferred_audio` per online occurrence. Original selects

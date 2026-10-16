@@ -164,7 +164,7 @@ internal fun VideoPlayer(
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
         if (playback.videoEnabled || presentation != PlayerPresentation.MINI) PlaybackVideoSurface(playback, controller,
-            Modifier.fillMaxSize())
+            Modifier.fillMaxSize(), rememberCaptionAppearance(vm))
         else playback.details?.video?.let { video ->
             ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), playbackOccurrence = spoilerQueue.currentKey, offline = playback.downloadId != null) {
             coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
@@ -370,6 +370,7 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
     var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
@@ -382,23 +383,24 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
     val selectedAudio = audio.firstOrNull { it.selected && it.explicitlySelected(selection) }
         ?: audio.firstOrNull { it.selected }
     val selectedCaption = if (selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) == true) null else captions.firstOrNull { it.selected }
+    val captionFailure by vm.captionFailure.collectAsStateWithLifecycle()
     val qualityAuto = playback.videoSelection.mode == net.wingress.mobivious.player.VideoSelectionMode.AUTO
     val selectedVideo = if (qualityAuto) null else playback.videoSelection.fixed(video)
     val available = !playback.loading && playback.canSelectTracks
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // Handle system Back in the sheet's dialog before the watch screen's handler.
-    fun back() { if (page == "Player settings") dismiss() else page = "Player settings" }
+    fun back() { when (page) { "Player settings" -> dismiss(); "Caption appearance" -> page = "Captions"; else -> page = "Player settings" } }
     AppModalSheet(onDismissRequest = dismiss, sheetState = sheetState) {
         BackHandler { back() }
         PanelSurface(Modifier.fillMaxWidth()) {
             WatchPanelToolbar(page, "Close player settings", dismiss,
-                backLabel = "Back to player settings", back = if (page != "Player settings") ({ page = "Player settings" }) else null)
+                backLabel = if (page == "Caption appearance") "Back to captions" else "Back to player settings", back = if (page != "Player settings") ({ back() }) else null)
             Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
                 .testTag("player-settings-list").padding(vertical = 8.dp)) {
                 if (page == "Player settings") {
                     run { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
                     run { SettingRow("Audio", selectedAudio?.primary ?: "Unavailable", available && audio.isNotEmpty()) { page = "Audio" } }
-                    run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", available && captions.isNotEmpty()) { page = "Captions" } }
+                    run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off") { page = "Captions" } }
                     run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
                     run {
                         Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -428,9 +430,23 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                         }
                     }
                     "Captions" -> {
+                        run { SettingRow("Caption appearance") { page = "Caption appearance" } }
+                        captionFailure?.takeIf { failure ->
+                            val selected = selectedCaption?.let { it.group.getFormat(it.index) }
+                            failure.occurrence == vm.queue.value.currentKey && selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) != true &&
+                                if (selected == null) failure.language in selection?.preferredTextLanguages.orEmpty()
+                                else failure.language == selected.language && failure.label == selected.label
+                        }?.let { failure ->
+                            Column(Modifier.padding(16.dp).testTag("caption-load-error")) {
+                                Text(failure.message, color = MaterialTheme.colorScheme.error)
+                                TextButton(onClick = { vm.retryPlayback() }, enabled = !playback.loading) { Text("Retry captions") }
+                            }
+                        }
+                        if (captions.isEmpty()) Text("No caption tracks available for this video.", Modifier.padding(16.dp))
                         run { SettingChoice("Off", selectedCaption == null, available) { vm.captions(null); page = "Player settings" } }
                         captions.forEach { track -> SettingChoice(track.label, track == selectedCaption, available) { vm.selectTrack(track.group, track.index); page = "Player settings" } }
                     }
+                    "Caption appearance" -> Box(Modifier.padding(horizontal = 16.dp)) { CaptionAppearanceEditor(vm) }
                 }
             }
         }

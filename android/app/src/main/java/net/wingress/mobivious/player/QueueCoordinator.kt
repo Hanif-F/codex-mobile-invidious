@@ -283,7 +283,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             .setSubtitleConfigurations(details.captions.map { track ->
                 val captionUrl = resolve(track.url).toHttpUrlOrNull()?.newBuilder()?.apply { entry.linkPlayback?.options?.region?.let { setQueryParameter("region", it) } }?.build()?.toString().orEmpty()
                 MediaItem.SubtitleConfiguration.Builder(Uri.parse(captionUrl))
-                .setMimeType(MimeTypes.TEXT_VTT).setLanguage(track.language).setLabel(track.label).setSelectionFlags(if (track == caption) C.SELECTION_FLAG_DEFAULT else 0).build() }).build()
+                .setId(track.url).setMimeType(MimeTypes.TEXT_VTT).setLanguage(track.language).setLabel(track.label).setSelectionFlags(if (track == caption) C.SELECTION_FLAG_DEFAULT else 0).build() }).build()
         val clippedItem = entry.clip?.let { clip -> item.buildUpon().setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
             .setStartPositionMs(clip.startMs).setEndPositionMs(clip.endMs).build()).build() } ?: item
         val snapshot = selection

@@ -3,7 +3,6 @@ package net.wingress.mobivious.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import android.view.accessibility.CaptioningManager
 import android.widget.TextView
 import android.graphics.Color as AndroidColor
 import androidx.compose.ui.Modifier
@@ -15,7 +14,7 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.CaptionStyleCompat
+import net.wingress.mobivious.data.CaptionAppearance
 
 internal val PlaybackState.videoEnabled: Boolean
     get() = C.TRACK_TYPE_VIDEO !in selection?.disabledTrackTypes.orEmpty()
@@ -29,17 +28,7 @@ internal fun PlaybackState.keepVideoScreenOn(visible: Boolean): Boolean =
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 internal fun PlayerView.removeBlackUiBackgrounds() {
     setShutterBackgroundColor(AndroidColor.BLACK)
-    val preferred = context.getSystemService(CaptioningManager::class.java)?.userStyle
-        ?.let(CaptionStyleCompat::createFromCaptionStyle) ?: CaptionStyleCompat.DEFAULT
-    subtitleView?.apply {
-        setStyle(CaptionStyleCompat(preferred.foregroundColor, AndroidColor.TRANSPARENT,
-            AndroidColor.TRANSPARENT,
-            if (preferred.edgeType == CaptionStyleCompat.EDGE_TYPE_NONE) CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW else preferred.edgeType,
-            if (preferred.edgeType == CaptionStyleCompat.EDGE_TYPE_NONE) AndroidColor.BLACK else preferred.edgeColor,
-            preferred.typeface))
-        // Embedded cue windows and background spans must not reintroduce text boxes.
-        setApplyEmbeddedStyles(false)
-    }
+    subtitleView?.applyCaptionAppearance(CaptionAppearance())
     findViewById<TextView>(androidx.media3.ui.R.id.exo_error_message)?.apply {
         setBackgroundColor(AndroidColor.TRANSPARENT)
         setShadowLayer(3f, 0f, 1f, AndroidColor.BLACK)
@@ -49,7 +38,7 @@ internal fun PlayerView.removeBlackUiBackgrounds() {
 /** Every visible player uses the service's controller; changing layouts only changes its surface. */
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaController?, modifier: Modifier) {
+internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaController?, modifier: Modifier, appearance: CaptionAppearance = CaptionAppearance()) {
     // PiP stays STARTED even though the activity is no longer RESUMED.
     val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val keepAwake = controller != null && playback.keepVideoScreenOn(lifecycleState.isAtLeast(Lifecycle.State.STARTED))
@@ -65,6 +54,7 @@ internal fun PlaybackVideoSurface(playback: PlaybackState, controller: MediaCont
         },
         update = {
             it.player = controller
+            it.subtitleView?.applyCaptionAppearance(appearance)
             it.keepScreenOn = keepAwake
         },
         onRelease = {

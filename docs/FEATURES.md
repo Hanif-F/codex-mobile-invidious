@@ -77,6 +77,10 @@ and PiP do not request previews.
 
 Player settings offer supported Quality, Audio and Caption tracks, speed from
 0.25× to 2×, Audio only, Picture in picture and Refresh buffer.
+The Captions menu and Settings → Playback share a caption appearance editor with
+a native preview, text size, font, text/background/window colors and opacity,
+edge styles and reset. Styling saves per profile and instance on this device,
+applies immediately, and does not change the selected caption language.
 Quality can be adaptive Auto or a specific stream. Audio groups distinguish
 Original Audio, Stable Volume, Dubbed Audio and other tracks when metadata permits.
 Options reflect decoder-supported tracks; unavailable choices are disabled.

@@ -31,6 +31,7 @@ class MobiviousApplication : Application() {
     val offline = MutableStateFlow(false)
     val playbackQueue = MutableStateFlow(PlaybackQueueSnapshot())
     val playbackContext = MutableStateFlow<ApiContext?>(null)
+    val captionFailure = MutableStateFlow<net.wingress.mobivious.player.CaptionLoadFailure?>(null)
     internal val storyboardImages by lazy { net.wingress.mobivious.ui.StoryboardImages(this) }
     val storyboards by lazy { net.wingress.mobivious.data.StoryboardRepository(api::storyboard) }
     override fun onCreate() {

@@ -25,7 +25,7 @@ internal object DownloadPlayback {
             require(file.isFile && file.length() > 0) { "The downloaded file is missing. Retry the download." }
             val item = MediaItem.Builder().setMediaId(details.video.id).setUri(Uri.fromFile(file)).setMimeType(asset.choice.mime).setMediaMetadata(metadata)
             if (index == 0) item.setSubtitleConfigurations(details.captions.map { caption ->
-                MediaItem.SubtitleConfiguration.Builder(Uri.parse(caption.url)).setMimeType(MimeTypes.TEXT_VTT).setLanguage(caption.language).setLabel(caption.label).build()
+                MediaItem.SubtitleConfiguration.Builder(Uri.parse(caption.url)).setId(caption.url).setMimeType(MimeTypes.TEXT_VTT).setLanguage(caption.language).setLabel(caption.label).build()
             })
             factory.createMediaSource(item.build())
         }

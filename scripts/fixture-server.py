@@ -346,6 +346,11 @@ class Handler(BaseHTTPRequestHandler):
         p = url.path
         if not p.startswith('/test/'):
             state['allRequests'].append(dict(method='GET', path=self.path))
+        if p.startswith('/caption-fixture/'):
+            if state.get('captionFail'): return self.respond(dict(error='Captions unavailable upstream'), 502)
+            language = p.rsplit('/', 1)[-1].removesuffix('.vtt')
+            text = 'ENGLISH CAPTION' if language == 'en' else 'KETERANGAN INDONESIA'
+            return self.xml(f'WEBVTT\n\n00:00.000 --> 00:20.000\n{text}\nSecond line\n\n00:40.000 --> 02:00.000\n{text}\nSecond line\n', content_type='text/vtt')
         if p in ('/api/v1/ai/status', '/api/v1/ai/channels'):
             if state['aiMissing']: return self.respond(dict(error='Not found'), 404)
             params = parse_qs(url.query)
@@ -633,7 +638,9 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(**selected, **info,
                               dashUrl='' if state['stream'] == 'mp4' else dash, formatStreams=[dict(url='/media/fixture.mp4', type='video/mp4', quality='medium')] if state['stream'] == 'mp4' else [],
                               adaptiveFormats=formats,
-                              hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '', captions=[dict(label='English', language_code='en', url='/media/captions.vtt')],
+                              hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '',
+                              captions=([dict(label=label, language_code=lang, url=f'/caption-fixture/{lang}.vtt') for label, lang in [('English', 'en'), ('Indonesian', 'id')]]
+                                        if state.get('captionFixture') else [dict(label='English', language_code='en', url='/media/captions.vtt')]),
                               recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
                                                  if state['duplicateRecommendations'] else browse_videos() if state.get('performance') else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
                               liveNow=state['liveNow'], isMember=state['memberCurrent'], liveChatReplay=state['chatReplay']))
@@ -852,7 +859,7 @@ class Handler(BaseHTTPRequestHandler):
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,
                          downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='',
                          downloadEndpointsMissing=False, downloadDuration=12, allRequests=[], performance=False,
-                         performancePatchDelay=0, performanceFailPatchNext=False, mediaFail=False)
+                         performancePatchDelay=0, performanceFailPatchNext=False, mediaFail=False, captionFixture=False, captionFail=False)
             prefs.clear()
             prefs.update(default_prefs)
             reset_sponsorblock()
@@ -974,6 +981,9 @@ class Handler(BaseHTTPRequestHandler):
             state['mediaFail'] = bool(data.get('mediaFail',False))
             state['videoFailNext'] = bool(data.get('failNext', False))
             if 'duplicateRecommendations' in data: state['duplicateRecommendations'] = bool(data['duplicateRecommendations'])
+            return self.respond({})
+        if p == '/test/captions':
+            state.update(captionFixture=True, captionFail=bool(data.get('fail', False)))
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
         state['events'].append(dict(method=self.command, path=p))

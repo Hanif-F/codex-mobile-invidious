@@ -159,8 +159,9 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
     Box(modifier.fillMaxSize().testTag("settings-category")) {
         LazyColumn(Modifier.fillMaxSize().testTag("settings-list"), contentPadding = PaddingValues(start = AppTokens.inset, end = AppTokens.inset,
             top = LocalSettingsTopInset.current + 16.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item { AppSection { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+            if (page != CaptionAppearance.PAGE) item { AppSection { Text(if (account != null) "Preferences are shared with your Invidious account on the website." else "Preferences are saved on this device for this instance.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
             when (page) {
+                "Caption appearance" -> item { AppSection { CaptionAppearanceEditor(vm) } }
                 "AI channel filter" -> {
                     item { AppSection {
                         Column(Modifier.testTag("ai-filter-master")) {
@@ -222,6 +223,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                                 update(value.copy(captions = languages))
                             }
                         }
+                        ActionRow("Caption appearance", detail = "Size, colors, opacity, fonts and edges") { navigate("Caption appearance") }
                     } }
                 }
                 "Appearance" -> item { AppSection {

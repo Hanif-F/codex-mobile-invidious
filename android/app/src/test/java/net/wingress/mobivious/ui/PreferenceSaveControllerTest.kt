@@ -8,6 +8,34 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class PreferenceSaveControllerTest {
+    @Test fun rapidCaptionEditsAndResetKeepTheLatestWholeStyleAndRetryTheFailedSave() = runTest {
+        val first = CompletableDeferred<Unit>()
+        val styles = mutableListOf<net.wingress.mobivious.data.CaptionAppearance>()
+        var fail = false
+        val controller = PreferenceSaveController<String>(backgroundScope, { edit ->
+            val style = net.wingress.mobivious.data.CaptionAppearance.parse(edit.requested)
+            if (styles.isEmpty()) first.await()
+            if (fail) error("Device storage unavailable")
+            styles += style
+        })
+        val defaults = net.wingress.mobivious.data.CaptionAppearance()
+        val large = defaults.copy(size = 200)
+        val colored = large.copy(textColor = "#FF00FF")
+        val key = net.wingress.mobivious.data.CaptionAppearance.SAVE_KEY
+        controller.bind("alice")
+        controller.request(key, "Caption appearance", defaults.json().toString(), large.json().toString()); runCurrent()
+        controller.request(key, "Caption appearance", defaults.json().toString(), colored.json().toString())
+        controller.request(key, "Caption appearance", defaults.json().toString(), defaults.json().toString())
+        first.complete(Unit); runCurrent()
+        assertEquals(listOf(large, defaults), styles)
+        fail = true
+        controller.request(key, "Caption appearance", defaults.json().toString(), colored.json().toString()); runCurrent()
+        assertEquals(PreferenceSaveStatus.FAILED, controller.edits.value[key]?.status)
+        assertEquals(defaults, styles.last())
+        fail = false; controller.retry(key); runCurrent()
+        assertEquals(colored, styles.last()); assertTrue(controller.edits.value.isEmpty())
+        controller.bind("bob"); assertTrue(controller.edits.value.isEmpty())
+    }
     @Test fun slowResponseNeverOverwritesNewerIntentAndIndependentFieldsRemainOrdered() = runTest {
         val release=CompletableDeferred<Unit>(); val calls=mutableListOf<PreferenceEdit<String>>()
         val c=PreferenceSaveController<String>(backgroundScope, { calls+=it; if (calls.size==1) release.await() })

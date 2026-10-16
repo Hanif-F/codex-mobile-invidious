@@ -226,7 +226,9 @@ def main():
         if not path.is_file():
             errors.append(f'Missing documentation: {name}')
         else:
-            errors.extend(local_links(path))
+            # Recovered historical snapshots retain their original links and bytes.
+            if name not in manifest.get('historicalDocuments', []):
+                errors.extend(local_links(path))
     if errors:
         print('\n'.join(errors), file=sys.stderr)
         return 1

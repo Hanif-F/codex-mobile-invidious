@@ -33,6 +33,7 @@ opened occurrence; current player controls are described separately below.
 | Codec / `videoCodec` | `video_codec` | `auto` | Auto, AV1 (`av1`), H.264 (`h264`). Preference applies to DASH. Shared. |
 | Preferred audio / `preferredAudio` | `preferred_audio` | `original` | Original Audio, Original Audio (Stable Volume), or a supported language/region tag. Shared. |
 | Caption priority | `captions` | three empty strings | First available language among three priorities; empty means None. Accepts web English names or language tags. Shared. |
+| Caption appearance | local `caption.appearance` | device font/color/edge, 100% size and text opacity, transparent backgrounds | Profile-local editor in Playback settings and the player's Captions menu; size, eight colors, three opacities, seven font families and five edge styles. Changes apply immediately, including offline playback. Reset restores defaults; failed saves offer Retry/Revert. |
 | Background playback | local `background` | true | Profile-local, saves immediately. |
 | Picture in picture | local `pip` | true | Profile-local, saves immediately; device must support PiP. |
 

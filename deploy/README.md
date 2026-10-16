@@ -198,3 +198,19 @@ fields. Lists and channel resolution stay on the instance. Verify guest/account
 settings, warning thumbnails and recommendation autoplay with `AiFilterSmokeTest`
 and `AiFilterTest`; see the [testing guide](../docs/TESTING.md). Old instances keep browsing and playback available and show
 an update-required message in AI settings. Downloads remain independent.
+
+## Caption delivery
+
+The native appearance editor is local to each profile. Caption retrieval also
+requires the sibling server update: its public selected-caption route now uses
+the configured Companion's private endpoint and rejects header-only VTT. A
+modern Companion with captions enabled must be available; the existing instance's
+Companion already returned usable English and Indonesian tracks during diagnosis.
+Rebuild and deploy the sibling Invidious source for live-instance recovery. No
+database migration or Android account preference API change is required.
+
+Before accepting deployment, request a known caption through `/api/v1/captions/`
+and verify timed cues and actual native display, rather than relying on HTTP 200
+or a selected language alone. Translation and installations without Companion
+retain the legacy retrieval backend. Deployment was not performed by the local
+caption implementation checks.

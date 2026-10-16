@@ -112,6 +112,12 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt) | Directory statistics, local search/sort fallback and revision-fenced confirmed subscription mutations. | [LIBRARY](../../docs/LIBRARY.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt](../../android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt) | Watched/progress models and indicators plus revision-fenced history/progress reconciliation and local fallback. | [LIBRARY](../../docs/LIBRARY.md) |
 
+## Data and account settings
+
+| File | Responsibility | Guide |
+| --- | --- | --- |
+| [android/app/src/main/java/net/wingress/mobivious/data/CaptionAppearance.kt](../../android/app/src/main/java/net/wingress/mobivious/data/CaptionAppearance.kt) | Validated profile-local caption appearance, supported choices, defaults and JSON persistence. | [SETTINGS](../../docs/SETTINGS.md) |
+
 ## Data and persistence
 
 | File | Responsibility | Guide |
@@ -144,6 +150,12 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/player/VideoGeometry.kt](../../android/app/src/main/java/net/wingress/mobivious/player/VideoGeometry.kt) | Decoded aspect ratio, embedded sizing, orientation and exact bounded PiP fractions. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/player/VideoSelection.kt](../../android/app/src/main/java/net/wingress/mobivious/player/VideoSelection.kt) | Occurrence-owned Auto/Preset/Manual video policy and reload fallback. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/player/WatchPlayerScroll.kt](../../android/app/src/main/java/net/wingress/mobivious/player/WatchPlayerScroll.kt) | Pure nested-scroll consumption rules for compact/expanded watch resizing. | [UI](../../docs/UI.md) |
+
+## Playback and media sessions
+
+| File | Responsibility | Guide |
+| --- | --- | --- |
+| [android/app/src/main/java/net/wingress/mobivious/player/CaptionLoadFailure.kt](../../android/app/src/main/java/net/wingress/mobivious/player/CaptionLoadFailure.kt) | Occurrence and track scoped subtitle loading failure, independent of cue gaps. | [PLAYBACK](../../docs/PLAYBACK.md) |
 
 ## Compose UI
 
@@ -201,6 +213,12 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/ui/WatchComponents.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchComponents.kt) | Opaque watch metadata, labeled disclosure rows and native player/tool controls. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/WatchPlayerResize.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/WatchPlayerResize.kt) | Saveable occurrence resize progress and nested-scroll connection for embedded video. | [UI](../../docs/UI.md) |
 | [android/app/src/main/java/net/wingress/mobivious/ui/YouUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/YouUi.kt) | You identity/dashboard destinations and owned/subscribed playlist library sections/empty states. | [FEATURES](../../docs/FEATURES.md) |
+
+## Native user interface
+
+| File | Responsibility | Guide |
+| --- | --- | --- |
+| [android/app/src/main/java/net/wingress/mobivious/ui/CaptionAppearanceUi.kt](../../android/app/src/main/java/net/wingress/mobivious/ui/CaptionAppearanceUi.kt) | Shared caption editor, native preview and SubtitleView appearance adapter. | [PLAYBACK](../../docs/PLAYBACK.md) |
 
 ## Scripts
 
