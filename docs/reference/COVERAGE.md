@@ -8,11 +8,11 @@ The current guides describe Mobivious **0.12.2** (version code **26**). This rep
 
 | Maintained files | Count |
 | --- | ---: |
-| Main application Kotlin | 108 |
-| JVM test Kotlin | 41 |
-| Android device test/support Kotlin | 71 |
+| Main application Kotlin | 109 |
+| JVM test Kotlin | 42 |
+| Android device test/support Kotlin | 72 |
 | Build, benchmark, resources, scripts, deployment and repository support | 53 |
-| **Total** | **273** |
+| **Total** | **276** |
 
 Every maintained file has a reviewed SHA-256 fingerprint, responsibility and owning guide in `coverage.json`. The source map indexes implementations; the test catalog lists every declared JVM/device test and explicit Ignore.
 

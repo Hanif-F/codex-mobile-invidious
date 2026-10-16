@@ -84,7 +84,7 @@ class ClipsTest {
             val context = api.context()
             mock.enqueue(MockResponse().setBody(JSONArray().put(metadata()).toString()))
             assertEquals(1, api.clips(page = 2, context = context).size)
-            val own = mock.takeRequest(); assertEquals("/api/v1/auth/clips?page=2", own.path); assertEquals("Bearer token", own.getHeader("Authorization"))
+            val own = mock.takeRequest(); assertEquals("/api/v1/auth/clips?page=2&show_original_title=true", own.path); assertEquals("Bearer token", own.getHeader("Authorization"))
             mock.enqueue(MockResponse().setBody(JSONArray().put(metadata()).toString()))
             api.clips("UC" + "b".repeat(22), 1, context)
             assertNull(mock.takeRequest().getHeader("Authorization"))

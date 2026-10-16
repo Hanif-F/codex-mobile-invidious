@@ -7,16 +7,17 @@ object RssLinks {
         require(value.matches(Regex("^[A-Za-z0-9_-]{1,100}$"))) { "Invalid feed source." }
         return value
     }
-    fun channel(server: String, channel: String) = server.toHttpUrl().newBuilder()
-        .addPathSegments("feed/channel").addPathSegment(id(channel)).build().toString()
-    fun playlist(server: String, list: Playlist): String {
+    fun channel(server: String, channel: String, showOriginalTitle: Boolean? = null) = server.toHttpUrl().newBuilder()
+        .addPathSegments("feed/channel").addPathSegment(id(channel))
+        .apply { showOriginalTitle?.let { setQueryParameter("show_original_title", it.toString()) } }.build().toString()
+    fun playlist(server: String, list: Playlist, showOriginalTitle: Boolean? = null): String {
         require(!list.owned || list.privacy != "private") { "Export this private playlist as an Atom file." }
         return server.toHttpUrl().newBuilder().addPathSegments("feed/playlist").addPathSegment(id(list.id))
             .apply { if (list.mix) {
                 val seed = list.seedVideoId ?: list.id.removePrefix("RD")
                 require(seed.matches(Regex("[A-Za-z0-9_-]{11}"))) { "This mix needs a seed video. Open it from discovery or a video link." }
                 addQueryParameter("continuation", seed)
-            } }.build().toString()
+            }; showOriginalTitle?.let { setQueryParameter("show_original_title", it.toString()) } }.build().toString()
     }
     fun privateFeed(server: String, path: String): String {
         val base = server.toHttpUrl()

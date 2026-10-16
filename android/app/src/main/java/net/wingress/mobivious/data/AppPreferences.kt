@@ -6,7 +6,7 @@ import org.json.JSONObject
 
 data class AccountPreferences(
     val watchHistory: Boolean = true, val savePosition: Boolean = false, val chat: ChatPreferences = ChatPreferences(),
-    val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true,
+    val dearrowEnabled: Boolean = false, val dearrowShowOriginal: Boolean = true, val showOriginalTitle: Boolean = true,
     val sponsorBlock: SponsorBlockSettings = SponsorBlockSettings(),
     val aiFilter: AiFilterSettings = AiFilterSettings(),
     val channelSpoilers: Map<String, ChannelSpoilerRule> = emptyMap(),
@@ -25,6 +25,7 @@ data class AccountPreferences(
         chat.json().let { c -> c.keys().forEach { put(it, c.get(it)) } }
         put("watch_history", watchHistory); put("save_player_pos", savePosition)
         put("dearrow_enabled", dearrowEnabled); put("dearrow_show_original", dearrowShowOriginal)
+        put("show_original_title", showOriginalTitle)
         put("autoplay", autoplay); put("listen", listen); put("local", local)
         put("continue", continueNext); put("continue_autoplay", continueAutoplay); put("video_loop", videoLoop)
         put("speed", speed); put("quality_dash", qualityDash); put("video_codec", PreferenceRules.videoCodec(videoCodec)); put("captions", JSONArray(captions))
@@ -69,6 +70,7 @@ data class AccountPreferences(
             return AccountPreferences(
                 watchHistory = j.optBoolean("watch_history", true), savePosition = j.optBoolean("save_player_pos", false), chat = ChatPreferences.parse(j),
                 dearrowEnabled = j.optBoolean("dearrow_enabled", false), dearrowShowOriginal = j.optBoolean("dearrow_show_original", true), sponsorBlock = SponsorBlockSettings.parse(j),
+                showOriginalTitle = j.opt("show_original_title") as? Boolean ?: true,
                 aiFilter = AiFilterSettings.parse(j),
                 channelSpoilers = ChannelSpoilerRules.parse(j.optJSONObject("channel_spoiler_settings")),
                 autoplay = j.optBoolean("autoplay", true), listen = j.optBoolean("listen", false), local = j.optBoolean("local", true),

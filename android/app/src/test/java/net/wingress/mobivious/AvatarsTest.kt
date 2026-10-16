@@ -82,7 +82,7 @@ class AvatarsTest {
             server.enqueue(MockResponse().setBody("""[{"videoId":"abcdefghijk","title":"Video","authorThumbnails":[{"url":"https://yt3.ggpht.com/avatar=s48"}]}]"""))
             val item = api.discovery("popular").single()
             assertEquals("$address/ggpht/avatar=s176", Avatars.url(address, item.authorAvatar))
-            assertEquals("/api/v1/popular", server.takeRequest().path)
+            assertEquals("/api/v1/popular?show_original_title=true", server.takeRequest().path)
             assertEquals(1, server.requestCount)
         }
     }

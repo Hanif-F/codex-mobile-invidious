@@ -131,6 +131,21 @@ overrides. The player uses effective settings for its current channel.
 
 ## DeArrow and AI filter
 
+**Show original title** (`show_original_title`, default **true**) is under
+Browsing → Video pages. It prefers non-translated titles supplied by the server;
+missing or unavailable originals keep the upstream title. Accounts share the
+choice with the website; guests save it for their current instance on this device.
+It is independent of DeArrow: community titles can still replace the selected
+title, and spoiler rules can still hide it. Custom clip and playlist names and
+existing downloaded metadata are preserved.
+
+Changes apply when content is refreshed or reopened. Existing player titles remain
+until metadata is reloaded (Retry/reopen), preserving playback state when the setting
+is saved. A buffer-only refresh reuses its loaded metadata. Reopened navigation snapshots fetch the new choice; loading another
+browsing page after a change restarts at page one to avoid mixing title choices.
+Account failures use the usual Retry/Revert feedback and retain the confirmed
+choice until a save succeeds.
+
 | Setting | Default | Details |
 | --- | --- | --- |
 | `dearrow_enabled` | false | Community title substitution; failed lookups retain original titles. |

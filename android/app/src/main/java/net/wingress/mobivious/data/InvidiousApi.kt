@@ -22,9 +22,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     private val expired: () -> Unit = {}, private val client: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build(),
     private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}, private val generation: () -> Long = { 0 },
-    private val onProfile: (ApiContext, String) -> Unit = { _, _ -> }) {
+    private val onProfile: (ApiContext, String) -> Unit = { _, _ -> },
+    private val originalTitles: OriginalTitlePreferences? = null) {
     private val contributionClient = client.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
     fun context() = ApiContext(server(), account(), generation())
+    suspend fun originalTitlePreference(context: ApiContext = context()) = originalTitles?.resolve(context) ?: true
+    fun knownOriginalTitlePreference(context: ApiContext = context()) = originalTitles?.known(context) ?: true
     companion object {
         fun normalizeServer(input: String, debug: Boolean): String {
             val url = input.trim().trimEnd('/').toHttpUrl()
@@ -42,8 +45,14 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context())
             throw CancellationException("Account or instance changed")
         if (context != null && target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
+        val titleChoice = if (method in listOf("GET", "HEAD") && OriginalTitlePreferences.supports(path))
+            originalTitlePreference(target) else null
+        if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
         val address = target.server.toHttpUrl().newBuilder().addPathSegments(path.removePrefix("/"))
-            .apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
+            .apply {
+                query.forEach { (k, v) -> if (titleChoice == null || k != "show_original_title") addQueryParameter(k, v) }
+                titleChoice?.let { setQueryParameter("show_original_title", it.toString()) }
+            }.build()
         val builder = Request.Builder().url(address).header("Accept", accept)
         if (auth) {
             val session = target.account ?: throw ApiException(401, "Sign in to use your account.")
@@ -334,7 +343,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun deletePlaylist(id: String) { request("api/v1/auth/playlists/$id", "DELETE", auth = true) }
     suspend fun addToPlaylist(id: String, video: String, context: ApiContext = context()): Video = ApiParser.video(JSONObject(scopedPlaylistWrite("api/v1/auth/playlists/$id/videos", "POST", context, JSONObject().put("videoId", video))))
     suspend fun removeFromPlaylist(id: String, index: String, context: ApiContext = context()) { require(index.matches(Regex("^[A-Fa-f0-9]+$"))) { "Missing playlist occurrence ID." }; scopedPlaylistWrite("api/v1/auth/playlists/$id/videos/$index", "DELETE", context) }
-    suspend fun preferences(context: ApiContext = context()): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context)))
+    suspend fun preferences(context: ApiContext = context()): AccountPreferences {
+        val version = originalTitles?.version()
+        return ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context))).also {
+            originalTitles?.confirm(context, it.showOriginalTitle, version)
+        }
+    }
 
     suspend fun spoilerPublications(ids: List<String>, context: ApiContext): Map<String, Long?> {
         require(ids.size in 1..100 && ids.distinct().size == ids.size && ids.all { it.matches(Regex("[A-Za-z0-9_-]{11}")) })
@@ -354,7 +368,10 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         require(value in -3_600_000..3_600_000)
         request("api/v1/auth/chat_timing/$id", "PUT", JSONObject().put("offsetMs", value), true, context = context)
     }
-    suspend fun preferences(changes: JSONObject, context: ApiContext): AccountPreferences = ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", "PATCH", changes, true, context = context)))
+    suspend fun preferences(changes: JSONObject, context: ApiContext): AccountPreferences =
+        ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", "PATCH", changes, true, context = context))).also {
+            originalTitles?.confirm(context, it.showOriginalTitle)
+        }
     suspend fun dearrowTitle(id: String, context: ApiContext = context()): String? = JSONObject(request("api/v1/dearrow/$id", context = context)).text("title").trim().takeIf { it.isNotEmpty() }
     suspend fun dearrowIdentity(context: ApiContext = context()) = JSONObject(request("api/v1/auth/dearrow/identity", auth = true, context = context)).let { DeArrowIdentity(it.getBoolean("ready"), it.getBoolean("configured")) }
     suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) { request("api/v1/auth/dearrow/identity", "PUT", JSONObject().put("privateId", privateId), true, context = context) }

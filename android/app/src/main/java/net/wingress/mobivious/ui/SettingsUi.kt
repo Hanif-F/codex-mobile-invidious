@@ -38,6 +38,7 @@ private val settingsPreferenceKeys = mapOf(
     "Caption priority 1" to "captions", "Caption priority 2" to "captions", "Caption priority 3" to "captions",
     "Default homepage" to "default_home", "Trending region" to "region", "Show related videos" to "related_videos",
     "Expand descriptions by default" to "extend_desc", "Show YouTube comments" to "comments",
+    "Show original title" to "show_original_title",
     "Show members-only videos" to "show_member_videos", "Videos per page" to "max_results", "Feed sorting" to "sort",
     "Latest video from each channel" to "latest_only", "Unwatched videos only" to "unseen_only",
     "Pending notifications only" to "notifications_only", "Watch history" to "watch_history",
@@ -269,6 +270,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                     } }
                     item { AppSection {
                         SettingsHeading("Video pages")
+                        SettingsToggle("Show original title", "Prefer non-translated video titles when available. DeArrow may still replace them.", value.showOriginalTitle) { update(value.copy(showOriginalTitle = it)) }
                         SettingsToggle("Show related videos", "Display recommendations below the video", value.relatedVideos) { update(value.copy(relatedVideos = it)) }
                         SettingsToggle("Expand descriptions by default", "Show the full description when opening a video", value.extendDescription) { update(value.copy(extendDescription = it)) }
                         SettingsToggle("Show YouTube comments", "Show a comments entry on video pages; text stays hidden until opened", value.showYoutubeComments) { enabled ->

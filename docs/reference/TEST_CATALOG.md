@@ -343,6 +343,19 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `oldSessionSuccessAndFailureCannotChangeSnapshotsOrOfflineStatus`
 - `successfulHtmlDoesNotPoisonTheLastUsableFeed`
 
+### OriginalTitlesTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/OriginalTitlesTest.kt) — Original-title defaults, sparse preferences, concurrent/stale contexts, explicit API selection, account isolation, feed caches and RSS contracts.
+
+- `defaultsRoundTripsAndSparsePatchesPreserveOtherSettings`
+- `concurrentInitialReadsSharePreferenceFetchAndSuccessfulSaveWins`
+- `failuresDefaultOnAndDoNotEraseConfirmedChoiceOrCrossContexts`
+- `canceledAccountReadNeverLeaksIntoAnotherProfile`
+- `failedInitialLookupDoesNotInvalidateAnAlreadyRunningSuccessfulRead`
+- `allVideoReadsSelectExactlyOneChoiceAndUnrelatedRequestsStayUnchanged`
+- `accountChoiceResolvesBeforePublicMetadataAndPatchUpdatesSubsequentReads`
+- `offlineCacheAndRssKeepTitleSelectionsSeparate`
+
 ### PlaybackQueueTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/PlaybackQueueTest.kt) — Playback Queue declared scenarios; exact cases are enumerated in the test catalog.
@@ -1085,6 +1098,16 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 - `ordinarySurfacesRemainOpaqueOverChangingScenery`
 
+### OriginalTitlesSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/OriginalTitlesSmokeTest.kt) — Original-title guest/account persistence, failed-save Retry/Revert, recreation, refresh/pagination, playback continuity, DeArrow, spoilers and unavailable-original fallback.
+
+- `guestTogglePersistsAndReopenedFeedUsesSelectedTitle`
+- `accountChoiceSyncsAndFailedSaveCanRevertAndRetry`
+- `activePlaybackKeepsTitleUntilRefreshAndPreservesPositionAndSpeed`
+- `loadingMoreAfterAChoiceChangeRestartsSearchAtPageOne`
+- `dearrowAndSpoilersUseSelectedTitleAndUnavailableOriginalFallsBack`
+
 ### PanelPresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PanelPresentationTest.kt) — Drawer header, modal scrolling and busy library-action layout and behavior scenarios.
@@ -1396,4 +1419,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **824 declared test methods** (including ignored tests).
+Inventory total: **837 declared test methods** (including ignored tests).

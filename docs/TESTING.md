@@ -22,6 +22,29 @@ connected suite is not yet green.
 
 ## Build and unit/static checks
 
+Original-title selection is covered by `OriginalTitlesTest` (default/round-trip
+and sparse saves, concurrent/stale preference resolution, supported request
+queries, account isolation, cache separation and RSS URLs) and
+`OriginalTitlesSmokeTest` (guest/account automatic saves and recreation,
+Retry/Revert, refresh/reopen and pagination, playback continuity/track selection,
+DeArrow/spoiler precedence and unavailable-original fallback). The fixture's
+`/test/original-titles` switch supplies a literal Unicode original title without
+YouTube access; `unavailable=true` retains upstream titles. Focus both this class
+and `DeArrowSmokeTest` through the fixture runner below. Passing results and live
+backend checks are recorded separately from test inventories.
+
+Original-title acceptance on **16 October 2026** passed **411 JVM tests**, five
+original-title, three DeArrow, ten settings and one RSS journey on the Android 16
+`emulator-5554`, debug app/test APK builds, debug lint and all 24 Python
+documentation/workflow regression tests. The standalone fixture checks also
+verified fallback, custom clip/playlist names, mutation exclusion and query
+validation. Build/device logs are in ignored `.tools/original-title-*.log`.
+The live public backend returned 200 for both choices on Popular, Search and
+video metadata, and 400 for invalid/duplicate values. The same YOASOBI search
+result changed from an English translated title to its Japanese original.
+Account saves, failure recovery and synchronization were verified against local
+fixtures; no real account settings were modified for live validation.
+
 Caption appearance acceptance on 16 October 2026 passed 403 JVM tests, nine
 focused Android 16 emulator cases, app/test APK builds and debug lint. Run the
 `CaptionsSmokeTest`, `CaptionAppearancePresentationTest` and existing

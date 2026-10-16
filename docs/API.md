@@ -206,6 +206,33 @@ the accompanying extension. Older servers default missing values to original;
 rejected account saves retain normal Retry/Revert feedback. Android builds and
 local fixture tests need no deployed server update. Production account sync does.
 
+## Original video titles
+
+Backend commit `be5609ad` exposes `show_original_title` through preference GET and
+boolean sparse PATCH, defaulting true when absent. Existing preference scopes
+suffice; no renewed sign-in is required. Deploy server migration 24 before the
+backend. Android requires no storage migration or direct YouTube access.
+
+Android sends one explicit `show_original_title=true|false` query on supported
+video-bearing reads: discovery/search/hashtag, channel listings, video metadata
+and recommendations, history/feed, playlists/mixes, clips and download catalogs.
+Public metadata endpoints do not read bearer-account preferences. A shared
+context-bound preference source resolves the account choice before public reads,
+uses guest storage when signed out, and rejects results from stale contexts.
+Successful preference responses update that source; a delayed GET cannot replace
+a newer successful PATCH. Failed initial synchronization defaults true; later
+successful synchronization replaces that fallback.
+
+The existing `title` response field contains the selected title. DeArrow and
+spoiler behavior follows selection. Media/caption/storyboard URLs, comments,
+DeArrow endpoints and mutations receive no added title query. Feed snapshot cache
+keys include the selected query, separating both title choices. Generated public
+channel/playlist RSS links include it, and private playlist Atom fetches send it.
+Private subscription feed links retain their owner's server-side preference.
+The server rejects invalid or duplicate query values with 400 and retains the
+upstream title when an original is unavailable. Older servers may ignore the
+read query; rejected preference saves retain existing update-required feedback.
+
 ## Channel title and thumbnail hiding
 
 Account preference GET already includes `channel_spoiler_settings`. Native sparse

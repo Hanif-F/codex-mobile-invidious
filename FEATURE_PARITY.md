@@ -21,6 +21,16 @@ emulator and server evidence is recorded in the 8 October entry in [VERIFICATION
 
 ## Discovery and channels
 
+Original-title parity added on **16 October 2026** against backend `be5609ad`:
+Browsing → Video pages exposes **Show original title**, default on, shared with
+the account or saved per guest instance. Supported video reads explicitly carry
+the choice, including public metadata, and refresh/reopen applies it throughout
+browsing, playback and RSS. DeArrow replacement, spoiler hiding, custom names and
+downloaded metadata retain their existing behavior. Migration 24 belongs to the
+backend; existing tokens suffice. See [settings](docs/SETTINGS.md#dearrow-and-ai-filter)
+and [API behavior](docs/API.md#original-video-titles) for the current contract;
+the broad audit counts below retain their original grouping.
+
 | ID | Feature in the web version | Android status | Implemented in Android | Missing from Android |
 | --- | --- | --- | --- | --- |
 | 01 | Anonymous viewing through Invidious, without a Google account or official YouTube API | Implemented | Public browsing/playback through Invidious and Companion; no client-side YouTube extraction. | — |

@@ -27,7 +27,7 @@ class PlaylistRssTest {
             val result = api.searchResults("music", 2, SearchType.PLAYLISTS, "relevance", "", "").items.filterIsInstance<SearchResult.PlaylistItem>().map { it.playlist }
             assertEquals("abcdefghijk", result.single().seedVideoId); assertTrue(result.single().mix)
             val request = server.takeRequest(); assertNull(request.getHeader("Authorization"))
-            assertEquals(setOf("q", "page", "sort", "type"), request.requestUrl!!.queryParameterNames)
+            assertEquals(setOf("q", "page", "sort", "type", "show_original_title"), request.requestUrl!!.queryParameterNames)
             assertEquals("playlist", request.requestUrl!!.queryParameter("type"))
             assertEquals("2", request.requestUrl!!.queryParameter("page"))
         }
@@ -100,7 +100,7 @@ class PlaylistRssTest {
             val opml = server.takeRequest(); assertEquals("newpipe", opml.requestUrl!!.queryParameter("format")); assertEquals("application/xml", opml.getHeader("Accept"))
             server.enqueue(MockResponse().setBody("<feed xmlns=\"http://www.w3.org/2005/Atom\"/>"))
             api.playlistAtom("IVown", api.context())
-            val atom = server.takeRequest(); assertEquals("/api/v1/auth/playlists/IVown/feed", atom.path); assertEquals("application/atom+xml", atom.getHeader("Accept"))
+            val atom = server.takeRequest(); assertEquals("/api/v1/auth/playlists/IVown/feed?show_original_title=true", atom.path); assertEquals("application/atom+xml", atom.getHeader("Accept"))
         }
     }
 

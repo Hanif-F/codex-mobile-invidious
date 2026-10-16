@@ -11,6 +11,7 @@ import net.wingress.mobivious.data.BlockedRepository
 import net.wingress.mobivious.player.PlaybackQueueSnapshot
 import net.wingress.mobivious.data.ApiContext
 import net.wingress.mobivious.data.DeArrowTitles
+import net.wingress.mobivious.data.OriginalTitlePreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -40,7 +41,10 @@ class MobiviousApplication : Application() {
         downloads = net.wingress.mobivious.data.DownloadRepository(this)
         net.wingress.mobivious.downloads.DownloadExportService.restore(this)
         cache = ResponseCache(File(cacheDir, "feeds"))
-        api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration }, onProfile = store::confirmProfile)
+        val originalTitles = OriginalTitlePreferences(store::positionContext,
+            { store.guestPreferences(it).showOriginalTitle }, { api.preferences(it) })
+        api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration }, onProfile = store::confirmProfile,
+            originalTitles = originalTitles)
         dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }
         channelSpoilers = net.wingress.mobivious.data.ChannelSpoilerRepository(titleScope, api::context, api::spoilerPublications)
         channelSpoilers.reset(preferences = if (store.account.value == null) store.guestPreferences() else null)

@@ -25,7 +25,7 @@ class DiscoverySearchTest {
             assertEquals("gaming", request.requestUrl!!.queryParameter("type")); assertEquals("ID", request.requestUrl!!.queryParameter("region"))
             assertNull(request.getHeader("Authorization"))
             server.enqueue(MockResponse().setBody("[]")); api.discovery("popular", "JP", TrendingCategory.GAMING)
-            assertTrue(server.takeRequest().requestUrl!!.queryParameterNames.isEmpty())
+            assertEquals(setOf("show_original_title"), server.takeRequest().requestUrl!!.queryParameterNames)
             server.enqueue(MockResponse().setBody("[]")); api.discovery("trending")
             assertEquals("livestreams", server.takeRequest().requestUrl!!.queryParameter("type"))
         }

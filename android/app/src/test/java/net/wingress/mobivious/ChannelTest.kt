@@ -63,7 +63,7 @@ class ChannelTest {
                         else -> page(api, tab, " \t\n")
                     }
                     val request = server.takeRequest()
-                    assertEquals("/api/v1/channels/$id/${tab.path}", request.path)
+                    assertEquals("/api/v1/channels/$id/${tab.path}?show_original_title=true", request.path)
                     assertFalse(request.requestUrl!!.queryParameterNames.contains("continuation"))
                     assertNull(request.getHeader("Authorization"))
                     assertTrue(result.items.isEmpty())
@@ -89,7 +89,7 @@ class ChannelTest {
                 val last = page(api, tab, first.continuation)
                 val request = server.takeRequest()
                 assertEquals("/api/v1/channels/$id/${tab.path}", request.requestUrl!!.encodedPath)
-                assertEquals(setOf("continuation"), request.requestUrl!!.queryParameterNames)
+                assertEquals(setOf("continuation", "show_original_title"), request.requestUrl!!.queryParameterNames)
                 assertEquals(token, request.requestUrl!!.queryParameter("continuation"))
                 assertEquals("bbbbbbbbbbb", last.items.single().id)
                 assertEquals("", last.continuation)

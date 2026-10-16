@@ -126,12 +126,12 @@ class PlaybackQueueTest {
             val api = InvidiousApi({ address }, { account })
             server.enqueue(MockResponse().setBody("""{"title":"Public","videoCount":300,"videos":[{"videoId":"testvideo01","title":"Repeated","index":150}]}"""))
             assertEquals(150, api.queuePage("PLlist", 150).videos.single().playlistIndex)
-            val public = server.takeRequest(); assertEquals("/api/v1/playlists/PLlist?index=150", public.path); assertNull(public.getHeader("Authorization"))
+            val public = server.takeRequest(); assertEquals("/api/v1/playlists/PLlist?index=150&show_original_title=true", public.path); assertNull(public.getHeader("Authorization"))
             account = Account("token", "Alice", Long.MAX_VALUE, address)
             server.enqueue(MockResponse().setBody("""{"videos":[]}""")); api.queuePage("IVprivate")
             val private = server.takeRequest(); assertTrue(private.path!!.startsWith("/api/v1/auth/playlists/IVprivate")); assertEquals("Bearer token", private.getHeader("Authorization"))
             server.enqueue(MockResponse().setBody("""{"videos":[]}""")); api.queuePage("RDtestvideo01", continuation = "testvideo02")
-            val mix = server.takeRequest(); assertEquals("/api/v1/auth/playlists/RDtestvideo01?continuation=testvideo02", mix.path); assertEquals("Bearer token", mix.getHeader("Authorization"))
+            val mix = server.takeRequest(); assertEquals("/api/v1/auth/playlists/RDtestvideo01?continuation=testvideo02&show_original_title=true", mix.path); assertEquals("Bearer token", mix.getHeader("Authorization"))
         }
     }
     @Test fun creationAndFailedSaveRetryUseSamePlaylistAndStableRemovalId() = runBlocking {

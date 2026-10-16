@@ -42,7 +42,7 @@ video = dict(videoId='testvideo01', title='A quiet moment · playback fixture', 
              authorId='UC' + 'a' * 22, lengthSeconds=120, viewCount=1200, publishedText='today',
              videoThumbnails=[dict(quality='medium', url='/media/thumbnail.jpg')],
              authorThumbnails=[dict(url='/ggpht/studio=s88', width=88, height=88)])
-default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True,
+default_prefs = dict(chat_show_timestamps=True, chat_user_blacklist="", chat_word_blacklist="", watch_history=True, save_player_pos=True, dearrow_enabled=False, dearrow_show_original=True, show_original_title=True,
                      autoplay=True, continue_autoplay=True, video_loop=False, listen=False, local=True, speed=1.0, seek_seconds=10, quality_dash='auto', video_codec='auto', preferred_audio='original', captions=['', '', ''],
                      dark_mode='', ui_density='balanced', thin_mode=False, default_home='Popular',
                      feed_menu=['Popular', 'Trending', 'Subscriptions', 'Playlists'], region='US',
@@ -238,6 +238,21 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def respond(self, data=None, status=200, headers=None):
+        if status == 200 and self.command in ('GET', 'HEAD') and state.get('originalTitleFixture') and not urlparse(self.path).path.startswith('/test/'):
+            params = parse_qs(urlparse(self.path).query, keep_blank_values=True)
+            values = params.get('show_original_title', [])
+            if values and (len(values) != 1 or values[0] not in ('true', 'false')):
+                return self.respond(dict(error='show_original_title must be true or false.'), 400)
+            enabled = values[0] == 'true' if values else prefs['show_original_title'] if '/auth/' in self.path else True
+            if enabled and not state.get('originalTitleUnavailable'):
+                def select(value):
+                    if isinstance(value, list): return [select(item) for item in value]
+                    if not isinstance(value, dict): return value
+                    result = {key: select(item) for key, item in value.items()}
+                    if result.get('videoId') == 'testvideo01' and 'title' in result and 'clipId' not in result:
+                        result['title'] = '原題 <日本語> & café'
+                    return result
+                data = select(data)
         self.send_response(status)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Cache-Control', 'no-store')
@@ -859,7 +874,8 @@ class Handler(BaseHTTPRequestHandler):
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,
                          downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='',
                          downloadEndpointsMissing=False, downloadDuration=12, allRequests=[], performance=False,
-                         performancePatchDelay=0, performanceFailPatchNext=False, mediaFail=False, captionFixture=False, captionFail=False)
+                         performancePatchDelay=0, performanceFailPatchNext=False, mediaFail=False, captionFixture=False, captionFail=False,
+                         originalTitleFixture=False, originalTitleUnavailable=False)
             prefs.clear()
             prefs.update(default_prefs)
             reset_sponsorblock()
@@ -919,6 +935,10 @@ class Handler(BaseHTTPRequestHandler):
             if 'delayNextMillis' in data: state['preferencesDelayNext'] = data.pop('delayNextMillis')
             prefs.update(data)
             return self.respond(prefs)
+        if p == '/test/original-titles':
+            state['originalTitleFixture'] = data.get('enabled', True)
+            state['originalTitleUnavailable'] = data.get('unavailable', False)
+            return self.respond({})
         if p == '/test/ai':
             for key in ('aiMatches', 'aiPending', 'aiUnavailable', 'aiStale', 'aiVersion', 'aiMissing', 'aiDelay', 'aiImages'):
                 if key in data: state[key] = data[key]

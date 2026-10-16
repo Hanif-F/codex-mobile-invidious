@@ -47,7 +47,7 @@ import net.wingress.mobivious.player.SeekPreviewController
 import net.wingress.mobivious.player.SeekPreviewKind
 
 data class BrowseState(val title: String = "For you", val videos: List<Video> = emptyList(), val loading: Boolean = false,
-    val refreshing: Boolean = false,
+    val refreshing: Boolean = false, val originalTitles: Boolean? = null,
     val error: String? = null, val page: Int = 1, val continuation: String = "", val end: Boolean = false,
     val history: HistoryPage? = null, val clips: List<Clip> = emptyList(), val lists: List<Playlist> = emptyList(),
     val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
@@ -738,6 +738,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         dismissLinkResolution()
         if (saved.context.server != api.context().server || !afterSignIn && saved.context != api.context()) { navigate("Popular"); return }
         val refreshSaved = currentBrowseAffected(saved.preferences, preferences.value, saved.tab, saved.route) ||
+            saved.browse.originalTitles?.let { it != api.knownOriginalTitlePreference() } == true ||
             saved.tab == "Trending" && saved.route.isEmpty() && saved.category != trendingCategory.value
         browseJob?.cancel(); browseGeneration++
         tab = saved.tab; route = saved.route; channel.value = saved.channel; channelTab.value = saved.channelTab
@@ -754,7 +755,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browse.value = saved.browse.copy(loading = false, refreshing = false)
         navigation.value = tab to route; restoredBrowse.value++
         if (route == "subscription-channels") refreshSubscriptions()
-        if (saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
+        if (!refreshSaved && saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
         else if (refreshSaved || saved.browse.loading || afterSignIn && saved.tab in listOf("You", "Subscriptions")) load(false, refreshChannel = false)
     }
     fun openGlobalSearch(text: String, newSearch: Boolean = true) {
@@ -895,16 +896,32 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun setChannelPlaylistSort(value: String) { if (value in listOf("last", "newest", "oldest")) { channelPlaylistSort.value = value; load(false, refreshChannel = false) } }
     fun openChannelRss(info: Channel) {
         rssJob?.cancel()
-        val link = runCatching { RssLinks.channel(api.context().server, info.id) }
-        rss.value = RssState(true, "${info.name} RSS", api.context(), url = link.getOrNull(), error = link.exceptionOrNull()?.message)
+        val context = api.context()
+        rss.value = RssState(true, "${info.name} RSS", context, loading = true)
+        rssJob = viewModelScope.launch {
+            try {
+                val link = RssLinks.channel(context.server, info.id, api.originalTitlePreference(context))
+                if (context == api.context()) rss.value = rss.value.copy(url = link, loading = false)
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { if (context == api.context()) rss.value = rss.value.copy(loading = false, error = friendly(e)) }
+        }
     }
     fun openPlaylistRss(list: Playlist) {
         rssJob?.cancel()
         val privateFile = list.owned && list.privacy == "private"
-        val link = runCatching { if (privateFile) null else RssLinks.playlist(api.context().server, list) }
         rss.value = RssState(true, "${list.title} RSS", api.context(), playlist = list,
-            url = link.getOrNull(), error = link.exceptionOrNull()?.message, filename = "playlist.atom")
-        if (privateFile) retryRss()
+            filename = "playlist.atom")
+        if (privateFile) retryRss() else {
+            val context = api.context()
+            rss.value = rss.value.copy(loading = true)
+            rssJob = viewModelScope.launch {
+                try {
+                    val link = RssLinks.playlist(context.server, list, api.originalTitlePreference(context))
+                    if (context == api.context()) rss.value = rss.value.copy(url = link, loading = false)
+                } catch (e: CancellationException) { throw e }
+                catch (e: Exception) { if (context == api.context()) rss.value = rss.value.copy(loading = false, error = friendly(e)) }
+            }
+        }
     }
     fun openSubscriptionRss() { rss.value = RssState(true, "Subscriptions RSS", api.context(), privateLink = true); retryRss() }
     fun openOpml(format: String = "rss") { rss.value = RssState(true, "Subscription OPML", api.context(), opml = true, format = format, filename = "subscriptions.opml"); retryRss() }
@@ -1020,6 +1037,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browse.value = displayed.copy(loading = true, refreshing = retainFeed, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
+                val originalTitles = api.originalTitlePreference(context)
+                if (generation != browseGeneration || context != api.context()) throw CancellationException("Browse request superseded")
+                if (more && old.originalTitles != null && old.originalTitles != originalTitles) {
+                    load(false, refreshChannel = refreshChannel)
+                    return@launch
+                }
                 var continuation = ""
                 var hasMore: Boolean? = null
                 var history: HistoryPage? = null
@@ -1128,7 +1151,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (generation == browseGeneration && context == api.context()) aiFilter.prepare(
                     (videos + clips.map { it.video }).map { it.channelId }, preferences.value.aiFilter, AiPageGroup.browsing(selectedTab, selectedRoute))
                 if (generation == browseGeneration && context == api.context()) {
-                    browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, refreshing = false, page = page,
+                    browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, refreshing = false, page = page, originalTitles = originalTitles,
                         continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
                         posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id },
                         searchResults = SearchResults.merge(old.searchResults, searchResults), searchKeys = old.searchKeys + searchKeys,
@@ -1301,6 +1324,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browse.value = browse.value.copy(loading = true, error = null)
         browseJob = viewModelScope.launch {
             try {
+                val originalTitles = api.originalTitlePreference(context)
                 val clips = mutableListOf<Clip>(); var page = 1; var count = 0
                 for (number in 1..pages.coerceAtLeast(1)) {
                     val response = api.clips(channelId, number, context)
@@ -1308,7 +1332,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     if (count < 30) break
                 }
                 if (generation == browseGeneration && context == api.context() && route == selectedRoute)
-                    browse.value = browse.value.copy(clips = clips.distinctBy { it.id }, page = page, end = count < 30, loading = false, error = null)
+                    browse.value = browse.value.copy(clips = clips.distinctBy { it.id }, page = page, end = count < 30, loading = false, error = null, originalTitles = originalTitles)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (generation == browseGeneration && context == api.context())
                 browse.value = browse.value.copy(loading = false, error = friendly(e), retryMore = false) }

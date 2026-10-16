@@ -44,7 +44,10 @@ class SettingsSmokeTest {
         }
     }
     private fun open(page: String) { compose.selectFeed("You"); compose.openAppSettings(); compose.onNodeWithText(page).performScrollTo().performClick() }
-    private fun toggle(label: String) { compose.onNodeWithText(label).performScrollTo().performClick() }
+    private fun toggle(label: String) {
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText(label))
+        compose.onNodeWithText(label).performClick()
+    }
     private fun save(page: String) {
         until {activity.model.preferenceSaves.edits.value.isEmpty()}
         compose.onNodeWithContentDescription("Back from $page").performClick()
@@ -234,7 +237,8 @@ class SettingsSmokeTest {
         compose.onNodeWithTag("preference-save-status").assertExists()
         compose.onNodeWithTag("preference-status-Browsing").performScrollTo().performClick()
         recreate()
-        compose.onNodeWithText("Show related videos").performScrollTo().assertIsOff()
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("Show related videos"))
+        compose.onNodeWithText("Show related videos").assertIsOff()
         command("sponsorblock", """{"failPreferences":false}""")
         compose.onNodeWithText("Retry").performScrollTo().performClick()
         save("Browsing")
