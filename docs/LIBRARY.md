@@ -129,6 +129,11 @@ filename, system transfer ID, state, bytes/total and error. States are Queued,
 Running, Waiting, Complete, Failed and Cancelled. At least one media selection is
 required; optional captions and same-origin artwork are additional assets.
 
+Download choices and saved details use friendly codec labels shared with playback,
+with separate primary track and supporting language/bitrate/size text. Raw format
+metadata, exact selection keys and stored downloads are preserved. Missing codec
+information says Unknown codec; an unfamiliar identifier remains visible.
+
 Creation journals the record in SQLite before submitting DownloadManager work.
 Each attempt uses a new filename so asynchronous removal of an old transfer cannot
 delete its retry. Transfers allow metered/roaming connections. The repository

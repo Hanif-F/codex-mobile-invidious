@@ -66,7 +66,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
             title = { modifier -> DeArrowTitle(vm, entry.video, MaterialTheme.typography.titleSmall, modifier, maxLines = 2,
                 fontWeight = if (entry.key == state.currentKey) FontWeight.Bold else FontWeight.Medium,
                 originalTitle = entry.clip?.title ?: entry.video.title, useDeArrow = entry.clip == null, offline = entry.downloadId != null) }) {
-            VideoActionsMenu(vm, entry.video, signIn, channel,
+            VideoActionsMenu(vm, entry.video, signIn,
                 audio = { vm.audioOnly(true); if (eligible) vm.selectQueue(entry.key) },
                 remove = if (!entry.removed) ({ vm.queueCommand(PlaybackService.QUEUE_REMOVE) { putString("key", entry.key) } }) else null,
                 removalLabel = "Remove from queue",

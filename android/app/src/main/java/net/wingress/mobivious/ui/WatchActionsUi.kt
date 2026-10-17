@@ -31,12 +31,12 @@ internal fun WatchPrimaryActions(vm: AppViewModel, details: VideoDetails, save: 
             }
         }, more = { expanded = true }, moreMenu = {
             AppDropdownMenu(expanded, { expanded = false }) {
-                if (ClipRules.eligible(details)) DropdownMenuItem(text = { Text("Create clip") },
-                    leadingIcon = { Icon(Icons.Default.ContentCut, null) }, modifier = Modifier.testTag("create-clip"), onClick = {
+                if (ClipRules.eligible(details)) ActionMenuItem("Create clip", Icons.Default.ContentCut,
+                     modifier = Modifier.testTag("create-clip"), onClick = {
                         expanded = false
                         if (vm.account.value == null) { vm.requestClipSignIn(); signIn() } else vm.openClipEditor()
                     })
-                DropdownMenuItem(text = { Text("DeArrow Title") }, leadingIcon = { Icon(Icons.Default.Title, null) },
+                ActionMenuItem("DeArrow Title", Icons.Default.Title,
                     onClick = { expanded = false; if (vm.account.value == null) signIn() else vm.openDeArrow(details.video.id) })
             }
         })

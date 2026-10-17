@@ -100,8 +100,10 @@ class SubscriptionJourneyTest {
         compose.onNodeWithTag("mini-player-preview").assertExists()
         val token = vm.queue.value.token
         compose.onNodeWithTag("subscription-search").performClick()
+        // Android reports IME visibility before Compose applies the corresponding inset frame.
         until { androidx.core.view.ViewCompat.getRootWindowInsets(activity.window.decorView)
-            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true }
+            ?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true &&
+            compose.onAllNodesWithTag("mini-player").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("mini-player").assertDoesNotExist()
         compose.onNodeWithTag("player-surface").assertDoesNotExist()
         compose.onNodeWithTag("subscription-channels-shortcut").assertDoesNotExist()
@@ -137,7 +139,7 @@ class SubscriptionJourneyTest {
         capture("creator-rss")
         compose.onNodeWithContentDescription("Close feed").performClick()
         compose.onNodeWithTag("channel-actions-$owner").performClick()
-        compose.onNodeWithText("Channel SponsorBlock settings", substring = false).performClick()
+        compose.onNodeWithText("SponsorBlock settings", substring = false).performClick()
         compose.onNodeWithTag("sponsorblock-sheet").assertIsDisplayed()
         capture("creator-sponsorblock")
         compose.onNodeWithContentDescription("Close SponsorBlock settings").performClick()

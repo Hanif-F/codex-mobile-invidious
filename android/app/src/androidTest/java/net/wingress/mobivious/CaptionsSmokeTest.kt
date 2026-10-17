@@ -167,6 +167,7 @@ class CaptionsSmokeTest {
         until { cues().contains("ENGLISH CAPTION") }; visibleMagenta(minimum = 20); captureWatchScreenshot("caption-mini")
         compose.onNodeWithTag("mini-player-preview").performClick()
         controls(); compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.expandPlayerSettingsMore()
         compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Picture in picture"))
         compose.onNodeWithText("Picture in picture").performClick()
         until { activity.isInPictureInPictureMode }

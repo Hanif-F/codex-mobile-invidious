@@ -20,6 +20,24 @@ It is an inventory, not a passing-results report. [Cleanup results](CLEANUP.md)
 record the latest source/device checks and baseline failures. The complete
 connected suite is not yet green.
 
+## Menu and download-label acceptance
+
+On **17 October 2026**, the menu overhaul passed **425 JVM tests**, **31 distinct
+focused Android 16 emulator cases**, debug app/test APK builds, debug lint and
+all **24 Python documentation/workflow tests**. The focused cases cover grouped
+video actions and channel/settings access, More collapse/navigation/recreation/
+occurrence changes, VR metadata with Flat/offline/failure states, audio-only,
+PiP, manual refresh and the committed automatic buffer-recovery regressions.
+Large-text light/dark/RTL checks cover targets, disabled actions, readable
+codec labels and numeric-unit ordering. Download choices retain their exact keys.
+The subscription journey waits for Compose to apply the IME inset frame before
+asserting that the mini-player is hidden.
+
+Logs are in ignored `.tools/menu-overhaul-*.log`; device XML summaries are in
+`.tools/menu-overhaul-results/` and reviewed screenshots in
+`.tools/menu-overhaul-preview/`. This is focused acceptance, not a claim that
+the complete connected suite is green.
+
 ## Build and unit/static checks
 
 Original-title selection is covered by `OriginalTitlesTest` (default/round-trip
@@ -108,6 +126,24 @@ separate from published releases. If a device is unavailable, report runtime
 acceptance as pending rather than inferring it from a successful build.
 
 ## Device runner and media fixtures
+
+Playback-statistics acceptance on **17 October 2026** passed **433 JVM tests** and
+**21 focused Android 16 emulator cases**, followed by two final presentation cases
+for fixed RTL numeric ordering and copy-failure recovery. Debug app/test builds,
+debug lint (0 errors, 33 warnings), the 24 Python documentation/workflow tests and
+documentation checks passed. This is focused acceptance; see
+[VERIFICATION.md](../VERIFICATION.md) for evidence and boundaries.
+
+`PlaybackStatisticsTest` verifies cumulative load-byte accounting, error/timeout/
+cancellation handling, visible observation and stall exclusions, bounded graph
+history, frame/buffer calculations and allowlisted JSON with availability reasons.
+`PlaybackStatisticsSmokeTest` exercises real Media3 metrics and copying through
+Player settings → More, source refresh and queue changes, fullscreen/recreation,
+mini-player/settings/background/PiP suspension, DASH/HLS/progressive/audio-only/live/offline playback.
+`PlaybackStatisticsPresentationTest` checks pinned actions, large-text light/dark
+RTL layouts, scrolling and selectable clipboard-failure recovery. Focus these
+classes through the fixture runner below; screenshots use
+`/data/local/tmp/mobivious-ui/statistics-*.png`.
 
 `BufferRecoveryTest` checks the three-attempt schedule, exhaustion, cancellation,
 stable-playback budget reset, permanent/offline exclusions and sanitized diagnostic

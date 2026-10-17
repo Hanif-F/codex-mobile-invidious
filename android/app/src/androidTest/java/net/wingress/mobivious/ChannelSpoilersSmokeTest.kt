@@ -84,6 +84,28 @@ class ChannelSpoilersSmokeTest {
         var title: String? = null; compose.runOnUiThread { title = activity.model.controller.value?.mediaMetadata?.title?.toString() }; return title
     }
 
+    @Test fun videoMenuGroupsActionsAndKeepsDisplaySettingsOnTheChannelPage() {
+        compose.onNodeWithTag("video-actions-testvideo01").performScrollTo().performClick()
+        compose.onNodeWithText(channelSpoilerSettingsPage).assertDoesNotExist()
+        compose.onNodeWithText("Open channel").assertDoesNotExist()
+        compose.onNodeWithText("Block channel").assertExists()
+        val labels = listOf("Play next", "Add to queue", "Play audio only", "Save to playlist", "Download", "Block channel")
+        val tops = labels.map { compose.onNodeWithText(it).assertHeightIsAtLeast(48.dp).fetchSemanticsNode().boundsInRoot.top }
+        assertTrue(tops.zipWithNext().all { (a, b) -> a < b })
+        captureWatchScreenshot("video-menu-grouped-icons")
+        InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.onNodeWithTag("video-avatar-testvideo01", useUnmergedTree = true).assertIsDisplayed().performTouchInput { click() }
+        until { activity.model.channel.value != null }
+        compose.onNodeWithTag("channel-actions-$channel").performScrollTo().performClick()
+        compose.onNodeWithText("SponsorBlock settings").assertExists()
+        compose.onNodeWithText("Title and thumbnail settings").performClick()
+        compose.onNodeWithTag("spoiler-hide-title").assertExists()
+        compose.onNodeWithContentDescription("Close channel title and thumbnail settings").performClick()
+        compose.openAppSettings()
+        compose.onNodeWithText(channelSpoilerSettingsPage).performScrollTo().performClick()
+        compose.onNodeWithTag("spoiler-channel-input").assertExists()
+    }
+
     @Test fun guestEditorValidationPersistenceAndThumbnailFirstTap() {
         settings(); configure()
         compose.onNodeWithTag("spoiler-hide-title").performClick()

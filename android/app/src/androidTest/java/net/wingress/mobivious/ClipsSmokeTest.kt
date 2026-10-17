@@ -145,10 +145,14 @@ class ClipsSmokeTest {
         until { vm.playback.value.position in 4998L..5002L }
         compose.onNodeWithContentDescription("Player settings").performClick()
         compose.onNodeWithText("SponsorBlock").assertDoesNotExist()
-        val labels = listOf("Quality", "Audio", "Captions", "Playback speed", "Audio only", "Picture in picture", "Refresh buffer")
+        compose.onNodeWithText("Viewing mode").assertDoesNotExist()
+        compose.onNodeWithText("Annotations").assertDoesNotExist()
+        compose.expandPlayerSettingsMore()
+        val labels = listOf("Quality", "Audio", "Captions", "Playback speed", "More", "Annotations", "Audio only", "Picture in picture", "Refresh buffer")
         val positions = labels.map { label -> compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("player-settings-list"))).fetchSemanticsNode().boundsInRoot.top }
         assertTrue("Player settings should follow the agreed order", positions.zipWithNext().all { (first, second) -> first < second })
         screenshot("player-settings-ordered")
+        compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Refresh buffer"))
         compose.onNodeWithText("Refresh buffer").performClick(); ready(id)
         ui {
             assertEquals(30444L, vm.controller.value!!.duration); assertEquals(1.5f, vm.controller.value!!.playbackParameters.speed)

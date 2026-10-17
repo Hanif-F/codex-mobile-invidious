@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.Saver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -178,7 +179,9 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             presentation.present(PlayerPresentation.MINI, animate = false)
         previousQueueToken = queue.token
     }
-    var dialog by remember { mutableStateOf("") }
+    // Only the player settings sheet restores; forms and destructive dialogs keep their existing lifecycle.
+    var dialog by rememberSaveable(stateSaver = Saver<String, String>(
+        save = { if (it == "player") it else "" }, restore = { it })) { mutableStateOf("") }
     fun openChapters() {
         vm.cancelAccumulatedSeek(); vm.closeComments(); vm.closeChat(); vm.queueExpanded.value = false; dialog = ""
         chapterPanel.show(chapters, playback.position)
@@ -313,7 +316,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         onDispose { activity.setFullscreen(false); activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
     LaunchedEffect(pip, watch, playback.mediaId) { if (pip || !watch) { vm.queueExpanded.value = false; chapterPanel.close(); vm.closeComments(); vm.cancelAccumulatedSeek(); dialog = ""; vm.closeDeArrow() }; if (pip) vm.sponsorSettingsChannel.value = null }
-    LaunchedEffect(account) { dialog = "" }
+    var dialogAccount by remember { mutableStateOf(account) }
+    LaunchedEffect(account) { if (dialogAccount != account) { dialog = ""; dialogAccount = account } }
     LaunchedEffect(watch, pip, settingsPage) { if (watch || pip || settingsPage.isNotEmpty()) {
         channelDescriptionOpen = false; vm.closePostComments()
     } }
@@ -396,7 +400,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                                 if (route.isEmpty()) AppIconButton(Icons.Default.Settings, "Settings", Modifier.testTag("global-settings"), enabled = !accountBusy) { vm.settingsOpened(); settingsPage = "Settings" }
                                 else if (route == "playlists" && account != null) AppIconButton(Icons.Default.Add, "New playlist", Modifier.testTag("playlist-create"), prominent = true) { dialog = "create" }
                                 if (route == "history" && account != null) OverflowMenu("History actions", vm.api.context(), Modifier.testTag("history-actions")) { close ->
-                                    DropdownMenuItem(text = { Text("Clear watch history") }, onClick = { close(); dialog = "clearHistory" })
+                                    ActionMenuItem("Clear watch history", Icons.Default.DeleteSweep, destructive = true, onClick = { close(); dialog = "clearHistory" })
                                 }
                             }, controls = {
                                 if (route == "playlists" && account != null) BrowseTabs(listOf("owned", "subscribed"), librarySection,
@@ -419,8 +423,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         else if (subscriptionFeed) SubscriptionFeedToolbar {
                             AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
                             if(account!=null) OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
-                                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openSubscriptionRss() })
-                                DropdownMenuItem(text = { Text("Export OPML") }, onClick = { close(); vm.openOpml() })
+                                ActionMenuItem("RSS", Icons.Default.RssFeed, onClick = { close(); vm.openSubscriptionRss() })
+                                ActionMenuItem("Export OPML", Icons.Default.FileDownload, onClick = { close(); vm.openOpml() })
                             }
                         }
                         else if (channelPage) ChannelBrowseToolbar(channel, channelTab, channelVideoSort, channelPlaylistSort,
@@ -504,10 +508,14 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         channel?.let { info -> item {
                             ChannelHeader(info, vm.store.server, prefs.thinMode, subscriptions.any { it.id == info.id }, actions = {
                                 OverflowMenu("Actions for channel ${info.name}", listOf(info.id, vm.api.context()), Modifier.testTag("channel-actions-${info.id}")) { close ->
-                                    DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openChannelRss(info) })
-                                    BlockChannelMenuItem(vm, info.id, info.name, { signIn() }, Modifier.testTag("channel-block-${info.id}"), close)
-                                    DropdownMenuItem(text = { Text("Channel SponsorBlock settings") }, onClick = { close(); vm.openSponsorBlock(info.id) })
-                                    DropdownMenuItem(text = { Text(channelSpoilerSettingsPage) }, onClick = { close(); vm.openChannelSpoilers(info.id) })
+                                    ActionMenuItem("SponsorBlock settings", Icons.Default.Shield, onClick = { close(); vm.openSponsorBlock(info.id) })
+                                    ActionMenuItem("Title and thumbnail settings", Icons.Default.VisibilityOff, onClick = { close(); vm.openChannelSpoilers(info.id) })
+                                    ActionMenuDivider()
+                                    ActionMenuItem("RSS", Icons.Default.RssFeed, onClick = { close(); vm.openChannelRss(info) })
+                                    if (ContentVisibility.validChannel(info.id)) {
+                                        ActionMenuDivider()
+                                        BlockChannelMenuItem(vm, info.id, info.name, { signIn() }, Modifier.testTag("channel-block-${info.id}"), close)
+                                    }
                                 }
                             }, readDescription = { channelDescriptionOpen = true },
                                 subscriptionBusy = info.id in subscriptionChannels.busy,
@@ -722,7 +730,7 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                     else if (prefs.thinMode) Text("Duration: ${time(video.duration)}", style = MaterialTheme.typography.bodySmall)
                 }
             }
-            VideoActionsMenu(vm, video, signIn, channel, audioPlay ?: { vm.playVideo(video, audio = true) }, remove, removalLabel,
+            VideoActionsMenu(vm, video, signIn, audioPlay ?: { vm.playVideo(video, audio = true) }, remove, removalLabel,
                 removeFromPlaylist, removeFromPlaylistEnabled)
             if(remove != null && !libraryRow) AppInsetIconButton(onClick = remove) { Icon(Icons.Default.RemoveCircleOutline, "Remove ${maskedVideoTitle(vm, video)}") }
         }

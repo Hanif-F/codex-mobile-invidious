@@ -152,6 +152,12 @@ class DownloadsSmokeTest {
         compose.runOnUiThread { activity.model.openDownload(activity.model.browse.value.videos.first()) }
         until { activity.model.downloadDialog.value.catalog != null }
         compose.onNodeWithTag("download-confirm").assertIsNotEnabled()
+        compose.onNodeWithText("360p · 24 fps · H.264").assertExists()
+        compose.onNodeWithText("avc1.42E01E", substring = true).assertDoesNotExist()
+        compose.onNodeWithTag("download-dialog").performScrollToNode(hasTestTag("download-choice-aen"))
+        compose.onNodeWithText("English · AAC").assertExists()
+        compose.onNodeWithText("mp4a.40.2", substring = true).assertDoesNotExist()
+        captureWatchScreenshot("download-friendly-codecs")
         compose.onNodeWithTag("download-dialog").performScrollToNode(hasTestTag("download-choice-cen"))
         compose.onNodeWithTag("download-choice-cen").performClick()
         compose.onNodeWithTag("download-confirm").assertIsNotEnabled()

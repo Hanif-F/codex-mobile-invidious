@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
+import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -15,23 +17,24 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import net.wingress.mobivious.data.*
 
 @Composable
-internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit, channel: (String) -> Unit,
+internal fun VideoActionsMenu(vm: AppViewModel, video: Video, signIn: () -> Unit,
     audio: () -> Unit, remove: (() -> Unit)? = null, removalLabel: String = "Remove",
     removeFromPlaylist: (() -> Unit)? = null, removeFromPlaylistEnabled: Boolean = true, offline: Boolean = false) {
     val account by vm.account.collectAsStateWithLifecycle()
     OverflowMenu("Actions for ${maskedVideoTitle(vm, video, offline = offline)}", listOf(video, ApiContext(vm.store.server, account)), Modifier.testTag("video-actions-${video.id}")) { close ->
-        if (ContentVisibility.validChannel(video.channelId)) DropdownMenuItem(text = { Text(channelSpoilerSettingsPage) }, onClick = { close(); vm.openChannelSpoilers(video.channelId) })
-        DropdownMenuItem(text = { Text("Save to playlist") }, onClick = { close(); vm.openSave(video) })
-        DropdownMenuItem(text = { Text("Download") }, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
-        DropdownMenuItem(text = { Text("Audio mode") }, enabled = !video.unavailable, onClick = { close(); audio() })
-        DropdownMenuItem(text = { Text("Play next") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
-        DropdownMenuItem(text = { Text("Add to queue") }, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })
+        ActionMenuItem("Play next", Icons.AutoMirrored.Filled.PlaylistPlay, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, true) })
+        ActionMenuItem("Add to queue", Icons.AutoMirrored.Filled.QueueMusic, enabled = !video.unavailable, onClick = { close(); vm.insertQueue(video, false) })
+        ActionMenuItem("Play audio only", Icons.Default.Headphones, enabled = !video.unavailable, onClick = { close(); audio() })
+        ActionMenuDivider()
+        ActionMenuItem("Save to playlist", Icons.AutoMirrored.Filled.PlaylistAdd, onClick = { close(); vm.openSave(video) })
+        ActionMenuItem("Download", Icons.Default.Download, enabled = !video.unavailable && !video.live, onClick = { close(); vm.openDownload(video) })
         if (ContentVisibility.validChannel(video.channelId)) {
-            DropdownMenuItem(text = { Text("Open channel") }, onClick = { close(); channel(video.channelId) })
+            ActionMenuDivider()
             BlockChannelMenuItem(vm, video.channelId, video.author, signIn, close = close)
         }
-        if (remove != null) DropdownMenuItem(text = { Text(removalLabel) }, onClick = { close(); remove() })
-        if (removeFromPlaylist != null) DropdownMenuItem(text = { Text("Remove from playlist") }, enabled = removeFromPlaylistEnabled,
+        if (remove != null || removeFromPlaylist != null) ActionMenuDivider()
+        if (remove != null) ActionMenuItem(removalLabel, Icons.Default.RemoveCircleOutline, destructive = true, onClick = { close(); remove() })
+        if (removeFromPlaylist != null) ActionMenuItem("Remove from playlist", Icons.Default.PlaylistRemove, enabled = removeFromPlaylistEnabled, destructive = true,
             onClick = { close(); removeFromPlaylist() })
     }
 }

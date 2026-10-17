@@ -2,6 +2,8 @@ package net.wingress.mobivious
 
 import net.wingress.mobivious.data.*
 import org.json.JSONObject
+import net.wingress.mobivious.ui.downloadChoiceLabel
+import net.wingress.mobivious.player.StreamCatalog
 import org.junit.Test
 import org.junit.Assert.*
 
@@ -49,4 +51,45 @@ class DownloadsTest {
         assertEquals(50L, known.bytes); assertEquals(200L, known.total)
         assertEquals(0L, known.copy(assets = known.assets.map { if (it.media) it.copy(total = 0) else it }).total)
     }
+    @Test fun friendlyDownloadCodecNamesPreserveTrackMetadataAndSelectionKeys() {
+        for ((codec, expected) in listOf("av01.0.05M.08" to "AV1", "avc1.42E01E" to "H.264",
+            "hvc1.1.6.L93.B0" to "HEVC", "vp09.00.31.08" to "VP9", "vp8" to "VP8")) {
+            val metadata = JSONObject().put("type", "video/mp4; codecs=\"$codec\"")
+                .put("size", "1920x1080").put("fps", 29.97).put("bitrate", 1500000).put("clen", "12000000").toString()
+            val choice = DownloadChoice("exact-$codec", DownloadKind.VIDEO, "/download", metadata)
+            val label = downloadChoiceLabel(choice)
+            assertEquals("1080p · 30 fps · $expected", label.primary)
+            assertEquals("${StreamCatalog.bitrateLabel(1500000)} · ${StreamCatalog.bytesLabel(12000000)}", label.secondary)
+            assertEquals(metadata, choice.metadata)
+            val catalog = DownloadCatalog("{}", listOf(choice), true, "")
+            assertSame(choice, DownloadSelection(video = choice.key).choices(catalog).single())
+        }
+        for ((codec, expected) in listOf("mp4a.40.2" to "AAC", "opus" to "Opus", "vorbis" to "Vorbis",
+            "flac" to "FLAC", "ac-3" to "AC-3", "ec-3" to "E-AC-3")) {
+            val choice = DownloadChoice("same-language-id", DownloadKind.AUDIO, "/audio", JSONObject()
+                .put("type", "audio/mp4; codecs=\"$codec\"")
+                .put("audioTrack", JSONObject().put("id", "es.2").put("displayName", "Spanish"))
+                .put("isDrc", true).put("bitrate", 96000).toString())
+            val label = downloadChoiceLabel(choice)
+            assertEquals("Spanish · $expected", label.primary)
+            assertEquals("es · Stable volume · ${StreamCatalog.bitrateLabel(96000)}", label.secondary)
+        }
+    }
+
+    @Test fun unknownDownloadCodecsDoNotConfuseContainersWithCodecsOrInventQuality() {
+        for (mime in listOf("video/mp4", "video/webm", "audio/mp4", "audio/webm", "audio/ogg")) {
+            val kind = if (mime.startsWith("video/")) DownloadKind.VIDEO else DownloadKind.AUDIO
+            val choice = DownloadChoice("key", kind, "/download", JSONObject().put("type", mime).toString())
+            assertEquals("${if (kind == DownloadKind.VIDEO) "Video" else "Audio"} · Unknown codec", downloadChoiceLabel(choice).primary)
+            assertEquals("", downloadChoiceLabel(choice).secondary)
+        }
+        val unfamiliar = DownloadChoice("custom", DownloadKind.VIDEO, "/download",
+            JSONObject().put("type", "video/mp4; codecs=\"custom.1\"").toString())
+        assertEquals("Video · custom.1", downloadChoiceLabel(unfamiliar).primary)
+        assertEquals("AAC", StreamCatalog.codecLabel("", "audio/mp4a-latm"))
+        assertEquals("Opus", StreamCatalog.codecLabel("", "audio/opus"))
+        assertEquals("H.264", StreamCatalog.codecLabel("", "video/avc"))
+        assertEquals("VP9", StreamCatalog.codecLabel("mp4a.40.2, vp09.00.31.08", "video/mp4"))
+    }
+
 }

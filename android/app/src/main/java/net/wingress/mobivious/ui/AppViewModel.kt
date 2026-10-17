@@ -201,6 +201,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val chatAppearance = MutableStateFlow(store.chatAppearance())
     val captionAppearance = MutableStateFlow(store.captionAppearance())
     val captionFailure = app.captionFailure
+    internal val playbackStatistics = app.playbackStatistics
     val viewing = MutableStateFlow(ViewingState())
     private val annotationsController = AnnotationsController(viewModelScope, api::context, api::annotations)
     val annotations = annotationsController.state

@@ -45,6 +45,7 @@ class AnnotationsViewingSmokeTest {
     }
     private fun menu(label: String) {
         controls(); compose.onNodeWithContentDescription("Player settings").performClick()
+        if (label == "Annotations") compose.expandPlayerSettingsMore()
         compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText(label))
         compose.onNodeWithText(label).performClick()
     }
@@ -95,6 +96,53 @@ class AnnotationsViewingSmokeTest {
             ui { activity.finishAndRemoveTask() }
         }
     }
+    @Test fun moreStartsCollapsedRestoresWithinTheSheetAndResetsOnReopenAndNewOccurrence() {
+        open("testvideo01"); controls()
+        compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("Viewing mode").assertDoesNotExist()
+        compose.onNodeWithText("Annotations").assertDoesNotExist()
+        compose.onNodeWithText("Audio only").assertDoesNotExist()
+        compose.onNodeWithTag("player-settings-more").assert(SemanticsMatcher.expectValue(
+            androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Collapsed"))
+        compose.expandPlayerSettingsMore()
+        compose.onNodeWithText("Annotations").performClick()
+        compose.onNodeWithContentDescription("Back to player settings").performClick()
+        compose.onNodeWithText("Annotations").assertExists()
+        recreate()
+        compose.onNodeWithContentDescription("Close player settings").assertExists()
+        compose.onNodeWithText("Annotations").assertExists()
+        captureWatchScreenshot("player-more-restored")
+        closeMenu(); controls(); compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.onNodeWithText("Annotations").assertDoesNotExist()
+        compose.expandPlayerSettingsMore()
+        val previous = vm.queue.value.currentKey
+        ui { vm.play("testvideo01", 1) }
+        until { vm.queue.value.currentKey != previous }; ready("testvideo01")
+        compose.onNodeWithText("Annotations").assertDoesNotExist()
+        compose.expandPlayerSettingsMore()
+        compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Audio only"))
+        compose.onNodeWithText("Audio only").performClick()
+        until { vm.playback.value.selection?.disabledTrackTypes?.contains(androidx.media3.common.C.TRACK_TYPE_VIDEO) == true }
+        compose.onNodeWithText("Quality").assertIsNotEnabled()
+        compose.onNodeWithText("Audio only").performClick()
+        until { vm.playback.value.selection?.disabledTrackTypes?.contains(androidx.media3.common.C.TRACK_TYPE_VIDEO) == false }
+        closeMenu()
+    }
+
+    @Test fun vrMenuUsesMetadataWhenAutomaticViewingIsOffOrRenderingFails() {
+        ui { vm.preferences.value = vm.preferences.value.copy(vrMode = false) }
+        open()
+        assertEquals(Projection.FLAT, vm.playback.value.projection)
+        menu("Viewing mode")
+        compose.onNodeWithText("360° equirectangular", useUnmergedTree = true).performClick()
+        until { vm.playback.value.projection == Projection.EQUIRECTANGULAR }
+        closeMenu()
+        ui { vm.viewing.value = vm.viewing.value.copy(error = "Projection failed") }
+        menu("Viewing mode")
+        compose.onNodeWithText("Projection failed").assertExists()
+        closeMenu()
+    }
+
     @Test fun equirectangularDecodedDirectionsDragRecenterAndCaptions() {
         open(); assertEquals(Projection.EQUIRECTANGULAR, vm.playback.value.projection); front()
         ui { vm.panViewing(90f, 0f) }; right()
@@ -216,5 +264,8 @@ class AnnotationsViewingSmokeTest {
         ui { vm.playDownload(id) }; ready("spherevid01"); ui { vm.setAnnotations(true) }
         assertEquals(Projection.EQUIRECTANGULAR, vm.playback.value.projection); front()
         assertEquals(before, fixture().getJSONArray("annotationRequests").length())
+        menu("Viewing mode"); compose.onNodeWithText("Flat", useUnmergedTree = true).performClick(); closeMenu()
+        menu("Viewing mode"); compose.onNodeWithText("Automatic", useUnmergedTree = true).performClick(); closeMenu()
+        until { vm.playback.value.projection == Projection.EQUIRECTANGULAR }
     }
 }

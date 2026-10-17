@@ -79,8 +79,10 @@ fit without stretching, and controls remain above them. Missing previews leave
 seeking usable. Hidden thumbnails, offline/audio-only/live playback, miniplayer
 and PiP do not request previews.
 
-Player settings offer supported Quality, Audio and Caption tracks, speed from
-0.25× to 2×, Audio only, Picture in picture and Refresh buffer.
+Player settings offer supported Quality, Audio and Caption tracks and speed from
+0.25× to 2×. Expand More for Annotations, Audio only, Picture in picture, Refresh buffer
+and Playback statistics. The statistics overlay offers live source/decoder/buffer/
+network details, 60-second graphs and Copy diagnostics without changing playback.
 The Captions menu and Settings → Playback share a caption appearance editor with
 a native preview, text size, font, text/background/window colors and opacity,
 edge styles and reset. Styling saves per profile and instance on this device,
@@ -110,7 +112,7 @@ playback pauses when leaving outside PiP. Audio only disables video decoding tra
 
 ## Legacy annotations and phone 360° viewing
 
-Player settings → Annotations enables archived overlays for the current queue
+Player settings → More → Annotations enables archived overlays for the current queue
 occurrence. Available text boxes, speech bubbles, labels, titles and highlights
 follow playback time, seeks, speed and clip bounds. Tap links to navigate or seek;
 use the close icon to dismiss an annotation. Missing archives show an empty state;
@@ -119,7 +121,8 @@ the selected instance, without account credentials. Mini-player, PiP, background
 audio-only and downloaded playback suspend annotation loading and overlays.
 
 Player settings → Viewing mode offers Automatic, Flat, 360° equirectangular and
-360° EAC. Automatic recognizes video projection metadata and the shared automatic
+360° EAC. This row appears only for videos marked with supported VR projection
+metadata and remains available when Flat is selected or automatic VR is off. Automatic recognizes video projection metadata and the shared automatic
 360° preference. Drag to look around, use the directional buttons for accessible
 navigation, and Recenter to reset the view. Device motion is optional and starts
 off. Mini-player and PiP preserve the viewpoint while motion tracking pauses.

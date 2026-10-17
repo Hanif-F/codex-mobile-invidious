@@ -106,3 +106,10 @@ internal fun assertLabelGlyphsFit(layout: androidx.compose.ui.text.TextLayoutRes
         org.junit.Assert.assertFalse("$label is ellipsized",layout.isLineEllipsized(layout.getLineForOffset(index)))
     }
 }
+
+/** Expand the secondary player actions only when the sheet is currently collapsed. */
+internal fun ComposeTestRule.expandPlayerSettingsMore() {
+    onNodeWithTag("player-settings-list").performScrollToNode(hasTestTag("player-settings-more"))
+    val more = onNodeWithTag("player-settings-more")
+    if (more.fetchSemanticsNode().config[SemanticsProperties.StateDescription] == "Collapsed") more.performClick()
+}

@@ -131,12 +131,12 @@ import kotlin.math.roundToInt
                 Icon(Icons.Default.MoreVert, "Chat menu")
             }
             AppDropdownMenu(expanded = menu, dismiss = { menu = false }) {
-                DropdownMenuItem(text = { Text("Chat settings") }, leadingIcon = { Icon(Icons.Default.Settings, null) },
+                ActionMenuItem("Chat settings", Icons.Default.Settings,
                     onClick = { menu = false; settings() }, modifier = Modifier.testTag("chat-settings"))
-                if (adjustOverlay != null) DropdownMenuItem(text = { Text("Adjust overlay") },
-                    leadingIcon = { Icon(Icons.Default.OpenInFull, null) }, onClick = { menu = false; adjustOverlay() },
+                if (adjustOverlay != null) ActionMenuItem("Adjust overlay", Icons.Default.OpenInFull,
+                     onClick = { menu = false; adjustOverlay() },
                     modifier = Modifier.testTag("chat-overlay-edit"))
-                DropdownMenuItem(text = { Text("Close chat") }, leadingIcon = { Icon(Icons.Default.Close, null) },
+                ActionMenuItem("Close chat", Icons.Default.Close,
                     onClick = { menu = false; close() }, modifier = Modifier.testTag("chat-menu-close"))
             }
         }

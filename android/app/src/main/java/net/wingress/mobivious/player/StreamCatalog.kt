@@ -188,13 +188,18 @@ object StreamCatalog {
             value.startsWith("vp09") || value == "vp9" -> "VP9"
             value.startsWith("vp08") || value == "vp8" -> "VP8"
             value.startsWith("av01") || value == "av1" -> "AV1"
-            value.startsWith("mp4a") -> "AAC"
+            value.startsWith("mp4a") || value == "aac" -> "AAC"
             value.contains("opus") -> "Opus"
+            value == "vorbis" -> "Vorbis"
+            value == "flac" -> "FLAC"
+            value in listOf("ac-3", "ac3") -> "AC-3"
+            value in listOf("ec-3", "eac3") -> "E-AC-3"
             token.isNotEmpty() -> token
             else -> when (mime) {
                 "video/avc" -> "H.264"; "video/hevc" -> "HEVC"; "video/x-vnd.on2.vp9" -> "VP9"
                 "video/x-vnd.on2.vp8" -> "VP8"; "video/av01" -> "AV1"; "audio/mp4a-latm" -> "AAC"; "audio/opus" -> "Opus"
-                "video/mp4", "video/webm" -> ""
+                "audio/vorbis" -> "Vorbis"; "audio/flac" -> "FLAC"; "audio/ac3" -> "AC-3"; "audio/eac3" -> "E-AC-3"
+                "video/mp4", "video/webm", "audio/mp4", "audio/webm", "audio/ogg", "application/ogg" -> ""
                 else -> mime.substringAfter('/', "")
             }
         }

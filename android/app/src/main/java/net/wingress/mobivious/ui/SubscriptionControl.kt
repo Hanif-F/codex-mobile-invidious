@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Unsubscribe
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -47,7 +48,7 @@ internal fun SubscriptionControl(subscribed: Boolean, onChange: () -> Unit, modi
                 }
             }
             AppDropdownMenu(expanded && !busy, { expanded = false }) {
-                DropdownMenuItem(text = { Text("Unsubscribe") }, modifier = Modifier.testTag("subscription-unsubscribe"),
+                ActionMenuItem("Unsubscribe", Icons.Default.Unsubscribe, destructive = true, modifier = Modifier.testTag("subscription-unsubscribe"),
                     onClick = { expanded = false; onChange() })
             }
         }

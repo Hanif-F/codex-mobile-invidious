@@ -5,7 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
@@ -89,10 +89,11 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
             LibraryActionButton("Play", icon = Icons.Default.PlayArrow, prominent = true, onClick = play)
             PlaylistSubscriptionButton(vm, list, signIn)
             OverflowMenu("Actions for playlist ${list.title}", listOf(list, vm.api.context(), owned), Modifier.size(48.dp).testTag("playlist-actions-${list.id}")) { close ->
-                DropdownMenuItem(text = { Text("RSS") }, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
+                ActionMenuItem("RSS", Icons.Default.RssFeed, onClick = { close(); vm.openPlaylistRss(list.copy(owned = owned)) })
                 if (owned) {
-                    DropdownMenuItem(text = { Text("Edit playlist") }, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
-                    DropdownMenuItem(text = { Text("Delete playlist") }, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
+                    ActionMenuItem("Edit playlist", Icons.Default.Edit, onClick = { close(); edit() }, modifier = Modifier.testTag("playlist-edit"))
+                    ActionMenuDivider()
+                    ActionMenuItem("Delete playlist", Icons.Default.Delete, destructive = true, onClick = { close(); delete() }, modifier = Modifier.testTag("playlist-delete"))
                 }
             }
         }

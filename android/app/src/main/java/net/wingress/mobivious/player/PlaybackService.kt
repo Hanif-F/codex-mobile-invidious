@@ -62,6 +62,7 @@ class PlaybackService : MediaSessionService() {
     private lateinit var queue: QueueCoordinator
     private lateinit var sessionPlayer: QueueSessionPlayer
     private lateinit var recovery: BufferRecovery
+    private lateinit var statistics: PlaybackStatisticsCollector
     private var recoveryOwner: Triple<ApiContext?, String, String?>? = null
     private var queueWasLoading = false
     private data class BufferSnapshot(val position: Long, val live: Boolean, val playing: Boolean,
@@ -100,6 +101,7 @@ class PlaybackService : MediaSessionService() {
             setWakeMode(PowerManager.PARTIAL_WAKE_LOCK)
         }
         queue = QueueCoordinator(app, player, trackSelector, scope) { persist() }
+        statistics = PlaybackStatisticsCollector(app, player, scope)
         recovery = BufferRecovery(scope, SystemClock::elapsedRealtime,
             refresh = { recoverySnapshot?.let(::refreshBuffer) },
             status = queue::recovering,
@@ -150,7 +152,7 @@ class PlaybackService : MediaSessionService() {
             val owner = Triple(state.context, state.token, state.currentKey)
             val changed = owner != recoveryOwner || state.loading && !queueWasLoading || state.context != app.api.context()
             recoveryOwner = owner; queueWasLoading = state.loading
-            if (changed) resetRecovery()
+            if (changed) { resetRecovery(); statistics.reset() }
             sessionPlayer.refresh()
         }
         session = MediaSession.Builder(this, sessionPlayer)
@@ -299,6 +301,7 @@ class PlaybackService : MediaSessionService() {
         player.playWhenReady, player.trackSelectionParameters, player.playbackParameters)
 
     private fun refreshBuffer(snapshot: BufferSnapshot) {
+        statistics.reset()
         // Keep the service's TrackGroups: MediaSession rewrites controller group IDs.
         player.stop()
         if (snapshot.live) player.seekToDefaultPosition() else player.seekTo(PlaybackRules.seek(snapshot.position, player.duration))
@@ -439,5 +442,5 @@ class PlaybackService : MediaSessionService() {
         return START_NOT_STICKY
     }
     override fun onTaskRemoved(rootIntent: Intent?) { if (!player.playWhenReady || !app.store.background) { player.pause(); stopSelf() } }
-    override fun onDestroy() { queue.close(); scope.cancel(); session.release(); sessionPlayer.release(); player.release(); super.onDestroy() }
+    override fun onDestroy() { queue.close(); statistics.release(); scope.cancel(); session.release(); sessionPlayer.release(); player.release(); super.onDestroy() }
 }

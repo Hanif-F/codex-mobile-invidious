@@ -106,9 +106,12 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             }
             OverflowMenu("Actions for clip ${maskedVideoTitle(vm, clip.video, clip.title)}", clip.id to account, Modifier.size(48.dp).testTag("clip-actions-${clip.id}")) { close ->
-                DropdownMenuItem(text = { Text("Share clip") }, onClick = { close(); shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } })
-                DropdownMenuItem(text = { Text("Copy link") }, onClick = { close(); copyClip(context, clip, vm) })
-                if (clip.owned(vm.api.context())) DropdownMenuItem(text = { Text("Delete clip") }, onClick = { close(); vm.confirmDeleteClip(clip) })
+                ActionMenuItem("Share clip", Icons.Default.Share, onClick = { close(); shareClip(context, clip, vm.displayTitle(clip.video, clip.title)) { vm.message.value = "No app could share this clip." } })
+                ActionMenuItem("Copy link", Icons.Default.ContentCopy, onClick = { close(); copyClip(context, clip, vm) })
+                if (clip.owned(vm.api.context())) {
+                    ActionMenuDivider()
+                    ActionMenuItem("Delete clip", Icons.Default.Delete, destructive = true, onClick = { close(); vm.confirmDeleteClip(clip) })
+                }
             }
         }
     }

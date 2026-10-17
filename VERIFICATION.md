@@ -1,5 +1,42 @@
 # Focused implementation verification
 
+## Playback statistics and diagnostic copying — 17 October 2026
+
+Source: Android `24b9f58` plus the statistics implementation and existing working
+tree changes. Debug package: `net.wingress.mobivious.debug`. Device: Android 16
+`emulator-5554`, Pixel_8_Pro. The release-key package was not changed.
+
+- **433 JVM tests** passed, including eight statistics bookkeeping/export tests.
+- **21 focused emulator cases** passed: nine new statistics cases, eight existing
+  automatic-recovery cases, two exact-track/audio refresh/reconnection cases, the
+  existing manual-buffer-refresh case and the existing PiP/wake-ownership case.
+  The final numeric-direction change also received a separate two-case statistics
+  presentation rerun with large-text light/dark RTL and clipboard-failure recovery.
+- Statistics acceptance covers More placement and On/Off state, actual decoder
+  metrics, fresh JSON copying without metadata requests, unchanged paused
+  playback, full-screen and recreation, rapid Back, mini-player/settings/background/
+  PiP suspension and restoration, source refresh and queue changes, DASH/HLS/
+  progressive/audio-only/live/downloaded playback, graphs and pinned controls.
+- Debug app/test APK builds and debug lint passed. Lint retains **0 errors and
+  33 warnings**; there is no new baseline or suppression file.
+- All **24 Python documentation/workflow tests**, documentation inventory/
+  fingerprint/link checks and Git whitespace checks passed. The reviewed catalog
+  contains **291 maintained files and 20 documents**.
+
+Evidence is in ignored `.tools/playback-statistics-final.log`,
+`.tools/playback-statistics-rtl-final.log`, `.tools/playback-statistics-python-final.log`
+and `.tools/playback-statistics-results/`. Visually reviewed captures are under
+`.tools/playback-statistics-preview/`; device originals use
+`/data/local/tmp/mobivious-ui/statistics-*.png`.
+
+The overlay observes existing service playback; no backend, dependency, permission
+or preference migration is required. Media-load metrics are Media3 callbacks,
+not a trace of all HTTP traffic. Progressive transfer bytes/speed can remain
+pending until a load finishes. Missing and offline-only fields are explicitly
+unavailable. Fixtures establish Android behavior rather than production bandwidth,
+upstream availability or physical-device decoder performance. The complete device
+suite and optimized release variant were not rerun for this feature.
+
 ## Mobivious 0.12.3 release — 16 October 2026
 
 Application source: `76b5a09` plus the version-only Android configuration change

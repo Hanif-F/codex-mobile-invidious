@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -15,6 +16,7 @@ import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.automirrored.filled.Comment
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.motionEventSpy
@@ -85,6 +88,12 @@ internal fun VideoPlayer(
     val preferences by vm.preferences.collectAsStateWithLifecycle()
     val viewing by vm.viewing.collectAsStateWithLifecycle()
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val statisticsUi by vm.playbackStatistics.ui.collectAsStateWithLifecycle()
+    val statisticsSnapshot by vm.playbackStatistics.snapshot.collectAsStateWithLifecycle()
+    val statisticsVisible = controls && chromeVisible && gesturesEnabled && !settingsOpen &&
+        presentation in listOf(PlayerPresentation.WATCH, PlayerPresentation.FULLSCREEN) && lifecycle.isAtLeast(Lifecycle.State.RESUMED)
+    LaunchedEffect(statisticsVisible) { vm.playbackStatistics.visible(statisticsVisible) }
+    DisposableEffect(vm) { onDispose { vm.playbackStatistics.visible(false) } }
     val immersive = playback.projection != Projection.FLAT
     LaunchedEffect(controls, presentation, lifecycle, playback.videoEnabled, playback.details, viewing.annotations) {
         vm.configurePlayerTools(controls && presentation != PlayerPresentation.MINI && lifecycle.isAtLeast(Lifecycle.State.RESUMED))
@@ -170,6 +179,7 @@ internal fun VideoPlayer(
     Box(modifier.graphicsLayer { alpha = surfaceAlpha }.background(Color.Black).testTag("player-surface")
         .onGloballyPositioned {
             inputOrigin = it.positionInRoot()
+            vm.playbackStatistics.viewport(it.size.width, it.size.height, density.density)
             val bounds = it.boundsInWindow()
             activity?.updatePipSource(android.graphics.Rect(bounds.left.toInt(), bounds.top.toInt(), bounds.right.toInt(), bounds.bottom.toInt()))
         }) {
@@ -332,7 +342,10 @@ internal fun VideoPlayer(
                     .fillMaxWidth(1f / 3f).padding(horizontal = 4.dp)
                     .then(if (pendingSeek != null) Modifier.testTag("pending-seek") else Modifier))
             }
-
+            if (statisticsVisible && statisticsUi.enabled) {
+                PlaybackStatisticsOverlay(statisticsUi, statisticsSnapshot, vm.playbackStatistics,
+                    Modifier.matchParentSize(), playback.playWhenReady, vm::togglePlay)
+            }
         }
     }
 }
@@ -392,7 +405,12 @@ private fun PlaybackState.trackChoices(type: Int): List<PlayerTrack> = tracks.gr
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: () -> Unit, pip: () -> Unit, supportsPip: Boolean) {
-    var page by rememberSaveable(playback.mediaId) { mutableStateOf("Player settings") }
+    val queue by vm.queue.collectAsStateWithLifecycle()
+    val annotations by vm.annotations.collectAsStateWithLifecycle()
+    val viewing by vm.viewing.collectAsStateWithLifecycle()
+    val statistics by vm.playbackStatistics.ui.collectAsStateWithLifecycle()
+    var page by rememberSaveable(queue.context, queue.currentKey, playback.mediaId) { mutableStateOf("Player settings") }
+    var moreExpanded by rememberSaveable(queue.context, queue.currentKey, playback.mediaId) { mutableStateOf(false) }
     val formats = playback.details?.formats.orEmpty()
     val video = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_VIDEO, formats)
     val audio = StreamCatalog.choices(playback.tracks, C.TRACK_TYPE_AUDIO, formats)
@@ -417,20 +435,33 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
             Column(Modifier.fillMaxWidth().weight(1f, fill = false).verticalScroll(rememberScrollState())
                 .testTag("player-settings-list").padding(vertical = 8.dp)) {
                 if (page == "Player settings") {
-                    run { SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable", available && !audioOnly && video.isNotEmpty()) { page = "Quality" } }
-                    run { SettingRow("Audio", selectedAudio?.primary ?: "Unavailable", available && audio.isNotEmpty()) { page = "Audio" } }
-                    run { SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off") { page = "Captions" } }
-                    run { SettingRow("Annotations", if (vm.annotations.collectAsStateWithLifecycle().value.enabled) "On" else "Off") { page = "Annotations" } }
-                    run { SettingRow("Viewing mode", vm.viewing.collectAsStateWithLifecycle().value.mode.label, !audioOnly) { page = "Viewing mode" } }
-                    run { SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed) { page = "Playback speed" } }
-                    run {
-                        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = available) { vm.audioOnly(!audioOnly) }.padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("Audio only", Modifier.weight(1f), color = if (available) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .38f))
-                            Switch(checked = audioOnly, onCheckedChange = vm::audioOnly, enabled = available)
-                        }
+                    SettingRow("Quality", if (video.isEmpty()) "Unavailable" else if (qualityAuto) "Auto" else selectedVideo?.let(StreamCatalog::qualityText) ?: "Unavailable",
+                        available && !audioOnly && video.isNotEmpty(), icon = Icons.Default.HighQuality) { page = "Quality" }
+                    SettingRow("Audio", selectedAudio?.primary ?: "Unavailable", available && audio.isNotEmpty(), icon = Icons.Default.Audiotrack) { page = "Audio" }
+                    SettingRow("Captions", if (captions.isEmpty()) "Unavailable" else selectedCaption?.label ?: "Off", icon = Icons.Default.ClosedCaption) { page = "Captions" }
+                    SettingRow("Playback speed", speedLabel(playback.speed), !playback.loading && playback.canSetSpeed, icon = Icons.Default.Speed) { page = "Playback speed" }
+                    if (playback.details?.projectionType in listOf("EQUIRECTANGULAR", "MESH")) {
+                        SettingRow("Viewing mode", viewing.mode.label, !audioOnly, icon = Icons.Default.ViewInAr) { page = "Viewing mode" }
                     }
-                    run { SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device", supportsPip && playback.details != null && playback.error == null && !playback.loading) { dismiss(); pip() } }
-                    run { SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading) { dismiss(); vm.refreshBuffer() } }
+                    PlayerSettingsMore(moreExpanded, { moreExpanded = it }) {
+                        SettingRow("Annotations", if (annotations.enabled) "On" else "Off", icon = Icons.AutoMirrored.Filled.Comment) { page = "Annotations" }
+                        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                            .toggleable(audioOnly, enabled = available, role = Role.Switch, onValueChange = vm::audioOnly)
+                            .padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (available) 1f else .38f)
+                            Icon(Icons.Default.Headphones, null, Modifier.size(24.dp), tint = color)
+                            Text("Audio only", Modifier.weight(1f), color = color)
+                            Switch(checked = audioOnly, onCheckedChange = null, enabled = available)
+                        }
+                        SettingRow("Picture in picture", if (supportsPip) "" else "Unavailable on this device",
+                            supportsPip && playback.details != null && playback.error == null && !playback.loading,
+                            icon = Icons.Default.PictureInPictureAlt, opensPage = false) { dismiss(); pip() }
+                        SettingRow("Refresh buffer", enabled = playback.canRefresh && !playback.loading,
+                            icon = Icons.Default.Refresh, opensPage = false) { dismiss(); vm.refreshBuffer() }
+                        SettingRow("Playback statistics", if (statistics.enabled) "On" else "Off",
+                            icon = Icons.Default.QueryStats, opensPage = false) { vm.playbackStatistics.toggle(); dismiss() }
+                    }
                 } else when (page) {
                     "Annotations" -> AnnotationSettings(vm, playback)
                     "Viewing mode" -> ViewingSettings(vm, playback)
@@ -453,7 +484,7 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
                         }
                     }
                     "Captions" -> {
-                        run { SettingRow("Caption appearance") { page = "Caption appearance" } }
+                        run { SettingRow("Caption appearance", icon = Icons.Default.TextFormat) { page = "Caption appearance" } }
                         captionFailure?.takeIf { failure ->
                             val selected = selectedCaption?.let { it.group.getFormat(it.index) }
                             failure.occurrence == vm.queue.value.currentKey && selection?.disabledTrackTypes?.contains(C.TRACK_TYPE_TEXT) != true &&
@@ -477,16 +508,35 @@ internal fun PlayerSettings(vm: AppViewModel, playback: PlaybackState, dismiss: 
 }
 
 @Composable
-private fun SettingRow(label: String, value: String = "", enabled: Boolean = true, click: () -> Unit) {
+internal fun PlayerSettingsMore(expanded: Boolean, change: (Boolean) -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    SettingRow("More", icon = Icons.Default.MoreHoriz, opensPage = false,
+        trailingIcon = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+        modifier = Modifier.testTag("player-settings-more").semantics { stateDescription = if (expanded) "Expanded" else "Collapsed" }) { change(!expanded) }
+    if (expanded) Column(content = content)
+}
+
+@Composable
+private fun SettingRow(label: String, value: String = "", enabled: Boolean = true,
+    icon: ImageVector, opensPage: Boolean = true, trailingIcon: ImageVector? = null,
+    modifier: Modifier = Modifier, click: () -> Unit) {
     val stacked = LocalDensity.current.fontScale > 1.3f
-    val modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = click)
-        .padding(horizontal = 16.dp, vertical = 12.dp)
-    if (stacked) Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(label, color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
-        if (value.isNotEmpty()) Text(value, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f), style = MaterialTheme.typography.bodyMedium)
-    } else Row(modifier, verticalAlignment = Alignment.CenterVertically) {
-        Text(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f))
-        if (value.isNotEmpty()) Text(value, Modifier.padding(start = 16.dp).widthIn(max = 200.dp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f), style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    val color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else .38f)
+    val detailColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else .38f)
+    Row(modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, role = Role.Button, onClick = click)
+        .padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Icon(icon, null, Modifier.size(24.dp), tint = color)
+        if (stacked) Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(label, color = color)
+            if (value.isNotEmpty()) Text(value, color = detailColor, style = MaterialTheme.typography.bodyMedium)
+        } else Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, Modifier.weight(1f), color = color)
+            if (value.isNotEmpty()) Text(value, Modifier.padding(start = 16.dp).widthIn(max = 160.dp),
+                color = detailColor, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        val trailing = trailingIcon ?: if (opensPage) Icons.Default.ChevronRight else null
+        if (trailing != null) Icon(trailing, null, Modifier.size(24.dp), tint = detailColor)
     }
 }
 

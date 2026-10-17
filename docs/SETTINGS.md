@@ -211,7 +211,13 @@ current link options, then carried session options (listen/speed/local). A null
 link option inherits; false and empty subtitle/comment lists are explicit values.
 These link options never patch saved account defaults. Annotation and automatic
 360° defaults apply to the active video unless a link or menu overrides them.
-The Annotations menu offers a per-occurrence override and Use playback default.
+Player settings → More → Annotations offers a per-occurrence override and Use playback default.
+More also contains Audio only, Picture in picture, Refresh buffer and Playback statistics.
+Statistics is a session toggle: its compact/expanded overlay survives queue changes
+and recreation, temporarily hides in mini-player/PiP/background/settings, and resets
+its measurements for each source. Details includes Copy diagnostics; no preference
+or account setting is saved. Viewing mode
+appears only for supported VR video metadata, including while using Flat mode.
 Viewing mode, device motion (initially off), yaw/pitch and dismissed annotations
 are session state; they survive Activity recreation and reset on occurrence changes.
 `annotations` overrides `iv_load_policy` (`1` on, `3` off); `vr_mode` is a boolean

@@ -177,6 +177,8 @@ class AppSmokeTest {
         compose.runOnUiThread { assertTrue(activity.model.controller.value!!.trackSelectionParameters.overrides.values.any { it.type == C.TRACK_TYPE_AUDIO }) }
         compose.onNodeWithText("Quality").performClick()
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+        compose.expandPlayerSettingsMore()
+        compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Refresh buffer"))
         compose.onNodeWithText("Refresh buffer").assertExists()
         compose.onNodeWithContentDescription("Close player settings").performClick()
         showControls()
@@ -199,6 +201,7 @@ class AppSmokeTest {
         compose.onNodeWithContentDescription("Exit full screen").assertExists()
         compose.onNodeWithContentDescription("Player settings").performClick()
         screenshot("player-settings-landscape")
+        compose.expandPlayerSettingsMore()
         compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Picture in picture"))
         compose.onNodeWithText("Picture in picture").assertIsDisplayed()
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
@@ -240,6 +243,8 @@ class AppSmokeTest {
         val requests = fixture().getInt("mediaRequests")
         showControls()
         compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.expandPlayerSettingsMore()
+        compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Refresh buffer"))
         compose.onNodeWithText("Refresh buffer").performClick()
         waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY && fixture().getInt("mediaRequests") > requests }
         compose.runOnUiThread {
@@ -325,6 +330,7 @@ class AppSmokeTest {
         compose.onNodeWithTag("mini-player-preview").performClick()
         showControls()
         compose.onNodeWithContentDescription("Player settings").performClick()
+        compose.expandPlayerSettingsMore()
         compose.onNodeWithTag("player-settings-list").performScrollToNode(hasText("Picture in picture"))
         compose.onNodeWithText("Picture in picture").performClick()
         waitFor { activity.isInPictureInPictureMode }

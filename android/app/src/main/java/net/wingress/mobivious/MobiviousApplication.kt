@@ -31,6 +31,7 @@ class MobiviousApplication : Application() {
     private val titleScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val offline = MutableStateFlow(false)
     val playbackQueue = MutableStateFlow(PlaybackQueueSnapshot())
+    internal val playbackStatistics = net.wingress.mobivious.player.PlaybackStatistics()
     val playbackContext = MutableStateFlow<ApiContext?>(null)
     val captionFailure = MutableStateFlow<net.wingress.mobivious.player.CaptionLoadFailure?>(null)
     internal val storyboardImages by lazy { net.wingress.mobivious.ui.StoryboardImages(this) }

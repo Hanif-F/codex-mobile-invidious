@@ -538,7 +538,7 @@ class PlaybackVisibilitySmokeTest {
                     }
                     compose.onNodeWithTag("watch-details-list").performScrollToNode(hasTestTag("watch-actions"))
                     compose.onNodeWithText("Suggest / vote on titles").assertDoesNotExist()
-                    compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
+                    compose.onNodeWithText("SponsorBlock settings").assertDoesNotExist()
                     compose.onNodeWithTag("watch-more").performScrollTo().performClick()
                     compose.onNodeWithText("DeArrow Title").assertIsDisplayed().performClick()
                     until { activity.model.dearrowContribution.value.open }

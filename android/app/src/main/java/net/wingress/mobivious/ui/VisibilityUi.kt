@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
+import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -23,7 +26,8 @@ internal fun BlockChannelMenuItem(vm: AppViewModel, id: String, name: String, si
     val state by vm.blocked.collectAsStateWithLifecycle()
     val context = state.context ?: vm.api.context()
     if (!ContentVisibility.validChannel(id)) return
-    DropdownMenuItem(text = { Text(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel") },
+    ActionMenuItem(if (id in state.busy) "Saving…" else if (id in state.ids) "Unblock channel" else "Block channel",
+        if (id in state.ids) Icons.AutoMirrored.Filled.Undo else Icons.Default.Block,
         onClick = { close(); vm.toggleBlocked(id, name, context) }, enabled = id !in state.busy,
         modifier = modifier)
 }

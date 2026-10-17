@@ -131,11 +131,11 @@ class SponsorBlockSmokeTest {
         until { activity.model.preferences.value.sponsorBlock.channels.containsKey(id) && activity.model.tab == "You" }
         compose.selectFeed("Popular")
         openVideo(); assertEquals(0, fixture().getInt("sponsorRequests"))
-        compose.onNodeWithText("Channel SponsorBlock settings").assertDoesNotExist()
+        compose.onNodeWithText("SponsorBlock settings").assertDoesNotExist()
         compose.onAllNodes(hasText("Mobivious Studio") and hasClickAction() and hasAnyAncestor(hasTestTag("watch-details-list"))).onFirst().performScrollTo().performClick()
         until { activity.model.channel.value?.id == id }
         compose.onNodeWithTag("channel-actions-$id").performScrollTo().performClick()
-        compose.onNodeWithText("Channel SponsorBlock settings").performClick()
+        compose.onNodeWithText("SponsorBlock settings").performClick()
         compose.onNodeWithTag("sponsor-channel-enabled").assert(hasText("Disabled")).performClick()
         command("sponsorblock", """{"failPreferences":true}""")
         compose.onNodeWithText("Enabled").performClick()

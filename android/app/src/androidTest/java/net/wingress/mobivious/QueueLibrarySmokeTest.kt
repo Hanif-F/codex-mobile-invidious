@@ -202,7 +202,7 @@ class QueueLibrarySmokeTest {
     }
     @Test fun audioMenuStartsWithoutVideoAndCarriesThroughNext() {
         compose.onAllNodesWithTag("video-actions-testvideo01").onFirst().performClick()
-        compose.onNodeWithText("Audio mode").performClick()
+        compose.onNodeWithText("Play audio only").performClick()
         waitFor { activity.model.playback.value.playing }
         ui { assertTrue(C.TRACK_TYPE_VIDEO in activity.model.controller.value!!.trackSelectionParameters.disabledTrackTypes) }
         ui { activity.model.insertQueue(Video("testvideo02", "Next audio"), true) }

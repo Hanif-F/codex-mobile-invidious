@@ -25,6 +25,23 @@ internal fun AppDropdownMenu(expanded: Boolean, dismiss: () -> Unit, content: @C
         tonalElevation=0.dp,shadowElevation=3.dp,content=content)
 }
 
+/** Action icons share the label's enabled/destructive colors and are decorative to accessibility. */
+@Composable
+internal fun ActionMenuItem(label: String, icon: ImageVector, modifier: Modifier = Modifier,
+    enabled: Boolean = true, destructive: Boolean = false, onClick: () -> Unit) {
+    val color = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
+    DropdownMenuItem(text = { Text(label) }, leadingIcon = { Icon(icon, null, Modifier.size(24.dp)) },
+        modifier = modifier.heightIn(min = 48.dp), enabled = enabled, onClick = onClick,
+        colors = MenuDefaults.itemColors(textColor = color, leadingIconColor = color,
+            disabledTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .38f),
+            disabledLeadingIconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = .38f)))
+}
+
+@Composable
+internal fun ActionMenuDivider() {
+    HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
+}
+
 /** Reset open menus when their entity/account changes; callers close before dispatching actions. */
 @Composable
 internal fun OverflowMenu(description: String, resetKey: Any?, modifier: Modifier = Modifier,

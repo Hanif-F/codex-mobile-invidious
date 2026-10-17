@@ -50,7 +50,7 @@ commands use a separate media/token pair. Old controls cannot mutate a new sessi
 Start precedence includes explicit position/time, bounded-link start, then saved
 resume as applicable. Saved resume within 20 seconds of the end restarts at zero.
 An explicit time overrides resume. Live media retains its real live window.
-Refresh buffer stops/prepares the same item, seeks to the default live position
+Player settings → More → Refresh buffer stops/prepares the same item, seeks to the default live position
 for live content, and otherwise keeps position. Retry refetches expired stream
 metadata and retains the requested playing intent and supported selections.
 
@@ -65,6 +65,40 @@ budget; otherwise only 30 seconds of continuously advancing playback replenishes
 it. READY and clearing an error alone cannot create an unlimited retry loop.
 `MobiviousRecovery` log entries record codes, cause classes, available HTTP status/
 load stage and outcomes without signed URLs, credentials or response bodies.
+
+## Playback statistics
+
+Player settings → More → Playback statistics toggles an observational overlay.
+The compact view shows decoded resolution, dropped/total frames, buffer ahead and
+the last completed media-load speed. Details adds active quality/codecs/FPS/bitrate,
+video ID and mode, viewport/density, loaded bytes, media-load/error/timeout/cancellation
+counts, playback state, observed buffering and available live-edge distance, plus
+buffer/speed graphs for the last 60 seconds. Header actions keep playback,
+collapse/close and diagnostic copying accessible while the details scroll.
+
+`PlaybackStatisticsCollector` observes the service's real ExoPlayer. Typed snapshots
+flow through the application to Compose; no metadata requests, track changes or
+player preparation are triggered by the overlay. Load counters exclude manifests,
+captions and offline file reads. Bytes are cumulative load-task deltas and update
+when Media3 reports the load, including errors; progressive playback may not report
+its completed transfer until the end. Speed describes a completed load rather than
+internet capacity. FPS/bitrate come from active formats, not a requested quality.
+Missing values say Waiting for data or Unavailable. Offline network fields are
+unavailable. Frames exclude skipped outputs, such as those skipped during seeks.
+
+Enabled/expanded state survives queue advancement, fullscreen and Activity recreation
+until disabled or the playback session is closed. Source changes, Retry and buffer
+refresh reset measurements and reject obsolete load events. One-second sampling,
+graphs and observed buffering suspend while the panel is hidden in mini-player,
+PiP, background or settings. Network/frame event counters still belong to the
+current source. Startup, seeking and paused buffering do not add observed stalls.
+
+Copy diagnostics captures a fresh, versioned JSON snapshot with application/player
+versions, metric display values with units and explicit availability reasons. The
+serializer allows only diagnostic fields; signed URLs, local paths, credentials,
+headers, exception messages and response bodies are excluded. Copy success is
+announced accessibly; failure retains selectable JSON and the copy action retries it.
+This feature requires no backend update or saved preference migration.
 
 ## Occurrences, source pages and successors
 

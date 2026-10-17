@@ -108,6 +108,41 @@ primary-container selection. Focus, selected state, disabled state, errors,
 progress and ripple remain native. [Storage](STORAGE_AND_SECURITY.md) describes
 appearance-key migration and retained saved values.
 
+## Action menus and player settings
+
+Action menus use decorative 24dp Material icons, text labels and at least 48dp
+row targets, with shared enabled and destructive colors. Video actions group
+Play next/Add to queue/Play audio only, Save to playlist/Download, Block channel,
+and any removal actions using dividers between populated groups. Channel navigation
+uses the existing avatar/author link rather than a video-menu action.
+Channel title and thumbnail settings belong to channel pages and Settings rather
+than individual video menus. Sort/filter selectors retain their selection checks.
+
+Player settings place Quality, Audio, Captions and Playback speed first. Viewing
+mode appears only for metadata-marked equirectangular or EAC videos, including
+when Flat is selected or automatic VR is off. More expands inline to show
+Annotations, Audio only, Picture in picture, Refresh buffer and Playback statistics. It starts
+collapsed on each opening, preserves expansion through nested pages and activity
+recreation while open, and resets for a new occurrence. Icons, page chevrons,
+expanded/collapsed semantics and stacked values at large text keep rows readable.
+
+Playback statistics overlays the picture with a compact four-metric view and a
+scrollable detailed view. Its pinned header exposes playback, expand/collapse,
+Close and (in Details) Copy diagnostics; the timeline/fullscreen footer stays
+available. Panel input cannot fall through to seeking, panning or minimizing.
+Back collapses Details, then closes statistics before normal watch navigation.
+The session toggle survives fullscreen/recreation and queue changes; sampling and
+the panel suspend in mini-player, PiP, background and player settings. Copy failures
+retain selectable JSON with retry; success uses an accessible status message.
+
+Download choices and saved-download details share two-line media labels: video
+resolution/frame rate/codec or audio track name/codec above available language,
+Stable volume, bitrate and size. Friendly codec names match playback (AV1,
+H.264, HEVC, VP9, AAC, Opus and others); unknown identifiers remain visible and
+missing codec metadata says Unknown codec. Container names are not codec names.
+Technical values keep their numbers beside their units in RTL layouts.
+Raw metadata and selection identities remain unchanged.
+
 ## App icon and splash
 
 Mobivious uses a flat angular cyan M (`#00B6F0`) and pale dot (`#F0F0F0`) on

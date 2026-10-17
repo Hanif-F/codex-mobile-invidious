@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,13 +35,36 @@ import coil.compose.AsyncImage
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.downloads.DownloadExportService
 import net.wingress.mobivious.player.StreamCatalog
+import kotlin.math.roundToInt
 
-private fun choiceLabel(choice: DownloadChoice): String {
-    if (choice.kind == DownloadKind.CAPTION) return listOf(choice.label, choice.language).filter(String::isNotBlank).joinToString(" · ")
+internal data class DownloadChoiceLabel(val primary: String, val secondary: String = "")
+
+internal fun downloadChoiceLabel(choice: DownloadChoice): DownloadChoiceLabel {
+    if (choice.kind == DownloadKind.CAPTION) return DownloadChoiceLabel(
+        choice.label.ifBlank { "Caption" }, choice.language)
     val format = choice.format
-    return listOf(if (choice.kind == DownloadKind.VIDEO) "${format.height}p${if (format.fps > 0) " · ${format.fps.toInt()} fps" else ""}" else listOf(format.audio?.name?.takeIf(String::isNotBlank) ?: "Audio", format.audio?.id?.substringBefore('.')?.takeIf { it.matches(Regex("[A-Za-z]{2,3}(-[A-Za-z0-9]+)*")) }).filterNotNull().joinToString(" · "),
-        format.codec, if (format.drc == true) "Stable volume" else "", StreamCatalog.bitrateLabel(format.bitrate), StreamCatalog.bytesLabel(format.bytes))
-        .filter(String::isNotBlank).joinToString(" · ")
+    val codec = StreamCatalog.codecLabel(format.codec, format.mimeType).ifBlank { "Unknown codec" }
+    val primary = if (choice.kind == DownloadKind.VIDEO) listOf(
+        if (format.height > 0) "${format.height}p" else "Video",
+        if (format.fps > 0 && format.fps.isFinite()) "${format.fps.roundToInt()} fps" else "", codec)
+    else listOf(format.audio?.name?.takeIf(String::isNotBlank) ?: "Audio", codec)
+    val language = if (choice.kind == DownloadKind.AUDIO) format.audio?.id?.substringBefore('.')
+        ?.takeIf { it.matches(Regex("[A-Za-z]{2,3}(-[A-Za-z0-9]+)*")) }.orEmpty() else ""
+    return DownloadChoiceLabel(primary.filter(String::isNotBlank).joinToString(" · "),
+        listOf(language, if (format.drc == true) "Stable volume" else "",
+            StreamCatalog.bitrateLabel(format.bitrate), StreamCatalog.bytesLabel(format.bytes))
+            .filter(String::isNotBlank).joinToString(" · "))
+}
+
+@Composable
+internal fun DownloadChoiceText(choice: DownloadChoice, modifier: Modifier = Modifier) {
+    val label = downloadChoiceLabel(choice)
+    Column(modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(label.primary, style = MaterialTheme.typography.bodyMedium)
+        // Keep numeric values beside their technical units in RTL layouts too.
+        if (label.secondary.isNotBlank()) Text(label.secondary, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Ltr),
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
@@ -61,13 +86,13 @@ internal fun DownloadDialog(vm: AppViewModel) {
                         val selected = if (kind == DownloadKind.VIDEO) state.selection.video else state.selection.audio
                         fun pick(key: String?) { vm.selectDownload(if (kind == DownloadKind.VIDEO) state.selection.copy(video = key) else state.selection.copy(audio = key)) }
                         run {
-                            Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { pick(null) }, verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected == null, { pick(null) }, enabled = !state.busy, modifier = Modifier.testTag("download-${kind.name.lowercase()}-none")); Text("None")
+                            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected == null, enabled = !state.busy, role = Role.RadioButton, onClick = { pick(null) }).testTag("download-${kind.name.lowercase()}-none"), verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected == null, null, enabled = !state.busy, modifier = Modifier.size(48.dp)); Text("None")
                             }
                         }
                         catalog.choices.filter { it.kind == kind }.forEach { choice ->
-                            Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { pick(choice.key) }.testTag("download-choice-${choice.key}"), verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(selected == choice.key, { pick(choice.key) }, enabled = !state.busy); Text(choiceLabel(choice), style = MaterialTheme.typography.bodyMedium)
+                            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected == choice.key, enabled = !state.busy, role = Role.RadioButton, onClick = { pick(choice.key) }).testTag("download-choice-${choice.key}"), verticalAlignment = Alignment.CenterVertically) {
+                                RadioButton(selected == choice.key, null, enabled = !state.busy, modifier = Modifier.size(48.dp)); DownloadChoiceText(choice, Modifier.weight(1f))
                             }
                         }
                         } }
@@ -76,7 +101,7 @@ internal fun DownloadDialog(vm: AppViewModel) {
                     catalog.choices.filter { it.kind == DownloadKind.CAPTION }.forEach { choice ->
                         fun toggle() = vm.selectDownload(state.selection.copy(captions = if (choice.key in state.selection.captions) state.selection.captions - choice.key else state.selection.captions + choice.key))
                         Row(Modifier.fillMaxWidth().clickable(enabled = !state.busy) { toggle() }.testTag("download-choice-${choice.key}"), verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(choice.key in state.selection.captions, { toggle() }, enabled = !state.busy); Text(choiceLabel(choice))
+                            Checkbox(choice.key in state.selection.captions, { toggle() }, enabled = !state.busy); DownloadChoiceText(choice, Modifier.weight(1f))
                         }
                     }
                     } }
@@ -157,12 +182,13 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                             DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
                         OverflowMenu("Actions for download ${maskedVideoTitle(vm, video, offline = true)}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->
-                            DropdownMenuItem(text = { Text("Details") }, modifier = Modifier.testTag("download-details-${record.id}"), onClick = { close(); details = true })
-                            if (record.active) DropdownMenuItem(text = { Text("Cancel") }, modifier = Modifier.testTag("download-cancel-${record.id}"), onClick = { close(); vm.cancelDownload(record.id) })
+                            ActionMenuItem("Details", Icons.Default.Info, modifier = Modifier.testTag("download-details-${record.id}"), onClick = { close(); details = true })
+                            if (record.active) ActionMenuItem("Cancel", Icons.Default.Cancel, modifier = Modifier.testTag("download-cancel-${record.id}"), onClick = { close(); vm.cancelDownload(record.id) })
                             if (record.assets.any { it.status in listOf(DownloadStatus.FAILED, DownloadStatus.CANCELLED) || it.status == DownloadStatus.QUEUED && it.transferId == 0L })
-                                DropdownMenuItem(text = { Text("Retry") }, modifier = Modifier.testTag("download-retry-${record.id}"), onClick = { close(); vm.retryDownload(record.id) })
-                            DropdownMenuItem(text = { Text("Save to files") }, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
-                            DropdownMenuItem(text = { Text("Delete") }, onClick = { close(); deleting = record.id })
+                                ActionMenuItem("Retry", Icons.Default.Refresh, modifier = Modifier.testTag("download-retry-${record.id}"), onClick = { close(); vm.retryDownload(record.id) })
+                            ActionMenuItem("Save to files", Icons.Default.SaveAlt, enabled = record.playable && !export.busy, modifier = Modifier.testTag("download-save-${record.id}"), onClick = { close(); exporting = record.id })
+                            ActionMenuDivider()
+                            ActionMenuItem("Delete", Icons.Default.Delete, destructive = true, onClick = { close(); deleting = record.id })
                         }
                     }
                 }
@@ -173,7 +199,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                     LazyColumn(body.testTag("download-details-sheet"),contentPadding=PaddingValues(AppTokens.inset),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                         item {DeArrowTitle(vm, video, MaterialTheme.typography.titleLarge, offline = true);Text(status,style=MaterialTheme.typography.bodyMedium)}
                         items(record.assets.filterNot {it.artwork},key={it.choice.key},contentType={"download-asset"}) { asset ->
-                            Column {Text(choiceLabel(asset.choice),style=MaterialTheme.typography.bodyLarge)
+                            Column {DownloadChoiceText(asset.choice)
                                 Text(DisplayFormats.bytes(asset.bytes),style=MaterialTheme.typography.bodySmall)
                                 asset.error.takeIf {it.isNotBlank()}?.let {Text(it,color=MaterialTheme.colorScheme.error)} }
                         }

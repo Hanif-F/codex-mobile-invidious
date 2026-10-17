@@ -295,13 +295,15 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### DownloadsTest
 
-[Source](../../android/app/src/test/java/net/wingress/mobivious/DownloadsTest.kt) — Downloads declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/test/java/net/wingress/mobivious/DownloadsTest.kt) — Download identity, selection, persistence, export consent, progress and friendly codec/missing-metadata labels.
 
 - `selectionsRequireMediaAndKeepExactIdentities`
 - `repeatDownloadsCreateIndependentEntriesAndRoundTripAllAssets`
 - `restrictedCatalogAndCombinedOrInvalidChoicesCannotBeSelected`
 - `exportConsentBelongsToOnePendingDestinationAndSelection`
 - `progressIncludesAllSelectedFilesButNotArtworkAndKeepsUnknownTotalsIndeterminate`
+- `friendlyDownloadCodecNamesPreserveTrackMetadataAndSelectionKeys`
+- `unknownDownloadCodecsDoNotConfuseContainersWithCodecsOrInventQuality`
 
 ### HistorySearchTest
 
@@ -399,6 +401,19 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `creationAndFailedSaveRetryUseSamePlaylistAndStableRemovalId`
 - `staleReadsAndWritesDoNotReachNetwork`
 - `delayedResponseIsRejectedAfterReturningToSameAccountAndInstance`
+
+### PlaybackStatisticsTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/PlaybackStatisticsTest.kt) — Load-byte deduplication, visibility/stall exclusions, bounded history, frame/buffer calculations, JSON allowlist and session reset tests.
+
+- `loadBytesUseCumulativeDeltasAndCompletedTransferTime`
+- `unknownAndTerminalTasksCannotAddBytesOrInvalidSpeeds`
+- `observationExcludesHiddenTimeAndClosesAnActiveStall`
+- `startupPauseSeekAndErrorDoNotCountAsStalls`
+- `graphHistoryHasGapsAndIsBoundedByAgeAndCount`
+- `buffersAndFramesHandleUnknownZeroAndBackwardsValues`
+- `exportedSnapshotHasAllowlistedFieldsAndExplicitAvailability`
+- `closingTheSessionResetsVisibilityButNewSourceMeasurementsKeepItEnabled`
 
 ### PlaybackVisibilityTest
 
@@ -691,8 +706,10 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### AnnotationsViewingSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AnnotationsViewingSmokeTest.kt) — Decoded projection pixels, gestures, annotation interaction, clip time, defaults and lifecycle/offline device journeys.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AnnotationsViewingSmokeTest.kt) — Decoded 360 directions, annotations, projection/menu metadata, More lifecycle, guest/account defaults and offline/PiP behavior.
 
+- `moreStartsCollapsedRestoresWithinTheSheetAndResetsOnReopenAndNewOccurrence`
+- `vrMenuUsesMetadataWhenAutomaticViewingIsOffOrRenderingFails`
 - `equirectangularDecodedDirectionsDragRecenterAndCaptions`
 - `eacDecodedDirectionsMatchIndependentFfmpegConversion`
 - `viewingSurvivesFullscreenRecreationAndResetsForNextOccurrence`
@@ -704,10 +721,12 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### AppControlPresentationTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppControlPresentationTest.kt) — Native control target, semantics, state and surface presentation scenarios. Exact cases appear in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppControlPresentationTest.kt) — Large-text/RTL control, icon-bearing menu, player More restoration and two-line download-label presentation.
 
 - `subscriptionStateAndExplicitActionRemainClearWithLargeText`
 - `settingsToolbarAndSegmentedControlsFitNarrowLargeTextAndKeepRowsReachable`
+- `actionMenusKeepLabelsTargetsAndDisabledActionsAtLargeTextInBothDirections`
+- `playerMoreAndDownloadLabelsRemainReadableAndRestoreAtNarrowLargeText`
 
 ### AppFoundationTest
 
@@ -847,6 +866,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChannelSpoilersSmokeTest.kt) — Emulator channel settings, masking, reveals, account failures, DeArrow, AI and offline acceptance.
 
+- `videoMenuGroupsActionsAndKeepsDisplaySettingsOnTheChannelPage`
 - `guestEditorValidationPersistenceAndThumbnailFirstTap`
 - `accountSparseSaveFailureRetryAndResetPreserveOtherRules`
 - `delayedDeArrowCyclesAndPlaybackNotificationStayMasked`
@@ -1177,6 +1197,25 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `narrowDarkLargeFontLayoutKeepsActionsAccessible`
 - `light390dpLayoutKeepsActionsAccessible`
 
+### PlaybackStatisticsPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlaybackStatisticsPresentationTest.kt) — Statistics scrolling/pinned actions, large text, light/dark RTL layout and selectable clipboard failure/retry checks.
+
+- `detailsRemainScrollableWithPinnedActionsLargeTextRtlAndBothThemes`
+- `failedClipboardRetainsSelectableSnapshotAndRetryCopiesThatSnapshot`
+
+### PlaybackStatisticsSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlaybackStatisticsSmokeTest.kt) — Real decoder/copy/More journeys, source refresh/queue changes, lifecycle suspension, recreation/fullscreen and streaming/offline modes.
+
+- `moreEntryShowsRealDecoderDataAndCopiesFreshSanitizedDiagnosticsWithoutRequests`
+- `fullscreenRecreationBackAndPanelGesturesPreservePlayback`
+- `hiddenBackgroundAndPipSuspendObservationAndResumeTheSameOverlay`
+- `miniPlayerAndSettingsSuspendStatisticsAndRestoreTheSessionToggle`
+- `refreshQueueAdvanceHlsProgressiveAndAudioOnlyResetSourceMeasurements`
+- `downloadedPlaybackMarksNetworkMetricsUnavailable`
+- `liveWindowReportsAvailableEdgeDistance`
+
 ### PlaybackVisibilitySmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlaybackVisibilitySmokeTest.kt) — Playback Visibility Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -1469,4 +1508,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **867 declared test methods** (including ignored tests).
+Inventory total: **891 declared test methods** (including ignored tests).
