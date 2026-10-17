@@ -21,7 +21,7 @@ data class PlaybackQueueSnapshot(val token: String = "", val context: ApiContext
     val sourceError: String? = null, val sourceLoading: Boolean = false, val sourceComplete: Boolean = true,
     val repeat: QueueRepeat = QueueRepeat.OFF, val explicitQueue: Boolean = false,
     val videoSelection: VideoSelection = VideoSelection(), val audioSelection: AudioSelection = AudioSelection(),
-    val carriedOptions: PlaybackLinkOptions = PlaybackLinkOptions()) {
+    val carriedOptions: PlaybackLinkOptions = PlaybackLinkOptions(), val recovering: Boolean = false) {
     val currentIndex get() = items.indexOfFirst { it.key == currentKey }
     val current get() = items.getOrNull(currentIndex)
     val hasExplicitQueue get() = token.isNotEmpty() && explicitQueue
@@ -46,7 +46,7 @@ data class PlaybackQueueSnapshot(val token: String = "", val context: ApiContext
     }
     private fun time(ms: Long) = BigDecimal(ms).divide(BigDecimal(1000)).stripTrailingZeros().toPlainString()
     fun json() = JSONObject().put("token", token).put("current", currentKey).put("repeat", repeat.name)
-        .put("loading", loading).put("error", error).put("sourceError", sourceError).put("sourceLoading", sourceLoading)
+        .put("loading", loading).put("error", error).put("recovering", recovering).put("sourceError", sourceError).put("sourceLoading", sourceLoading)
         .put("sourceComplete", sourceComplete).put("explicitQueue", explicitQueue).put("carriedOptions", carriedOptions.json())
         .put("source", source?.let { JSONObject().put("id", it.id).put("title", it.title).put("count", it.count).put("mix", it.mix).put("owned", it.owned).put("seedVideoId", it.seedVideoId) })
         .put("items", JSONArray(items.map { JSONObject().put("key", it.key).put("videoId", it.video.id).put("title", it.video.title)

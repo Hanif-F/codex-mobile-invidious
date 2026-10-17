@@ -14,7 +14,8 @@ main scope. Compose connects with `MediaController` and does not own that player
 `player/PlaybackQueue.kt` owns the runtime snapshot, occurrences, repeat and
 merge/successor rules, plus occurrence-aware share URLs. `data/Models.kt` retains
 plain source-page/library models and `data/ContentLinks.kt` parses incoming links.
-The data layer does not import player or UI types; queue wire fields are unchanged.
+The data layer does not import player or UI types. Recovery adds an internal
+service snapshot flag; server API payloads are unchanged.
 
 `QueueSessionPlayer` wraps ExoPlayer with a logical playlist while resolving only
 the active item. Placeholder entries expose missing previous pages and future
@@ -52,6 +53,18 @@ An explicit time overrides resume. Live media retains its real live window.
 Refresh buffer stops/prepares the same item, seeks to the default live position
 for live content, and otherwise keeps position. Retry refetches expired stream
 metadata and retains the requested playing intent and supported selections.
+
+After Media3 exhausts its load retries, eligible terminal streaming failures get
+up to three automatic buffer refreshes, delayed by 1, 2 and 4 seconds. The service
+uses the same stop/prepare operation as manual Refresh buffer, preserves playback
+intent and selections, and publishes `recovering` so Compose shows buffering until
+success or exhaustion. This does not refetch VideoDetails. Unsupported formats,
+DRM/security/permission failures and offline downloads retain immediate errors.
+Manual recovery or replacing/closing playback cancels pending work and resets the
+budget; otherwise only 30 seconds of continuously advancing playback replenishes
+it. READY and clearing an error alone cannot create an unlimited retry loop.
+`MobiviousRecovery` log entries record codes, cause classes, available HTTP status/
+load stage and outcomes without signed URLs, credentials or response bodies.
 
 ## Occurrences, source pages and successors
 

@@ -10,6 +10,8 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.common.PlaybackParameters
+import androidx.media3.common.TrackSelectionParameters
+import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DefaultHttpDataSource
@@ -25,6 +27,7 @@ import net.wingress.mobivious.MainActivity
 import net.wingress.mobivious.MobiviousApplication
 import net.wingress.mobivious.data.*
 import android.os.SystemClock
+import android.util.Log
 import java.util.UUID
 import org.json.JSONObject
 
@@ -58,6 +61,15 @@ class PlaybackService : MediaSessionService() {
     private lateinit var session: MediaSession
     private lateinit var queue: QueueCoordinator
     private lateinit var sessionPlayer: QueueSessionPlayer
+    private lateinit var recovery: BufferRecovery
+    private var recoveryOwner: Triple<ApiContext?, String, String?>? = null
+    private var queueWasLoading = false
+    private data class BufferSnapshot(val position: Long, val live: Boolean, val playing: Boolean,
+        val tracks: TrackSelectionParameters, val speed: PlaybackParameters)
+    private var recoverySnapshot: BufferSnapshot? = null
+    private var recoveryDiagnostic = ""
+    private var lastLoadFailure: Pair<Throwable, String>? = null
+    private var lastLoadStage: String? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val app get() = application as MobiviousApplication
     private var owner: Account? = null
@@ -88,19 +100,41 @@ class PlaybackService : MediaSessionService() {
             setWakeMode(PowerManager.PARTIAL_WAKE_LOCK)
         }
         queue = QueueCoordinator(app, player, trackSelector, scope) { persist() }
+        recovery = BufferRecovery(scope, SystemClock::elapsedRealtime,
+            refresh = { recoverySnapshot?.let(::refreshBuffer) },
+            status = queue::recovering,
+            outcome = { result, attempt -> Log.i("MobiviousRecovery", "$recoveryDiagnostic attempt=$attempt outcome=$result") })
         player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
             private fun subtitle(info: androidx.media3.exoplayer.source.LoadEventInfo) = player.currentMediaItem?.localConfiguration
                 ?.subtitleConfigurations?.firstOrNull { it.uri == info.uri || it.uri == info.dataSpec.uri }
             private fun occurrence(event: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime): String? =
                 if (event.windowIndex in 0 until event.timeline.windowCount) event.timeline.getWindow(event.windowIndex, androidx.media3.common.Timeline.Window())
                     .mediaItem.mediaMetadata.extras?.getString("occurrence") else null
+            private fun stage(data: androidx.media3.exoplayer.source.MediaLoadData) = when (data.dataType) {
+                C.DATA_TYPE_MANIFEST -> "manifest"
+                C.DATA_TYPE_MEDIA_INITIALIZATION -> "initialization"
+                C.DATA_TYPE_MEDIA -> "media"
+                else -> "source"
+            }
+            override fun onLoadStarted(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
+                loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo, mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData) {
+                val key = occurrence(eventTime) ?: player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence")
+                if (key != null && key == app.playbackQueue.value.currentKey && subtitle(loadEventInfo) == null)
+                    lastLoadStage = stage(mediaLoadData)
+            }
             override fun onLoadError(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime,
                 loadEventInfo: androidx.media3.exoplayer.source.LoadEventInfo, mediaLoadData: androidx.media3.exoplayer.source.MediaLoadData,
                 error: java.io.IOException, wasCanceled: Boolean) {
                 if (wasCanceled) return
-                val track = subtitle(loadEventInfo) ?: return
-                val key = occurrence(eventTime) ?: return
+                val key = occurrence(eventTime) ?: player.currentMediaItem?.takeIf {
+                    mediaLoadData.dataType == C.DATA_TYPE_MANIFEST && it.localConfiguration?.uri == loadEventInfo.dataSpec.uri
+                }?.mediaMetadata?.extras?.getString("occurrence") ?: return
                 if (key != app.playbackQueue.value.currentKey) return
+                val track = subtitle(loadEventInfo)
+                if (track == null) {
+                    lastLoadFailure = error to stage(mediaLoadData)
+                    return
+                }
                 app.captionFailure.value = CaptionLoadFailure(key, track.uri.toString(), track.language, track.label,
                     "Captions could not be loaded. Try another track or retry.")
             }
@@ -111,7 +145,14 @@ class PlaybackService : MediaSessionService() {
             }
         })
         sessionPlayer = QueueSessionPlayer(player, queue) { app.playbackQueue.value }
-        queue.changed = { sessionPlayer.refresh() }
+        queue.changed = {
+            val state = app.playbackQueue.value
+            val owner = Triple(state.context, state.token, state.currentKey)
+            val changed = owner != recoveryOwner || state.loading && !queueWasLoading || state.context != app.api.context()
+            recoveryOwner = owner; queueWasLoading = state.loading
+            if (changed) resetRecovery()
+            sessionPlayer.refresh()
+        }
         session = MediaSession.Builder(this, sessionPlayer)
             .setSessionActivity(PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
             .setCallback(object : MediaSession.Callback {
@@ -150,6 +191,7 @@ class PlaybackService : MediaSessionService() {
                 val metadataOnly = current?.mediaMetadata?.extras?.getString("occurrence") == mediaItem?.mediaMetadata?.extras?.getString("occurrence") && current?.mediaId == mediaItem?.mediaId && mediaItem?.mediaMetadata?.extras?.getBoolean("dearrowMetadataOnly") == true && reason == Player.MEDIA_ITEM_TRANSITION_REASON_PLAYLIST_CHANGED
                 current = mediaItem
                 if (metadataOnly) return
+                resetRecovery()
                 app.captionFailure.value = null
                 owner = app.store.account.value
                 ownerContext = app.api.context()
@@ -162,22 +204,36 @@ class PlaybackService : MediaSessionService() {
                 resetSponsor(mediaItem)
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                if (!isPlaying) recovery.interrupted()
                 if (isPlaying) {
                     started = true
                     recordHistory()
                 } else persist()
             }
-            override fun onPlaybackStateChanged(state: Int) { if (state == Player.STATE_ENDED) { if (queue.enforceEnd()) persist() else { persist(ended = true); queue.advance(automatic = true) } } }
-            override fun onPlayerError(error: androidx.media3.common.PlaybackException) { queue.playerError(if (app.playbackQueue.value.current?.downloadId != null) "Offline playback failed. Check the downloaded files or retry the download." else "Playback failed. Retry to refresh the stream.") }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY && player.playerError == null) { recovery.ready(); recoverySnapshot = null }
+                if (state == Player.STATE_ENDED) { if (queue.enforceEnd()) persist() else { persist(ended = true); queue.advance(automatic = true) } }
+            }
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                if (recovery.recovering) recoverySnapshot = recoverySnapshot?.copy(playing = playWhenReady)
+            }
+            override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
+                if (recovery.recovering) recoverySnapshot = recoverySnapshot?.copy(speed = playbackParameters)
+            }
+            override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
+                if (recovery.recovering) recoverySnapshot = recoverySnapshot?.copy(tracks = parameters)
+            }
+            override fun onPlayerError(error: PlaybackException) { playbackFailed(error) }
             override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) { if (error == null) queue.playerError(null) }
             override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+                recovery.interrupted()
                 if (reason == Player.DISCONTINUITY_REASON_REMOVE) persist(item = oldPosition.mediaItem, position = oldPosition.positionMs)
                 else if (reason == Player.DISCONTINUITY_REASON_SEEK) persist()
             }
             override fun onEvents(player: Player, events: Player.Events) { queue.applySelection(); queue.syncModeOverrides(); queue.enforceEnd(); evaluateSponsor() }
         })
         scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
-        scope.launch { while (isActive) { delay(100); queue.enforceEnd(); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
+        scope.launch { while (isActive) { delay(100); recovery.sample(player.isPlaying, player.currentPosition); queue.enforceEnd(); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
         scope.launch { app.playbackContext.collect { if (app.playbackQueue.value.context != null && app.playbackQueue.value.context != it) queue.close() } }
         scope.launch { app.dearrowTitles.titles.collect { queue.syncDisplayTitle() } }
@@ -211,21 +267,15 @@ class PlaybackService : MediaSessionService() {
             }
             QUEUE_REMOVE -> queue.remove(args.getString("key").orEmpty())
             QUEUE_DELETE_SOURCE -> queue.removeFromPlaylist(args.getString("key").orEmpty())
-            QUEUE_RETRY -> queue.retry()
+            QUEUE_RETRY -> { resetRecovery(); queue.retry() }
             QUEUE_REFRESH -> {
-                val position = PlaybackRules.seek(args.getLong("positionMs"), player.duration)
-                val live = player.isCurrentMediaItemLive
-                // MediaSession rewrites TrackGroup IDs for each controller.
-                // Keep the service's own groups rather than decoding a controller
-                // bundle outside MediaSession's normal ID translation.
-                val tracks = player.trackSelectionParameters
                 val speed = args.getFloat("speed", 1f); val pitch = args.getFloat("pitch", 1f)
                 if (!speed.isFinite() || speed !in .25f..2f || !pitch.isFinite() || pitch <= 0) return SessionResult(SessionError.ERROR_BAD_VALUE)
-                player.stop()
-                if (live) player.seekToDefaultPosition() else player.seekTo(position)
-                player.trackSelectionParameters = tracks
-                player.playbackParameters = PlaybackParameters(speed, pitch)
-                player.prepare(); player.playWhenReady = args.getBoolean("playing")
+                val snapshot = (recoverySnapshot ?: bufferSnapshot()).copy(
+                    position = PlaybackRules.seek(args.getLong("positionMs"), player.duration),
+                    speed = PlaybackParameters(speed, pitch), playing = args.getBoolean("playing"))
+                resetRecovery()
+                refreshBuffer(snapshot)
             }
             QUEUE_MORE -> queue.more()
             QUEUE_CLOSE -> queue.close()
@@ -240,6 +290,40 @@ class PlaybackService : MediaSessionService() {
             }
         }
         return SessionResult(SessionResult.RESULT_SUCCESS)
+    }
+    private fun resetRecovery() {
+        recovery.reset(); recoverySnapshot = null; lastLoadFailure = null; lastLoadStage = null
+    }
+    private fun bufferSnapshot() = BufferSnapshot(player.currentPosition, player.isCurrentMediaItemLive ||
+        player.currentTimeline.isEmpty && app.playbackQueue.value.details?.video?.live == true,
+        player.playWhenReady, player.trackSelectionParameters, player.playbackParameters)
+
+    private fun refreshBuffer(snapshot: BufferSnapshot) {
+        // Keep the service's TrackGroups: MediaSession rewrites controller group IDs.
+        player.stop()
+        if (snapshot.live) player.seekToDefaultPosition() else player.seekTo(PlaybackRules.seek(snapshot.position, player.duration))
+        player.trackSelectionParameters = snapshot.tracks
+        player.playbackParameters = snapshot.speed
+        player.prepare(); player.playWhenReady = snapshot.playing
+    }
+    private fun playbackFailed(error: PlaybackException) {
+        val state = app.playbackQueue.value
+        if (state.loading || state.context != app.api.context() || state.currentKey == null ||
+            player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return
+        val stage = lastLoadFailure?.takeIf { load -> generateSequence(error as Throwable) { it.cause }.take(8).any { it === load.first } }?.second ?: lastLoadStage
+        recoveryDiagnostic = BufferRecoveryPolicy.diagnostic(state.current?.video?.id.orEmpty(), error, stage)
+        val streamed = state.current?.downloadId == null && player.currentMediaItem?.localConfiguration?.uri?.scheme in listOf("https", "http")
+        if (BufferRecoveryPolicy.eligible(error, streamed)) {
+            if (!recovery.recovering) recoverySnapshot = bufferSnapshot().let {
+                if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) it.copy(live = true) else it
+            }
+            if (recovery.failed(error)) return
+        } else {
+            resetRecovery()
+            Log.i("MobiviousRecovery", "$recoveryDiagnostic outcome=ineligible")
+        }
+        queue.playerError(if (state.current?.downloadId != null) "Offline playback failed. Check the downloaded files or retry the download."
+            else "Playback failed. Retry to refresh the stream.")
     }
     private fun resetSponsor(item: MediaItem?, readSettings: Boolean = true) {
         segmentJob?.cancel(); segmentJob = null; segmentsRequested = false

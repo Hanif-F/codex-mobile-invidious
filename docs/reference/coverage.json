@@ -780,7 +780,7 @@
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "Canonical playback runtime snapshot, occurrence identity, share URLs, repeat and source merge/successor rules.",
-      "sha256": "5fdf0ec0673d73a38cad89bb440f75c2dcf244605fe9c21b6b38465c7cfd54de"
+      "sha256": "397566bbc2600751e6ca0013c91ce8063d05c9eab93f0293be71800e21a61b01"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/PlaybackRules.kt": {
       "area": "Playback",
@@ -792,13 +792,13 @@
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "ExoPlayer/MediaSession lifetime, trusted commands, history/progress ownership, SponsorBlock and PiP transport actions.",
-      "sha256": "01fa2616a034defdf7cd19c36100906efcd968ffccf9dfcf6e09c8b7d649ca23"
+      "sha256": "64c4f7ab82f0ffdb316d61ea608ae3700a6d496e2dbb08ac4c734c6ca9fe7c08"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueCoordinator.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "Service-owned lazy resolution, source pagination, occurrence transitions, tracks, bounds, offline media, clips and successor behavior; integrates channel title/thumbnail rules.",
-      "sha256": "25f7e4f1073f449e0796953c25a9b529cc76b34f941cf7c9c2074dd6b6894c6d"
+      "sha256": "95e7ec01798f8395e1bc3944917c998203d733a8b2677adfcba70db06c4c9b9d"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueSessionPlayer.kt": {
       "area": "Playback",
@@ -900,7 +900,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination.",
-      "sha256": "b5d9c2a734865adfd2814bec5b27266a0cba5d5dcbe11a6094e8ada0e5486f38"
+      "sha256": "1cbcc52f34853b8125ede9522142cb680fac6430d5bcaf1d62161cfe6bd38a63"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1626,7 +1626,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic account/content APIs and media/Range/failure responses.",
-      "sha256": "530d323db4b04d77bdabe92a0ff70c3760c31547977fa2b89ee280a1c92754f4"
+      "sha256": "b37e78f4f3e3c1ec26e71c0feab0f6f120641c53fa3269f6ad3285ac576bced0"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1717,6 +1717,24 @@
       "guide": "docs/TESTING.md",
       "description": "Decoded projection pixels, gestures, annotation interaction, clip time, defaults and lifecycle/offline device journeys.",
       "sha256": "b3c75ad3d92c3452b5aea47bf6500c75e3025a0159a2cb0ec4592c26f7e15e80"
+    },
+    "android/app/src/androidTest/java/net/wingress/mobivious/BufferRecoverySmokeTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Real failed DASH preparations, automatic/manual recovery, preserved tracks and intent, cancellation, live edge and clip boundaries.",
+      "sha256": "0a9e8729f15537732259795425225c212f3fa246edca580a01d2c177cedc249e"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/player/BufferRecovery.kt": {
+      "area": "Playback",
+      "guide": "docs/PLAYBACK.md",
+      "description": "Bounded automatic buffer recovery, terminal error eligibility, stable-progress budget reset and sanitized diagnostics.",
+      "sha256": "8cef2f3f43e5669dbb18aa664f10ed2802a06ad2b22240668eb716d204cf5052"
+    },
+    "android/app/src/test/java/net/wingress/mobivious/BufferRecoveryTest.kt": {
+      "area": "JVM tests",
+      "guide": "docs/TESTING.md",
+      "description": "Automatic buffer recovery timing, exhaustion, cancellation, stable progress, error exclusions and diagnostic privacy.",
+      "sha256": "1bafd094211815380126f72b9369957d86191f8a76dc4bd5b93c25b410f0291c"
     }
   },
   "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md.",

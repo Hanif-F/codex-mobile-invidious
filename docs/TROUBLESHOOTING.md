@@ -16,7 +16,7 @@
 | History search disabled | Legacy flat history response. Basic viewing remains; matching organized-history server support enables scoped search/date groups. |
 | Approximate counts / missing Shorts date | Optional exact-precision or cached metadata was omitted. Do not infer missing values from a different field. |
 | Upcoming video has no playable stream | Wait until available and Retry. Upcoming streams are not converted into regular playback/downloads. |
-| Decoder/stream playback error | Retry refreshes stream metadata; Refresh buffer re-prepares current media. Check device-supported tracks, instance/Companion/upstream health. |
+| Decoder/stream playback error | Eligible streamed failures get three automatic buffer refreshes after Media3 retries, then show manual controls. Retry refetches metadata; Refresh buffer re-prepares current media. Unsupported/security/offline failures remain immediate. Check `MobiviousRecovery` logs and device/instance/Companion/upstream health. |
 | Preferred codec/quality is unavailable | Selection uses supported manifest representations and falls back. Defaults cannot add an unsupported decoder or missing stream. |
 | Leaving the app pauses | Check profile-local Background playback and PiP settings/device support. Audio only is a separate mode. |
 | Queue missing next page | Use source Retry/Load more. Repeated playlist/mix cursors stop intentionally; existing video playback can remain available. |

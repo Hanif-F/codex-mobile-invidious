@@ -87,6 +87,9 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         if (message != null) { requestedPlayWhenReady = player.playWhenReady; decoderError = true; update(state.copy(loading = false, error = message)) }
         else if (decoderError) { decoderError = false; update(state.copy(error = null)) }
     }
+    fun recovering(value: Boolean) {
+        if (state.recovering != value) update(state.copy(recovering = value, error = if (value) null else state.error))
+    }
     private fun valid(token: String, context: ApiContext) = state.token == token && state.context == context && app.api.context() == context
     private fun check(token: String, context: ApiContext) { if (!valid(token, context)) throw CancellationException("Playback context changed") }
     private fun launch(sourceOnly: Boolean = false, block: suspend (String, ApiContext) -> Unit) {

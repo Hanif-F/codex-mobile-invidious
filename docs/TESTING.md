@@ -109,6 +109,21 @@ acceptance as pending rather than inferring it from a successful build.
 
 ## Device runner and media fixtures
 
+`BufferRecoveryTest` checks the three-attempt schedule, exhaustion, cancellation,
+stable-playback budget reset, permanent/offline exclusions and sanitized diagnostic
+fields. `BufferRecoverySmokeTest` exercises real malformed and HTTP-failed DASH
+manifests using `/test/recovery`, preserving paused/playing intent, exact tracks,
+captions, speed, position, audio-only mode, live-edge behavior and clip boundaries.
+It also checks cancellation and manual recovery after exhaustion. These synthetic
+failures verify resilience; they do not identify a past upstream playback failure.
+
+Acceptance on **17 October 2026** passed **423 JVM tests**, all eight recovery
+journeys and three existing manual-refresh, track/reconnection and offline-playback
+regressions on Android 16 `emulator-5554`, plus debug app/test APK builds and debug
+lint. The final run is recorded in ignored `.tools/buffer-recovery-acceptance.log`.
+The historical upstream trigger remains unconfirmed; the fixture failures verify
+the automatic recovery behavior and its limits.
+
 Start/connect a device yourself, select its ADB serial and run:
 
 ```sh

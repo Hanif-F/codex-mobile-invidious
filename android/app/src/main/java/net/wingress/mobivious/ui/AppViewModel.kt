@@ -68,7 +68,8 @@ data class PlaybackState(val details: VideoDetails? = null, val loading: Boolean
     val canPlay: Boolean = false, val canSetSpeed: Boolean = false, val canSelectTracks: Boolean = false,
     val canRefresh: Boolean = false, val videoSelection: VideoSelection = VideoSelection(),
     val audioSelection: AudioSelection = AudioSelection(),
-    val geometry: VideoGeometry = VideoGeometry(), val projection: Projection = Projection.FLAT, val clip: Clip? = null, val downloadId: String? = null) {
+    val geometry: VideoGeometry = VideoGeometry(), val projection: Projection = Projection.FLAT, val clip: Clip? = null, val downloadId: String? = null,
+    val recovering: Boolean = false) {
     val displayGeometry get() = if (projection == Projection.FLAT) geometry else VideoGeometry(mediaId, 16, 9)
 }
 data class DeArrowContributionState(val open: Boolean = false, val videoId: String = "", val context: ApiContext? = null,
@@ -506,7 +507,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                             if (pendingSeek.value?.mediaId != mediaItem?.mediaId) cancelAccumulatedSeek(false)
                         }
                         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { if (playWhenReady) cancelAccumulatedSeek(false) }
-                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) { cancelAccumulatedSeek(false); playback.value = playback.value.copy(error = "Playback failed. Retry to refresh the stream.", buffering = false) }
+                        override fun onPlayerError(error: androidx.media3.common.PlaybackException) { cancelAccumulatedSeek(false) }
                         override fun onPlayerErrorChanged(error: androidx.media3.common.PlaybackException?) {
                             if (error == null) playback.value = playback.value.copy(error = null)
                         }
@@ -540,7 +541,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (clipEditor.value.open && clipEditor.value.occurrence != state.currentKey) closeClipEditor()
             requestedVideo = state.current?.video?.id
             val old = playback.value.details?.video?.id
-            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, videoSelection = state.videoSelection, audioSelection = state.audioSelection, clip = state.current?.clip, downloadId = state.current?.downloadId)
+            playback.value = playback.value.copy(details = state.details, loading = state.loading, error = state.error, recovering = state.recovering,
+                buffering = state.recovering || controller.value?.playbackState == Player.STATE_BUFFERING,
+                videoSelection = state.videoSelection, audioSelection = state.audioSelection, clip = state.current?.clip, downloadId = state.current?.downloadId)
             if (old != state.details?.video?.id) {
                 playback.value = playback.value.copy(geometry = VideoGeometry())
                 cancelAccumulatedSeek(false)
@@ -662,7 +665,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             playing = p.isPlaying, playWhenReady = p.playWhenReady, playerState = p.playbackState,
             mediaId = p.currentMediaItem?.mediaId.orEmpty(), position = p.currentPosition.coerceAtLeast(0),
             duration = p.duration.coerceAtLeast(0), bufferedPosition = p.bufferedPosition.coerceAtLeast(0),
-            buffering = p.playbackState == Player.STATE_BUFFERING, live = p.isCurrentMediaItemLive,
+            buffering = queue.value.recovering || p.playbackState == Player.STATE_BUFFERING, live = p.isCurrentMediaItemLive,
             seekable = p.isCurrentMediaItemSeekable && p.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM),
             speed = p.playbackParameters.speed, tracks = p.currentTracks, selection = p.trackSelectionParameters,
             canPlay = p.isCommandAvailable(Player.COMMAND_PLAY_PAUSE),

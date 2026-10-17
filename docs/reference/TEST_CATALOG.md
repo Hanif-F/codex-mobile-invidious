@@ -79,6 +79,16 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `existingApiResponsesNeedNoAvatarMetadataRequests`
 - `imageClientNeverFollowsRedirectsOrSendsCredentials`
 
+### BufferRecoveryTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/BufferRecoveryTest.kt) — Automatic buffer recovery timing, exhaustion, cancellation, stable progress, error exclusions and diagnostic privacy.
+
+- `threeDelayedRefreshesThenManualRecoveryAndDuplicateEvents`
+- `cancellationInvalidatesPendingWorkAndReadyDoesNotResetBudget`
+- `onlyThirtySecondsOfUninterruptedAdvancingPlaybackReplenishesBudget`
+- `policyIncludesRecoverableSourceAndDecoderFailuresButExcludesPermanentAndOfflineErrors`
+- `diagnosticsContainClassesAndCodesWithoutMessagesOrSignedUrls`
+
 ### CaptionAppearanceTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/CaptionAppearanceTest.kt) — Caption appearance serialization, supported choices, corruption defaults and profile storage failure/isolation.
@@ -772,6 +782,19 @@ Test support/helper file; no declared `@Test` methods.
 - `subscriptionsHistoryAndPlaylistCreatorsUseExistingPayloads`
 - `thinModeMakesNoAvatarRequestsAndFailuresKeepAuthorsUsable`
 
+### BufferRecoverySmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/BufferRecoverySmokeTest.kt) — Real failed DASH preparations, automatic/manual recovery, preserved tracks and intent, cancellation, live edge and clip boundaries.
+
+- `initialFailureAutomaticallyRecoversWithoutMetadataRefetch`
+- `initialPausedFailureRemainsPausedAfterAutomaticRecovery`
+- `httpLoadRetriesFinishBeforeAutomaticBufferRecovery`
+- `threeFailuresExposeManualControlsAndManualRefreshStartsAFreshBudget`
+- `automaticRefreshPreservesExactTracksCaptionsSpeedPositionAndAudioOnly`
+- `closeAndVideoReplacementCancelPendingRecovery`
+- `liveStartupRecoverySeeksToTheLiveEdge`
+- `clipRecoveryKeepsRelativePositionAndBoundaries`
+
 ### CaptionAppearancePresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CaptionAppearancePresentationTest.kt) — Native caption text/background/window pixels, transparent reset and large RTL multiline preview.
@@ -1446,4 +1469,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **854 declared test methods** (including ignored tests).
+Inventory total: **867 declared test methods** (including ignored tests).

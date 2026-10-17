@@ -84,8 +84,8 @@ saved preferences/progress are durable.
 | State | Contents |
 | --- | --- |
 | `BrowseState` | Raw videos, search results, playlists, clips, posts/channels, pagination, loading/error/retry state and scroll position. |
-| `PlaybackQueueSnapshot` | Session token/context, occurrences, current key, source metadata, details, source errors, repeat, selection and carried link options. |
-| `PlaybackState` | Controller-derived position/duration/buffering, available commands, tracks, selection, decoded geometry and current clip/download. |
+| `PlaybackQueueSnapshot` | Session token/context, occurrences, current key, source metadata, details, source errors, automatic recovery status, repeat, selection and carried link options. |
+| `PlaybackState` | Controller-derived position/duration, service recovery/buffering status, available commands, tracks, selection, decoded geometry and current clip/download. |
 | `AccountPreferences` | Supported website-compatible preferences plus chat, SponsorBlock and AI settings. |
 | `CommentsState` | Target/context, sort, main feed, independent reply feeds and positions. Video and post controllers are separate. |
 | `ChatReplayState` | Video/occurrence, availability, presentation visibility, messages/window, following and timing synchronization. |
