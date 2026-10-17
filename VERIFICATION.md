@@ -1,5 +1,24 @@
 # Focused implementation verification
 
+## Mobivious 0.12.4 core release — 17 October 2026
+
+Application source: `8193bdd` plus the version-only change to **0.12.4**, code **28**.
+The requested core workflow passed 433 JVM tests, the signed optimized release
+build and release lint (0 errors, 33 warnings). No new emulator or optimized
+runtime journey was run; the feature's 21 focused emulator cases and final RTL/
+clipboard presentation checks below remain its runtime evidence.
+
+The APK identity/version, checksum, uncompressed DEX/native payloads and matching
+R8 mapping/archive checksums were verified. Its signing certificate matches the
+published 0.12.3 APK; that local prior APK matched GitHub's asset digest.
+APK size: 7,220,231 bytes. APK SHA-256:
+`801beea1462e75dae0b8716f771f8bc623bc1e02775577ba41c8affaced2b7d9`.
+The archive is retained under `artifacts/r8/0.12.4/<APK-SHA256>/`.
+Documentation inventory/fingerprint/link and Git whitespace checks passed.
+Evidence: ignored `.tools/release-0.12.4-build.log` and
+`.tools/release-0.12.4-verification.json`. No backend deployment is required for
+these player changes. Existing broader runtime limitations remain unchanged.
+
 ## Playback statistics and diagnostic copying — 17 October 2026
 
 Source: Android `24b9f58` plus the statistics implementation and existing working
