@@ -11,19 +11,27 @@ import androidx.compose.ui.platform.LocalDensity
 import net.wingress.mobivious.player.WatchPlayerScroll
 
 @Stable
-internal class WatchPlayerResizeState(initialDistance: Float = 0f) {
-    var distance by mutableFloatStateOf(initialDistance.coerceIn(0f, WatchPlayerScroll.RESIZE_DISTANCE))
+internal class WatchPlayerResizeState(initialProgress: Float = 0f) {
+    var progress by mutableFloatStateOf(initialProgress.takeIf { it.isFinite() }?.coerceIn(0f, 1f) ?: 0f)
         private set
-    val progress: Float get() = distance / WatchPlayerScroll.RESIZE_DISTANCE
 
-    fun consume(delta: Float, topDistance: Float?): Float {
-        val consumed = WatchPlayerScroll.consume(delta, distance, topDistance)
-        distance = (distance + consumed).coerceIn(0f, WatchPlayerScroll.RESIZE_DISTANCE)
+    fun consume(delta: Float, topDistance: Float?, resizeRange: Float): Float {
+        if (!resizeRange.isFinite() || resizeRange <= 0f) return 0f
+        val consumed = WatchPlayerScroll.consume(delta, progress * resizeRange, topDistance, resizeRange)
+        progress = (progress + consumed / resizeRange).coerceIn(0f, 1f)
         return consumed
     }
 
     companion object {
-        val saver = Saver<WatchPlayerResizeState, Float>(save = { it.distance }, restore = { WatchPlayerResizeState(it) })
+        // Older activities saved a distance on a fixed 96 dp scale. New saves wrap the
+        // normalized progress so restoration can distinguish the two representations.
+        val saver = Saver<WatchPlayerResizeState, Any>(save = { listOf(it.progress) }, restore = {
+            when (it) {
+                is Float -> WatchPlayerResizeState(it / 96f)
+                is List<*> -> (it.singleOrNull() as? Float)?.let(::WatchPlayerResizeState)
+                else -> null
+            }
+        })
     }
 }
 
@@ -34,15 +42,15 @@ internal fun rememberWatchPlayerResizeState(): WatchPlayerResizeState =
 /** Consume only the resize part of a drag/fling; the list receives all remaining scrolling. */
 @Composable
 internal fun rememberWatchPlayerScrollConnection(
-    list: LazyListState, resize: WatchPlayerResizeState, enabled: Boolean,
+    list: LazyListState, resize: WatchPlayerResizeState, resizeRange: Float, enabled: Boolean,
 ): NestedScrollConnection {
     val density = LocalDensity.current.density
-    return remember(list, resize, density, enabled) {
+    return remember(list, resize, density, resizeRange, enabled) {
         object : NestedScrollConnection {
             private fun consume(available: Offset): Offset {
                 if (!enabled) return Offset.Zero
                 val top = if (list.firstVisibleItemIndex == 0) list.firstVisibleItemScrollOffset / density else null
-                return Offset(0f, -resize.consume(-available.y / density, top) * density)
+                return Offset(0f, -resize.consume(-available.y / density, top, resizeRange) * density)
             }
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset = consume(available)
             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset = consume(available)

@@ -17,6 +17,27 @@ for the current account or guest on this device/instance. **Device-wide** means
 independent of account and instance. Playback defaults normally affect the next
 opened occurrence; current player controls are described separately below.
 
+## Opening links
+
+**Settings → Connection & app → Opening links** shows how many of the eight
+supported YouTube domains Android currently opens in this installed Mobivious
+variant. The count refreshes when returning from Android settings; these choices
+belong to Android and are independent of the active account or instance.
+
+1. In Android app settings for YouTube, turn off **Open supported links**. Do the
+   same for YouTube Music if it handles `music.youtube.com`.
+2. Select **Open Android link settings** in Mobivious, enable **Open supported
+   links**, and select the YouTube addresses under **Add link** or **Supported web
+   addresses**. Android's exact labels vary by device.
+
+The shortcut opens this installed package's Open by default page, falling back to
+app details if the direct page is unavailable. Ordinary supported video, playlist,
+channel, post, hashtag and clip URLs can then open in Mobivious. Homepage/search
+URLs, apps explicitly launching the YouTube package, and browser navigation that
+stays inside its own page are outside this routing. YouTube domains cannot be
+verified as Mobivious-owned websites; selection is manual. See
+[Android's domain association documentation](https://developer.android.com/training/app-links/verify-applinks).
+
 ## Playback
 
 | UI / model | Wire field | Default | Behavior / scope |

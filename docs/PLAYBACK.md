@@ -29,6 +29,17 @@ require the same package. Queue commands validate server/account/generation and,
 where applicable, queue token; selection also validates occurrence. SponsorBlock
 commands use a separate media/token pair. Old controls cannot mutate a new session.
 
+## Watch-page resizing
+
+The watch player's resize budget is its current expanded height minus its compact
+height. Each consumed dp changes height by one dp; unused scroll goes to the
+metadata/recommendations list. The first 24dp scrolls the list, expansion is limited
+to the top region, and ordinary Compose flings use the same accounting. There is
+no animation timer or scroll-speed preference. Normalized occurrence-scoped
+progress survives layout changes and activity restoration, including legacy
+saved distances from the former 96dp scale. Drawers suspend resizing and use their
+existing compact layout; minimizing does not discard progress.
+
 ## Opening online content
 
 1. The view model sends Queue Start with video/source/index/explicit time/link
@@ -189,8 +200,14 @@ and the two configured Wingress hostnames. Video aliases include watch/w/v/e/
 shorts/embed/live, playlists and mixes. Channel handles/custom/user names resolve
 through the instance. Posts, hashtags and clips have distinct targets. Credential-
 bearing/untrusted origins are rejected for native navigation; supported external
-rich links use Android intents. Android auto-verified link filters cover only the
-two declared hostnames; parsing more hosts does not register them all with Android.
+rich links use Android intents. Android auto-verified link filters cover the two
+declared Wingress hostnames. Separate HTTP/HTTPS filters register supported
+content paths on all eight accepted YouTube hosts, including youtu.be short links
+and nocookie embeds; homepage/search links are excluded. YouTube domains require
+manual selection in Android's Open by default settings. Settings → Opening links
+explains setup and opens that screen for the installed app variant. Apps that
+explicitly target YouTube and browsers that retain navigation internally can
+bypass Android's default selection.
 
 Timestamps accept numeric seconds, decimal seconds, clock format, h/m/s/ms units
 and supported query/fragment forms. YouTube playlist index is converted from one-

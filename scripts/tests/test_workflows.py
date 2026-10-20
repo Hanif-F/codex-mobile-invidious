@@ -1,4 +1,4 @@
-"""Regression checks for fixture ownership and release signing safeguards.
+"""Regression checks for Android test selection, fixtures and release safeguards.
 
 Uses a disposable repository, a fake ADB executable, and a localhost HTTP server.
 No real device, release identity or deployed service is modified.
@@ -64,6 +64,7 @@ class WorkflowTest(unittest.TestCase):
         (self.root / 'jbr/bin').mkdir(parents=True)
         shutil.copy2(ROOT / 'scripts/lib/android-fixture.sh', self.root / 'scripts/lib')
         shutil.copy2(ROOT / 'scripts/build-release.sh', self.root / 'scripts')
+        shutil.copy2(ROOT / 'scripts/test-android.sh', self.root / 'scripts')
         (self.root / 'scripts/fixture-server.py').write_text(SERVER)
         adb = self.root / 'sdk/platform-tools/adb'
         adb.write_text(FAKE_ADB)
@@ -96,6 +97,78 @@ class WorkflowTest(unittest.TestCase):
         if path.exists():
             with self.assertRaises(ProcessLookupError):
                 os.kill(int(path.read_text()), 0)
+
+    def fake_android_build(self, exit_code=0):
+        (self.root / 'scripts/generate-player-fixture.py').write_text(
+            'from pathlib import Path\nimport sys\n'
+            'Path(sys.argv[1]).mkdir(parents=True, exist_ok=True)\n')
+        gradle = self.root / 'android/gradlew'
+        gradle.write_text('#!/usr/bin/env python3\nimport json, os, sys\nfrom pathlib import Path\n'
+                          'root = Path(os.environ["FAKE_ANDROID_STATE"])\n'
+                          '(root / "gradle.json").write_text(json.dumps(sys.argv[1:]))\n'
+                          f'sys.exit({exit_code})\n')
+        gradle.chmod(0o755)
+
+    def run_android(self, *arguments):
+        return subprocess.run(['scripts/test-android.sh', *arguments], cwd=self.root,
+                              env=self.environment, text=True, capture_output=True, timeout=15)
+
+    def test_android_default_preserves_full_checks_with_or_without_selector(self):
+        self.fake_android_build()
+        for arguments in ([], ['--offline', '-Pandroid.testInstrumentationRunnerArguments.class=example.Smoke#play']):
+            with self.subTest(arguments=arguments):
+                result = self.run_android(*arguments)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual([
+                    ':app:testDebugUnitTest', ':app:connectedDebugAndroidTest', ':app:lintDebug',
+                    '--console=plain', '-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true',
+                    *arguments,
+                ], json.loads((self.root / 'gradle.json').read_text()))
+                self.assert_server_stopped()
+
+    def test_android_device_only_forwards_selection_and_gradle_options(self):
+        self.fake_android_build()
+        arguments = ['--offline', '-Pandroid.testInstrumentationRunnerArguments.class=example.Smoke#play,example.Settings',
+                     '--max-workers=1', '-Dtest.message=two words']
+        result = self.run_android('--device-only', *arguments)
+        self.assertEqual(0, result.returncode, result.stderr)
+        self.assertEqual([
+            ':app:connectedDebugAndroidTest', '--console=plain',
+            '-Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true', *arguments,
+        ], json.loads((self.root / 'gradle.json').read_text()))
+        self.assertIn(['reverse', '--remove', 'tcp:18080'], self.calls())
+        self.assert_server_stopped()
+
+    def test_android_device_only_rejects_missing_or_empty_selection_before_setup(self):
+        selector = '-Pandroid.testInstrumentationRunnerArguments.class='
+        for arguments in ([], [selector], [selector + ' \t'], [selector + 'example.Smoke', selector]):
+            with self.subTest(arguments=arguments):
+                result = self.run_android('--device-only', *arguments)
+                self.assertEqual(2, result.returncode, result.stderr)
+                self.assertIn('requires a nonempty', result.stderr)
+                self.assertEqual([], self.calls())
+                self.assertFalse((self.root / '.tools').exists())
+                self.assertFalse((self.root / 'pid.txt').exists())
+                self.assertFalse((self.root / 'gradle.json').exists())
+
+    def test_android_help_needs_no_device_or_media(self):
+        self.state(devices=[])
+        for arguments in (['--help'], ['-h'], ['--device-only', '--help']):
+            with self.subTest(arguments=arguments):
+                result = self.run_android(*arguments)
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertIn('Usage:', result.stdout)
+                self.assertIn('--device-only', result.stdout)
+                self.assertEqual([], self.calls())
+                self.assertFalse((self.root / '.tools').exists())
+                self.assertFalse((self.root / 'pid.txt').exists())
+
+    def test_android_gradle_failure_preserves_status_and_cleans_owned_resources(self):
+        self.fake_android_build(exit_code=7)
+        result = self.run_android('--device-only', '-Pandroid.testInstrumentationRunnerArguments.class=example.Smoke')
+        self.assertEqual(7, result.returncode, result.stderr)
+        self.assertIn(['reverse', '--remove', 'tcp:18080'], self.calls())
+        self.assert_server_stopped()
 
     def fake_release_build(self, mapping='fixture mapping', apk=b'fixture APK'):
         gradle = self.root / 'android/gradlew'

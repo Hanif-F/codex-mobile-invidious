@@ -16,6 +16,49 @@
             android:supportsPictureInPicture="true" android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation">
             <intent-filter><action android:name="android.intent.action.MAIN" /><category android:name="android.intent.category.LAUNCHER" /></intent-filter>
             <intent-filter><action android:name="android.intent.action.SEND" /><category android:name="android.intent.category.DEFAULT" /><data android:mimeType="text/plain" /></intent-filter>
+            <!-- YouTube domains require the user's selection in Android's Open by default settings. -->
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="youtube.com" />
+                <data android:host="www.youtube.com" />
+                <data android:host="m.youtube.com" />
+                <data android:host="music.youtube.com" />
+                <data android:host="youtube-nocookie.com" />
+                <data android:host="www.youtube-nocookie.com" />
+                <data android:path="/watch" />
+                <data android:pathPrefix="/watch/" />
+                <data android:path="/playlist" />
+                <data android:path="/mix" />
+                <data android:pathPrefix="/w/" />
+                <data android:pathPrefix="/v/" />
+                <data android:pathPrefix="/e/" />
+                <data android:pathPrefix="/shorts/" />
+                <data android:pathPrefix="/live/" />
+                <data android:pathPrefix="/embed/" />
+                <data android:pathPrefix="/channel/" />
+                <data android:pathPrefix="/@" />
+                <data android:pathPrefix="/c/" />
+                <data android:pathPrefix="/user/" />
+                <data android:pathPrefix="/hashtag/" />
+                <data android:pathPrefix="/clip/" />
+                <data android:pathPrefix="/post/" />
+                <data android:path="/profile" />
+                <data android:path="/attribution_link" />
+            </intent-filter>
+            <intent-filter android:autoVerify="false">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="youtu.be" />
+                <data android:host="www.youtu.be" />
+                <data android:pathAdvancedPattern="/[A-Za-z0-9_-]{11}/*" />
+            </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" />

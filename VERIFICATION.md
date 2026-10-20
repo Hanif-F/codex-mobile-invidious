@@ -1,5 +1,100 @@
 # Focused implementation verification
 
+## Testing workflow optimization — 21 October 2026
+
+Source: Android `b56217b` plus the existing working-tree changes and this testing
+workflow update. The production app/server sources and release workflow receive
+no changes from this update. Existing runtime acceptance below remains separate.
+
+- All **434 JVM tests** passed with zero failures, errors or skips; the set of
+  executed class/method names is identical to the saved pre-change report.
+  Summed JUnit execution time fell from **25.852s to 13.466s**. The two AI-filter
+  timer cases fell from **12.243s to 0.040s** combined while checking exact
+  two-second/five-second boundaries, background request survival and no further
+  automatic retry. Other real-dispatcher concurrency tests remain in place.
+- The focused 12-case AI-filter run passed in **2.81s wall time**, including
+  incremental test compilation. The subsequent full JVM command took **15.23s
+  wall time**, with compilation up to date. The pre-change evidence is an existing
+  JUnit report, so these figures establish execution-time savings rather than a
+  controlled comparison of total build or development time.
+- All **29 Python documentation/workflow tests** passed in **3.231s**, including
+  five new runner tests for legacy/default tasks, device-only selection, selector
+  and option forwarding, missing/blank selectors before setup, help without a
+  device, and failure-status/owned-resource cleanup. Fake Gradle/ADB commands and
+  disposable local fixtures were used; no emulator runtime check was needed for
+  this script/test-only update. Debug lint was not requested.
+- Shell syntax, documentation inventory/fingerprints/local links and generated
+  catalogs passed. The contributor policy now selects checks by changed behavior,
+  with full JVM/debug lint once at production-code task completion. Focused device
+  commands use `--device-only`; release checks and known full-device-suite
+  failures/ignored cases remain explicit.
+
+Commands: from `android/`, with `JAVA_HOME=/opt/android-studio/jbr` and
+`ANDROID_HOME=$HOME/Android/Sdk`, run `./gradlew :app:testDebugUnitTest --tests
+net.wingress.mobivious.AiFilterTest --offline --console=plain`, then
+`./gradlew :app:testDebugUnitTest --offline --console=plain`. From the repository
+root, run `python3 -m unittest discover -s scripts/tests -v`,
+`bash -n scripts/test-android.sh`, `scripts/test-android.sh --help`,
+`python3 scripts/check-documentation.py` and `git diff --check`.
+
+Evidence: ignored `.tools/testing-optimization/` contains `jvm-before.json`,
+`jvm-focused.json`, `jvm-after.json`, Gradle logs and wall-time files, plus
+`python-verified.log` and its wall-time file. Initial restricted-sandbox attempts
+could not write Gradle cache locks or bind fixture sockets; successful runs used
+the required local cache/socket access. The failed Python attempt remains in
+`python.log` and is separate from the successful acceptance run.
+
+## Finger-tracking player resize and Android YouTube links — 21 October 2026
+
+Source: Android `b56217b` plus this working-tree change. Device: Android 16
+`emulator-5554`, Pixel_8_Pro; isolated `net.wingress.mobivious.debug` preview.
+The release package and its stored data were preserved.
+
+- **434 JVM tests** passed, including variable height ranges, exact consumed
+  distance, top-region crossings, reversals, fling bounds, zero range and
+  normalized/legacy state restoration.
+- **18 focused emulator tests** passed: five resize presentation cases, four
+  link/manifest/settings presentation cases, eight content-link journeys and the
+  Settings navigation/recreation case. Active drags changed both player height
+  and metadata position by 24dp for a 24dp move and 12dp for a reversed 12dp move,
+  within 1dp layout rounding. Held touches stayed stationary, and flings crossed
+  from resizing into list scrolling and back without an added animation.
+- Installed-manifest tests covered all eight YouTube hosts over HTTP/HTTPS,
+  content aliases, short links and nocookie embeds; unrelated pages, hosts and
+  schemes were rejected. Cold/warm VIEW delivery preserved precise timestamps;
+  activity recreation did not replay the launch link.
+- A separate OS check temporarily disabled competing YouTube/YouTube Music
+  handling and selected all eight debug domains. Default-only resolution selected
+  debug MainActivity for every host, and an unrestricted browsable VIEW opened it
+  cold. All four packages' original link-handling flags and selected domains were
+  restored in a finally block and compared afterward.
+- Debug app/test APK builds, debug lint (**0 errors, 17 warnings**), documentation
+  inventory/fingerprint/link checks and Git whitespace checks passed. The new
+  Opening links page and its actual Android Open by default destination were
+  visually inspected on the emulator.
+
+Commands: `JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME=$HOME/Android/Sdk
+./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+:app:lintDebug --offline --console=plain` from `android/`; the focused
+`ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline` command in
+[Testing](docs/TESTING.md#scroll-tracking-and-android-link-routing), additionally
+selecting `SettingsSmokeTest#openingLinksIsReachableAndSurvivesRecreation`.
+
+Evidence: ignored `.tools/scroll-links-build.log`,
+`.tools/scroll-links-device-final.log`, `.tools/scroll-links-results/final/`,
+`.tools/scroll-links-routing.json`, `.tools/check-scroll-links-routing.py` and
+`.tools/scroll-links-preview/`. The initial 17-case run had one test-only failure:
+its Settings helper looked for an offscreen lazy row before scrolling it into
+composition; the corrected final run and added fling case passed. Initial results
+remain in `.tools/scroll-links-results/initial/`. The first shell resolution probe
+omitted `MATCH_DEFAULT_ONLY` and returned a chooser; the corrected query and actual
+unrestricted launch both passed.
+
+No backend, preference migration, dependency or permission change is required.
+This establishes emulator behavior, not physical-device smoothness, every browser's
+internal navigation, or interception of intents explicitly addressed to YouTube.
+The complete device suite and optimized release variant were not rerun.
+
 ## Mobivious 0.12.4 core release — 17 October 2026
 
 Application source: `8193bdd` plus the version-only change to **0.12.4**, code **28**.

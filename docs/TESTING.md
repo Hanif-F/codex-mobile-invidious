@@ -2,6 +2,63 @@
 
 [Documentation index](README.md) · [Development guide](DEVELOPMENT.md)
 
+## Choosing checks
+
+[Contributor policy](../AGENTS.md) applies to every verification category: JVM
+tests, lint, emulator/device tests, Python checks, builds and benchmarks. Choose
+checks from the changed behavior and its immediate dependencies. Keep passing
+results until a later edit affects their inputs; rerun the affected checks after
+fixes. Keep Gradle's incremental outputs instead of cleaning builds routinely.
+
+| Change or stage | Checks to run |
+| --- | --- |
+| Development iteration | Focused JVM classes/methods or device cases for the affected behavior and its immediate dependencies. |
+| Production-code task completion | Full JVM suite and debug lint once after the final relevant edits, plus required focused runtime checks. |
+| UI, playback, lifecycle, storage or Android integration | Relevant device journeys and regression cases; inspect screenshots when rendering changes. |
+| Shared navigation, preferences, authentication, playback services, manifests or dependencies | Widen device coverage across affected consumers, including relevant failures and recovery. |
+| Documentation only | Documentation inventory/fingerprint/link checks; documentation-checker tests when its behavior changes. |
+| Scripts or fixtures | Relevant Python workflow/contract checks; affected device consumers when their fixture contract changes. |
+| Tests only | Changed tests; add broader checks only if the change affects what they verify. |
+| Packaging or installation | Required APK builds; connected Gradle tasks already build their app/test APKs. |
+| Release or performance work | Existing release validation; relevant benchmark journeys for performance work or requested measurements. |
+
+For focused JVM feedback, from `android/`:
+
+```sh
+./gradlew :app:testDebugUnitTest --tests 'net.wingress.mobivious.AiFilterTest' --console=plain
+```
+
+Use `Class.method` for one JVM method, or repeat `--tests` for related classes.
+For focused device feedback, from the repository root:
+
+```sh
+scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest#unifiedControlsGesturesAndFullscreen
+```
+
+`--device-only` requests connected tests and their APK builds, without requesting
+JVM tests or lint. It requires a nonempty `class` property, supports comma-separated
+classes/methods, and forwards other Gradle arguments unchanged. `--help` works
+without a device or media generation. Without this flag, the runner retains its
+broad JVM/device/lint behavior; use that mode for an intentional combined run.
+Lint still checks the full app at completion. The full connected suite is not a
+routine completion gate and its known failures/ignored cases remain explicit.
+
+Add tests for meaningful behavior and regressions at the lowest suitable layer.
+Extend existing cases where practical; trivial edits and assertions that merely
+mirror implementation do not need new tests. Preserve existing coverage unless a
+test has a demonstrated obsolete or duplicate purpose. Server checks follow actual
+server-code or contract changes; Android-only work does not require the sibling
+checkout. Report commands, results and material gaps, including pending device
+acceptance when a required device is unavailable.
+
+The two AI-filter timer cases use `runTest` and a shared virtual-time scheduler:
+they check the two-second page-wait boundary without cancelling the background
+request, and the five-second retry boundary with no further automatic retry.
+Production timeouts and real-dispatcher concurrency cases remain unchanged.
+Measured timings and runner acceptance are recorded in
+[the verification report](../VERIFICATION.md#testing-workflow-optimization--21-october-2026).
+
 ## What each check establishes
 
 | Check | Evidence supplied |
@@ -19,6 +76,35 @@ test file and declared test method, including helper-only files and ignored case
 It is an inventory, not a passing-results report. [Cleanup results](CLEANUP.md)
 record the latest source/device checks and baseline failures. The complete
 connected suite is not yet green.
+
+## Scroll tracking and Android link routing
+
+`WatchPlayerScrollTest` covers real height ranges, conservation of consumed scroll,
+threshold crossings, reversals, fling bounds, window changes, normalized/legacy
+restoration and zero range. `WatchPlayerResizePresentationTest` measures player
+and metadata movement during an active drag, pause and reversal, and checks short
+pages/fling expansion, drawers, restoration, window resizing and landscape fit.
+`OpeningLinksPresentationTest` queries the installed manifest across all eight
+YouTube hosts, supported content paths and rejected unrelated URLs, and checks
+setup guidance and package-specific settings intents/fallback. The YouTube VIEW
+case in `ContentLinksSmokeTest` covers cold/warm launches, precise timestamps,
+recreation without replay, and rejected origins.
+
+Run on an already running emulator:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.WatchPlayerResizePresentationTest,net.wingress.mobivious.OpeningLinksPresentationTest,net.wingress.mobivious.ContentLinksSmokeTest,net.wingress.mobivious.SettingsSmokeTest#openingLinksIsReachableAndSurvivesRecreation
+```
+
+For OS routing acceptance, snapshot the release/debug/YouTube/YouTube Music app-link
+states, temporarily disable YouTube's conflicting link handling, and select the
+debug package for a supported YouTube domain. Start an unrestricted browsable VIEW
+intent and verify Android resolves it to the debug MainActivity. Shell resolution
+queries must include `--query-flags 0x10000` (`MATCH_DEFAULT_ONLY`) to match a
+normal activity launch. Restore every
+previous link-handling flag and selected domain afterward; preserve the installed
+release app and its data. Manifest matching alone does not prove default routing.
 
 ## Menu and download-label acceptance
 
@@ -87,9 +173,12 @@ From the repository root, with JDK and SDK paths appropriate to the host:
 export JAVA_HOME=/opt/android-studio/jbr
 export ANDROID_HOME="$HOME/Android/Sdk"
 cd android
-./gradlew :app:testDebugUnitTest :app:assembleDebug \
-  :app:assembleDebugAndroidTest :app:lintDebug --console=plain
+./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain
 ```
+
+Run these completion checks once after the final production-code edits. Add
+`:app:assembleDebug` or `:app:assembleDebugAndroidTest` when packaging or device-test
+compilation needs verification; connected tasks already build their required APKs.
 
 Use `--offline` only when dependencies are already cached. The Gradle wrapper
 pins 9.4.1 with a distribution checksum; app configuration pins SDK/tool/library
@@ -160,18 +249,20 @@ lint. The final run is recorded in ignored `.tools/buffer-recovery-acceptance.lo
 The historical upstream trigger remains unconfirmed; the fixture failures verify
 the automatic recovery behavior and its limits.
 
-Start/connect a device yourself, select its ADB serial and run:
+Start/connect a device yourself, select its ADB serial and the relevant cases:
 
 ```sh
 export ANDROID_SERIAL=emulator-5554
-scripts/test-android.sh
+scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
 ```
 
 The runner requires one running device or an explicit serial and never launches
 an emulator. It creates generated media in ignored `.tools/test-media`, starts
 `fixture-server.py` on host loopback port 18080, waits for readiness, creates a
-matching ADB reverse mapping when needed, then runs JVM/device tests and debug
-lint. It rejects an occupied port or conflicting mapping and removes only its
+matching ADB reverse mapping when needed, then runs the selected device tests.
+Without `--device-only`, it also requests JVM tests and debug lint. It rejects an
+occupied port or conflicting mapping and removes only its
 own server/mapping on exit. FFmpeg generates synthetic audiovisual/caption media;
 `generate-player-fixture.py` adds shapes, codec/track and download fixtures.
 The runner leaves APKs installed afterward to preserve the preview's app identity
@@ -181,7 +272,7 @@ and accounts; preserve device settings before a run and restore them afterward.
 Focus a class by passing a Gradle property:
 
 ```sh
-scripts/test-android.sh \
+scripts/test-android.sh --device-only \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
 ```
 
@@ -238,7 +329,7 @@ timer with a virtual clock. `SeekPreviewsSmokeTest` uses multiple locally genera
 storyboard sheets/resolutions and timestamped request logs to check actual caching,
 full-player fit, pause/resume, drag cancellation, clips, fullscreen, miniplayer/PiP,
 spoilers, audio-only/live playback and delayed/failed images on the connected emulator. Run with
-`scripts/test-android.sh -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.SeekPreviewsSmokeTest`.
+`scripts/test-android.sh --device-only -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.SeekPreviewsSmokeTest`.
 The `/test/seek-previews` fixture mode accepts delay/failure/bad-crop controls;
 its index and image request arrays record URL, start time and authentication.
 
@@ -333,8 +424,10 @@ Run workflow regression checks while port 18080 is free:
 python3 -m unittest discover -s scripts/tests -v
 ```
 
-They use disposable repositories and fake ADB/keytool executables to check
-resource ownership, signals, conflicting/multiple devices and signing safeguards.
+They use disposable repositories and fake Gradle/ADB/keytool executables to check
+device-only/default task selection, exact selector/argument forwarding, validation
+and help before device/media setup, failure status/cleanup, resource ownership,
+signals, conflicting/multiple devices and signing safeguards.
 No real signing material or device data is modified. Release initialization is
 explicit and refuses existing keys; see [Development](DEVELOPMENT.md#signed-releases).
 
@@ -440,7 +533,7 @@ or capture failure cannot silently count as screenshot evidence.
 Run the channel and DeArrow journeys on the selected running device:
 
 ```sh
-ANDROID_SERIAL=emulator-5554 scripts/test-android.sh \
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.ChannelSpoilersSmokeTest,net.wingress.mobivious.DeArrowSmokeTest
 ```
 
@@ -463,7 +556,7 @@ submission and the unauthenticated suggestions API contract.
 Run against an already running emulator with the disposable fixture:
 
 ```sh
-scripts/test-android.sh --offline \
+scripts/test-android.sh --device-only --offline \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.SearchExperienceSmokeTest,net.wingress.mobivious.SearchHistorySmokeTest,net.wingress.mobivious.DiscoverySearchSmokeTest,net.wingress.mobivious.NavigationHubSmokeTest
 ```
 
@@ -488,7 +581,7 @@ archive requests, preference/link round-trips, projection mapping and sensor mat
 Use the existing emulator and disposable fixture:
 
 ```sh
-ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --offline \
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AnnotationsViewingSmokeTest,net.wingress.mobivious.DiscoverySearchSmokeTest,net.wingress.mobivious.SearchExperienceSmokeTest
 ```
 

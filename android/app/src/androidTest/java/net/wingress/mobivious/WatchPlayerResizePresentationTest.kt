@@ -34,24 +34,25 @@ class WatchPlayerResizePresentationTest {
     private val occurrence = mutableStateOf("first")
     private val visible = mutableStateOf(true)
     private val comments = mutableStateOf(false)
+    private val windowHeight = mutableStateOf(700.dp)
 
     @Composable private fun Content(short: Boolean = false, wide: Boolean = false) {
         MaterialTheme {
             resize = key(occurrence.value) { rememberWatchPlayerResizeState() }
             list = key(occurrence.value) { rememberLazyListState() }
             density = LocalDensity.current.density
-            if (visible.value) BoxWithConstraints(Modifier.width(400.dp).height(700.dp)) {
+            if (visible.value) BoxWithConstraints(Modifier.width(400.dp).height(windowHeight.value)) {
                 val geometry = if (wide) VideoGeometry("wide", 16, 9) else VideoGeometry("portrait", 9, 16)
                 val expanded = geometry.embeddedHeight(maxWidth.value, maxHeight.value, false)
                 val compact = geometry.embeddedHeight(maxWidth.value, maxHeight.value, false, 1f)
-                val connection = rememberWatchPlayerScrollConnection(list, resize, expanded > compact && !comments.value)
+                val connection = rememberWatchPlayerScrollConnection(list, resize, expanded - compact, !comments.value)
                 val playerHeight = geometry.embeddedHeight(maxWidth.value, maxHeight.value, comments.value, resize.progress).dp
                 Column(Modifier.fillMaxSize()) {
                     Box(Modifier.fillMaxWidth().height(playerHeight)
                         .testTag("sized-player"))
                     if (comments.value) Text("Comments", Modifier.weight(1f))
                     else LazyColumn(Modifier.weight(1f).nestedScroll(connection).testTag("details"), state = list) {
-                        item { Text("Metadata", Modifier.height(if (short) 300.dp else 360.dp)) }
+                        item { Text("Metadata", Modifier.height(if (short) 300.dp else 360.dp).testTag("metadata")) }
                         if (!short) items(20) { Text("Recommendation $it", Modifier.height(80.dp)) }
                     }
                 }
@@ -60,6 +61,7 @@ class WatchPlayerResizePresentationTest {
     }
 
     private fun height(): Float = compose.onNodeWithTag("sized-player").getUnclippedBoundsInRoot().let { (it.bottom - it.top).value }
+    private fun metadataTop(): Float = compose.onNodeWithTag("metadata").getUnclippedBoundsInRoot().top.value
     private fun drag(delta: Float) {
         compose.onNodeWithTag("details").performTouchInput {
             down(center); moveBy(Offset(0f, -delta * density), delayMillis = 400)
@@ -80,11 +82,21 @@ class WatchPlayerResizePresentationTest {
         val partial = height()
         assertTrue(partial < expanded)
         assertTrue(resize.progress > 0f && resize.progress < 1f)
+        val metadataBeforeStep = metadataTop()
         compose.onNodeWithTag("details").performTouchInput { moveBy(Offset(0f, -24f * density), delayMillis = 400) }
         compose.waitForIdle()
-        assertTrue(height() < partial)
+        assertEquals(24f, partial - height(), 1f)
+        assertEquals(24f, metadataBeforeStep - metadataTop(), 1f)
+        val paused = height()
+        compose.mainClock.advanceTimeBy(500)
+        assertEquals(paused, height(), .01f)
+        val metadata = metadataTop()
+        compose.onNodeWithTag("details").performTouchInput { moveBy(Offset(0f, 12f * density), delayMillis = 400) }
+        compose.waitForIdle()
+        assertEquals(12f, height() - paused, 1f)
+        assertEquals(12f, metadataTop() - metadata, 1f)
         compose.onNodeWithTag("details").performTouchInput { advanceEventTime(200); up() }
-        drag(200f)
+        drag(320f)
         assertEquals(1f, resize.progress, .001f)
         compose.runOnIdle { runBlocking { list.scrollToItem(4) } }
         drag(-40f)
@@ -92,13 +104,13 @@ class WatchPlayerResizePresentationTest {
         compose.runOnIdle { runBlocking { list.scrollToItem(0) } }
         drag(-60f)
         assertTrue(resize.progress > 0f && resize.progress < 1f)
-        drag(-100f)
+        drag(-240f)
         assertEquals(expanded, height(), 1f)
     }
 
     @Test fun shortPageStaysCompactAfterItsListStopsScrollingAndFlingCanExpandIt() {
         compose.setContent { Content(short = true) }
-        drag(200f)
+        drag(320f)
         assertEquals(1f, resize.progress, .001f)
         assertFalse(list.canScrollForward)
         val compact = height()
@@ -108,6 +120,18 @@ class WatchPlayerResizePresentationTest {
         compose.waitForIdle()
         assertEquals(0f, resize.progress, .001f)
         assertTrue(height() > compact)
+    }
+
+    @Test fun flingContinuesIntoTheListAfterThePlayerReachesItsHeightLimit() {
+        compose.setContent { Content() }
+        compose.onNodeWithTag("details").performTouchInput { swipeUp(durationMillis = 150) }
+        compose.waitForIdle()
+        assertEquals(1f, resize.progress, .001f)
+        assertTrue(list.firstVisibleItemIndex > 0 || list.firstVisibleItemScrollOffset / density > 24f)
+        compose.runOnIdle { runBlocking { list.scrollToItem(0, (24f * density).toInt()) } }
+        compose.onNodeWithTag("details").performTouchInput { swipeDown(durationMillis = 150) }
+        compose.waitForIdle()
+        assertEquals(0f, resize.progress, .001f)
     }
 
     @Test fun commentsMinimizationAndRecreationKeepProgressButANewOccurrenceResetsIt() {
@@ -126,10 +150,14 @@ class WatchPlayerResizePresentationTest {
         restoration.emulateSavedInstanceStateRestore()
         assertEquals(progress, resize.progress, .001f)
         assertEquals(partial, height(), 1f)
+        compose.runOnIdle { windowHeight.value = 600.dp }
+        assertEquals(progress, resize.progress, .001f)
+        assertTrue(height() < partial)
+        val resizedWindow = height()
         compose.runOnIdle { occurrence.value = "next" }
         compose.waitForIdle()
         assertEquals(0f, resize.progress, .001f)
-        assertTrue(height() > partial)
+        assertTrue(height() > resizedWindow)
     }
 
     @Test fun smallLandscapePlayerDoesNotConsumeScrollingForAnInvisibleResize() {

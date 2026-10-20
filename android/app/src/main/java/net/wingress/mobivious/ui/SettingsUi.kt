@@ -113,10 +113,12 @@ internal fun SettingsScreen(vm: AppViewModel, page: String, navigate: (String) -
                         item { AppSection {
                             SectionHeading("Connection & app")
                             SettingsLink("Server", vm.store.server, Icons.Default.Dns, navigate)
+                            SettingsLink("Opening links", "Open YouTube links in Mobivious", Icons.Default.Link, navigate)
                             SettingsLink("About", "Version and community data", Icons.Default.Info, navigate)
                         } }
                     }
                     "Server" -> ServerSettingsScreen(vm, content, back)
+                    "Opening links" -> OpeningLinksScreen(content) { vm.message.value = "Android link settings could not be opened." }
                     "About" -> AboutSettingsScreen(content)
                     "Blocked channels" -> BlockedChannelsScreen(vm, content, signIn, openChannel)
                     in accountSettingsPages -> AccountSettingsContent(vm, page, content, navigate, signIn)

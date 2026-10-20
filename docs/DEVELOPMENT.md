@@ -109,18 +109,27 @@ behavior still needs instrumentation.
 
 ### Local checks
 
+Follow [Choosing checks](TESTING.md#choosing-checks) and the
+[contributor policy](../AGENTS.md): use focused tests during development and run
+the full JVM suite and debug lint once after final production-code edits. For
+example, run `./gradlew :app:testDebugUnitTest --tests 'net.wingress.mobivious.AiFilterTest'`
+from `android/` for a focused JVM iteration. Documentation, scripts and test-only
+changes use their relevant checks without automatically adding unrelated Android
+validation. Repeat a passing check when later edits affect its inputs.
+
 These environment paths are Linux examples; adjust them for your installation:
 
 ```sh
 export JAVA_HOME=/opt/android-studio/jbr
 export ANDROID_HOME="$HOME/Android/Sdk"
 cd android
-./gradlew :app:testDebugUnitTest :app:assembleDebug \
-  :app:assembleDebugAndroidTest :app:lintDebug --console=plain
+./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain
 cd ..
 ```
 
-The debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
+Add `:app:assembleDebug` or `:app:assembleDebugAndroidTest` when packaging or
+device-test compilation needs verification. Connected Gradle tasks build their
+required APKs. The debug APK is `android/app/build/outputs/apk/debug/app-debug.apk`.
 Building the instrumentation APK compiles device scenarios; it does not run them.
 
 Release builds require HTTPS. Debug builds additionally allow HTTP to
@@ -133,12 +142,16 @@ Start an emulator or connect a device, then select the serial reported by ADB:
 ```sh
 "$ANDROID_HOME/platform-tools/adb" devices
 export ANDROID_SERIAL=emulator-5554  # Replace with your device's serial.
-scripts/test-android.sh
+scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
 ```
 
 The runner selects an already connected device, generates local test media, waits
 for the fixture on localhost port 18080, reverses that port through ADB, and runs
-unit tests, device tests and debug lint. It never starts or restarts an emulator.
+the selected device tests. `--device-only` requires a nonempty class/method
+selector and does not request JVM tests or lint. Without this flag, the runner
+keeps its broad JVM/device/lint behavior for an intentional combined run.
+`scripts/test-android.sh --help` needs no device. It never starts or restarts an emulator.
 It stops its own fixture and removes only the ADB reverse mapping it created.
 Stop any earlier fixture using the same port before starting it. The fixture tests
 use generated media and local accounts rather than production accounts or YouTube
@@ -148,7 +161,7 @@ See [Testing](TESTING.md) and its test catalog for focused scenarios.
 Pass additional Gradle options to run focused checks, for example:
 
 ```sh
-scripts/test-android.sh --offline \
+scripts/test-android.sh --device-only --offline \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest
 ```
 
@@ -160,7 +173,7 @@ The focused download checks use separate video/audio files, captions, Range
 responses, slow transfers and controllable failures:
 
 ```sh
-scripts/test-android.sh \
+scripts/test-android.sh --device-only \
   -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DownloadsSmokeTest
 scripts/test-download-restart.sh
 ```

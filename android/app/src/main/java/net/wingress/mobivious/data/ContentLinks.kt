@@ -72,7 +72,7 @@ sealed interface ContentLink {
     data class External(val url: String) : ContentLink
 }
 object ContentLinks {
-    private val youtubeHosts = setOf("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be",
+    internal val youtubeHosts = setOf("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be",
         "youtube-nocookie.com", "www.youtube-nocookie.com")
     fun youtube(url: HttpUrl) = url.host in youtubeHosts && url.port == if (url.isHttps) 443 else 80
     fun accepted(url: HttpUrl, instance: String): Boolean {

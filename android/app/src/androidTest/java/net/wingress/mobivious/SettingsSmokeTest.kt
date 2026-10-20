@@ -59,6 +59,18 @@ class SettingsSmokeTest {
         until {var ready=false;compose.runOnUiThread {ready=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any {it is MainActivity && it!==previous}};ready}
         compose.runOnUiThread {activity=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single()}
     }
+    @Test fun openingLinksIsReachableAndSurvivesRecreation() {
+        compose.selectFeed("You"); compose.openAppSettings()
+        compose.onNodeWithTag("settings-root").performScrollToNode(hasText("Opening links"))
+        compose.onNodeWithText("Opening links").performClick()
+        compose.onNodeWithTag("opening-links").assertExists()
+        compose.onNodeWithTag("open-android-link-settings").performScrollTo().assertHasClickAction()
+        recreate()
+        compose.onNodeWithTag("opening-links").assertExists()
+        compose.onNodeWithTag("opening-links-status").assertExists()
+        compose.onNodeWithContentDescription("Back from Opening links").performClick()
+        compose.onNodeWithTag("settings-root").assertExists()
+    }
     @Test fun seekIntervalPersistsForGuestsAndAccountsAndPreservesFailedSaves() {
         fun option(label: String) = compose.onNode(hasText(label) and hasAnyAncestor(isPopup()))
         open("Playback")

@@ -20,7 +20,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### AiFilterTest
 
-[Source](../../android/app/src/test/java/net/wingress/mobivious/AiFilterTest.kt) — Ai Filter declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/test/java/net/wingress/mobivious/AiFilterTest.kt) — AI-filter preference/API/cache/concurrency regressions with virtual-time page-wait and single-retry boundaries.
 
 - `preferencesRoundTripSparsePatchesAndPausePreserveAllActions`
 - `legacyChoicesAndInvalidCanonicalValuesFollowWebsiteRules`
@@ -601,11 +601,12 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/WatchPlayerScrollTest.kt) — Watch Player Scroll declared scenarios; exact cases are enumerated in the test catalog.
 
-- `first24DpScrollTheListAndTheNext96DpResizeContinuously`
-- `crossingTheTopRegionInOneScrollLeavesTheCorrectRemainderForTheList`
+- `first24DpScrollTheListThenEveryConsumedDpChangesHeightByOneDp`
+- `crossingTheTopRegionLeavesTheCorrectRemainderForTheList`
 - `upwardBrowsingOnlyExpandsWhenReturningNearTheTop`
-- `viewportClampingOnAShortPageCannotRestartOrReverseResizing`
-- `largeFlingDeltasRespectTheLimitsAndRestoredProgressCanReverse`
+- `viewportClampingCannotRestartOrReverseResizing`
+- `flingLimitsAndReversalsUseTheCurrentHeightRange`
+- `normalizedProgressAndLegacyActivityStateRestore`
 
 ### WatchedStateTest
 
@@ -982,6 +983,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ContentLinksSmokeTest.kt) — Content Links Smoke declared scenarios; exact cases are enumerated in the test catalog.
 
+- `youtubeViewIntentsOpenColdAndWarmWithPreciseTimestampsAndDoNotReplayOnRecreation`
 - `sharedChannelAliasesResolveAndRetryWithoutSearching`
 - `sharedHashtagsUseNativePaginationAndChannelLinksPreservePlayback`
 - `richWatchInformationAndTimestampSeekKeepTheQueueOccurrence`
@@ -1167,6 +1169,15 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/OpaqueSurfacesPresentationTest.kt) — Opaque controls and panels remain independent of scrolling artwork and backgrounds. Exact cases appear in the test catalog.
 
 - `ordinarySurfacesRemainOpaqueOverChangingScenery`
+
+### OpeningLinksPresentationTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/OpeningLinksPresentationTest.kt) — Installed manifest matching for all eight YouTube hosts and excluded URLs, setup guidance and package-specific settings shortcut/fallback.
+
+- `manifestMatchesAllEightHostsOverHttpAndHttps`
+- `manifestExcludesUnrelatedPagesHostsAndSchemes`
+- `settingsScreenExplainsSelectionAndOffersTheSystemShortcut`
+- `shortcutTargetsTheInstalledPackageAndFallsBackToAppDetails`
 
 ### OriginalTitlesSmokeTest
 
@@ -1362,6 +1373,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Automatic per-field saves and invalid/failed edits, playback/codec settings, device appearance persistence, recreation/account isolation and System mode updates.
 
+- `openingLinksIsReachableAndSurvivesRecreation`
 - `seekIntervalPersistsForGuestsAndAccountsAndPreservesFailedSaves`
 - `outstandingChatValidationLinksToTheActualControlsAndReverts`
 - `deviceAccentSavesImmediatelyAndSurvivesRecreationAndAccountChange`
@@ -1483,6 +1495,7 @@ Test support/helper file; no declared `@Test` methods.
 
 - `playerTracksAnActiveDragAndOnlyExpandsNearTheTop`
 - `shortPageStaysCompactAfterItsListStopsScrollingAndFlingCanExpandIt`
+- `flingContinuesIntoTheListAfterThePlayerReachesItsHeightLimit`
 - `commentsMinimizationAndRecreationKeepProgressButANewOccurrenceResetsIt`
 - `smallLandscapePlayerDoesNotConsumeScrollingForAnInvisibleResize`
 
@@ -1508,4 +1521,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **891 declared test methods** (including ignored tests).
+Inventory total: **899 declared test methods** (including ignored tests).

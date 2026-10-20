@@ -870,7 +870,7 @@ private enum class WatchPane { PHONE, PRIMARY, SUPPORTING }
         val playerWidth = (if (sideBySide) maxWidth * .62f - 16.dp else maxWidth - 16.dp).value
         val expandedHeight = playback.displayGeometry.embeddedHeight(playerWidth, maxHeight.value, false).let { if(sideBySide) minOf(it,maxHeight.value*.6f) else it }
         val compactHeight = minOf(expandedHeight,playback.displayGeometry.embeddedHeight(playerWidth, maxHeight.value, false, 1f))
-        val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight > compactHeight && !drawerOpen)
+        val scrollConnection = rememberWatchPlayerScrollConnection(detailsList, resize, expandedHeight - compactHeight, !drawerOpen)
         val playerHeight = if(sideBySide) (expandedHeight+(compactHeight-expandedHeight)*resize.progress).dp else if (chatDocked) maxHeight * (1f - chatAppearance.belowFraction) else playback.displayGeometry.embeddedHeight(playerWidth, maxHeight.value, drawerOpen, resize.progress).dp
         val supportingList = key(queue.token,queue.currentKey) { rememberLazyListState() }
         val detailsContent: @Composable ColumnScope.(WatchPane) -> Unit = { pane ->

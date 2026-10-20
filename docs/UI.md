@@ -76,6 +76,16 @@ can provide at least 480dp for the player and 320dp for its supporting pane.
 Root-coordinate anchors keep the existing decoder attached while presentation
 moves between embedded, mini, fullscreen and PiP modes.
 
+When the embedded player can shrink, the first 24dp scrolls the details list.
+Further scrolling changes player height by the consumed scroll distance, using
+the actual expanded-to-compact height difference rather than a fixed gesture
+distance. The list receives the remainder, so content follows the finger during
+collapse and expansion. Expansion starts only near the top; flings retain
+Compose's normal physics without extra animation or snapping. Normalized progress
+survives recreation, window changes, drawers and minimization and resets for a new
+queue occurrence. Videos whose fitted height already meets the compact cap leave
+scrolling entirely to the list.
+
 ## Theme and components
 
 Drawers, modal sheets and full-screen action panels share a flat panel header and

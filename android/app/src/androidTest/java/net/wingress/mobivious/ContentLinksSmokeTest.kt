@@ -44,6 +44,41 @@ class ContentLinksSmokeTest {
     }
     @After fun close() { if (::activity.isInitialized) ui { activity.model.store.background = background; activity.model.closePlayer(); activity.finishAndRemoveTask() } }
 
+    @Test fun youtubeViewIntentsOpenColdAndWarmWithPreciseTimestampsAndDoNotReplayOnRecreation() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        ui { activity.finishAndRemoveTask() }
+        activity = instrumentation.startActivitySync(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://youtu.be/testvideo01?t=2.345&autoplay=0"))
+            .setClass(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
+        ready()
+        assertEquals(2345L, activity.model.queue.value.current!!.linkPlayback!!.startMs)
+        val first = activity.model.queue.value.currentKey
+        ui { activity.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.youtube.com/shorts/testvideo02?t=3.456&autoplay=0"))
+            .setClass(activity, MainActivity::class.java)) }
+        until { activity.model.queue.value.current?.video?.id == "testvideo02" }
+        ready()
+        assertEquals(3456L, activity.model.queue.value.current!!.linkPlayback!!.startMs)
+        assertNotEquals(first, activity.model.queue.value.currentKey)
+        val occurrence = activity.model.queue.value.currentKey
+        val token = activity.model.queue.value.token
+        val previous = activity
+        ui { activity.recreate() }
+        until {
+            var found = false
+            ui { ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED)
+                .filterIsInstance<MainActivity>().firstOrNull { it !== previous }?.let { activity = it; found = true } }
+            found
+        }
+        ready()
+        assertEquals(token, activity.model.queue.value.token)
+        assertEquals(occurrence, activity.model.queue.value.currentKey)
+        val message = "Share a YouTube or configured Invidious video, clip, playlist, mix, channel, hashtag or post link."
+        ui { activity.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://youtube.com.evil.test/watch?v=testvideo01"))
+            .setClass(activity, MainActivity::class.java)) }
+        until { activity.model.message.value == message }
+        assertEquals(occurrence, activity.model.queue.value.currentKey)
+    }
+
     @Test fun sharedChannelAliasesResolveAndRetryWithoutSearching() {
         command("content-links", """{"resolveFailNext":true}""")
         incoming("/@fixture/shorts")

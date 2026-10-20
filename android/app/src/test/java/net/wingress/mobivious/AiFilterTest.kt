@@ -1,6 +1,7 @@
 package net.wingress.mobivious
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.test.*
 import net.wingress.mobivious.data.*
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -9,6 +10,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.atomic.AtomicInteger
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class AiFilterTest {
     private val first = "UC" + "a".repeat(22)
     private val second = "UC" + "b".repeat(22)
@@ -118,28 +120,27 @@ class AiFilterTest {
             assertEquals(block, repo.state.value.matches[first]); assertNull(repo.state.value.matches[second]); assertEquals("Offline", repo.state.value.error)
         } finally { scope.cancel() }
     }
-    @Test fun boundedPageWaitLeavesTheBackgroundRequestAlive() = runBlocking {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        try {
-            val gate = CompletableDeferred<Unit>(); val owner = ApiContext("https://one.example", null)
-            val repo = AiFilterRepository(scope, { owner }, { response() }, { ids, _, _ -> gate.await(); response(ids) })
-            withTimeout(3_000) { repo.prepare(listOf(first), settings(), AiPageGroup.FEEDS) }
-            assertTrue(repo.state.value.matches.isEmpty())
-            gate.complete(Unit)
-            withTimeout(2_000) { while (repo.state.value.matches[first] != block) yield() }
-        } finally { scope.cancel() }
+    @Test fun boundedPageWaitLeavesTheBackgroundRequestAlive() = runTest {
+        val gate = CompletableDeferred<Unit>(); val owner = ApiContext("https://one.example", null)
+        val repo = AiFilterRepository(backgroundScope, { owner }, { response() }, { ids, _, _ -> gate.await(); response(ids) }, { testScheduler.currentTime })
+        val page = async { repo.prepare(listOf(first), settings(), AiPageGroup.FEEDS) }
+        runCurrent()
+        advanceTimeBy(1_999); runCurrent()
+        assertFalse(page.isCompleted)
+        advanceTimeBy(1); runCurrent()
+        assertTrue(page.isCompleted); page.await()
+        assertTrue(repo.state.value.matches.isEmpty())
+        gate.complete(Unit); runCurrent()
+        assertEquals(block, repo.state.value.matches[first])
     }
-    @Test fun pendingClassificationsRetryOnlyOnceAfterFiveSeconds() = runBlocking {
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-        try {
-            val calls = AtomicInteger(); val owner = ApiContext("https://one.example", null)
-            val repo = AiFilterRepository(scope, { owner }, { response() }, { ids, _, _ -> calls.incrementAndGet(); response(ids, resolved = false) })
-            repo.prepare(listOf(first), settings(), AiPageGroup.FEEDS)
-            assertEquals(1, calls.get())
-            delay(200); assertEquals(1, calls.get())
-            withTimeout(7_000) { while (calls.get() < 2) delay(50) }
-            delay(5_200); assertEquals(2, calls.get())
-        } finally { scope.cancel() }
+    @Test fun pendingClassificationsRetryOnlyOnceAfterFiveSeconds() = runTest {
+        val calls = AtomicInteger(); val owner = ApiContext("https://one.example", null)
+        val repo = AiFilterRepository(backgroundScope, { owner }, { response() }, { ids, _, _ -> calls.incrementAndGet(); response(ids, resolved = false) }, { testScheduler.currentTime })
+        repo.prepare(listOf(first), settings(), AiPageGroup.FEEDS)
+        assertEquals(1, calls.get())
+        advanceTimeBy(4_999); runCurrent(); assertEquals(1, calls.get())
+        advanceTimeBy(1); runCurrent(); assertEquals(2, calls.get())
+        advanceTimeBy(5_000); runCurrent(); assertEquals(2, calls.get())
     }
     @Test fun aLateBatchCannotRestoreAnOlderListSnapshot() = runBlocking {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
