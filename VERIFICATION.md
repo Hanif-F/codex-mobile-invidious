@@ -1,5 +1,42 @@
 # Focused implementation verification
 
+## Mobivious 0.12.5 release — 21 October 2026
+
+Application source: `47ce6db` plus the version-only change to **0.12.5**, code
+**29**. This patch includes finger-tracking player resizing, YouTube HTTP/HTTPS
+content-link registration and the Opening links setup screen. No backend update
+or database migration is required for these fixes.
+
+- `scripts/build-release.sh` passed: **434 JVM tests**, signed optimized release
+  APK and release lint (**0 errors, 33 warnings**).
+- The optimized ordinary-speed watch journey passed on Android 16
+  `emulator-5554` (Pixel_8_Pro), including fixture connection, account setup,
+  navigation and playing media. Recording validation passed with no source drift;
+  this was a smoke check, not a timing benchmark. The release app/data were preserved.
+- Documentation inventory/fingerprint/link and Git whitespace checks passed.
+- Identity/version/SDK, APK checksum, uncompressed DEX/native payloads and matching
+  R8 mapping/archive checksums passed. The signing certificate matches 0.12.4;
+  the previous local APK matches GitHub's published asset digest. All eight
+  YouTube domains are present in the packaged release manifest.
+- APK: **7,220,771 bytes**, compared with 7,220,231 bytes
+  for 0.12.4 (+0.0075%). Uncompressed DEX:
+  **6,210,516 bytes**, previously 6,205,984 bytes.
+- APK SHA-256:
+  `6d62fe08fd6fb55ac2f87a5aad6cabe5c2dee2fccfa509034e9a9b3b1e010dd3`.
+  Matching archive: `artifacts/r8/0.12.5/<APK-SHA256>/`.
+
+Build/artifact evidence is retained under ignored `.tools/release-0.12.5/`.
+Optimized runtime command: `ANDROID_SERIAL=emulator-5554
+scripts/test-ui-performance.sh --record --label release-0_12_5-watch --journey watch`.
+Its recording, source fingerprints, raw outputs and successful exit status are
+under `.tools/ui-performance/release-0_12_5-watch/`.
+The existing 18 focused debug emulator cases and Android default-routing check
+below remain the feature's detailed runtime evidence; production code is unchanged
+apart from the version bump. The complete device suite was not rerun. Android
+user selection is still required for YouTube domains, and explicitly targeted
+YouTube intents can bypass the default. Physical-device smoothness remains
+outside emulator acceptance.
+
 ## Testing workflow optimization — 21 October 2026
 
 Source: Android `b56217b` plus the existing working-tree changes and this testing
