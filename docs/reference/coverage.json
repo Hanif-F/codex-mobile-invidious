@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "47ce6dbd2155d179787b7846b8eed20b4aa99cde",
+  "reviewedSourceCommit": "7cf9c7f25f74eafc15cd7db1f2e6006dd6a3a619",
   "reviewedDate": "2026-10-22",
-  "version": "0.12.5",
+  "version": "0.13.0",
   "documents": [
     "AGENTS.md",
     "FEATURE_PARITY.md",
@@ -49,7 +49,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "4590f8a56631c1d4f3c8b97f90581debaac90f515bcfdda1a08b721b9558685a"
+      "sha256": "a889f4b9558a5a5ae8446d5e7804f03224e3efb91956beab125a8d96ae95dd4b"
     },
     "android/app/proguard-rules.pro": {
       "area": "Build configuration",
@@ -1543,7 +1543,7 @@
       "area": "Performance verification",
       "guide": "docs/TESTING.md",
       "description": "Eighteen current-UI performance journeys with ordinary-control setup, automatic-save recovery and measured gesture provenance.",
-      "sha256": "e9025cd8ca7e34af9b81f5e5d2d649979467419828a8dbf23c965bd6d7ac5009"
+      "sha256": "486728c34cd7d1aacda9ff7ea41d9c478fc2449927805b570526ab64394a5f8a"
     },
     "android/macrobenchmark/src/main/res/xml/fixture_network_security.xml": {
       "area": "Performance verification",

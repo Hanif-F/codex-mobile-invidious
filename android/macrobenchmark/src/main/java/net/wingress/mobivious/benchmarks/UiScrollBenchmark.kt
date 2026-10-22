@@ -49,8 +49,7 @@ class UiScrollBenchmark {
         }
         "Required benchmark content missing: $selector\n${hierarchy.toString("UTF-8")}"
     }
-    private fun click(text: String) {
-        val selector=By.text(text)
+    private fun click(text: String, selector: BySelector = By.text(text)) {
         var bounds=required(selector).visibleBounds
         var stableSince=SystemClock.uptimeMillis()
         val deadline=stableSince+5000
@@ -112,7 +111,8 @@ class UiScrollBenchmark {
         val shellRoot=By.res("navigation-Popular")
         while(!device.hasObject(By.res("settings-root")) && !device.hasObject(shellRoot)) {
             if(!confirmed && device.hasObject(By.text("Change server?"))) {
-                device.findObjects(By.text("Connect")).last().click();confirmed=true
+                click("Connect", By.text("Connect").hasAncestor(By.hasDescendant(By.text("Change server?"))))
+                confirmed=true
             }
             if(!discarded && device.hasObject(By.text("Continue"))) {click("Continue");discarded=true}
             if(SystemClock.uptimeMillis()>=deadline) required(By.res("settings-root"))

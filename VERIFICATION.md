@@ -1,5 +1,53 @@
 # Focused implementation verification
 
+## Mobivious 0.13.0 release — 22 October 2026
+
+Application source: `7cf9c7f` plus the version-only change to **0.13.0**, code
+**30**. This release adds Android client support for required sign-in and instance
+verification. Administration remains on the website; no server deployment or
+production policy changes are included. The release preparation also scopes the
+optimized smoke runner's Connect confirmation to its dialog and waits for stable
+bounds, preventing a click on the underlying button during the opening animation.
+
+- Reused the completed instance-access checks below without rerunning them:
+  **445 JVM tests**, the subsequent **16 affected JVM cases**, **29 focused Android
+  cases**, **32 Python checks**, and debug lint (**0 errors, 36 warnings**).
+- Ran `./gradlew :app:assembleRelease :app:lintRelease --console=plain` from
+  `android/`, retaining incremental outputs: passed. Release lint reported
+  **0 errors, 36 warnings**. The existing release script's signing checks and
+  artifact/R8 archive logic were retained; its already-completed JVM task was
+  omitted from this invocation at the user's request. No release script change
+  was committed and the existing signing key was preserved.
+- The new optimized ordinary-speed watch smoke passed on Android 16
+  `emulator-5554` (Pixel 8 Pro), covering fixture connection, account setup,
+  navigation and playing media. Command: `ANDROID_SERIAL=emulator-5554
+  scripts/test-ui-performance.sh --record --label release-0_13_0-watch-fixed
+  --journey watch`. Recording/provenance checks passed with no source drift.
+  The initial attempt failed in runner setup because it clicked the background
+  Connect button while the confirmation dialog was opening; only this failed
+  check was rerun after the test-helper correction. This was not a timing
+  benchmark. The installed release and its data were preserved.
+- Documentation inventory/fingerprint/link and Git whitespace checks passed.
+- APK identity/version/SDK, checksum, uncompressed DEX/native payloads and matching
+  R8 mapping/archive checksums passed. The signing certificate matches 0.12.5;
+  the previous local APK matches GitHub's published asset digest. The packaged
+  protected-download service is private and declares the dataSync foreground type.
+- APK: **7,302,896 bytes**; uncompressed DEX: **6,284,908 bytes**. The prior release
+  was 7,220,771 APK bytes and 6,210,516 DEX bytes (+1.1373% and +1.1978%). These
+  different-feature release sizes are descriptive, not a controlled performance
+  comparison. APK SHA-256:
+  `976fd90c0c4a2d592bb492beeac88bd6c5809b18cb74f02e1e5bd551c69c9987`.
+  Matching archive: `artifacts/r8/0.13.0/<APK-SHA256>/`.
+
+Build/artifact evidence is retained under ignored `.tools/release-0.13.0/`.
+Optimized smoke evidence is under `.tools/ui-performance/release-0_13_0-watch-fixed/`;
+the failed setup attempt remains under `.tools/ui-performance/release-0_13_0-watch/`.
+The detailed fixture and live-provider acceptance below remains valid and separate:
+real Turnstile completion passed; real-account content access was not tested.
+The complete device suite, exhaustive optimized access/download journeys and
+physical-device performance were not rerun or claimed. The existing emulator
+accepted-video-conversion limitation remains explicit.
+
 ## Mobivious 0.12.5 release — 21 October 2026
 
 Application source: `47ce6db` plus the version-only change to **0.12.5**, code
