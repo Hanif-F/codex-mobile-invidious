@@ -28,6 +28,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private var prefsContext: ApiContext? = null
     private var settingsVersion = 0L
     private var selection: Selection? = null
+    private var accessSelection: Selection? = null
     private data class Selection(val audio: StreamKey?, val text: StreamKey?,
         val parameters: TrackSelectionParameters, val speed: Float)
     private var pendingSelection: Selection? = null
@@ -90,6 +91,15 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     fun recovering(value: Boolean) {
         if (state.recovering != value) update(state.copy(recovering = value, error = if (value) null else state.error))
     }
+    fun reauthenticate(context: ApiContext) {
+        job?.cancel()
+        accessSelection = capture()
+        requestedPlayWhenReady = player.playWhenReady
+        player.pause(); player.stop()
+        decoderError = true
+        update(state.copy(context = context, loading = false, sourceLoading = false, recovering = false,
+            error = "Access restored. Retry playback to continue."))
+    }
     private fun valid(token: String, context: ApiContext) = state.token == token && state.context == context && app.api.context() == context
     private fun check(token: String, context: ApiContext) { if (!valid(token, context)) throw CancellationException("Playback context changed") }
     private fun launch(sourceOnly: Boolean = false, block: suspend (String, ApiContext) -> Unit) {
@@ -106,7 +116,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     }
     fun startDownload(id: String) {
         val record = app.downloads.find(id) ?: return
-        beforeChange(); job?.cancel(); selection = null; decoderError = false
+        beforeChange(); job?.cancel(); selection = null; accessSelection = null; decoderError = false
         player.pause()
         prefs = app.store.initialPreferences(); prefsContext = app.api.context()
         baseRepeat = QueueRepeat.OFF; mixContinuations.clear()
@@ -140,7 +150,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     }
     fun start(id: String, source: String? = null, index: Int? = null, seconds: Long? = null,
         audio: Boolean = false, paused: Boolean = false, sourceSeed: String? = null, linkPlayback: LinkPlayback? = null, clip: Clip? = null) {
-        beforeChange(); job?.cancel(); selection = null; decoderError = false; mixContinuations.clear()
+        beforeChange(); job?.cancel(); selection = null; accessSelection = null; decoderError = false; mixContinuations.clear()
         player.pause()
         val context = app.api.context()
         if (prefsContext != context) { prefs = app.store.initialPreferences(); prefsContext = context }
@@ -228,7 +238,8 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         if (entry.downloadId != null) { loadDownload(entry, playing, positionMs, fresh); check(token, context); return }
         val sameOccurrence = !fresh && state.videoSelection.occurrence == entry.key
         if (!fresh && player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == state.currentKey) {
-            val captured = capture()
+            val captured = accessSelection ?: capture()
+            accessSelection = null
             selection = captured.takeIf { sameOccurrence }
             if (!sameOccurrence) update(state.copy(carriedOptions = state.carriedOptions.copy(
                 listen = (C.TRACK_TYPE_VIDEO in captured.parameters.disabledTrackTypes).takeIf { state.carriedOptions.listen != null || it != prefs.listen },
@@ -534,5 +545,5 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             if (state.source?.mix == true) state.items.lastOrNull { it.sourceIndex != null }?.video?.id else null)
         if (player.playbackState == Player.STATE_ENDED && state.current != null) advance(automatic = true)
     } }
-    fun close() { beforeChange(); job?.cancel(); selectionPending = false; update(PlaybackQueueSnapshot()); player.stop(); player.clearMediaItems() }
+    fun close() { beforeChange(); job?.cancel(); accessSelection = null; selectionPending = false; update(PlaybackQueueSnapshot()); player.stop(); player.clearMediaItems() }
 }

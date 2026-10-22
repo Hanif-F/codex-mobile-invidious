@@ -59,6 +59,46 @@ Production timeouts and real-dispatcher concurrency cases remain unchanged.
 Measured timings and runner acceptance are recorded in
 [the verification report](../VERIFICATION.md#testing-workflow-optimization--21-october-2026).
 
+## Instance access verification
+
+`InstanceAccessTest` covers redirect credential boundaries, bootstrap exclusions,
+stale requests, pass validation, account cache isolation and recovery policy.
+`InstanceAccessSmokeTest` uses the disposable fixture for the native WebView
+event/Keystore round trip, either/both gates, disabled registration, cancellation/
+recreation, expiry/policy/outage recovery, retained playback and protected-download
+retry/cancellation. Its background/PiP case checks that access failures do not
+enter buffer recovery.
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.InstanceAccessSmokeTest
+python3 -m unittest discover -s scripts/tests
+```
+
+`scripts/test-download-restart.sh` runs the existing system-transfer phases and
+`ProtectedDownloadsPersistenceSmokeTest` across real force-stops. System transfers
+retain IDs; managed unfinished transfers require explicit Retry and retain
+completed assets and the encrypted instance pass. Build app/test APKs through the
+focused runner first. These cases require `downloadRestart=true`; ordinary
+connected selection skips them.
+
+Real Cloudflare acceptance is separate from synthetic fixture acceptance. The
+opt-in `LiveInstanceAccessSmokeTest` opens the default production instance's
+verification page, obtains a native pass and confirms it through discovery. It
+uses no account credentials and changes no admin policy. Run it intentionally:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveInstanceAccessSmokeTest \
+  -Pandroid.testInstrumentationRunnerArguments.liveInstanceAccess=true
+```
+
+Set `liveKeepInstance=true` to leave the tested instance selected afterward.
+A managed widget may require its visible Retry/checkbox interaction.
+This confirms the live provider handoff; production account-gated content remains
+separate from fixture account acceptance. Evidence is kept under ignored
+`.tools/access-*.log` and `.tools/access-results/`.
+
 ## What each check establishes
 
 | Check | Evidence supplied |

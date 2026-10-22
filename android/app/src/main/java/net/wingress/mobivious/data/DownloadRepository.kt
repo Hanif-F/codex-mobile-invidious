@@ -36,11 +36,21 @@ class DownloadRepository(private val context: Context) {
     private val mutex = Mutex()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val initialized = CompletableDeferred<Unit>()
+    private val managedCalls = java.util.concurrent.ConcurrentHashMap<String, okhttp3.Call>()
+    private val managedOwners = java.util.concurrent.ConcurrentHashMap<String, ApiContext>()
+    private val app get() = context.applicationContext as net.wingress.mobivious.MobiviousApplication
     private val root get() = File(requireNotNull(context.getExternalFilesDir(null)) { "Download storage is unavailable." }, "downloads")
     val records = MutableStateFlow<List<DownloadRecord>>(emptyList())
     val error = MutableStateFlow<String?>(null)
     init { scope.launch {
-        try { mutex.withLock { records.value = database.read().sortedByDescending { it.created } }; reconcile() }
+        try { mutex.withLock {
+            records.value = database.read().sortedByDescending { it.created }
+            records.value.toList().forEach { record ->
+                if (record.assets.any { it.managed && it.status in listOf(DownloadStatus.QUEUED, DownloadStatus.RUNNING, DownloadStatus.WAITING) })
+                    save(record.copy(assets = record.assets.map { if (it.managed && it.status in listOf(DownloadStatus.QUEUED, DownloadStatus.RUNNING, DownloadStatus.WAITING))
+                        it.copy(status = DownloadStatus.FAILED, error = "Download interrupted. Retry to continue.") else it }))
+            }
+        }; reconcile() }
         catch (e: Exception) { error.value = e.message ?: "Could not read downloads." }
         finally { initialized.complete(Unit) }
         while (isActive) { delay(1000); if (records.value.any { it.active }) runCatching { reconcile() }.onFailure { error.value = it.message } }
@@ -58,17 +68,29 @@ class DownloadRepository(private val context: Context) {
         require(url.host == base.host && url.port == base.port && url.scheme == base.scheme) { "Downloads must use the originating instance." }
         return url.toString()
     }
-    suspend fun create(server: String, catalog: DownloadCatalog, selection: DownloadSelection): String = mutex.withLock {
-        withContext(Dispatchers.IO) {
-            var record = DownloadRecord.create(server, catalog, selection)
-            val video = catalog.details.video
-            val artwork = listOf(DownloadKind.THUMBNAIL to video.thumbnail, DownloadKind.AVATAR to Avatars.url(server, video.authorAvatar).orEmpty()).mapNotNull { (kind, url) ->
-                if (url.isBlank()) null else runCatching { DownloadAsset(DownloadChoice(kind.name.lowercase(), kind, address(server, url), "{}"), "${kind.name.lowercase()}.jpg") }.getOrNull()
+    private suspend fun prepareTransfer(server: String) {
+        val owner = app.store.positionContext()
+        if (!InstanceAccess.sameOrigin(server.toHttpUrlOrNull()!!, owner.server)) return
+        val status = app.access.discover(owner)
+        if (status?.required == true) {
+            app.access.report(owner, AccessReason.VERIFICATION)
+            throw InstanceAccessException(AccessReason.VERIFICATION)
+        }
+    }
+    suspend fun create(server: String, catalog: DownloadCatalog, selection: DownloadSelection): String {
+        prepareTransfer(server)
+        return mutex.withLock {
+            withContext(Dispatchers.IO) {
+                var record = DownloadRecord.create(server, catalog, selection)
+                val video = catalog.details.video
+                val artwork = listOf(DownloadKind.THUMBNAIL to video.thumbnail, DownloadKind.AVATAR to Avatars.url(server, video.authorAvatar).orEmpty()).mapNotNull { (kind, url) ->
+                    if (url.isBlank()) null else runCatching { DownloadAsset(DownloadChoice(kind.name.lowercase(), kind, address(server, url), "{}"), "${kind.name.lowercase()}.jpg") }.getOrNull()
+                }
+                record = record.copy(assets = record.assets + artwork)
+                save(record) // Journal before submitting system work; interrupted enqueue can be retried.
+                enqueue(record)
+                record.id
             }
-            record = record.copy(assets = record.assets + artwork)
-            save(record) // Journal before submitting system work; interrupted enqueue can be retried.
-            enqueue(record)
-            record.id
         }
     }
     private fun enqueue(original: DownloadRecord) {
@@ -80,23 +102,44 @@ class DownloadRepository(private val context: Context) {
             val pending = asset.copy(filename = "${asset.choice.key}-${UUID.randomUUID()}.${asset.choice.extension}", transferId = 0, status = DownloadStatus.QUEUED, bytes = 0, error = "")
             val replacement = try {
                 if (asset.transferId > 0) manager.remove(asset.transferId)
+                managedOwners.remove(asset.filename)
                 file(record, asset).delete()
                 record = record.copy(assets = record.assets.toMutableList().apply { set(index, pending) }); save(record)
                 val target = file(record, pending); check(target.parentFile!!.mkdirs() || target.parentFile!!.isDirectory)
-                val request = DownloadManager.Request(Uri.parse(address(record.server, asset.choice.url)))
-                    .setDestinationUri(Uri.fromFile(target)).setTitle("Mobivious download")
-                    .setDescription(if (asset.artwork) "Download artwork" else "${asset.choice.kind.name.lowercase()} track")
-                    .setMimeType(asset.choice.mime).setAllowedOverMetered(true).setAllowedOverRoaming(true)
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
-                pending.copy(transferId = manager.enqueue(request))
+                val url = address(record.server, asset.choice.url)
+                val targetContext = app.store.positionContext()
+                val protected = asset.managed || app.access.headers(url.toHttpUrlOrNull()!!, targetContext).isNotEmpty()
+                if (protected) {
+                    require(InstanceAccess.sameOrigin(url.toHttpUrlOrNull()!!, targetContext.server)) { "Switch to this download's instance before retrying." }
+                    managedOwners[pending.filename] = targetContext
+                    pending.copy(managed = true)
+                } else {
+                    val request = DownloadManager.Request(Uri.parse(url))
+                        .setDestinationUri(Uri.fromFile(target)).setTitle("Mobivious download")
+                        .setDescription(if (asset.artwork) "Download artwork" else "${asset.choice.kind.name.lowercase()} track")
+                        .setMimeType(asset.choice.mime).setAllowedOverMetered(true).setAllowedOverRoaming(true)
+                        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+                    pending.copy(transferId = manager.enqueue(request))
+                }
             } catch (e: Exception) { pending.copy(status = DownloadStatus.FAILED, error = e.message ?: "Could not start download.") }
             record = record.copy(assets = record.assets.toMutableList().apply { set(index, replacement) })
             save(record)
+        }
+        if (record.assets.any { it.managed && it.status == DownloadStatus.QUEUED }) try {
+            net.wingress.mobivious.downloads.ProtectedDownloadService.start(context)
+        } catch (_: Exception) {
+            save(record.copy(assets = record.assets.map {
+                if (it.managed && it.status == DownloadStatus.QUEUED) {
+                    managedOwners.remove(it.filename)
+                    it.copy(status = DownloadStatus.FAILED, error = "Could not start download. Open the app and retry.")
+                } else it
+            }))
         }
     }
     suspend fun reconcile() = mutex.withLock { withContext(Dispatchers.IO) {
         for (record in records.value) {
             val assets = record.assets.map { original ->
+                if (original.managed) return@map original
                 // Recover a system ID if the process died between enqueue and its DB save.
                 val asset = if (original.transferId == 0L && original.status == DownloadStatus.QUEUED) {
                     val target = Uri.fromFile(file(record, original)).toString()
@@ -130,7 +173,7 @@ class DownloadRepository(private val context: Context) {
             }
             val reconciled = record.copy(assets = assets)
             if (assets != record.assets) save(reconciled)
-            if (assets.any { it.status == DownloadStatus.QUEUED && it.transferId == 0L }) enqueue(reconciled)
+            if (assets.any { !it.managed && it.status == DownloadStatus.QUEUED && it.transferId == 0L }) enqueue(reconciled)
         }
     } }
     private fun validContent(file: File, asset: DownloadAsset): Boolean = runCatching {
@@ -147,13 +190,17 @@ class DownloadRepository(private val context: Context) {
             } finally { extractor.release() }
         }
     }.getOrDefault(false)
-    suspend fun retry(id: String) { reconcile(); mutex.withLock { withContext(Dispatchers.IO) { find(id)?.let(::enqueue) } } }
+    suspend fun retry(id: String) { find(id)?.let { prepareTransfer(it.server) }; reconcile(); mutex.withLock { withContext(Dispatchers.IO) { find(id)?.let(::enqueue) } } }
     suspend fun cancel(id: String) = mutex.withLock { withContext(Dispatchers.IO) {
+        managedCalls[id]?.cancel()
+        find(id)?.assets?.forEach { managedOwners.remove(it.filename) }
         find(id)?.let { record -> save(record.copy(assets = record.assets.map { asset ->
             if (asset.status == DownloadStatus.COMPLETE) asset else { if (asset.transferId > 0) manager.remove(asset.transferId); file(record, asset).delete(); asset.copy(transferId = 0, status = DownloadStatus.CANCELLED, bytes = 0, error = "Cancelled") }
         })) }
     } }
     suspend fun delete(id: String) = mutex.withLock { withContext(Dispatchers.IO) {
+        managedCalls[id]?.cancel()
+        find(id)?.assets?.forEach { managedOwners.remove(it.filename) }
         find(id)?.let { record -> record.assets.forEach { if (it.transferId > 0) manager.remove(it.transferId) }; File(root, record.id).deleteRecursively(); database.delete(id); records.value = records.value.filterNot { it.id == id } }
     } }
     suspend fun position(id: String, position: Long) = mutex.withLock { withContext(Dispatchers.IO) { find(id)?.let { save(it.copy(positionMs = position.coerceAtLeast(0))) } } }
@@ -166,4 +213,59 @@ class DownloadRepository(private val context: Context) {
     }
     fun refresh() { scope.launch { runCatching { reconcile() }.onFailure { error.value = it.message } } }
     suspend fun completion() { initialized.await(); reconcile() }
+
+    /** Service-owned transfers never put credentials into DownloadManager's persistent header table. */
+    suspend fun transferManaged() = withContext(Dispatchers.IO) {
+        initialized.await()
+        while (currentCoroutineContext().isActive) {
+            val pair = mutex.withLock {
+                records.value.firstNotNullOfOrNull { record -> record.assets.firstOrNull { it.managed && it.status == DownloadStatus.QUEUED }?.let { record to it } }
+            } ?: return@withContext
+            val (record, asset) = pair
+            val owner = managedOwners[asset.filename]
+            var written = 0L
+            suspend fun update(status: DownloadStatus, total: Long = asset.total, error: String = "") = mutex.withLock {
+                find(record.id)?.let { latest ->
+                    save(latest.copy(assets = latest.assets.map {
+                        if (it.filename == asset.filename && it.status !in listOf(DownloadStatus.CANCELLED, DownloadStatus.COMPLETE))
+                            it.copy(status = status, bytes = written, total = total, error = error) else it
+                    }))
+                }
+            }
+            try {
+                check(owner != null && owner == app.store.positionContext()) { "Account or instance changed. Retry the download." }
+                require(InstanceAccess.sameOrigin(record.server.toHttpUrlOrNull()!!, owner.server)) { "Switch to this download's instance before retrying." }
+                val call = mutex.withLock {
+                    if (find(record.id)?.assets?.any { it.filename == asset.filename && it.status == DownloadStatus.QUEUED } != true) return@withLock null
+                    app.access.client(okhttp3.OkHttpClient.Builder().followSslRedirects(false).build()) { owner }.newCall(
+                        okhttp3.Request.Builder().url(address(record.server, asset.choice.url)).tag(ApiContext::class.java, owner).build())
+                        .also { managedCalls[record.id] = it }
+                } ?: continue
+                update(DownloadStatus.RUNNING)
+                call.execute().use { response ->
+                    check(response.isSuccessful) { "Download failed (${response.code}). Retry." }
+                    val body = requireNotNull(response.body)
+                    val total = body.contentLength().coerceAtLeast(0)
+                    var savedAt = 0L
+                    body.byteStream().use { input -> file(record, asset).outputStream().use { output ->
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            check(owner == app.store.positionContext()) { "Account or instance changed. Retry the download." }
+                            val count = input.read(buffer); if (count < 0) break
+                            output.write(buffer, 0, count); written += count
+                            if (System.currentTimeMillis() - savedAt > 500) { update(DownloadStatus.RUNNING, total); savedAt = System.currentTimeMillis() }
+                        }
+                    } }
+                    check(written > 0 && (total == 0L || written == total) && validContent(file(record, asset), asset)) { "The downloaded file is incomplete. Retry." }
+                    update(DownloadStatus.COMPLETE, written)
+                }
+            } catch (e: Exception) {
+                withContext(NonCancellable) { update(DownloadStatus.FAILED, error = if (e is CancellationException) "Download interrupted. Retry." else e.message ?: "Download failed. Retry.") }
+                file(record, asset).delete()
+                if (e is CancellationException) throw e
+            } finally { managedCalls.remove(record.id); managedOwners.remove(asset.filename) }
+        }
+    }
+    fun stopManagedCalls() { managedCalls.values.forEach { it.cancel() } }
 }

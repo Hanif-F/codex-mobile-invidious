@@ -131,6 +131,29 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore, 
                 .setBlockModes(KeyProperties.BLOCK_MODE_GCM).setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE).build())
         }.generateKey()
     }
+    val verificationPersistence: VerificationPersistence = object : VerificationPersistence {
+        private fun name(origin: String) = "verification." + java.security.MessageDigest.getInstance("SHA-256")
+            .digest(origin.toByteArray()).joinToString("") { "%02x".format(it) }
+        override fun read(origin: String): VerificationPass? = synchronized(this@SessionStore) {
+            runCatching {
+                val encoded = prefs.getString(name(origin), null) ?: return@synchronized null
+                val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                    init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
+                    updateAAD(origin.toByteArray())
+                }
+                val json = JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8))
+                VerificationPass(json.getString("token"), json.getLong("expiresAt"))
+            }.getOrNull()
+        }
+        override fun write(origin: String, pass: VerificationPass?) = synchronized(this@SessionStore) {
+            if (pass == null) checked(emptyMap(), setOf(name(origin))) else {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()); updateAAD(origin.toByteArray()) }
+                val json = JSONObject().put("token", pass.token).put("expiresAt", pass.expiresAt).toString()
+                checked(mapOf(name(origin) to Base64.encodeToString(cipher.iv + cipher.doFinal(json.toByteArray()), Base64.NO_WRAP)))
+            }
+        }
+    }
     private fun readAccount(): Account? = runCatching {
         val bytes = Base64.decode(prefs.all["session"] as? String ?: return null, Base64.NO_WRAP)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12))) }

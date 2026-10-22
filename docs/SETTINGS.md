@@ -17,6 +17,14 @@ for the current account or guest on this device/instance. **Device-wide** means
 independent of account and instance. Playback defaults normally affect the next
 opened occurrence; current player controls are described separately below.
 
+## Instance access
+
+Instance access prompts offer native sign-in or an embedded verification page.
+Cancel/Later leaves Server settings and local Downloads reachable; retry the
+failed action to reopen the prompt. Verification passes are instance-specific and
+independent of the account. CAPTCHA, registration, required-login and Turnstile
+administration remain on the instance website.
+
 ## Opening links
 
 **Settings → Connection & app → Opening links** shows how many of the eight

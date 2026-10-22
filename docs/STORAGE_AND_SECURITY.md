@@ -10,6 +10,7 @@ Paths describe Android sandbox locations, not host repository paths.
 | --- | --- |
 | SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide accent settings; dormant legacy colored-background/adaptive-control keys. |
 | AndroidKeyStore alias `mobivious.session` | AES key for session encryption; the key is not a checked-in file. |
+| `verification.<SHA-256(origin)>` preference keys | AES-GCM encrypted instance passes/expiry; origin is authenticated as additional data. Independent of account sign-out; expired/rejected passes are not used. |
 | `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions, search assistance/recents and visibility snapshots. |
 | `cacheDir/feeds/` | Selected successful feed/search response snapshots, hashed keys, bounded count/age/size. |
 | SQLite `downloads.db`, schema version 1 | Table `downloads(id TEXT PRIMARY KEY, record TEXT NOT NULL)` storing JSON download journals. Upgrade hook currently has no migration logic. |
@@ -83,11 +84,13 @@ Release instance selection permits only HTTPS origins without credentials/path/
 query/fragment. Debug cleartext configuration is restricted to localhost,
 127.0.0.1 and 10.0.2.2. API redirects are disabled, and mutations disable automatic
 connection retry. Authenticated calls validate server match/expiry and captured
-context. Public API calls and ExoPlayer/DownloadManager media requests do not
-attach the Invidious bearer.
+context. Same-instance content APIs, images, captions and media may carry a valid
+account bearer and independent verification pass. Network interceptors recheck
+the origin on every redirect and strip Authorization, verification and Cookie
+headers before external requests. Account/bootstrap credentials never enter URLs.
 
 Avatar/GGPHT images normalize supported sources to the selected instance proxy;
-the avatar client follows no redirects and sends no account credentials. Banner/
+the avatar client follows no redirects and uses the shared access boundary. Banner/
 post image proxy rules preserve their selected sizes. Download URLs must exactly
 match the originating scheme/host/port and contain no credentials. Download file
 paths validate UUID directory and safe asset filename characters.
@@ -96,7 +99,10 @@ Link parsing accepts supported YouTube hosts, the configured origin and declared
 Wingress hosts, validates IDs and timestamps, and distinguishes external links.
 Foreign native clips are represented as origin-owned browser actions. Rich text
 uses Compose's native representation; arbitrary HTML/JavaScript is not executed
-in a WebView. The app has no WebView browsing session containing account cookies.
+in a WebView. Only the instance verification page executes in a WebView, with an
+origin-restricted AndroidX message bridge accepting main-frame messages only.
+External top-level navigation and file/content access are blocked. Unsupported
+WebView versions show update guidance; SSL failures never bypass validation.
 Private RSS links must be same-origin `/feed/private` with a token parameter.
 
 ## Exported Android components and permissions
@@ -123,9 +129,18 @@ mobivious.wingress.net, not every YouTube/custom-instance domain the parser acce
 ResponseCache hashes the full URL/session key as the filename; the response body
 is ordinary sandboxed text. It keeps at most 50 newest files, rejects writes over
 2,000,000 characters, and reads only snapshots younger than 24 hours. Temporary
-write/rename avoids publishing a partly written snapshot. Public results use a
-public key; authenticated feed keys include bearer identity. Sign-out/server switch
+write/rename avoids publishing a partly written snapshot. Feed keys include the
+account session when present, including content APIs. Image cache keys include a
+hashed account/instance context and access revision; stale results are discarded.
+Access denials never use feed fallback. Sign-out/server switch
 clears the cache. No offline mutation replay exists.
+
+Credentialed downloads run in a non-exported dataSync foreground service. Their
+journal adds a backward-compatible `managed` flag, progress and attempt filename,
+never account/verification headers. In-memory ownership fences each attempt.
+Process death marks active managed work Interrupted/failed for explicit Retry;
+completed assets and local playback survive. Legacy/system transfers keep their
+DownloadManager IDs and continue using the existing reconciliation path.
 
 Server APIs necessarily receive searches, video/channel IDs, account actions and
 enabled optional-tool requests. Proxy-stream preference controls media routing;

@@ -134,7 +134,9 @@ private fun AuthenticationForm(vm: AppViewModel, context: ApiContext) {
         catch (e: Exception) { error = e.message ?: "Unable to load registration." }
         finally { loading = false }
     }
-    LaunchedEffect(signup) { error = null; password = ""; confirmation = ""; answer = ""; if (signup) challenge() }
+    LaunchedEffect(signup) { error = null; password = ""; confirmation = ""; answer = ""; challenge() }
+    if (config?.loginRequired == true) Text("This instance requires sign-in to browse and play videos.")
+    if (config?.loginEnabled == false) Text("Sign-in is disabled on this instance.", color = MaterialTheme.colorScheme.error)
     AppSection {
     FlowRow(Modifier.fillMaxWidth().selectableGroup(),horizontalArrangement=Arrangement.spacedBy(8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         listOf(false,true).forEach { creating ->

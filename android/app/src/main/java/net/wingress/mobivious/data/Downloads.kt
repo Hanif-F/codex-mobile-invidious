@@ -53,12 +53,12 @@ data class DownloadSelection(val video: String? = null, val audio: String? = nul
     }
 }
 data class DownloadAsset(val choice: DownloadChoice, val filename: String, val transferId: Long = 0,
-    val status: DownloadStatus = DownloadStatus.QUEUED, val bytes: Long = 0, val total: Long = 0, val error: String = "") {
+    val status: DownloadStatus = DownloadStatus.QUEUED, val bytes: Long = 0, val total: Long = 0, val error: String = "", val managed: Boolean = false) {
     val media get() = choice.kind in listOf(DownloadKind.VIDEO, DownloadKind.AUDIO)
     val artwork get() = choice.kind in listOf(DownloadKind.THUMBNAIL, DownloadKind.AVATAR)
-    fun json() = JSONObject().put("choice", choice.json()).put("filename", filename).put("transferId", transferId).put("status", status.name).put("bytes", bytes).put("total", total).put("error", error)
+    fun json() = JSONObject().put("choice", choice.json()).put("filename", filename).put("transferId", transferId).put("status", status.name).put("bytes", bytes).put("total", total).put("error", error).put("managed", managed)
     companion object {
-        fun parse(j: JSONObject) = DownloadAsset(DownloadChoice.parse(j.getJSONObject("choice")), j.getString("filename"), j.optLong("transferId"), DownloadStatus.valueOf(j.getString("status")), j.optLong("bytes"), j.optLong("total"), j.text("error"))
+        fun parse(j: JSONObject) = DownloadAsset(DownloadChoice.parse(j.getJSONObject("choice")), j.getString("filename"), j.optLong("transferId"), DownloadStatus.valueOf(j.getString("status")), j.optLong("bytes"), j.optLong("total"), j.text("error"), j.optBoolean("managed", false))
     }
 }
 data class DownloadRecord(val id: String, val server: String, val metadata: String, val created: Long, val assets: List<DownloadAsset>, val positionMs: Long = 0) {

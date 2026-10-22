@@ -49,7 +49,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.*
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
@@ -283,8 +282,9 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val keyboard = LocalSoftwareKeyboardController.current
     val focus = LocalFocusManager.current
-    val player = remember(editor.occurrence) { ExoPlayer.Builder(context).setMediaSourceFactory(DefaultMediaSourceFactory(DefaultHttpDataSource.Factory()
-        .setUserAgent("Mobivious/${net.wingress.mobivious.BuildConfig.VERSION_NAME}").setAllowCrossProtocolRedirects(false))).build().apply {
+    val player = remember(editor.occurrence) { ExoPlayer.Builder(context).setMediaSourceFactory(DefaultMediaSourceFactory(androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(
+            vm.access.client(okhttp3.OkHttpClient.Builder().followSslRedirects(false).build()) { editor.context ?: vm.api.context() })
+        .setUserAgent("Mobivious/${net.wingress.mobivious.BuildConfig.VERSION_NAME}"))).build().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
             setHandleAudioBecomingNoisy(true)
             repeatMode = Player.REPEAT_MODE_ONE
@@ -294,7 +294,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
     var playing by remember { mutableStateOf(false) }
     DisposableEffect(player, lifecycle) {
         val listener = object : Player.Listener {
-            override fun onPlayerError(e: PlaybackException) { error = "Preview could not play. Check the connection and retry." }
+            override fun onPlayerError(e: PlaybackException) { player.pause(); error = InstanceAccess.failure(e)?.message ?: "Preview could not play. Check the connection and retry." }
             override fun onIsPlayingChanged(value: Boolean) { playing = value }
         }
         player.addListener(listener)

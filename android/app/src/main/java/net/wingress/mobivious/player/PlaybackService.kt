@@ -14,7 +14,6 @@ import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.PlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.session.SessionCommand
@@ -92,8 +91,9 @@ class PlaybackService : MediaSessionService() {
     private var noticeUntil = 0L
     override fun onCreate() {
         super.onCreate()
-        // This data source has no Authorization headers or account cookies.
-        val mediaHttp = DefaultHttpDataSource.Factory().setUserAgent("Mobivious/${net.wingress.mobivious.BuildConfig.VERSION_NAME}").setAllowCrossProtocolRedirects(false)
+        val mediaHttp = androidx.media3.datasource.okhttp.OkHttpDataSource.Factory(app.access.client(
+            okhttp3.OkHttpClient.Builder().followSslRedirects(false).build()) { app.playbackQueue.value.context ?: app.api.context() })
+            .setUserAgent("Mobivious/${net.wingress.mobivious.BuildConfig.VERSION_NAME}")
         val trackSelector = CodecAwareTrackSelector(this)
         player = ExoPlayer.Builder(this).setTrackSelector(trackSelector).setMediaSourceFactory(DefaultMediaSourceFactory(androidx.media3.datasource.DefaultDataSource.Factory(this, mediaHttp))).build().apply {
             setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
@@ -132,6 +132,10 @@ class PlaybackService : MediaSessionService() {
                     mediaLoadData.dataType == C.DATA_TYPE_MANIFEST && it.localConfiguration?.uri == loadEventInfo.dataSpec.uri
                 }?.mediaMetadata?.extras?.getString("occurrence") ?: return
                 if (key != app.playbackQueue.value.currentKey) return
+                net.wingress.mobivious.data.InstanceAccess.failure(error)?.let {
+                    if (it.context == null || it.context == app.api.context()) { queue.playerError(it.message); player.pause() }
+                    return
+                }
                 val track = subtitle(loadEventInfo)
                 if (track == null) {
                     lastLoadFailure = error to stage(mediaLoadData)
@@ -237,7 +241,13 @@ class PlaybackService : MediaSessionService() {
         scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
         scope.launch { while (isActive) { delay(100); recovery.sample(player.isPlaying, player.currentPosition); queue.enforceEnd(); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
-        scope.launch { app.playbackContext.collect { if (app.playbackQueue.value.context != null && app.playbackQueue.value.context != it) queue.close() } }
+        scope.launch { app.playbackContext.collect { context ->
+            val previous = app.playbackQueue.value.context
+            if (previous != null && previous != context) {
+                if (context != null && app.access.retainPlayback(previous, context)) { resetRecovery(); queue.reauthenticate(context) }
+                else queue.close()
+            }
+        } }
         scope.launch { app.dearrowTitles.titles.collect { queue.syncDisplayTitle() } }
         scope.launch { app.channelSpoilers.state.collect { queue.syncDisplayTitle(); sessionPlayer.refresh() } }
     }
@@ -311,6 +321,10 @@ class PlaybackService : MediaSessionService() {
     }
     private fun playbackFailed(error: PlaybackException) {
         val state = app.playbackQueue.value
+        net.wingress.mobivious.data.InstanceAccess.failure(error)?.let {
+            if (it.context != null && it.context != app.api.context()) return
+            recovery.ready(); queue.playerError(it.message); player.pause(); return
+        }
         if (state.loading || state.context != app.api.context() || state.currentKey == null ||
             player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return
         val stage = lastLoadFailure?.takeIf { load -> generateSequence(error as Throwable) { it.cause }.take(8).any { it === load.first } }?.second ?: lastLoadStage

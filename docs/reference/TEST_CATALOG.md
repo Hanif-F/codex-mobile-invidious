@@ -322,6 +322,22 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `scopedRequestsRejectCapturedContextsAfterAccountChanges`
 - `delayedScopedReadsNeverReturnThePreviousAccountsResults`
 
+### InstanceAccessTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt) — Instance access, redirect credential stripping, cache isolation, stale contexts and recovery contracts.
+
+- `discoveryDefaultsAndOnlyKnownCodesBecomeAccessErrors`
+- `headersAreBoundToOriginExpiryAndCurrentContext`
+- `redirectHopsStripBothSecretsAndPreserveRange`
+- `gateDenialsNeverExpireAccountsOrUseFeedFallback`
+- `completionRechecksPassAndPersistsAcrossAccountsButNotInstances`
+- `oldServersAreUnsupportedButOutagesAndRejectedPassesStayErrors`
+- `lateDenialsAndCompletionsCannotChangeANewContext`
+- `cachedFeedsAreAccountScopedAndUnavailableGatesNeverServeSnapshots`
+- `accessErrorsAreExcludedFromAutomaticBufferRecovery`
+- `onlyGateDrivenSameIdentityAuthenticationMayRetainPlayback`
+- `queuedImageContextMarkersRejectNewAccountsBeforeSendingAndNeverReachTheWire`
+
 ### LiveChatTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/LiveChatTest.kt) — Live Chat declared scenarios; exact cases are enumerated in the test catalog.
@@ -1095,6 +1111,22 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `directoryGuestPromptAndLateReadsCannotExposeFormerAccountChannels`
 - `guestWatchActionsHavePrimaryControlsAndMoreWithoutImplicitQueue`
 
+### InstanceAccessSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt) — Fixture-backed native access, encryption, playback, ownership and protected-download recovery journeys.
+
+- `verificationUsesTheNativePageAndEncryptedInstancePass`
+- `requiredLoginUsesNativeSignInWithRegistrationDisabledAndThenVerification`
+- `cancelledAndRecreatedVerificationCanBeRetried`
+- `unavailableVerificationAndPolicyChangesRemainRetryableWithoutSigningOut`
+- `playbackAccessExpiryPausesWithoutAutomaticRecoveryAndRetryKeepsPosition`
+- `protectedDownloadsRetryWithoutRepeatingCompleteAssetsAndPlayOffline`
+- `requiredSignInDuringPlaybackRetainsThePausedPlayerUntilExplicitRetry`
+- `protectedTransferOwnershipChangesStopWorkAndCancellationStaysRetryable`
+- `backgroundAndPipAccessExpiryPauseUntilVerificationAndExplicitRetry`
+- `rendererFailureOffersAFreshPageWithoutCrashingTheApp`
+- `subframeCompletionsAreIgnoredAndRetryReplacesTheVisiblePage`
+
 ### LibraryJourneyTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LibraryJourneyTest.kt) — Library dashboard, playlist, history and downloads journeys across appearance and text sizes. Exact cases appear in the test catalog.
@@ -1135,6 +1167,12 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `pipAndBackgroundSuspendRequestsAndRestoreAtTheCurrentPosition`
 - `invalidFilterTextDoesNotBlockAnIndependentTimestampChoice`
 - `staleChatCallbacksCannotWriteIntoAnotherVideoOrAccount`
+
+### LiveInstanceAccessSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt) — Explicitly opted-in real-provider native verification without account or policy changes.
+
+- `realProviderCompletesWithoutAccountOrPolicyChanges`
 
 ### MediaListPresentationTest
 
@@ -1279,6 +1317,13 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `signInRetainsSubscriptionIntentAndFailureCanRetry`
 - `typedDiscoveryAndChannelPaginationKeepMixSeeds`
 - `rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange`
+
+### ProtectedDownloadsPersistenceSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ProtectedDownloadsPersistenceSmokeTest.kt) — Two-phase protected download process-death, encrypted pass and offline playback acceptance.
+
+- `seedProtectedTransfers`
+- `restoreProtectedTransfersRequireRetryAndRetainOfflinePlayback`
 
 ### QueueLibrarySmokeTest
 
@@ -1521,4 +1566,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **899 declared test methods** (including ignored tests).
+Inventory total: **924 declared test methods** (including ignored tests).

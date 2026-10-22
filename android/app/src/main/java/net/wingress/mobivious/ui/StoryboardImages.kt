@@ -28,11 +28,11 @@ import net.wingress.mobivious.data.StoryboardFrame
 import net.wingress.mobivious.data.StoryboardRules
 import net.wingress.mobivious.player.SeekPreviewState
 
-/** Original sprite sheets share URL-based caches across crops and interactions. No account headers. */
+/** Original sprite sheets share URL-based caches across crops and interactions. Requests use the shared instance-access boundary. */
 internal class StoryboardImages(context: Context) {
     private val context = context.applicationContext
-    val loader = ImageLoader.Builder(this.context)
-        .okHttpClient(okhttp3.OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build())
+    val loader = (this.context as net.wingress.mobivious.MobiviousApplication).imageLoaderBuilder(
+            okhttp3.OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build())
         .memoryCache { MemoryCache.Builder(this.context).maxSizeBytes(32 * 1024 * 1024).build() }
         .diskCache { DiskCache.Builder().directory(File(this.context.cacheDir, "storyboards")).maxSizeBytes(64L * 1024 * 1024).build() }
         .build()

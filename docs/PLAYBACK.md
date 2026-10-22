@@ -7,9 +7,18 @@
 `PlaybackService` is a foreground `MediaSessionService`. It creates one ExoPlayer
 with a codec-aware selector, media/audio attributes, audio focus, becoming-noisy
 handling and a partial wake lock. Its HTTP media source carries a Mobivious user
-agent and no account cookies/bearer; cross-protocol redirects are disabled.
+agent and an OkHttp data source that attaches valid account/verification headers
+only to the selected instance. External redirects receive no credentials;
+cross-protocol redirects are disabled. Clip previews use the same transport.
 `QueueCoordinator` owns all loading and logical queue operations on the service
 main scope. Compose connects with `MediaController` and does not own that player.
+
+Access denials pause playback and bypass automatic buffer recovery. Verification
+retains position, speed, captions and selected tracks; use Retry after completing
+the check. Required-login recovery can retain the stopped queue when signing in
+as the same identity (or upgrading a guest); changing identities closes the old
+queue. Neither flow automatically restarts playback. Background/PiP denials retain
+the access issue until the app is foregrounded.
 
 `player/PlaybackQueue.kt` owns the runtime snapshot, occurrences, repeat and
 merge/successor rules, plus occurrence-aware share URLs. `data/Models.kt` retains

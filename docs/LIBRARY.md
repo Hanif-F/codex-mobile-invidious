@@ -134,7 +134,14 @@ with separate primary track and supporting language/bitrate/size text. Raw forma
 metadata, exact selection keys and stored downloads are preserved. Missing codec
 information says Unknown codec; an unfamiliar identifier remains visible.
 
-Creation journals the record in SQLite before submitting DownloadManager work.
+Creation checks instance verification policy and journals the record in SQLite
+before starting work. Credential-free downloads use DownloadManager;
+credentialed downloads use ProtectedDownloadService with per-hop OkHttp credential
+selection. Same-origin redirects retain credentials; external redirects strip them.
+Managed attempts keep their owning API context in memory, never in the journal.
+Changing identity cancels their active calls and fails queued work for explicit
+Retry. Process death similarly marks unfinished managed assets retryable;
+completed tracks remain available. Existing records default to DownloadManager.
 Each attempt uses a new filename so asynchronous removal of an old transfer cannot
 delete its retry. Transfers allow metered/roaming connections. The repository
 reconciles on startup, roughly each second while active, and download broadcasts.

@@ -59,6 +59,8 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.media3:media3-exoplayer:1.9.3")
+    implementation("androidx.media3:media3-datasource-okhttp:1.9.3")
+    implementation("androidx.webkit:webkit:1.17.1")
     implementation("androidx.media3:media3-exoplayer-dash:1.9.3")
     implementation("androidx.media3:media3-exoplayer-hls:1.9.3")
     implementation("androidx.media3:media3-session:1.9.3")

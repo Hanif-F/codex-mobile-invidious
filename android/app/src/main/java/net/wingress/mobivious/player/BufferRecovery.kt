@@ -11,7 +11,7 @@ import javax.net.ssl.SSLException
 /** Only terminal player failures reach this policy, after Media3's own load retries. */
 internal object BufferRecoveryPolicy {
     fun eligible(error: PlaybackException, streamed: Boolean): Boolean {
-        if (!streamed) return false
+        if (!streamed || net.wingress.mobivious.data.InstanceAccess.failure(error) != null) return false
         val causes = causes(error)
         if (causes.any { it is SecurityException || it is SSLException }) return false
         if (causes.filterIsInstance<HttpDataSource.InvalidResponseCodeException>().any { it.responseCode in listOf(401, 407) }) return false

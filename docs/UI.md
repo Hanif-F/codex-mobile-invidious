@@ -6,6 +6,21 @@ This guide describes the opaque Material 3 implementation in the working tree.
 The [testing guide](TESTING.md) describes validation; [cleanup results](CLEANUP.md)
 record the latest tested scope and known failures.
 
+## Instance access
+
+The shared access prompt offers native sign-in or an embedded verification dialog.
+Later/Cancel leaves navigation, Server settings and local Downloads usable; Retry
+on the failed action reopens the prompt. Verification shows the selected origin,
+an origin-restricted WebView, load/error feedback and Retry/Cancel actions. It
+retains the default browser user agent, JavaScript and DOM storage for Turnstile.
+Only same-origin main-frame completion messages are accepted; external top-level
+navigation is blocked. An outdated WebView shows update guidance.
+
+After successful verification, the app offers Retry browsing or Done. Playback
+and downloads retain their own explicit Retry actions. Access prompts wait until
+the activity leaves PiP; background playback failures retain their issue for the
+next foreground visit. Account and verification expiry remain separate.
+
 ## Shell and screen ownership
 
 `MobiviousApp` owns browsing, watch presentation, settings and modal tools.

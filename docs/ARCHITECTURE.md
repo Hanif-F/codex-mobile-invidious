@@ -25,6 +25,7 @@ flowchart LR
     E --> R[Resolved media URLs or local files]
     V --> D[DownloadRepository]
     D --> DM[Android DownloadManager]
+    D --> PD[ProtectedDownloadService / OkHttp]
     D --> DB[SQLite journal / app media files]
     V --> X[DownloadExportService / Transformer]
     X --> F[User-selected document URI]
@@ -53,8 +54,13 @@ the activity creates an `AndroidViewModel`, which drives Compose with StateFlows
 
 Versions and prerequisites are recorded in [Development](DEVELOPMENT.md). The
 main libraries are Compose Material3, Media3 ExoPlayer/session/UI/Transformer,
-OkHttp, Coil, coroutines, WindowManager and RE2/J. JUnit, MockWebServer and Android
+OkHttp, AndroidX WebKit, Coil, coroutines, WindowManager and RE2/J. JUnit, MockWebServer and Android
 Compose tests supply validation. All dependency versions are pinned in Gradle.
+
+The application owns InstanceAccess alongside SessionStore. It coalesces access
+failures and supplies captured-context, per-hop credentials to APIs, image
+loaders, Media3 and protected downloads. The WebView is confined to verification;
+ordinary screens stay native and account sign-in does not use browser cookies.
 
 ## Startup and lifetime
 

@@ -267,6 +267,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
         if (watch) { authWatchId = playback.details?.video?.id.orEmpty(); authWatchPosition = playback.position / 1000 }
         vm.openSignIn()
     }
+    fun accessSignIn() { signIn(); authWatchId = "" }
     fun cancelSearchEntry() {
         vm.searchEntry.cancel(); keyboard?.hide()
         if (originWatch) restorePlayer()
@@ -650,6 +651,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (downloadDialog.video != null && !pip) DownloadDialog(vm)
             if (saveSheet.video != null && route != "sign-in" && !pip) SavePlaylistSheet(vm) { signIn() }
             if (!pip) { ClipDialogs(vm); ClipEditor(vm) }
+            if (!pip) InstanceAccessPrompt(vm, ::accessSignIn)
             if (searchOpen && !pip) SearchEntryScreen(searchEditor, vm.searchEntry, ::cancelSearchEntry, ::submitGlobalSearch)
           }
         }

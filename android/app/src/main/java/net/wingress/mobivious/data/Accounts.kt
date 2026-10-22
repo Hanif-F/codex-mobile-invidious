@@ -2,12 +2,12 @@ package net.wingress.mobivious.data
 
 import org.json.JSONObject
 
-data class Registration(val loginEnabled: Boolean, val enabled: Boolean, val captchaImage: String = "", val captchaToken: String = "") {
+data class Registration(val loginEnabled: Boolean, val enabled: Boolean, val captchaImage: String = "", val captchaToken: String = "", val loginRequired: Boolean = false) {
     companion object {
         fun parse(json: JSONObject): Registration {
             val captcha = json.optJSONObject("captcha")
             return Registration(json.optBoolean("loginEnabled", true), json.optBoolean("registrationEnabled"),
-                captcha?.text("image").orEmpty(), captcha?.text("token").orEmpty())
+                captcha?.text("image").orEmpty(), captcha?.text("token").orEmpty(), json.optBoolean("loginRequired", false))
         }
     }
 }

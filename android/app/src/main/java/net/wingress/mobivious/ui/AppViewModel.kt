@@ -118,7 +118,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun playDownload(id: String) { queueCommand(PlaybackService.DOWNLOAD_START) { putString("downloadId", id) } }
     fun cancelDownload(id: String) { viewModelScope.launch { runCatching { downloads.cancel(id) }.onFailure { message.value = it.message } } }
-    fun retryDownload(id: String) { viewModelScope.launch { runCatching { downloads.retry(id) }.onFailure { message.value = it.message } } }
+    fun retryDownload(id: String) { access.prompt(); viewModelScope.launch { runCatching { downloads.retry(id) }.onFailure { message.value = it.message } } }
     fun deleteDownload(id: String) {
         viewModelScope.launch {
             try {
@@ -132,6 +132,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     val store = app.store
     val api = app.api
+    val access = app.access
     val account = store.account
     val accountBusy = MutableStateFlow(false)
     val offline = app.offline
@@ -1045,6 +1046,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun more() = load(true)
     fun retryBrowse() {
+        access.prompt()
         if (!browse.value.retryMore && route.isEmpty() && tab in listOf("Popular", "Trending", "Subscriptions")) refreshFeed()
         else load(browse.value.retryMore, refreshChannel = false)
     }
@@ -1428,7 +1430,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun selectQueue(key: String) { cancelAccumulatedSeek(false); val state = queue.value; val index = state.items.indexOfFirst { it.key == key }; val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0; if (index >= 0) controller.value?.seekTo(index + prefix, C.TIME_UNSET) }
     fun nextQueue(direction: Int) { cancelAccumulatedSeek(false); if (direction > 0) controller.value?.seekToNextMediaItem() else controller.value?.seekToPreviousMediaItem() }
     fun repeatQueue(value: QueueRepeat) { controller.value?.repeatMode = when(value) { QueueRepeat.ONE -> Player.REPEAT_MODE_ONE; QueueRepeat.ALL -> Player.REPEAT_MODE_ALL; else -> Player.REPEAT_MODE_OFF } }
-    fun retryPlayback() { cancelAccumulatedSeek(); queueCommand(PlaybackService.QUEUE_RETRY) }
+    fun retryPlayback() { access.prompt(); cancelAccumulatedSeek(); queueCommand(PlaybackService.QUEUE_RETRY) }
     fun closePlayer() { chatController.bind("", "", false); commentController.bind(null, false); cancelAccumulatedSeek(false); queueCommand(PlaybackService.QUEUE_CLOSE); contributionJob?.cancel(); dearrowContribution.value = DeArrowContributionState(); queueExpanded.value = false }
     fun undoBlock(value: BlockUndo) {
         if (value != blockUndo.value || value.context != api.context() || SystemClock.elapsedRealtime() > value.expires) return
@@ -1702,6 +1704,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private fun acceptAuthentication(value: Account, context: ApiContext, resumeIntent: Boolean = true, replaceCurrent: Boolean = false) {
         if (context != api.context()) throw CancellationException("Account or instance changed")
         homeAppliedContext = null
+        if (!replaceCurrent) access.prepareLogin(context, value)
         if (replaceCurrent) store.replaceAccount(context, value) else store.save(value)
         val accepted = store.account.value
         homeAppliedContext = api.context()

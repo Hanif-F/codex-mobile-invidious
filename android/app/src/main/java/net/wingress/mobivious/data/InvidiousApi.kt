@@ -23,8 +23,9 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build(),
     private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}, private val generation: () -> Long = { 0 },
     private val onProfile: (ApiContext, String) -> Unit = { _, _ -> },
-    private val originalTitles: OriginalTitlePreferences? = null) {
-    private val contributionClient = client.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
+    private val originalTitles: OriginalTitlePreferences? = null, private val access: InstanceAccess? = null) {
+    private val accessClient = access?.client(client) ?: client
+    private val contributionClient = accessClient.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
     fun context() = ApiContext(server(), account(), generation())
     suspend fun originalTitlePreference(context: ApiContext = context()) = originalTitles?.resolve(context) ?: true
     fun knownOriginalTitlePreference(context: ApiContext = context()) = originalTitles?.known(context) ?: true
@@ -53,15 +54,15 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                 query.forEach { (k, v) -> if (titleChoice == null || k != "show_original_title") addQueryParameter(k, v) }
                 titleChoice?.let { setQueryParameter("show_original_title", it.toString()) }
             }.build()
-        val builder = Request.Builder().url(address).header("Accept", accept)
+        val builder = Request.Builder().url(address).header("Accept", accept).tag(ApiContext::class.java, target)
         if (auth) {
             val session = target.account ?: throw ApiException(401, "Sign in to use your account.")
             if (session.server.toHttpUrl() != target.server.toHttpUrl() || session.expiresAt <= System.currentTimeMillis() / 1000) { if (target == this@InvidiousApi.context()) expired(); throw ApiException(401, "Your session expired. Sign in again.") }
             builder.header("Authorization", "Bearer ${session.token}")
         }
         builder.method(method, if (method in listOf("POST", "PUT", "PATCH")) (data ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()) else null)
-        val cacheKey = if (method == "GET" && path in listOf("api/v1/popular", "api/v1/trending", "api/v1/search", "api/v1/auth/feed")) "$address|${if (auth) target.account?.token else "public"}" else null
-        val transport = if (method != "GET") contributionClient else client
+        val cacheKey = if (method == "GET" && path in listOf("api/v1/popular", "api/v1/trending", "api/v1/search", "api/v1/auth/feed")) "$address|${target.account?.token ?: "public"}" else null
+        val transport = if (method != "GET") contributionClient else accessClient
         try {
             val response = transport.newCall(builder.build()).awaitBody(maxResponseBytes)
             coroutineContext.ensureActive()
@@ -111,7 +112,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         } catch (e: IOException) {
             coroutineContext.ensureActive()
             if (target != this@InvidiousApi.context()) throw CancellationException("Account or instance changed")
-            if (!allowCachedFallback || e is ApiException && e.status < 500) throw e
+            if (!allowCachedFallback || e is InstanceAccessException || access?.issue?.value?.context == target || e is ApiException && e.status < 500) throw e
             val saved = cacheKey?.let { cache?.read(it) } ?: throw e
             onOffline(true)
             saved

@@ -57,6 +57,11 @@ default_prefs.update(ai_filter_enabled=False, **{f'ai_{kind}_{group}_action': 'o
 state = dict(annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
+def reset_access():
+    state.update(accessEnabled=False, accessLogin=False, accessUnavailable=False, accessMissing=False,
+                 accessPolicy=1, accessExpiry=int(time.time()) + 3600, accessRequests=[])
+reset_access()
+
 def reset_comments():
     state.update(commentRequests=[], commentFailNext=False, commentDelayNext=0, commentEmpty=False)
 reset_comments()
@@ -268,7 +273,7 @@ class Handler(BaseHTTPRequestHandler):
         for name, value in (headers or {}).items():
             self.send_header(name, value)
         self.end_headers()
-        if data is not None:
+        if data is not None and self.command != 'HEAD':
             self.wfile.write(json.dumps(data).encode())
 
     def xml(self, text, content_type='application/xml'):
@@ -365,9 +370,48 @@ class Handler(BaseHTTPRequestHandler):
         finally:
             event['completed'] = True
 
+    def access_status(self):
+        valid = self.headers.get('X-Invidious-Verification') == f"fixture-pass-{state['accessPolicy']}" and state['accessExpiry'] > time.time()
+        enabled = state['accessEnabled']
+        return dict(enabled=enabled, required=enabled and not valid, verified=enabled and valid,
+                    expiresAt=state['accessExpiry'] if valid else None, duration=3600, siteKey='fixture-only',
+                    challengeUrl='/verify?client=native', verificationHeader='X-Invidious-Verification')
+
+    def access_gate(self):
+        p = urlparse(self.path).path
+        if p.startswith('/test/') or p in ('/verify', '/api/v1/verification', '/api/v1/verification/complete',
+                '/api/v1/mobile/registration', '/api/v1/mobile/login', '/api/v1/mobile/register'):
+            return False
+        state['accessRequests'].append(dict(path=self.path, method=self.command,
+            bearer=self.headers.get('Authorization') == 'Bearer fixture-token',
+            verification=self.headers.get('X-Invidious-Verification') == f"fixture-pass-{state['accessPolicy']}",
+            range=self.headers.get('Range')))
+        if state['accessLogin'] and (state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token'):
+            self.respond(dict(error='login_required', loginUrl='/login'), 401); return True
+        if state['accessUnavailable']:
+            self.respond(dict(error='verification_unavailable'), 503); return True
+        if state['accessEnabled'] and self.access_status()['required']:
+            reason = 'verification_expired' if self.headers.get('X-Invidious-Verification') == f"fixture-pass-{state['accessPolicy']}" and state['accessExpiry'] <= time.time() else 'verification_required'
+            self.respond(dict(error=reason, verification=self.access_status(), challengeUrl='/verify'), 403,
+                         {'X-Invidious-Verification-Required': reason}); return True
+        return False
+
+    def do_HEAD(self):
+        if self.access_gate(): return
+        self.send_response(200); self.send_header('Content-Length', '0'); self.end_headers()
+
     def do_GET(self):
         url = urlparse(self.path)
         p = url.path
+        if self.access_gate(): return
+        if p == '/api/v1/verification':
+            return self.respond(dict(error='Not found'), 404) if state['accessMissing'] else self.respond(self.access_status())
+        if p == '/verify':
+            return self.xml('''<!doctype html><meta name=viewport content="width=device-width"><title>Fixture verification</title>
+<button id=complete>Complete fixture verification</button><script>document.getElementById('complete').onclick=async function(){
+const r=await fetch('/api/v1/verification/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transport:'native',turnstileToken:'fixture-response'})});
+const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidious-verification-complete',{detail}));
+};</script>''', content_type='text/html')
         if not p.startswith('/test/'):
             state['allRequests'].append(dict(method='GET', path=self.path))
         if p.startswith('/caption-fixture/'):
@@ -448,7 +492,7 @@ class Handler(BaseHTTPRequestHandler):
             items = [c for c in state['clips'] if not auth or c['creator'] == 'fixture-user']
             return self.respond(items[(page - 1) * 30:page * 30])
         if p == '/api/v1/mobile/registration':
-            return self.respond(dict(loginEnabled=True, registrationEnabled=state['registrationEnabled'], captcha=state['registrationCaptcha']))
+            return self.respond(dict(loginEnabled=True, loginRequired=state['accessLogin'], registrationEnabled=state['registrationEnabled'], captcha=state['registrationCaptcha']))
         if p == '/api/v1/auth/account/sessions':
             if state['accountRevoked'] or self.headers.get('Authorization') != 'Bearer fixture-token':
                 return self.respond(dict(error='Request must be authenticated'), 403)
@@ -886,6 +930,18 @@ class Handler(BaseHTTPRequestHandler):
         if not p.startswith('/test/'):
             state['allRequests'].append(dict(method=self.command, path=self.path))
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+        if self.access_gate(): return
+        if p == '/test/access':
+            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry'):
+                if key in data: state[key] = data[key]
+            if data.get('resetRequests'): state['accessRequests'] = []
+            return self.respond(self.access_status())
+        if p == '/api/v1/verification/complete':
+            if state['accessUnavailable']: return self.respond(dict(error='verification_unavailable'), 503)
+            if data.get('transport') != 'native' or data.get('turnstileToken') != 'fixture-response': return self.respond(dict(error='verification_failed'), 403)
+            if not state['accessEnabled']: return self.respond(dict(enabled=False, verificationToken=None, expiresAt=None))
+            state['accessExpiry'] = int(time.time()) + 3600
+            return self.respond(dict(enabled=True, verificationToken=f"fixture-pass-{state['accessPolicy']}", expiresAt=state['accessExpiry']))
         if p == '/test/performance':
             if not args.performance: return self.respond(dict(error='Performance fixture is not enabled'), 404)
             state.update(performance=True, discoveryCategories=False, discoveryDistinct=False,
@@ -934,6 +990,7 @@ class Handler(BaseHTTPRequestHandler):
             state['avatarRequests'] = []
             return self.respond(status=204)
         elif p == '/test/reset':
+            reset_access()
             state.update(annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,

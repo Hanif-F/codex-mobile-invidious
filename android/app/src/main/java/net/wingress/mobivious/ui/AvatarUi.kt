@@ -40,8 +40,7 @@ import java.io.File
 /** Shared image cache, keyed by the complete instance URL. */
 internal object AvatarImageLoader {
     private var loader: ImageLoader? = null
-    @Synchronized fun get(context: Context): ImageLoader = loader ?: ImageLoader.Builder(context.applicationContext)
-        .okHttpClient(Avatars.client())
+    @Synchronized fun get(context: Context): ImageLoader = loader ?: (context.applicationContext as net.wingress.mobivious.MobiviousApplication).imageLoaderBuilder(Avatars.client())
         .diskCache { DiskCache.Builder().directory(File(context.applicationContext.cacheDir, "avatars"))
             .maxSizeBytes(16L * 1024 * 1024).build() }
         .build().also { loader = it }

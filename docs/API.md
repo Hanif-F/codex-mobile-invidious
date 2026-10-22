@@ -18,10 +18,28 @@ mutation replay. `HttpCall.awaitBody` cancels the socket when its coroutine canc
 
 Requests default to `Accept: application/json`; XML/feed methods override it.
 POST/PUT/PATCH send JSON bodies (an empty object when no fields are supplied).
-Bearer authorization is attached only to calls marked authenticated. Tokens
-must belong to the selected server and be unexpired. Public metadata, optional
-title/segment/classification reads and media data sources have no account bearer.
+Valid same-instance bearer authorization also accompanies content and media
+requests so private instances can enforce required sign-in. Verification uses
+the separate `X-Invidious-Verification` header. Bootstrap login, registration and
+verification requests omit stored bearer/verification headers and browser cookies.
 Every request is fenced against a changed live context before accepting its body.
+
+## Instance access gates
+
+`GET /api/v1/verification` discovers Turnstile policy and checks an existing pass.
+Only 404/405 mean unsupported; outages remain errors. The embedded same-origin
+`/verify?client=native` page completes the challenge through the server and emits
+`invidious-verification-complete`. Android validates the origin/main frame, checks
+the returned pass against discovery, then encrypts it locally. It never exchanges
+account cookies with the WebView. Registration discovery additionally parses
+`loginRequired`, default false for older servers.
+
+HTTP 401 `login_required` opens native sign-in. HTTP 403 `verification_required`
+or `verification_expired` opens verification; 503 `verification_unavailable`
+offers retry without expiring the account or serving a cached protected feed.
+Completing access does not replay mutations or restart media. Retry is explicit.
+All transports strip credentials on external redirects, matching scheme/host/port
+on each hop. Same-instance HEAD and Range requests retain their access headers.
 
 ## Public discovery, channels and discussions
 
@@ -130,7 +148,7 @@ not imply Android upload notifications are implemented.
 | DELETE `/api/v1/auth/clips/:id` | Owned native clip only. |
 | GET storyboard VTT URL | Public same-instance-host validation, text/vtt; shared lazy index cache for player/clip editor; same-origin image URLs and validated `#xywh` cues. |
 | GET `/api/v1/videos/:id/downloads` | Public `{video,choices,allowed,reason}`; choices include key/kind/url/stream metadata. |
-| GET `/api/v1/videos/:id/download?key=…` | Origin-bound download URLs supplied by catalog, consumed by DownloadManager. |
+| GET `/api/v1/videos/:id/download?key=…` | Origin-bound catalog URL; DownloadManager for credential-free transfers, foreground OkHttp transfer for credentialed requests. |
 | GET `/api/v1/sponsorblock/:id` | Public segments with id/category/start/end seconds. |
 | GET `/api/v1/dearrow/:id` | Public optional title. |
 | GET/PUT `/api/v1/auth/dearrow/identity` | Read readiness/configuration; import or clear `{privateId}`. |
@@ -258,7 +276,7 @@ native API update; unsupported servers show the existing shared-settings error.
 ## Annotation archives and projection metadata
 
 Public `GET /api/v1/annotations/:id` returns XML through the selected instance.
-The app sends `Accept: text/xml` without Authorization, bounds the decoded body
+The app sends `Accept: text/xml` with instance access credentials when available, bounds the decoded body
 to 2 MiB, cancels suspended/obsolete loads and disables DTD/external entities.
 The sibling route preserves direct archive responses even without a redirect
 header. 404 means no archive; other failures offer an independent Retry. Archives are

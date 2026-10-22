@@ -300,3 +300,90 @@ results depend on the selected instance and upstream data. Fixture accounts and
 synthetic media were used; no production account settings were changed. The
 sibling server update has not been deployed. Headset stereo is outside the
 selected phone-viewing scope.
+
+
+## Instance access support — 22 October 2026
+
+Implemented Android client compatibility with server commits `446baa0548bc49ca4c10c99b43bc096ba092823c`
+and `7325245318dd1fd0770499d544f599b821d7a2b0`. Administration remains on the site;
+the sibling server checkout and production policy were unchanged. The app version
+remains 0.12.5 (29). The debug app/test APKs were built and installed on
+`emulator-5554` (Pixel 8 Pro AVD, Android 16); the installed release and its data
+were not replaced. The debug app was left on `https://invidious.wingress.net`.
+
+The change provides encrypted per-origin verification passes, native required
+sign-in, a main-frame/origin-restricted verification WebView, credential stripping
+on external redirects, context-scoped caches and typed access recovery throughout
+metadata, images, captions, playback, clip previews and downloads. Playback keeps
+its position/selections and requires explicit Retry. Gate-driven same-identity
+sign-in can retain the stopped queue; different identities close it. Protected
+transfers use a foreground OkHttp service; legacy credential-free transfers retain
+DownloadManager. Download journals add an optional `managed` flag, without storing
+credentials. Process death leaves unfinished managed work retryable and preserves
+completed files and the encrypted pass.
+
+### Checks and results
+
+- Full JVM suite: **445 passed, 0 skipped/failed**, using
+  `JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain`
+  from `android/`. Subsequent access-context/lifecycle refinements reran the
+  affected **16 JVM cases** with `--tests 'net.wingress.mobivious.InstanceAccessTest'`
+  and `--tests 'net.wingress.mobivious.BufferRecoveryTest'`, plus debug lint.
+- Final debug lint: **0 errors, 36 warnings**. One AndroidX WebKit diagnostic flags
+  the `WebViewClient` superclass constructor despite the implemented
+  `onRenderProcessGone` override; actual renderer termination/retry passed.
+- **29 distinct Android cases passed**, with no ignored cases counted as passes:
+  11 `InstanceAccessSmokeTest` cases, 11 existing account/navigation/playback/
+  captions/previews/images/download regression cases, two existing automatic
+  buffer-recovery cases, one live-provider case and four force-stop phases.
+  The first integration run passed 19/19; the final access/recovery/provider run
+  passed 14/14. The two dialog-targeted renderer/subframe cases also passed a
+  focused 2/2 run. Previously failing dialog-focus/PiP-animation test assumptions
+  were corrected and their affected cases passed subsequently.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-download-restart.sh`: **four phases
+  passed** across real app force-stops. Legacy transfer IDs survived. Protected
+  unfinished assets restored as failed/retryable, retained their encrypted pass,
+  completed after Retry and played offline without instance access.
+- `python3 -m unittest discover -s scripts/tests -v`: **32 passed**, including three
+  new fixture HTTP contract checks. `bash -n scripts/test-download-restart.sh`
+  passed. Documentation inventory/fingerprint/link checks passed for **301
+  maintained files and 21 documents**.
+- Deployed discovery returned HTTP 200 with verification enabled; anonymous content
+  returned HTTP 401 `login_required`. The real Managed Turnstile page issued native
+  passes which discovery confirmed as verified. The final live run completed
+  after the page's normal Retry and visible checkbox interaction following a
+  provider load failure. No real account credentials or admin changes were used.
+
+The final connected command was:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.InstanceAccessSmokeTest,net.wingress.mobivious.BufferRecoverySmokeTest#initialFailureAutomaticallyRecoversWithoutMetadataRefetch,net.wingress.mobivious.BufferRecoverySmokeTest#automaticRefreshPreservesExactTracksCaptionsSpeedPositionAndAudioOnly,net.wingress.mobivious.LiveInstanceAccessSmokeTest \
+  -Pandroid.testInstrumentationRunnerArguments.liveInstanceAccess=true \
+  -Pandroid.testInstrumentationRunnerArguments.liveKeepInstance=true
+```
+
+The existing regression selectors in the 19-case integration run were:
+
+- `net.wingress.mobivious.AccountNavigationSmokeTest#contextualSignupReturnsToLibraryAndCredentialChangesRetainSignIn`
+- `net.wingress.mobivious.AccountNavigationSmokeTest#fourRootsGuestSettingsAndSearchCancellationAndReturn`
+- `net.wingress.mobivious.AppSmokeTest#accountBrowsingAndServicePlayback`
+- `net.wingress.mobivious.AppSmokeTest#refreshPreservesPausedAndPlayingSettings`
+- `net.wingress.mobivious.AvatarsSmokeTest#browsingChannelHeaderAndWatchReuseImagesWithoutExtraMetadataLookups`
+- `net.wingress.mobivious.CaptionsSmokeTest#clipPreviewInheritsSelectedLanguageAndUsesTheSharedStyle`
+- `net.wingress.mobivious.CaptionsSmokeTest#networkErrorsAreReportedForCaptionsAndRetryRecovers`
+- `net.wingress.mobivious.DownloadsSmokeTest#failuresRetryWithoutRepeatingCompletedTracksAndDeleteIsIndependent`
+- `net.wingress.mobivious.DownloadsSmokeTest#transfersSurviveRecreationCancellationAndProfileChanges`
+- `net.wingress.mobivious.SeekPreviewsSmokeTest#draggingShowsFullPlayerHighestResolutionAndRestoresPlayingOrPausedIntent`
+- `net.wingress.mobivious.StreamControlsSmokeTest#exactTracksMenusRefreshRetryAndReconnection`
+
+All those connected selections used `scripts/test-android.sh --device-only` with
+an explicit `-Pandroid.testInstrumentationRunnerArguments.class` selector.
+Evidence is in ignored `.tools/access-*.log`, `.tools/access-results/`,
+`.tools/download-verification/` and `.tools/access-live-complete.png`.
+
+This is focused acceptance. The complete connected suite was not run and its
+existing failures/ignored cases remain unaccepted, including the emulator-crashing
+accepted video-conversion case. Production account-gated content was verified
+with disposable fixtures; real-account content access was not tested. No release,
+optimized-runtime or performance acceptance is claimed.

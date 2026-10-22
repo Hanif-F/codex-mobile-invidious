@@ -16,3 +16,8 @@ rg -q 'OK \(1 test\)' .tools/download-verification/restart-seed.txt
 "$adb" shell am force-stop "$app_id"
 "$adb" shell am instrument -w -e downloadRestart true -e class net.wingress.mobivious.DownloadsPersistenceSmokeTest#restoreTransfersAndOfflineResume "$runner" | tee .tools/download-verification/restart-restored.txt
 rg -q 'OK \(1 test\)' .tools/download-verification/restart-restored.txt
+"$adb" shell am instrument -w -e downloadRestart true -e class net.wingress.mobivious.ProtectedDownloadsPersistenceSmokeTest#seedProtectedTransfers "$runner" | tee .tools/download-verification/protected-restart-seed.txt
+rg -q 'OK \(1 test\)' .tools/download-verification/protected-restart-seed.txt
+"$adb" shell am force-stop "$app_id"
+"$adb" shell am instrument -w -e downloadRestart true -e class net.wingress.mobivious.ProtectedDownloadsPersistenceSmokeTest#restoreProtectedTransfersRequireRetryAndRetainOfflinePlayback "$runner" | tee .tools/download-verification/protected-restart-restored.txt
+rg -q 'OK \(1 test\)' .tools/download-verification/protected-restart-restored.txt
