@@ -35,9 +35,11 @@ account cookies with the WebView. Registration discovery additionally parses
 `loginRequired`, default false for older servers.
 
 HTTP 401 `login_required` opens native sign-in. HTTP 403 `verification_required`
-or `verification_expired` opens verification; 503 `verification_unavailable`
+or `verification_expired` opens verification automatically in the foreground;
+503 `verification_unavailable`
 offers retry without expiring the account or serving a cached protected feed.
-Completing access does not replay mutations or restart media. Retry is explicit.
+Successful verification retries browsing, including a failed pagination request.
+Mutations, playback and downloads retain explicit Retry actions.
 All transports strip credentials on external redirects, matching scheme/host/port
 on each hop. Same-instance HEAD and Range requests retain their access headers.
 

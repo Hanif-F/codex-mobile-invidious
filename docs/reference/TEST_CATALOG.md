@@ -1113,17 +1113,22 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### InstanceAccessSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt) — Fixture-backed native access, encryption, playback, ownership and protected-download recovery journeys.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt) — Fixture-backed automatic verification, browsing retry, cancellation/lifecycle/context isolation, encryption, playback and protected-download recovery journeys.
 
 - `verificationUsesTheNativePageAndEncryptedInstancePass`
+- `automaticVerificationCoalescesDenialsAndRetriesBrowsingOnce`
+- `verificationWaitsForTheCurrentBrowseRequestBeforeRetrying`
+- `automaticVerificationRetriesTheFailedSearchPageWithoutLosingEarlierResults`
 - `requiredLoginUsesNativeSignInWithRegistrationDisabledAndThenVerification`
 - `cancelledAndRecreatedVerificationCanBeRetried`
+- `accountAndServerChangesDiscardVerificationAndRejectStaleCompletions`
 - `unavailableVerificationAndPolicyChangesRemainRetryableWithoutSigningOut`
 - `playbackAccessExpiryPausesWithoutAutomaticRecoveryAndRetryKeepsPosition`
 - `protectedDownloadsRetryWithoutRepeatingCompleteAssetsAndPlayOffline`
 - `requiredSignInDuringPlaybackRetainsThePausedPlayerUntilExplicitRetry`
 - `protectedTransferOwnershipChangesStopWorkAndCancellationStaysRetryable`
 - `backgroundAndPipAccessExpiryPauseUntilVerificationAndExplicitRetry`
+- `cancelledVerificationStaysDismissedAcrossBackgroundAndPipUntilExplicitRetry`
 - `rendererFailureOffersAFreshPageWithoutCrashingTheApp`
 - `subframeCompletionsAreIgnoredAndRetryReplacesTheVisiblePage`
 
@@ -1170,7 +1175,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### LiveInstanceAccessSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt) — Explicitly opted-in real-provider native verification without account or policy changes.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt) — Explicitly opted-in automatic real-provider native verification and dismissal without account or policy changes.
 
 - `realProviderCompletesWithoutAccountOrPolicyChanges`
 
@@ -1566,4 +1571,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **924 declared test methods** (including ignored tests).
+Inventory total: **929 declared test methods** (including ignored tests).

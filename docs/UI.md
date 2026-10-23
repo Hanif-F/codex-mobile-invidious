@@ -8,18 +8,24 @@ record the latest tested scope and known failures.
 
 ## Instance access
 
-The shared access prompt offers native sign-in or an embedded verification dialog.
-Later/Cancel leaves navigation, Server settings and local Downloads usable; Retry
-on the failed action reopens the prompt. Verification shows the selected origin,
+Required verification opens the embedded verification dialog automatically when
+the activity is resumed, outside PiP and sign-in. Required sign-in and unavailable
+verification retain their access prompts. Later/Cancel or Back leaves navigation,
+Server settings and local Downloads usable; cancellation survives recreation and
+PiP until Retry on the failed action reopens verification. Concurrent access
+failures share one dialog. Verification shows the selected origin,
 an origin-restricted WebView, load/error feedback and Retry/Cancel actions. It
 retains the default browser user agent, JavaScript and DOM storage for Turnstile.
 Only same-origin main-frame completion messages are accepted; external top-level
 navigation is blocked. An outdated WebView shows update guidance.
 
-After successful verification, the app offers Retry browsing or Done. Playback
-and downloads retain their own explicit Retry actions. Access prompts wait until
-the activity leaves PiP; background playback failures retain their issue for the
-next foreground visit. Account and verification expiry remain separate.
+After successful verification, the dialog closes and browsing retries automatically
+after any current browse request settles, preserving a failed pagination retry.
+Playback and downloads retain their own explicit Retry actions. Access prompts
+wait until the activity leaves PiP; background playback failures retain their issue
+for the next foreground visit. Account or server changes discard the previous verification
+flow. Account and verification expiry remain separate. Cloudflare may still
+require interaction with its managed widget.
 
 ## Shell and screen ownership
 

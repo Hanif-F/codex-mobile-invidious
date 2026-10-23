@@ -63,11 +63,13 @@ Measured timings and runner acceptance are recorded in
 
 `InstanceAccessTest` covers redirect credential boundaries, bootstrap exclusions,
 stale requests, pass validation, account cache isolation and recovery policy.
-`InstanceAccessSmokeTest` uses the disposable fixture for the native WebView
-event/Keystore round trip, either/both gates, disabled registration, cancellation/
-recreation, expiry/policy/outage recovery, retained playback and protected-download
-retry/cancellation. Its background/PiP case checks that access failures do not
-enter buffer recovery.
+`InstanceAccessSmokeTest` uses the disposable fixture for automatic verification,
+coalesced denials, automatic browsing/pagination retry, in-flight browse completion,
+the native WebView event/Keystore round trip, either/both gates, disabled registration,
+cancellation/recreation, stale account/instance contexts, expiry/policy/outage
+recovery, retained playback and protected-download retry/cancellation. Its
+background/PiP cases check deferred presentation, retained cancellation and that
+access failures do not enter buffer recovery.
 
 ```sh
 ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \
@@ -84,7 +86,8 @@ connected selection skips them.
 
 Real Cloudflare acceptance is separate from synthetic fixture acceptance. The
 opt-in `LiveInstanceAccessSmokeTest` opens the default production instance's
-verification page, obtains a native pass and confirms it through discovery. It
+verification page automatically, obtains a native pass, confirms it through
+discovery and checks dismissal without a success confirmation. It
 uses no account credentials and changes no admin policy. Run it intentionally:
 
 ```sh

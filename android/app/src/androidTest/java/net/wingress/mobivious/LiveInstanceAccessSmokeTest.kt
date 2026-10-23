@@ -29,13 +29,18 @@ class LiveInstanceAccessSmokeTest {
                 vm.store.save(null); vm.switchServer("https://invidious.wingress.net")
                 vm.store.verificationPersistence.write(InstanceAccess.origin(vm.store.server.toHttpUrl()), null)
             }
+            compose.waitUntil(60_000) { !vm.browse.value.loading }
             val status = runBlocking { vm.access.discover(vm.api.context()) }
             assertNotNull(status)
-            if (status!!.enabled && status.required) {
+            Assume.assumeTrue("Live verification must be enabled and required", status!!.enabled && status.required)
+            if (status.enabled && status.required) {
                 compose.runOnUiThread { vm.access.contextChanged(); vm.access.report(vm.api.context(), AccessReason.VERIFICATION) }
-                compose.onNodeWithTag("instance-access-action").performClick()
+                compose.onNodeWithTag("instance-access-action").assertDoesNotExist()
                 compose.waitUntil(120_000) { vm.access.pass(vm.api.context()) != null }
                 assertTrue(runBlocking { vm.access.discover(vm.api.context()) }!!.verified)
+                compose.waitUntil(60_000) { !vm.browse.value.loading }
+                compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+                compose.onNodeWithText("Access restored").assertDoesNotExist()
                 instrumentation.uiAutomation.takeScreenshot().let { bitmap ->
                     File(activity.filesDir, "access-live-complete.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                 }

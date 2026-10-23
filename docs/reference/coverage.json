@@ -901,7 +901,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination. Integrates session playback statistics.",
-      "sha256": "a877d4f152274f2d8a360f9f91c3d969cf3467186723acbedd026ff30cc0dabd"
+      "sha256": "a5b8892b680fd4a98cb888f7ecde9cac8865978146549f2a938da7282ac79729"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1027,7 +1027,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "89f42ca71d271e2cf882194de68141465431f8de33af68c4282519bb493ec07b"
+      "sha256": "39c4b3f185a34f7952a5994258d4030165963106d5b14473635dcb0c1d42a791"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
       "area": "Compose UI",
@@ -1800,8 +1800,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/InstanceAccessUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Coalesced access prompts and an origin-restricted WebView verification dialog with explicit retry.",
-      "sha256": "423160eec64a1fe4573f687f4de0ff8b8f94796a6bd4ed353dc8175ff094c688"
+      "description": "Automatic origin-restricted WebView verification, coalesced access prompts and cancellation retained across lifecycle changes.",
+      "sha256": "486e036b93f400086d6998309c743699493d741adb54d39504b75da1fed1e271"
     },
     "android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt": {
       "area": "JVM tests",
@@ -1812,14 +1812,14 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Fixture-backed native access, encryption, playback, ownership and protected-download recovery journeys.",
-      "sha256": "4e3648c84956c7f6ee4f9251fa25c6b5a4225ac0e13e09e4eb928cfde950b76b"
+      "description": "Fixture-backed automatic verification, browsing retry, cancellation/lifecycle/context isolation, encryption, playback and protected-download recovery journeys.",
+      "sha256": "fa623f0b4ed89bcde3431921fc06044bc0db88acd64517466a07869bc47d4a76"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Explicitly opted-in real-provider native verification without account or policy changes.",
-      "sha256": "4b6225cbf6f4607ebc4c5c2651d347b3660566d5cdd0931d2187fc1022b713b2"
+      "description": "Explicitly opted-in automatic real-provider native verification and dismissal without account or policy changes.",
+      "sha256": "538cb270b870c46215a0ef0f880fbf5d0a9800bf8829f34871ba8d5dc4e278f9"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ProtectedDownloadsPersistenceSmokeTest.kt": {
       "area": "Android device tests",

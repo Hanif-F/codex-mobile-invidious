@@ -18,6 +18,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CancellationException
@@ -29,33 +31,31 @@ import org.json.JSONObject
 
 /** A single dismissible prompt leaves local downloads and server selection reachable. */
 @Composable
-internal fun InstanceAccessPrompt(vm: AppViewModel, signIn: () -> Unit) {
+internal fun InstanceAccessPrompt(vm: AppViewModel, visible: Boolean, signIn: () -> Unit) {
     val issue by vm.access.issue.collectAsStateWithLifecycle()
     val revision by vm.access.promptRevision.collectAsStateWithLifecycle()
-    var dismissed by remember { mutableStateOf<AccessIssue?>(null) }
-    var verifying by rememberSaveable { mutableStateOf(false) }
-    var completed by remember { mutableStateOf(false) }
-    LaunchedEffect(revision) { dismissed = null }
-    LaunchedEffect(issue) { if (issue == null) dismissed = null }
+    val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    // Save only an opaque identity, never account credentials, across activity recreation.
+    val contextKey = InstanceAccess.cacheScope(vm.api.context())
+    var dismissed by rememberSaveable(contextKey) { mutableStateOf<String?>(null) }
+    var requested by rememberSaveable(contextKey) { mutableStateOf<String?>(null) }
     val active = issue?.takeIf { it.context == vm.api.context() }
-    if (active != null && active != dismissed && !verifying && vm.route != "sign-in") {
-        AlertDialog(onDismissRequest = { dismissed = active }, title = { Text("Instance access") },
+    val attempt = active?.let { "$contextKey:${it.reason}:$revision" }
+    if (!visible || !lifecycle.isAtLeast(Lifecycle.State.RESUMED) || vm.route == "sign-in" ||
+        active == null || attempt == dismissed) return
+    if (active.reason == AccessReason.VERIFICATION || requested == attempt) key(attempt) {
+        VerificationDialog(vm, { dismissed = attempt }) { vm.retryBrowseAfterVerification(active.context) }
+    } else {
+        AlertDialog(onDismissRequest = { dismissed = attempt }, title = { Text("Instance access") },
             text = { Text(active.reason.message) }, confirmButton = {
                 TextButton(onClick = {
-                    dismissed = active
-                    if (active.reason == AccessReason.LOGIN) signIn() else verifying = true
+                    if (active.reason == AccessReason.LOGIN) { dismissed = attempt; signIn() }
+                    else requested = attempt
                 }, modifier = Modifier.testTag("instance-access-action")) {
                     Text(if (active.reason == AccessReason.LOGIN) "Sign in" else "Verify")
                 }
-            }, dismissButton = { TextButton({ dismissed = active }) { Text("Later") } })
+            }, dismissButton = { TextButton({ dismissed = attempt }) { Text("Later") } })
     }
-    if (verifying) key(vm.api.context()) {
-        VerificationDialog(vm, { verifying = false }) { verifying = false; completed = true }
-    }
-    if (completed) AlertDialog(onDismissRequest = { completed = false }, title = { Text("Access restored") },
-        text = { Text("Retry browsing or playback to continue. Downloads can be retried from Downloads.") },
-        confirmButton = { TextButton({ completed = false; vm.retryBrowse() }, Modifier.testTag("instance-access-retry")) { Text("Retry browsing") } },
-        dismissButton = { TextButton({ completed = false }) { Text("Done") } })
 }
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -66,6 +66,7 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit, complete: 
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var completed by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     var failedView by remember { mutableStateOf<WebView?>(null) }
     val supported = remember { WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
@@ -81,15 +82,15 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit, complete: 
             val rules = setOf(InstanceAccess.origin(origin))
             if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
                 WebViewCompat.addWebMessageListener(this, "mobiviousVerification", rules) { _, message, source, main, _ ->
-                    if (!main || source.toString().toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, target.server) } != true || busy || target != vm.api.context()) return@addWebMessageListener
+                    if (!main || source.toString().toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, target.server) } != true || busy || completed || target != vm.api.context()) return@addWebMessageListener
                     val body = message.data?.takeIf { it.length <= 4096 } ?: return@addWebMessageListener
+                    busy = true; error = null
                     scope.launch {
-                        busy = true; error = null
                         try {
                             val value = JSONObject(body)
                             vm.access.complete(target, if (value.isNull("verificationToken")) null else value.getString("verificationToken"),
                                 if (value.isNull("expiresAt")) null else value.getLong("expiresAt"), value.getBoolean("enabled"))
-                            complete()
+                            completed = true; complete()
                         } catch (e: CancellationException) { throw e }
                         catch (e: Exception) { error = e.message ?: "Verification failed. Try again." }
                         finally { busy = false }

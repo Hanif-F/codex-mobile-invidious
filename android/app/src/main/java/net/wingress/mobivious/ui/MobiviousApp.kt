@@ -651,7 +651,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
             if (downloadDialog.video != null && !pip) DownloadDialog(vm)
             if (saveSheet.video != null && route != "sign-in" && !pip) SavePlaylistSheet(vm) { signIn() }
             if (!pip) { ClipDialogs(vm); ClipEditor(vm) }
-            if (!pip) InstanceAccessPrompt(vm, ::accessSignIn)
+            InstanceAccessPrompt(vm, visible = !pip, signIn = ::accessSignIn)
             if (searchOpen && !pip) SearchEntryScreen(searchEditor, vm.searchEntry, ::cancelSearchEntry, ::submitGlobalSearch)
           }
         }

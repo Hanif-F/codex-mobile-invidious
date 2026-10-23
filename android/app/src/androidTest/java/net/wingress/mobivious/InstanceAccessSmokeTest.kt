@@ -57,20 +57,43 @@ class InstanceAccessSmokeTest {
         }
     }
     private fun denied() = runBlocking { assertTrue(runCatching { vm.api.discovery("popular") }.exceptionOrNull() is InstanceAccessException) }
-    private fun verify() {
-        until { vm.access.issue.value != null }
-        compose.onNodeWithTag("instance-access-action").performClick()
-        completePage()
-        until { vm.access.issue.value == null && vm.access.pass(vm.api.context()) != null }
-        compose.onNodeWithText("Done").performClick()
+    private fun fixture() = JSONObject(URL("http://127.0.0.1:18080/test/state").readText())
+    private fun verifiedBrowseRequests(path: String): Int {
+        val requests = fixture().getJSONArray("accessRequests")
+        return (0 until requests.length()).count {
+            val request = requests.getJSONObject(it)
+            request.getString("path").substringBefore('?') == path && request.getBoolean("verification")
+        }
     }
-    private fun completePage() {
+    private fun recreate() {
+        val old = activity
+        compose.runOnUiThread { activity.recreate() }
+        until { var ready = false; compose.runOnUiThread { ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== old } }; ready }
+        compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
+    }
+    private fun returnToForeground() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.uiAutomation.executeShellCommand("am start -n ${instrumentation.targetContext.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top")
+            .use { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() }
+        until { !activity.isInPictureInPictureMode && activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
+    }
+    private fun verify(duplicate: Boolean = false) {
+        until { vm.access.issue.value != null }
+        compose.onNodeWithTag("instance-access-action").assertDoesNotExist()
+        completePage(duplicate)
+        until { vm.access.issue.value == null && vm.access.pass(vm.api.context()) != null }
+        until { !vm.browse.value.loading }
+        compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        compose.onNodeWithText("Access restored").assertDoesNotExist()
+    }
+    private fun completePage(duplicate: Boolean = false) {
         compose.onNodeWithTag("instance-verification").assertExists()
         onView(isAssignableFrom(WebView::class.java)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(object : ViewAction {
             override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
             override fun getDescription() = "Complete the local fixture's synthetic verification page"
             override fun perform(controller: UiController, view: View) {
-                (view as WebView).evaluateJavascript("(function ready(){var b=document.getElementById('complete');if(b)b.click();else setTimeout(ready,100);})();", null)
+                val repeat = if (duplicate) "window.addEventListener('invidious-verification-complete',function again(e){window.removeEventListener('invidious-verification-complete',again);window.dispatchEvent(new CustomEvent('invidious-verification-complete',{detail:e.detail}));});" else ""
+                (view as WebView).evaluateJavascript("(function ready(){var b=document.getElementById('complete');if(b){${repeat}b.click();}else setTimeout(ready,100);})();", null)
             }
         })
     }
@@ -84,6 +107,43 @@ class InstanceAccessSmokeTest {
         assertEquals(token, restored.verificationPersistence.read(InstanceAccess.origin(vm.store.server.toHttpUrl()))?.token)
         compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)) }
         assertEquals(token, app.access.pass(vm.api.context())?.token)
+    }
+    @Test fun automaticVerificationCoalescesDenialsAndRetriesBrowsingOnce() {
+        command("access", """{"accessEnabled":true}""")
+        compose.runOnUiThread { vm.refresh() }
+        until { !vm.browse.value.loading && vm.browse.value.error != null }
+        denied(); denied()
+        val before = verifiedBrowseRequests("/api/v1/popular")
+        compose.onAllNodesWithTag("instance-verification").assertCountEquals(1)
+        verify(duplicate = true)
+        until { vm.browse.value.error == null && vm.browse.value.videos.isNotEmpty() }
+        assertEquals(before + 1, verifiedBrowseRequests("/api/v1/popular"))
+    }
+    @Test fun verificationWaitsForTheCurrentBrowseRequestBeforeRetrying() {
+        command("discovery-search", """{"discoveryDelayNext":4000}""")
+        compose.runOnUiThread { vm.refresh() }
+        until { vm.browse.value.loading && fixture().getInt("discoveryDelayNext") == 0 }
+        command("access", """{"accessEnabled":true}"""); denied()
+        val before = verifiedBrowseRequests("/api/v1/popular")
+        verify()
+        until { !vm.browse.value.loading && verifiedBrowseRequests("/api/v1/popular") == before + 1 }
+        assertNull(vm.browse.value.error)
+    }
+    @Test fun automaticVerificationRetriesTheFailedSearchPageWithoutLosingEarlierResults() {
+        command("discovery-search", """{"searchMixed":true}""")
+        compose.runOnUiThread { vm.openGlobalSearch("mixed") }
+        until { !vm.browse.value.loading && vm.browse.value.searchResults.isNotEmpty() }
+        val first = vm.browse.value.searchResults
+        command("access", """{"accessEnabled":true}""")
+        compose.runOnUiThread { vm.more() }
+        until { !vm.browse.value.loading && vm.browse.value.retryMore }
+        val before = verifiedBrowseRequests("/api/v1/search")
+        verify()
+        until { vm.browse.value.page == 2 && !vm.browse.value.loading }
+        assertNull(vm.browse.value.error)
+        assertTrue(vm.browse.value.searchResults.containsAll(first))
+        assertTrue(vm.browse.value.searchResults.size > first.size)
+        assertEquals(before + 1, verifiedBrowseRequests("/api/v1/search"))
     }
     @Test fun requiredLoginUsesNativeSignInWithRegistrationDisabledAndThenVerification() {
         command("accounts", """{"registrationEnabled":false}""")
@@ -100,15 +160,38 @@ class InstanceAccessSmokeTest {
     }
     @Test fun cancelledAndRecreatedVerificationCanBeRetried() {
         command("access", """{"accessEnabled":true}"""); denied()
-        compose.onNodeWithTag("instance-access-action").performClick()
         compose.onNodeWithTag("instance-verification-cancel").performClick()
-        compose.runOnUiThread { vm.access.prompt() }
-        compose.onNodeWithTag("instance-access-action").performClick()
-        val old = activity
-        compose.runOnUiThread { activity.recreate() }
-        until { var ready = false; compose.runOnUiThread { ready = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any { it is MainActivity && it !== old } }; ready }
-        compose.runOnUiThread { activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single() }
-        completePage(); until { vm.access.issue.value == null }
+        denied(); recreate(); denied()
+        compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        compose.runOnUiThread { vm.retryBrowse() }
+        compose.onNodeWithTag("instance-verification").assertExists()
+        recreate()
+        compose.onNodeWithTag("instance-verification").assertExists()
+        androidx.test.espresso.Espresso.pressBack()
+        denied(); compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        compose.runOnUiThread { vm.retryBrowse() }
+        verify()
+    }
+    @Test fun accountAndServerChangesDiscardVerificationAndRejectStaleCompletions() {
+        for (changeAccount in listOf(true, false)) {
+            command("access", """{"accessEnabled":true}"""); denied()
+            compose.onNodeWithTag("instance-verification").assertExists()
+            val previous = vm.api.context()
+            command("access", """{"accessEnabled":false}""")
+            compose.runOnUiThread {
+                if (changeAccount) vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server))
+                else vm.switchServer("http://localhost:18080")
+                vm.access.report(previous, AccessReason.VERIFICATION)
+                vm.retryBrowseAfterVerification(previous)
+            }
+            until { vm.access.issue.value == null }
+            compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+            runBlocking {
+                try { vm.access.complete(previous, "stale-pass", Long.MAX_VALUE, true); fail("Stale completion accepted") }
+                catch (_: kotlinx.coroutines.CancellationException) { }
+            }
+            assertNull(vm.access.pass(vm.api.context()))
+        }
     }
     @Test fun unavailableVerificationAndPolicyChangesRemainRetryableWithoutSigningOut() {
         compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)) }
@@ -116,6 +199,8 @@ class InstanceAccessSmokeTest {
         command("access", """{"accessPolicy":2}"""); denied(); verify()
         command("access", """{"accessUnavailable":true}"""); denied()
         assertEquals(AccessReason.UNAVAILABLE, vm.access.issue.value?.reason); assertNotNull(vm.account.value)
+        compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        compose.onNodeWithTag("instance-access-action").assertExists()
         command("access", """{"accessUnavailable":false}""")
         runBlocking { assertTrue(vm.api.discovery("popular").isNotEmpty()) }
     }
@@ -185,10 +270,10 @@ class InstanceAccessSmokeTest {
     @Test fun backgroundAndPipAccessExpiryPauseUntilVerificationAndExplicitRetry() {
         command("access", """{"accessEnabled":true}"""); denied(); verify()
         val background = vm.store.background; val pip = vm.store.pip
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
         try {
             compose.runOnUiThread { vm.store.background = true; vm.store.pip = false; vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
             until { vm.playback.value.playerState == Player.STATE_READY }
+            val occurrence = vm.queue.value.currentKey
             for (inPip in listOf(false, true)) {
                 compose.runOnUiThread {
                     vm.controller.value?.play()
@@ -203,18 +288,42 @@ class InstanceAccessSmokeTest {
                 compose.runOnUiThread { vm.refreshBuffer() }
                 until { vm.access.issue.value?.reason == AccessReason.VERIFICATION && !vm.playback.value.playing }
                 assertFalse(vm.playback.value.recovering)
-                instrumentation.uiAutomation.executeShellCommand("am start -n ${instrumentation.targetContext.packageName}/net.wingress.mobivious.MainActivity --activity-clear-top")
-                    .use { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).readBytes() }
-                until { !activity.isInPictureInPictureMode && activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
+                assertTrue(InstrumentationRegistry.getInstrumentation().uiAutomation.rootInActiveWindow
+                    ?.findAccessibilityNodeInfosByText("Verify access").isNullOrEmpty())
+                returnToForeground()
                 verify()
+                assertFalse(vm.playback.value.playing)
+                assertEquals(occurrence, vm.queue.value.currentKey)
                 compose.runOnUiThread { vm.refreshBuffer() }
                 until { vm.playback.value.playerState == Player.STATE_READY && vm.playback.value.error == null }
             }
         } finally { compose.runOnUiThread { vm.store.background = background; vm.store.pip = pip } }
     }
+    @Test fun cancelledVerificationStaysDismissedAcrossBackgroundAndPipUntilExplicitRetry() {
+        val background = vm.store.background; val pip = vm.store.pip
+        try {
+            compose.runOnUiThread { vm.store.background = true; vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+            until { vm.playback.value.playerState == Player.STATE_READY }
+            compose.runOnUiThread { vm.controller.value?.pause() }
+            command("access", """{"accessEnabled":true}"""); denied()
+            compose.onNodeWithTag("instance-verification-cancel").performClick()
+            for (inPip in listOf(false, true)) {
+                compose.runOnUiThread {
+                    vm.store.pip = inPip
+                    if (inPip) activity.enterPip()
+                    else { activity.updatePip(false); activity.moveTaskToBack(true) }
+                }
+                until { if (inPip) activity.isInPictureInPictureMode else !activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) }
+                if (inPip) Thread.sleep(1500)
+                denied(); returnToForeground()
+                compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+            }
+            compose.runOnUiThread { vm.retryBrowse() }
+            verify()
+        } finally { compose.runOnUiThread { vm.store.background = background; vm.store.pip = pip } }
+    }
     @Test fun rendererFailureOffersAFreshPageWithoutCrashingTheApp() {
         command("access", """{"accessEnabled":true}"""); denied()
-        compose.onNodeWithTag("instance-access-action").performClick()
         compose.onNodeWithTag("instance-verification").assertExists()
         onView(isAssignableFrom(WebView::class.java)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(object : ViewAction {
             override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
@@ -227,7 +336,6 @@ class InstanceAccessSmokeTest {
     }
     @Test fun subframeCompletionsAreIgnoredAndRetryReplacesTheVisiblePage() {
         command("access", """{"accessEnabled":true}"""); denied()
-        compose.onNodeWithTag("instance-access-action").performClick()
         compose.onNodeWithTag("instance-verification").assertExists()
         onView(isAssignableFrom(WebView::class.java)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(object : ViewAction {
             override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)

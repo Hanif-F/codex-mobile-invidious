@@ -1050,6 +1050,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (!browse.value.retryMore && route.isEmpty() && tab in listOf("Popular", "Trending", "Subscriptions")) refreshFeed()
         else load(browse.value.retryMore, refreshChannel = false)
     }
+    internal fun retryBrowseAfterVerification(context: ApiContext) {
+        // A denial can open verification before its browse coroutine has published retryMore.
+        val pending = browseJob
+        viewModelScope.launch {
+            pending?.join()
+            if (context == api.context()) retryBrowse()
+        }
+    }
     fun selectChannelTab(value: ChannelTab) {
         val info = channel.value ?: return
         if (!route.startsWith("channel:") || value !in info.contentTabs || value == channelTab.value && scopedSearch.value.submitted.isBlank()) return

@@ -118,10 +118,12 @@ Public browsing and playback use Invidious APIs. **Account features and some
 enhancements require this fork's mobile server extensions**; support varies on
 other or older instances. Optional metadata is hidden when it is unavailable.
 
-Instances can require sign-in, Turnstile verification, or both. Follow the access
-prompt, then retry browsing, playback or downloads. Verification is saved securely
-for that instance and also applies to signed-in accounts. Administration stays on
-the instance website; local downloads remain available without instance access.
+Instances can require sign-in, Turnstile verification, or both. Required verification
+opens automatically and browsing retries after success. Follow the sign-in prompt
+when required; playback and downloads retain explicit Retry actions. Verification
+is saved securely for that instance and also applies to signed-in accounts.
+Administration stays on the instance website; local downloads remain available
+without instance access.
 
 Readable counts and dates work on older instances. Verified exact view/like totals
 in expanded video details and cached Shorts dates/durations require the matching

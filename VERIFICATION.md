@@ -1,5 +1,78 @@
 # Focused implementation verification
 
+## Automatic Turnstile verification — 23 October 2026
+
+Required verification now opens automatically in the foreground and closes after
+the native pass is validated and encrypted. Browsing retries after any current
+browse request settles, including a failed pagination request. Cancel/Back remains
+effective through recreation, background and PiP until explicit Retry. Required
+sign-in and unavailable-provider prompts remain separate; playback and downloads
+retain explicit Retry actions. Server code, contracts and release packaging were
+unchanged.
+
+- Full JVM suite: **445 tests passed**, no failures/errors/skips. Debug lint:
+  **0 errors, 36 warnings**. Ran once after the final production edits, retaining
+  incremental outputs, from `android/`:
+
+  ```sh
+  JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME=/home/haha.m.lady/Android/Sdk \
+    ./gradlew :app:testDebugUnitTest :app:lintDebug --offline --console=plain
+  ```
+
+- Fixture acceptance: **16 distinct device cases passed**, no ignored cases,
+  on Android 16 `emulator-5554` (Pixel 8 Pro). Coverage includes automatic opening,
+  duplicate denials/completion events, exactly one new browse retry, in-flight
+  browse completion, preserved search pagination, Cancel/Back/recreation,
+  background/PiP suppression and retained cancellation, stale account/server
+  contexts, login precedence, encrypted persistence, renderer recovery,
+  untrusted subframes, retained playback and protected-download recovery.
+
+  ```sh
+  ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+    -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.InstanceAccessSmokeTest
+  ```
+
+  The full class initially passed 14/16. Two new assertions were corrected: the
+  request count included startup traffic carrying a previously persisted pass,
+  and paused playback need not retain an error string after verification. Request
+  assertions now measure the increase from their baseline; playback checks retain
+  the queue occurrence and paused state. No production fix was needed. Reran only
+  the four affected methods through the same runner/options with a comma-separated
+  `net.wingress.mobivious.InstanceAccessSmokeTest#method` selector; all four passed:
+  `automaticVerificationCoalescesDenialsAndRetriesBrowsingOnce`,
+  `verificationWaitsForTheCurrentBrowseRequestBeforeRetrying`,
+  `automaticVerificationRetriesTheFailedSearchPageWithoutLosingEarlierResults`,
+  `backgroundAndPipAccessExpiryPauseUntilVerificationAndExplicitRetry`.
+  The other 12 passing cases remained valid. An earlier five-case development
+  selection also passed. Connected runs built and installed their required debug
+  app/test APKs; the release app and its data were preserved.
+
+- Live-provider acceptance: **1 test passed**, no skips. The real Managed
+  Turnstile page on `https://invidious.wingress.net` completed without clicks,
+  issued a native pass and passed discovery validation. Verification and success
+  confirmation were absent afterward. The persisted pass remained usable after
+  reopening the debug app. The production feed still returned `login_required`;
+  real-account content acceptance was not exercised. No account credentials or
+  server policy were changed. The default production instance was left selected.
+
+  ```sh
+  ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+    -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveInstanceAccessSmokeTest \
+    -Pandroid.testInstrumentationRunnerArguments.liveInstanceAccess=true \
+    -Pandroid.testInstrumentationRunnerArguments.liveKeepInstance=true
+  ```
+
+- Reviewed prose/source descriptions, refreshed fingerprints and generated
+  catalogs with `python3 scripts/check-documentation.py --refresh`, then ran
+  `python3 scripts/check-documentation.py` and `git diff --check`: passed.
+
+Logs are under ignored `.tools/access-auto-{focused,device,device-recheck,live,jvm-lint}.log`.
+Device XML/logcat evidence is preserved under `.tools/access-auto-results/` in
+`initial/`, `recheck/` and `live/`; the settled live screen is
+`.tools/access-auto-settled.png`. This is focused device acceptance. The complete
+device suite, release/optimized checks, physical-device runs and production
+account-gated content were not run or claimed.
+
 ## Mobivious 0.13.0 release — 22 October 2026
 
 Application source: `7cf9c7f` plus the version-only change to **0.13.0**, code
