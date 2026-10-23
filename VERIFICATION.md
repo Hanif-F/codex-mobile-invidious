@@ -1,5 +1,21 @@
 # Focused implementation verification
 
+## Patch release 0.13.1 — 23 October 2026
+
+Bumped version name to **0.13.1**, code **31**. Reused completed JVM, device,
+Python and debug-lint results at the user's request. No tests were repeated.
+Ran `:app:assembleRelease :app:lintRelease --console=plain`, retaining the
+release script's signing/checksum/R8 archive steps and omitting its JVM task.
+Release build and lint passed (**0 errors, 36 warnings**).
+
+Verified package/version/code, minimum SDK 33 and target SDK 37, certificate
+continuity with 0.13.0, APK checksum, uncompressed DEX, and matching nonempty
+R8 mapping/archive checksums. APK: **7,302,896 bytes**; SHA-256:
+`9afaba3fc7db30689442edc16466ccd5c1dfc0474c84ed9d761245591d67ef27`. Evidence is in ignored
+`.tools/release-0.13.1-checks.json` and `artifacts/r8/0.13.1/<APK-SHA256>/`.
+Documentation and whitespace checks passed. Optimized runtime journeys were
+not repeated; existing acceptance boundaries remain unchanged.
+
 ## View-count availability — 23 October 2026
 
 Android consumes supplied per-video count type/precision and legacy text across
