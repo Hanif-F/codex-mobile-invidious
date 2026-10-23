@@ -54,7 +54,7 @@ default_prefs = dict(annotations=False, annotations_subscribed=False, vr_mode=Tr
                      default_playlist=None, channel_spoiler_settings={}, **{'continue': False}, show_member_videos=False, unrelated_setting='preserved')
 prefs = default_prefs.copy()
 default_prefs.update(ai_filter_enabled=False, **{f'ai_{kind}_{group}_action': 'off' for kind in ('blocklist', 'warnlist') for group in ('feeds', 'search', 'recommendations', 'other_pages')})
-state = dict(annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
+state = dict(viewCounts=False, annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
 def reset_access():
@@ -251,6 +251,22 @@ class Handler(BaseHTTPRequestHandler):
             pass
 
     def respond(self, data=None, status=200, headers=None):
+        if status == 200 and self.command == 'GET' and state['viewCounts'] and not urlparse(self.path).path.startswith('/test/'):
+            def counts(value):
+                if isinstance(value, list): return [counts(item) for item in value]
+                if not isinstance(value, dict): return value
+                result = {key: counts(item) for key, item in value.items()}
+                identity = result.get('videoId', result.get('video_id'))
+                if identity and 'clipId' not in result:
+                    for key in ('viewCount', 'viewCountPrecision', 'viewCountType', 'viewCountText'):
+                        result.pop(key, None)
+                    result.update({
+                        'testvideo01': dict(viewCount=0, viewCountPrecision='exact', viewCountType='views', viewCountText='0 views'),
+                        'testvideo02': dict(viewCountText='1.2K'),
+                        'testvideo03': dict(viewCount=12, viewCountPrecision='unknown', viewCountType='watching', viewCountText='12 watching'),
+                    }.get(identity, {}))
+                return result
+            data = counts(data)
         if status == 200 and self.command in ('GET', 'HEAD') and state.get('originalTitleFixture') and not urlparse(self.path).path.startswith('/test/'):
             params = parse_qs(urlparse(self.path).query, keep_blank_values=True)
             values = params.get('show_original_title', [])
@@ -765,7 +781,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
                               hlsUrl='/media/master.m3u8' if state['stream'] == 'hls' else '',
                               captions=([dict(label=label, language_code=lang, url=f'/caption-fixture/{lang}.vtt') for label, lang in [('English', 'en'), ('Indonesian', 'id')]]
                                         if state.get('captionFixture') else [dict(label='English', language_code='en', url='/media/captions.vtt')]),
-                              recommendedVideos=([recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
+                              recommendedVideos=([recommended, dict(recommended, videoId='testvideo03', title='Concurrent viewers'), unknown_video] if state['viewCounts'] else [recommended, dict(recommended, title='Repeated recommendation'), dict(recommended, videoId='testvideo03', title='Third recommendation')]
                                                  if state['duplicateRecommendations'] else browse_videos() if state.get('performance') else [recommended, visibility_member, visibility_other] if state['visibilityVideos'] else ([recommended, unknown_video, live_video] if state['indicatorVideos'] else [recommended])),
                               liveNow=state['liveNow'], isMember=state['memberCurrent'], liveChatReplay=state['chatReplay']))
         elif p.startswith('/api/v1/dearrow/'):
@@ -820,6 +836,11 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
         elif p == '/api/v1/auth/playlists': self.respond([dict(pl, isOwned=True, isSaved=False) for pl in state['playlists']] + [source_playlist(id) for id in state['savedPlaylists']])
         elif p.startswith('/api/v1/auth/playlists/') or p.startswith('/api/v1/playlists/'):
             plid = p.rsplit('/', 1)[-1]
+            if state['viewCounts'] and plid == 'PLcounts':
+                offset = int(parse_qs(url.query).get('index', ['0'])[0])
+                rows = [video, recommended, video, unknown_video]
+                return self.respond(dict(playlistId=plid, title='View count playlist', videoCount=4, viewCount=9000,
+                    videos=[dict(item, index=i) for i, item in enumerate(rows)][offset:offset + 2]))
             if plid.startswith('RD'):
                 continuation = parse_qs(url.query).get('continuation', ['testvideo01'])[0]
                 upcoming = 'testvideo02' if continuation == 'testvideo01' else 'testvideo03'
@@ -962,6 +983,14 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['playlists'] = [dict(playlistId=f'IVperf{i:04d}', title=f'Benchmark playlist {i:03d}',
                 privacy='private', videoCount=120, videos=browse_videos()) for i in range(80)]
             return self.respond(dict(revision='performance-v1', videos=120, creators=80, playlists=80))
+        if p == '/test/view-counts':
+            state['viewCounts'] = data.get('enabled', True)
+            prefs.update(max_results=2, autoplay=False, continue_autoplay=False, watch_history=False, ui_density='compact', thin_mode=True)
+            state['historyEntries'] = [dict(video_id=id, title='History ' + id, channel_name=video['author'], channel_id=video['authorId'],
+                length_seconds=120, latest_watched='2026-10-23', release_date='2024-01-01') for id in ('testvideo01', 'testvideo02', 'testvideo03', 'unknownvid1')]
+            state['watched'] = [entry['video_id'] for entry in state['historyEntries']]
+            state['historyToday'] = '2026-10-23'
+            return self.respond({})
         if p == '/test/clips':
             state['clipsEnabled'] = True
             state['channelTabs'] = ['videos', 'playlists', 'clips', 'posts', 'channels']
@@ -991,7 +1020,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             return self.respond(status=204)
         elif p == '/test/reset':
             reset_access()
-            state.update(annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
+            state.update(viewCounts=False, annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,
                          downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='',

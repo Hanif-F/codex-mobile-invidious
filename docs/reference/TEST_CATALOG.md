@@ -613,6 +613,16 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `suppliedMetadataPreservesFalseZeroAndMusicCredits`
 - `oldAndMalformedOptionalFieldsRemainUnknown`
 
+### VideoViewCountsTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/VideoViewCountsTest.kt) — View-count parsing, zero/unknown/approximate precision, legacy text, numeric validation, collection request counts and clip/queue round trips.
+
+- `knownCountsKeepZeroPrecisionAndExplicitUnits`
+- `malformedValuesAndAmbiguousLiveCountsStayHidden`
+- `legacyTextIsDisplayOnlyAndNumericCountsWin`
+- `countHandoffsAndClipSerializationRetainValuesWithoutInventingPrecision`
+- `collectionResponsesKeepCountsWithoutExtraMetadataRequests`
+
 ### WatchPlayerScrollTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/WatchPlayerScrollTest.kt) — Watch Player Scroll declared scenarios; exact cases are enumerated in the test catalog.
@@ -1190,6 +1200,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/MetadataPresentationTest.kt) — Metadata Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
+- `sourceCountsAndWatchingLabelsWrapInBothThemesAndDirections`
 - `compactChannelAndVerifiedWatchDetailsRemainReadableAtLargeFont`
 - `roundedAndLegacyCountsNeverGainExactTotalsAndEpochDatesStayHidden`
 
@@ -1505,6 +1516,15 @@ Test support/helper file; no declared `@Test` methods.
 - `richDescriptionPreservesFormattingAndNativeLinkTargets`
 - `plainFallbackLinksTimestampsAndHashtagsWithoutExecutingHtml`
 
+### ViewCountsSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ViewCountsSmokeTest.kt) — Supplied counts across Up next, history, playlist/mix pagination, duplicate/manual queues, recreation, clip sources and offline downloads.
+
+- `upNextAndManualQueueKeepSuppliedCountsWithoutExtraVideoRequests`
+- `historyPlaylistAndMixPaginationUseSuppliedCountsWithoutFetchingVideos`
+- `duplicatePlaylistQueueCountsSurvivePaginationAndRecreation`
+- `clipsIdentifySourceCountsAndDownloadsRetainCountsOffline`
+
 ### VisibilitySmokeTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/VisibilitySmokeTest.kt) — Visibility Smoke declared scenarios; exact cases are enumerated in the test catalog.
@@ -1571,4 +1591,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **929 declared test methods** (including ignored tests).
+Inventory total: **939 declared test methods** (including ignored tests).

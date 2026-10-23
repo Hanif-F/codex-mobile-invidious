@@ -8,8 +8,10 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextDirection
 import net.wingress.mobivious.data.DisplayFormats
 import net.wingress.mobivious.data.Video
+import net.wingress.mobivious.data.VideoViewCounts
 
 @Composable
 internal fun publishedLabel(video: Video): String {
@@ -25,8 +27,17 @@ internal fun relativePublication(seconds: Long?): String = DisplayFormats.public
 
 @Composable
 internal fun VideoMetadataLine(video: Video, modifier: Modifier = Modifier, likes: Long? = null) {
-    val label = listOf(DisplayFormats.audience(video.views, "view"), DisplayFormats.audience(likes, "like"), publishedLabel(video))
+    val label = listOf(VideoViewCounts.label(video), DisplayFormats.audience(likes, "like"), publishedLabel(video))
         .filter(String::isNotBlank).joinToString(" · ")
     if (label.isNotBlank()) Text(label, modifier.testTag("video-metadata-${video.id}"),
-        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.ContentOrLtr), color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+internal fun VideoViewCountLine(video: Video, modifier: Modifier = Modifier, source: Boolean = false) {
+    LocalConfiguration.current
+    val label = VideoViewCounts.label(video)
+    if (label.isNotBlank()) Text(if (source) "Source video · $label" else label,
+        modifier.testTag("video-view-count-${video.id}"), style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.ContentOrLtr),
+        color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

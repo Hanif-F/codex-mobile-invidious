@@ -71,6 +71,17 @@ own validators. Optional numbers are validated as non-negative, finite values;
 unknown counts/dates do not become invented zero/exact values. `viewCountPrecision`
 and `likeCountPrecision` distinguish explicitly exact from rounded/unverified totals.
 
+Per-video `viewCountType` distinguishes cumulative `views` from concurrent
+`watching`. A non-negative `viewCount`, including zero, with precision `unknown`
+is usable when a recognized type is supplied; without that type, `unknown` marks
+an unavailable count. Legacy numeric counts without precision remain unverified.
+Numeric counts use device-local compact formatting. Older text-only
+`viewCountText` values support English labelled counts and bare numeric/K/M/B/T
+counts; they never become exact totals. Placeholders, ambiguous bare zero and
+untyped live counts stay hidden. No count-only metadata requests or count cache
+are added. Improved playlist/history/recommendation availability depends on the
+server supplying those fields; playlist aggregates and clip statistics are separate.
+
 VideoDetails includes description/plain HTML, video metadata, dash/hls/fallback,
 captions, recommended videos, adaptive/format streams, optional likes/credits,
 availability/premiere/region flags, `liveChatReplay` and storyboard tracks.

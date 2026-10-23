@@ -1424,8 +1424,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun insertQueue(video: Video, next: Boolean) {
         queueCommand(PlaybackService.QUEUE_INSERT) {
-            putBoolean("next", next); putString("video", JSONObject().put("videoId", video.id).put("title", video.title).put("author", video.author)
-                .put("authorId", video.channelId).put("lengthSeconds", video.duration).put("isMember", video.membersOnly).toString())
+            putBoolean("next", next); putString("video", VideoViewCounts.write(video, JSONObject().put("videoId", video.id).put("title", video.title).put("author", video.author)
+                .put("authorId", video.channelId).put("lengthSeconds", video.duration).put("liveNow", video.live).put("isMember", video.membersOnly)).toString())
         }
         message.value = if (next) "Will play next" else "Added to queue"
     }

@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import net.wingress.mobivious.data.*
 import java.util.Locale
@@ -56,11 +57,12 @@ internal fun VideoDescription(details: VideoDetails, occurrence: String, server:
 
 @Composable
 internal fun VideoStatistics(details: VideoDetails) {
-    val views = details.video.views.takeIf { details.video.viewCountPrecision == CountPrecision.EXACT }
+    val views = VideoViewCounts.label(details.video, exact = true)
     val likes = details.likes.takeIf { details.likeCountPrecision == CountPrecision.EXACT }
-    if (views == null && likes == null && details.video.publishedAt == null) return
+    if (views.isBlank() && likes == null && details.video.publishedAt == null) return
     Column(Modifier.fillMaxWidth().testTag("video-statistics"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        DisplayFormats.inventory(views, "view").takeIf(String::isNotBlank)?.let { Text(it, Modifier.testTag("video-exact-views")) }
+        views.takeIf(String::isNotBlank)?.let { Text(it, Modifier.testTag("video-exact-views"),
+            style = LocalTextStyle.current.copy(textDirection = TextDirection.ContentOrLtr)) }
         DisplayFormats.inventory(likes, "like").takeIf(String::isNotBlank)?.let { Text(it, Modifier.testTag("video-exact-likes")) }
         details.video.publishedAt?.let { Text("Published: ${DisplayFormats.timestamp(it, dateOnly = true)}", Modifier.testTag("video-published-date")) }
     }

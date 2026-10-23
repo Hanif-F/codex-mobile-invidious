@@ -59,6 +59,18 @@ Production timeouts and real-dispatcher concurrency cases remain unchanged.
 Measured timings and runner acceptance are recorded in
 [the verification report](../VERIFICATION.md#testing-workflow-optimization--21-october-2026).
 
+## View counts
+
+View-count coverage uses `VideoViewCountsTest` for parsing, formatting, numeric
+precision, clip/queue handoffs and request counts. The opt-in `/test/view-counts`
+fixture supplies zero, legacy text, typed unknown precision, absent counts and
+duplicate paginated playlist rows. `ViewCountsSmokeTest` checks Up next, organized
+history, playlists/mixes, manual and source queues, recreation, clip source labels
+and offline downloads. `MetadataPresentationTest` and
+`PlaybackQueuePresentationTest` cover large-text wrapping and existing queue
+failure/recovery presentation. Run these through the focused device runner;
+`scripts/tests/test_view_counts_fixture.py` checks the fixture contract separately.
+
 ## Instance access verification
 
 `InstanceAccessTest` covers redirect credential boundaries, bootstrap exclusions,

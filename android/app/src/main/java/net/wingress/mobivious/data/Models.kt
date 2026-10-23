@@ -9,7 +9,8 @@ data class Video(val id: String, val title: String, val author: String = "", val
     val live: Boolean = false, val indexId: String = "", val unavailable: Boolean = false, val membersOnly: Boolean = false,
     val history: HistoryMetadata? = null, val playlistIndex: Int? = null, val authorAvatar: String = "",
     val publishedAt: Long? = null, val viewCountPrecision: CountPrecision = CountPrecision.UNVERIFIED,
-    val publicationTime: Long? = publishedAt)
+    val publicationTime: Long? = publishedAt, val viewCountType: ViewCountType? = null,
+    val viewCountText: String = "")
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,
@@ -77,11 +78,12 @@ object ApiParser {
         json.text("title", "Unavailable video"), json.text("author", json.text("channel_name")),
         json.text("authorId", json.text("channel_id")), thumbnail(json),
         json.nonNegativeLong("lengthSeconds") ?: json.nonNegativeLong("length_seconds") ?: 0,
-        json.nonNegativeLong("viewCount").takeUnless { json.text("viewCountPrecision") == "unknown" },
+        VideoViewCounts.value(json),
         publicationText(json), json.optBoolean("liveNow"), json.text("indexId"), json.isNull("title") || json.text("author") == "[Deleted video]" || json.text("title") in listOf("[Deleted video]", "[Private video]"), json.opt("isMember") == true,
         playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null, authorAvatar = Avatars.parse(json),
         publishedAt = DisplayFormats.publication(json.nonNegativeLong("published")), viewCountPrecision = CountPrecision.parse(json.text("viewCountPrecision")),
-        publicationTime = ChannelSpoilerRules.publication(json))
+        publicationTime = ChannelSpoilerRules.publication(json), viewCountType = ViewCountType.parse(json.text("viewCountType")),
+        viewCountText = VideoViewCounts.text(json))
     fun videos(array: JSONArray): List<Video> = array.objects().filter { it.text("videoId", it.text("video_id")).isNotBlank() }.map(::video)
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",

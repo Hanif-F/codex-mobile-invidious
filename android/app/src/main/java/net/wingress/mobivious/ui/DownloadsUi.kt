@@ -179,6 +179,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                         Column(Modifier.weight(1f)) {
                             DeArrowTitle(vm, video, MaterialTheme.typography.titleMedium, maxLines = 3, offline = true)
                             Text(video.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            VideoViewCountLine(video)
                             DisplayFormats.duration(video.duration).takeIf(String::isNotBlank)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         }
                         OverflowMenu("Actions for download ${maskedVideoTitle(vm, video, offline = true)}", record.id, Modifier.size(48.dp).testTag("download-actions-${record.id}")) { close ->

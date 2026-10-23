@@ -113,6 +113,7 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt](../../android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt) | Segment/settings/category/mode/color/channel models, parsing, sparse patches and validation. | [SETTINGS](../../docs/SETTINGS.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/Storyboards.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Storyboards.kt) | Storyboard track selection, same-origin VTT sprite cues, frame lookup, clip offsets, crop bounds and bounded shared index cache. | [PLAYBACK](../../docs/PLAYBACK.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt](../../android/app/src/main/java/net/wingress/mobivious/data/Subscriptions.kt) | Directory statistics, local search/sort fallback and revision-fenced confirmed subscription mutations. | [LIBRARY](../../docs/LIBRARY.md) |
+| [android/app/src/main/java/net/wingress/mobivious/data/VideoViewCounts.kt](../../android/app/src/main/java/net/wingress/mobivious/data/VideoViewCounts.kt) | Supplied view-count type, precision, legacy display fallback and clip/queue metadata handoffs without count-only requests. | [API](../../docs/API.md) |
 | [android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt](../../android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt) | Watched/progress models and indicators plus revision-fenced history/progress reconciliation and local fallback. | [LIBRARY](../../docs/LIBRARY.md) |
 
 ## Data and account settings
@@ -257,6 +258,7 @@ Generated from the reviewed descriptions in [coverage.json](coverage.json). Each
 | [scripts/test-download-restart.sh](../../scripts/test-download-restart.sh) | Two-phase force-stop checks for system and protected downloads, export cleanup and offline recovery. | [TESTING](../../docs/TESTING.md) |
 | [scripts/tests/test_documentation.py](../../scripts/tests/test_documentation.py) | Disposable Git-inventory regression checks for new/removed sources, Markdown review, fingerprints, dated links and generated coverage. | [TESTING](../../docs/TESTING.md) |
 | [scripts/tests/test_instance_access_fixture.py](../../scripts/tests/test_instance_access_fixture.py) | Local fixture HTTP access-gate precedence, bootstrap, expiry, policy and outage contract checks. | [TESTING](../../docs/TESTING.md) |
+| [scripts/tests/test_view_counts_fixture.py](../../scripts/tests/test_view_counts_fixture.py) | Opt-in fixture count contract for recommendations, history, paginated duplicate playlists, mixes, clip sources and downloads. | [TESTING](../../docs/TESTING.md) |
 | [scripts/tests/test_workflows.py](../../scripts/tests/test_workflows.py) | Disposable regression checks for test selection/argument forwarding, fixture ownership, device/port conflicts, signals, release signing and R8 archive safeguards. | [TESTING](../../docs/TESTING.md) |
 
 ## Tests and test infrastructure

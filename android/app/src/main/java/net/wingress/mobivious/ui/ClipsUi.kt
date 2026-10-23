@@ -100,6 +100,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 DeArrowTitle(vm, clip.video, MaterialTheme.typography.titleSmall, maxLines = 2, originalTitle = clip.title, useDeArrow = false)
                 Text("from ${clip.video.author.ifBlank { "Source video" }}",
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                VideoViewCountLine(clip.video, source = true)
                 Text(listOf(clip.creator.takeIf(String::isNotBlank), clippedDate(clip).takeIf(String::isNotBlank),
                     playerTime(clip.durationMs).takeIf { prefs.thinMode }).filterNotNull().joinToString(" · "),
                     style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
@@ -167,6 +168,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     DeArrowTitle(vm, source, MaterialTheme.typography.titleSmall, maxLines = 2)
                     Text(source.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    VideoViewCountLine(source, source = true)
                     Text("Continue from this moment", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
             }

@@ -1,5 +1,65 @@
 # Focused implementation verification
 
+## View-count availability — 23 October 2026
+
+Android consumes supplied per-video count type/precision and legacy text across
+cards, history, playlists/mixes, queues, clip sources and downloads. Genuine zero
+remains visible; unknown sentinels and ambiguous untyped live counts stay hidden.
+Queue insertion and clip serialization retain counts without a new cache or
+count-only requests. Server code and contracts were unchanged.
+
+The full JVM suite passed **450 tests**, with no failures, errors or skips.
+Debug lint passed with **0 errors, 36 warnings**. Final completion command, from
+`android/`, retaining incremental outputs:
+
+```sh
+JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain
+```
+
+**14 distinct focused Android 16 emulator cases passed** across the selection
+below and affected-method reruns, with no ignored cases. The four new journeys
+cover Up next and manual insertion; history/playlist/mix pagination; duplicate
+queue occurrences and recreation; and clip source labels with saved offline
+counts. Request assertions verify browsing adds no video-detail requests and
+manual insertion/offline playback add none beyond the requested playback.
+Presentation coverage includes light/dark, 2× text, narrow width, RTL numeric-unit
+ordering, bounded queues, and existing queue loading/recovery behavior.
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.ViewCountsSmokeTest,net.wingress.mobivious.MetadataPresentationTest,net.wingress.mobivious.PlaybackQueuePresentationTest,net.wingress.mobivious.QueueLibrarySmokeTest#standaloneManualQueueCollapseAndNewSessionVisibility
+```
+
+Initial new-test selectors were corrected to inspect unmerged Compose children
+and distinguish the clip source card from the underlying clip list. Screenshot
+review then exposed reversed exact-count ordering in RTL; count paragraphs now
+use content direction with an LTR fallback. The final presentation case verifies
+actual glyph bounds and visual number-before-unit order in all four theme/direction
+combinations. After that display fix, the 13 count/layout cases were rerun and
+only the presentation assertion needed a focused rerun using the repository's
+existing glyph-bounds helper (the generic overflow flag reported subpixel width
+rounding). All selected cases are accepted. Screenshots were reviewed under
+ignored `.tools/view-counts-preview/`; archived device results are in
+`.tools/view-counts-*-results/`.
+
+All **33 Python fixture/workflow/documentation tests** passed. An earlier overlap
+with the Android fixture occupied port 18080; rerunning the workflow checks after
+the device runner released it passed without workflow changes. Documentation
+inventory, fingerprints, catalogs and local links passed for 305 maintained files
+and 21 documents:
+
+```sh
+python3 -m unittest discover -s scripts/tests
+python3 scripts/check-documentation.py --refresh
+python3 scripts/check-documentation.py
+git diff --check
+```
+
+This is focused acceptance, not full connected-suite acceptance. Existing
+failures/ignored cases outside these selectors remain unaccepted. Improved
+availability depends on the selected server returning counts; no production
+deployment, release build or performance acceptance is claimed.
+
 ## Automatic Turnstile verification — 23 October 2026
 
 Required verification now opens automatically in the foreground and closes after

@@ -178,6 +178,7 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
                     video.author.ifBlank { "Unknown channel" }, Avatars.show(thinMode, video.channelId),
                     tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null, maxLines = 1)
                 val duration = if (video.live) "LIVE" else DisplayFormats.duration(video.duration)
+                VideoViewCountLine(video, source = entry.clip != null)
                 if (duration.isNotBlank()) Text(duration, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 if (indicator.watched) Text("Watched", Modifier.testTag("video-watched-${video.id}"), style = MaterialTheme.typography.labelSmall)
                 if (thinMode) indicator.percent?.let { Text("Progress: $it%", Modifier.testTag("video-progress-${video.id}"), style = MaterialTheme.typography.labelSmall) }

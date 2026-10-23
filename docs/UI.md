@@ -76,6 +76,14 @@ usable row width is below 320dp or font scale exceeds 1.3. Thin mode keeps the
 space available to text; spoiler controls, AI warnings and watched indicators
 retain their existing behavior.
 
+Supplied view counts appear on video cards (including Up next, history and
+playlist/mix entries), playback queue rows and downloads. Live audience counts
+say “watching”; totals say “views”. Clip rows and full-video cards label the
+count “Source video” to distinguish it from clip statistics. Missing counts stay
+hidden, genuine zero stays visible, and expanded watch statistics show grouped
+counts only when the source explicitly marks them exact. Count text wraps in
+compact/thin layouts and large text; browsing adds no requests to obtain counts.
+
 Channel tabs occupy their own row. Sorting shares the next row with a search
 icon: measured sort choices appear as pills when they fit, otherwise as a
 dropdown. Sort pills use fully rounded ends, smaller labels and a default 32dp visual

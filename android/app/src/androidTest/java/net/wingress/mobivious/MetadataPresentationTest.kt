@@ -8,10 +8,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import net.wingress.mobivious.data.*
@@ -25,6 +29,41 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class MetadataPresentationTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun sourceCountsAndWatchingLabelsWrapInBothThemesAndDirections() {
+        var dark by mutableStateOf(false)
+        var rtl by mutableStateOf(false)
+        val video = ApiParser.video(JSONObject("""{"videoId":"count","title":"Video","viewCount":1234,"viewCountPrecision":"exact","viewCountType":"watching"}"""))
+        compose.setContent { MaterialTheme(colorScheme = if (dark) darkColorScheme() else lightColorScheme()) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f),
+                LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                Surface(Modifier.width(240.dp).statusBarsPadding()) {
+                    Column(Modifier.verticalScroll(rememberScrollState()).padding(12.dp)) {
+                        VideoViewCountLine(video, source = true)
+                        VideoStatistics(VideoDetails(video, "", "", "", "", emptyList(), emptyList()))
+                    }
+                }
+            }
+        } }
+        for (night in listOf(false, true)) for (rightToLeft in listOf(false, true)) {
+            compose.runOnIdle { dark = night; rtl = rightToLeft }
+            val label = compose.onNodeWithTag("video-view-count-count").performScrollTo()
+                .assertTextEquals("Source video · ${VideoViewCounts.label(video)}")
+            val layouts = mutableListOf<TextLayoutResult>()
+            label.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertLabelGlyphsFit(layouts.single(), "Source count")
+            val sourceLayout = layouts.single()
+            org.junit.Assert.assertTrue(sourceLayout.getBoundingBox(sourceLayout.layoutInput.text.indexOfFirst(Char::isDigit)).left <
+                sourceLayout.getBoundingBox(sourceLayout.layoutInput.text.indexOf("watching")).left)
+            layouts.clear()
+            compose.onNodeWithTag("video-exact-views").performScrollTo().assertTextEquals(VideoViewCounts.label(video, exact = true))
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            captureWatchScreenshot("view-counts-${if (night) "dark" else "light"}-${if (rightToLeft) "rtl" else "ltr"}")
+            assertLabelGlyphsFit(layouts.single(), "Exact count")
+            org.junit.Assert.assertTrue(layouts.single().getBoundingBox(0).left <
+                layouts.single().getBoundingBox(layouts.single().layoutInput.text.indexOf("watching")).left)
+        }
+    }
 
     @Test fun compactChannelAndVerifiedWatchDetailsRemainReadableAtLargeFont() {
         val details = ApiParser.details(JSONObject("""{"videoId":"abcdefghijk","title":"Video","author":"Studio","viewCount":5600001,"viewCountPrecision":"exact","likeCount":0,"likeCountPrecision":"exact","published":1704060000}"""))
