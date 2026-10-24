@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "reviewedSourceCommit": "7cf9c7f25f74eafc15cd7db1f2e6006dd6a3a619",
   "reviewedDate": "2026-10-22",
-  "version": "0.13.1",
+  "version": "0.13.2",
   "documents": [
     "AGENTS.md",
     "FEATURE_PARITY.md",
@@ -49,7 +49,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "86cabcb727b2e891dd21fb804ab08b014fa2486c091035e87a9f083954181702"
+      "sha256": "ba81d8f51325e9312768bf1aad8830d51121a686b34fd754d2ffaf223e559075"
     },
     "android/app/proguard-rules.pro": {
       "area": "Build configuration",
@@ -96,8 +96,8 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/AppSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "App Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "dfa1a6e5081fde58fd932b68f653886de4d2f8418bb804655d752a66e904c30c"
+      "description": "App playback journeys including displayed HTTP/empty-metadata failure recovery with queue identity and autoplay/paused intent retained.",
+      "sha256": "9fbc763176d188f8cfb34d9fc0ae4ad1804a2c44b21e6d6bf9f2489cf4f90ab0"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AppThemePresentationTest.kt": {
       "area": "Android device tests",
@@ -678,8 +678,8 @@
     "android/app/src/main/java/net/wingress/mobivious/data/InvidiousApi.kt": {
       "area": "Data and domain",
       "guide": "docs/API.md",
-      "description": "Complete instance HTTP client, auth/error/cache semantics and consumed API endpoint methods.",
-      "sha256": "e8550a88505f1b4c3fd3033a5626081bc1f55e269487706564ae40cc5f26deaf"
+      "description": "Complete instance HTTP client, auth/error/cache semantics, actionable invalid video JSON errors and consumed API endpoint methods.",
+      "sha256": "1c49428331087e83fef5401cb49a6ac4f2707a796e55d88531e35013004272d0"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/LiveChat.kt": {
       "area": "Data and domain",
@@ -1368,8 +1368,8 @@
     "android/app/src/test/java/net/wingress/mobivious/NetworkReliabilityTest.kt": {
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
-      "description": "Network Reliability declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "28c8a98f0a5b2eeadc72d56aa86d1278ef6960dced1726941d4cf37f90ec08c7"
+      "description": "Network cache/cancellation/context isolation, invalid video metadata and explicit retry recovery, retained HTTP errors and empty write contracts.",
+      "sha256": "475ba49076a48adaa8b3bdba93d4dd20494ef4951c1ab589d3f9f8e50b7f2f0c"
     },
     "android/app/src/test/java/net/wingress/mobivious/OriginalTitlesTest.kt": {
       "area": "JVM tests",
@@ -1626,8 +1626,8 @@
     "scripts/fixture-server.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic account/content APIs and media/Range/failure responses.",
-      "sha256": "1b4485c05afcec7a93c16d567e36ff9e223f80103ed29df7e99cdc9405ff01a7"
+      "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic APIs/media and single-use HTTP/empty-video failures.",
+      "sha256": "7c56ad093e12cfea83450321ccf062ad495df1ef34d48a0774fae477b1b5e1f2"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1856,6 +1856,12 @@
       "guide": "docs/TESTING.md",
       "description": "Opt-in fixture count contract for recommendations, history, paginated duplicate playlists, mixes, clip sources and downloads.",
       "sha256": "a26042d22e8f9176c7882a6e39b2eb1c32e813367da448172602c904f6ac0210"
+    },
+    "scripts/tests/test_video_metadata_fixture.py": {
+      "area": "Scripts",
+      "guide": "docs/TESTING.md",
+      "description": "Single-use empty video metadata response, recovery/reset and retained HTTP failure fixture contracts.",
+      "sha256": "67a96d9bf4c9332dc05cc35724bca8da7e507bd6fec4173c70bdec8cbe13f906"
     }
   },
   "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md.",

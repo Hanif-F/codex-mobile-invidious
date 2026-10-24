@@ -740,6 +740,13 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['hashtagRequests'].append(dict(tag=tag, page=page, authorized=self.headers.get('Authorization') is not None))
             return self.respond(dict(results=[dict(video, videoId='hashvid%04d' % i, title='Hashtag video ' + str(i)) for i in range(60)] if page == 1 else [recommended]))
         elif p in ('/api/v1/videos/testvideo01', '/api/v1/videos/testvideo02', '/api/v1/videos/testvideo03', '/api/v1/videos/othervideo1', '/api/v1/videos/membervid01') or state.get('performance') and re.fullmatch(r'/api/v1/videos/perf\d{7}', p):
+            if state.get('videoEmptyNext'):
+                state['videoEmptyNext'] = False
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
             if state.get('videoFailNext'):
                 state['videoFailNext'] = False
                 return self.respond(dict(error='Fixture video temporarily unavailable'), 503)
@@ -1020,7 +1027,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             return self.respond(status=204)
         elif p == '/test/reset':
             reset_access()
-            state.update(viewCounts=False, annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
+            state.update(viewCounts=False, annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', videoFailNext=False, videoEmptyNext=False, mediaRequests=0, mediaPaths=[], failPlaylistSave=False,
                          identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
                          originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False,
                          downloadRequests=[], downloadDisabled=False, downloadSlow=False, downloadFailKey='',
@@ -1165,6 +1172,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['stream'] = data['type']
             state['mediaFail'] = bool(data.get('mediaFail',False))
             state['videoFailNext'] = bool(data.get('failNext', False))
+            state['videoEmptyNext'] = bool(data.get('emptyNext', False))
             if 'duplicateRecommendations' in data: state['duplicateRecommendations'] = bool(data['duplicateRecommendations'])
             return self.respond({})
         if p == '/test/captions':

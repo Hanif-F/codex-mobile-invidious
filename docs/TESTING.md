@@ -59,6 +59,18 @@ Production timeouts and real-dispatcher concurrency cases remain unchanged.
 Measured timings and runner acceptance are recorded in
 [the verification report](../VERIFICATION.md#testing-workflow-optimization--21-october-2026).
 
+## Video metadata failures
+
+`NetworkReliabilityTest` covers empty, whitespace, malformed and non-object video
+responses, explicit recovery without storyboard previews, retained HTTP errors
+and successful empty writes. `AppSmokeTest#failedInitialPlaybackRetryPreservesAutoplayAndPausedIntent`
+covers both HTTP failures and empty successful metadata responses, the displayed
+error/Retry action, and queue/autoplay/paused-intent preservation. The opt-in
+`/test/stream` control `emptyNext=true` returns one empty JSON response;
+`scripts/tests/test_video_metadata_fixture.py` checks recovery and reset behavior.
+Retain `SeekPreviewsSmokeTest#unavailableAndInvalidCropsLeaveSeekingUsableAndNeverShowTheSpriteSheet`
+as the unavailable-preview runtime regression.
+
 ## View counts
 
 View-count coverage uses `VideoViewCountsTest` for parsing, formatting, numeric

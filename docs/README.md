@@ -2,10 +2,11 @@
 
 This is the current documentation for the Android app in `androidInvidious`.
 The current guides describe the opaque Material 3 implementation in this working
-tree, including the 23 October 2026 automatic verification flow,
+tree, including the 24 October 2026 video-metadata error recovery,
+23 October automatic verification flow,
 22 October instance-access client support and the
 21 October scroll tracking and Android link setup changes.
-Current release version is **0.13.1**, code **31**.
+Current release version is **0.13.2**, code **32**.
 The [testing guide](TESTING.md) defines repeatable validation; the
 [cleanup report](CLEANUP.md) records the latest audit results and known failures.
 The [feature parity checklist](../FEATURE_PARITY.md) retains its 9 October

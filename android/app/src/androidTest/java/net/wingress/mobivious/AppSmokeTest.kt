@@ -51,8 +51,8 @@ class AppSmokeTest {
 
     @Test fun failedInitialPlaybackRetryPreservesAutoplayAndPausedIntent() {
         command("reset")
-        for (autoplay in listOf(true, false)) {
-            command("stream", """{"type":"dash","failNext":true}""")
+        for (emptyResponse in listOf(false, true)) for (autoplay in listOf(true, false)) {
+            command("stream", """{"type":"dash","failNext":${!emptyResponse},"emptyNext":$emptyResponse}""")
             compose.runOnUiThread {
                 activity.model.openLink(net.wingress.mobivious.data.VideoLinks.parse(
                     "http://127.0.0.1:18080/watch?v=testvideo01&autoplay=${if (autoplay) 1 else 0}",
@@ -60,9 +60,10 @@ class AppSmokeTest {
                 activity.sharedVideo.value = true
             }
             waitFor { activity.model.queue.value.error != null && !activity.model.queue.value.loading }
+            if (emptyResponse) compose.onNodeWithText("The instance returned invalid video information. Try again.").assertIsDisplayed()
             val token = activity.model.queue.value.token
             val occurrence = activity.model.queue.value.currentKey
-            compose.runOnUiThread { activity.model.retryPlayback() }
+            compose.onNodeWithText("Retry").assertIsDisplayed().performClick()
             waitFor(40_000) { activity.model.playback.value.playerState == Player.STATE_READY &&
                 !activity.model.queue.value.loading && activity.model.queue.value.error == null }
             assertEquals(token, activity.model.queue.value.token)

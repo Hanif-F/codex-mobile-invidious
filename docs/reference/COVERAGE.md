@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Source map](SOURCE_MAP.md) · [Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)
 
-The current guides describe Mobivious **0.13.1** (version code **31**). This report is generated from the current Gradle configuration and reviewed inventory; counts describe files, not measured execution coverage.
+The current guides describe Mobivious **0.13.2** (version code **32**). This report is generated from the current Gradle configuration and reviewed inventory; counts describe files, not measured execution coverage.
 
 ## File coverage
 
@@ -11,8 +11,8 @@ The current guides describe Mobivious **0.13.1** (version code **31**). This rep
 | Main application Kotlin | 122 |
 | JVM test Kotlin | 47 |
 | Android device test/support Kotlin | 81 |
-| Build, benchmark, resources, scripts, deployment and repository support | 55 |
-| **Total** | **305** |
+| Build, benchmark, resources, scripts, deployment and repository support | 56 |
+| **Total** | **306** |
 
 Every maintained file has a reviewed SHA-256 fingerprint, responsibility and owning guide in `coverage.json`. The source map indexes implementations; the test catalog lists every declared JVM/device test and explicit Ignore.
 

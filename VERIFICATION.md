@@ -1,5 +1,50 @@
 # Focused implementation verification
 
+## Video metadata recovery and release 0.13.2 — 24 October 2026
+
+Version **0.13.2**, code **32**, converts empty or malformed video metadata into
+a readable Retry error. HTTP error handling and successful empty writes retain
+their contracts. Retry retains the queue occurrence and autoplay/paused intent.
+The separately prepared server changes return no previews for missing or
+wrong-shaped storyboard metadata and catch/log video serialization failures.
+Those server changes remain local in the sibling checkout at the user's request;
+neither the Android commit nor the APK deploys the server playback fix.
+
+Checks on Android 16 `emulator-5554` and the local fixture:
+
+- From `android/`, `./gradlew :app:testDebugUnitTest --tests 'net.wingress.mobivious.NetworkReliabilityTest' --tests 'net.wingress.mobivious.SeekPreviewTest' --console=plain`: **20 tests passed**.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.AppSmokeTest#failedInitialPlaybackRetryPreservesAutoplayAndPausedIntent,net.wingress.mobivious.SeekPreviewsSmokeTest#unavailableAndInvalidCropsLeaveSeekingUsableAndNeverShowTheSpriteSheet`: **2 focused tests passed**, including HTTP/empty-response recovery for both autoplay and paused intent.
+- `python3 -m unittest discover -s scripts/tests`: **34 passed**, including the new single-use empty-response/reset fixture contract.
+- `scripts/build-release.sh`: **452 JVM tests**, signed release build and release lint passed (**0 errors, 36 warnings**). The script retained checksum and R8 archive validation.
+- From `android/`, `./gradlew :app:lintDebug --console=plain`: passed after the version bump.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-ui-performance.sh --record --label release-0-13-2 --journey watch`: **1 optimized benchmark watch journey passed**, without timing measurement or source drift. The recording shows successful video playback; the installed release app and its data were preserved.
+- `python3 scripts/check-documentation.py --refresh`, its normal check and `git diff --check`: passed after reviewing the API/error/testing guides and inventory.
+
+The signed APK is **7,302,896 bytes**; SHA-256:
+`aa0058e853729deac37026a56b0b402f8575c2839aa0205fc45275aa667d5d70`.
+SDK `apksigner` and `aapt` checks confirm package/version/code, minimum SDK 33,
+target SDK 37 and the unchanged release signing certificate. DEX is uncompressed;
+the nonempty archived R8 mapping matches the release output and all archive
+checksums pass. Evidence is in ignored `.tools/release-0.13.2-checks.json`,
+`.tools/release-0.13.2-*.log`, `.tools/storyboards-*.log` and
+`artifacts/r8/0.13.2/<APK-SHA256>/`. Optimized runtime evidence is under
+`.tools/ui-performance/release-0-13-2/emulator-5554/20261024T063028Z/`.
+
+In the sibling server checkout, `crystal run tests/video_metadata_routes.cr`
+passed **97 checks** through the production accessor/parser/serializers/API
+dispatcher, with synthetic metadata and cache boundaries. `crystal spec
+-Dskip_videojs_download` passed **400 examples** (293 Spectator and 107 Spec).
+GUI and API-only `crystal build src/invidious.cr -Dskip_videojs_download
+--no-codegen` checks passed (adding `-Dapi_only` for the latter); both retain four
+existing deprecation warnings. Changed Crystal formatting, generated-reference
+and documentation/link checks passed. The earlier documented full-spec helper
+compilation failure did not reproduce on this source.
+
+This is focused emulator/fixture acceptance. Full connected-suite acceptance,
+the remaining optimized background/PiP/download/clip/export journeys and live
+playback after server deployment remain separate. Existing ignored device cases
+retain their previous acceptance boundaries.
+
 ## Patch release 0.13.1 — 23 October 2026
 
 Bumped version name to **0.13.1**, code **31**. Reused completed JVM, device,

@@ -376,8 +376,10 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### NetworkReliabilityTest
 
-[Source](../../android/app/src/test/java/net/wingress/mobivious/NetworkReliabilityTest.kt) — Network Reliability declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/test/java/net/wingress/mobivious/NetworkReliabilityTest.kt) — Network cache/cancellation/context isolation, invalid video metadata and explicit retry recovery, retained HTTP errors and empty write contracts.
 
+- `invalidVideoResponsesAreActionableAndAnExplicitRetryCanRecoverWithoutPreviews`
+- `videoHttpErrorsAndSuccessfulEmptyWritesKeepTheirExistingContracts`
 - `explicitRefreshReportsFailuresWithoutDiscardingTheNormalOfflineFallback`
 - `cancellingAResponseBodyReleasesTheCallAndDoesNotPublishOrCache`
 - `oldSessionSuccessAndFailureCannotChangeSnapshotsOrOfflineStatus`
@@ -770,7 +772,7 @@ Test support/helper file; no declared `@Test` methods.
 
 ### AppSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppSmokeTest.kt) — App Smoke declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/AppSmokeTest.kt) — App playback journeys including displayed HTTP/empty-metadata failure recovery with queue identity and autoplay/paused intent retained.
 
 - `failedInitialPlaybackRetryPreservesAutoplayAndPausedIntent`
 - `repeatedRecommendationsRenderOnceAndKeepPlaybackUsable`
@@ -1591,4 +1593,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **939 declared test methods** (including ignored tests).
+Inventory total: **941 declared test methods** (including ignored tests).

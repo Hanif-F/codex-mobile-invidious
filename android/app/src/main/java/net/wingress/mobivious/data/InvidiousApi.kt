@@ -14,6 +14,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
 
 class ApiException(val status: Int, message: String, val retryAfter: String? = null) : IOException(message)
@@ -233,8 +234,13 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         request(path, method, data, auth = true, context = context).also {
             if (context != this.context()) throw CancellationException("Account or instance changed")
         }
-    suspend fun video(id: String, local: Boolean = true, region: String? = null, context: ApiContext = context()) =
-        ApiParser.details(JSONObject(scopedRead("api/v1/videos/$id", buildMap { put("local", local.toString()); region?.let { put("region", it) } }, false, context)))
+    suspend fun video(id: String, local: Boolean = true, region: String? = null, context: ApiContext = context()): VideoDetails {
+        val body = scopedRead("api/v1/videos/$id", buildMap { put("local", local.toString()); region?.let { put("region", it) } }, false, context)
+        val json = try { JSONObject(body) } catch (_: JSONException) {
+            throw ApiException(502, "The instance returned invalid video information. Try again.")
+        }
+        return ApiParser.details(json)
+    }
     suspend fun downloads(id: String, context: ApiContext = context()): DownloadCatalog {
         try { return DownloadCatalog.parse(JSONObject(scopedRead("api/v1/videos/$id/downloads", emptyMap(), false, context))) }
         catch (e: ApiException) { if (e.status in listOf(404, 405)) throw ApiException(e.status, "Update this server to enable native downloads."); throw e }

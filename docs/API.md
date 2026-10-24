@@ -198,6 +198,12 @@ playback ownership and explain token renewal. Missing extensions/scopes receive
 feature-specific update/sign-in guidance. 429 uses Retry-After. Other JSON error
 messages are bounded to 300 characters; 5xx gets a retryable server message.
 
+Empty or malformed JSON from the video metadata endpoint becomes a retryable
+502-style client error: "The instance returned invalid video information. Try
+again." Retry refetches metadata without an automatic retry loop. Successful
+empty write responses retain their existing behavior. Missing storyboard previews
+do not prevent playback when the server returns valid video metadata.
+
 Only GET Popular, Trending, Search and authenticated Feed have disk snapshots.
 Keys include the full URL and, for authenticated feeds, token identity. Network
 IO/5xx failures may use a snapshot younger than 24 hours; 4xx errors never do.

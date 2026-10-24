@@ -11,6 +11,45 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class NetworkReliabilityTest {
+    @Test fun invalidVideoResponsesAreActionableAndAnExplicitRetryCanRecoverWithoutPreviews() = runBlocking {
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val api = InvidiousApi({ address }, { null })
+            for (body in listOf("", " \n\t", "<html>Proxy failure</html>", "{broken", "[]", "null")) {
+                val requests = server.requestCount
+                server.enqueue(MockResponse().setBody(body))
+                val error = runCatching { api.video("testvideo01") }.exceptionOrNull()
+                assertTrue(error is ApiException)
+                assertEquals(502, (error as ApiException).status)
+                assertEquals("The instance returned invalid video information. Try again.", error.message)
+                assertEquals(requests + 1, server.requestCount)
+
+                server.enqueue(MockResponse().setBody("""{"videoId":"testvideo01","title":"Post-live recording","dashUrl":"/media/dash.mpd","storyboards":[]}"""))
+                val details = api.video("testvideo01")
+                assertEquals("testvideo01", details.video.id)
+                assertEquals("/media/dash.mpd", details.dash)
+                assertTrue(details.storyboards.isEmpty())
+            }
+        }
+    }
+
+    @Test fun videoHttpErrorsAndSuccessfulEmptyWritesKeepTheirExistingContracts() = runBlocking {
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val account = Account("fixture", "Viewer", Long.MAX_VALUE, address)
+            val api = InvidiousApi({ address }, { account })
+            for (status in listOf(404, 500)) {
+                server.enqueue(MockResponse().setResponseCode(status).setBody("""{"error":"Video unavailable"}"""))
+                val error = runCatching { api.video("testvideo01") }.exceptionOrNull()
+                assertTrue(error is ApiException)
+                assertEquals(status, (error as ApiException).status)
+                assertEquals("Video unavailable", error.message)
+            }
+            server.enqueue(MockResponse().setResponseCode(204))
+            api.removeHistory("testvideo01")
+        }
+    }
+
     @Test fun explicitRefreshReportsFailuresWithoutDiscardingTheNormalOfflineFallback() = runBlocking {
         for (authenticated in listOf(false, true)) MockWebServer().use { server ->
             val directory = Files.createTempDirectory("mobivious-refresh-network").toFile()
