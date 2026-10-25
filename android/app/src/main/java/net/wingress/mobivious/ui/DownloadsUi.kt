@@ -31,7 +31,6 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.downloads.DownloadExportService
 import net.wingress.mobivious.player.StreamCatalog
@@ -116,7 +115,7 @@ internal fun DownloadChannelIdentity(video: Video) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(40.dp).clip(CircleShape), contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Person, null)
-            if (video.authorAvatar.isNotBlank()) AsyncImage(video.authorAvatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (video.authorAvatar.isNotBlank()) InstanceImage(video.authorAvatar, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
         Text(video.author)
     }
@@ -171,7 +170,7 @@ internal fun DownloadedScreen(vm: AppViewModel, list: LazyListState, top: Dp = 8
                     Box(modifier.aspectRatio(16f / 9f).clip(AppTokens.media).testTag("download-artwork-${record.id}"), contentAlignment = Alignment.Center) {
                         Icon(Icons.Default.OndemandVideo, null)
                         ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), offline = true) {
-                            if (video.thumbnail.isNotBlank()) AsyncImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            if (video.thumbnail.isNotBlank()) InstanceImage(video.thumbnail, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         }
                     }
                 }) else null) { modifier ->

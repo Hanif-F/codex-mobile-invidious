@@ -38,8 +38,12 @@ HTTP 401 `login_required` opens native sign-in. HTTP 403 `verification_required`
 or `verification_expired` opens verification automatically in the foreground;
 503 `verification_unavailable`
 offers retry without expiring the account or serving a cached protected feed.
-Successful verification retries browsing, including a failed pagination request.
-Mutations, playback and downloads retain explicit Retry actions.
+Successful verification retries browsing, including a failed pagination request,
+and visible failed images. Verification-blocked playback retries automatically,
+retaining its position, options and playing/paused intent. Mutations and failed
+downloads retain explicit Retry actions. A denial from an older access revision
+cannot reject a fresh pass; superseded GET/HEAD requests retry once with current
+credentials, while writes are never replayed.
 All transports strip credentials on external redirects, matching scheme/host/port
 on each hop. Same-instance HEAD and Range requests retain their access headers.
 

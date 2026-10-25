@@ -38,7 +38,6 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import net.wingress.mobivious.data.*
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -280,11 +279,12 @@ internal fun NativeRichText(text: String, html: String, key: String, server: Str
     var expanded by rememberSaveable(server, key, tag, collapsedLines) { mutableStateOf(false) }
     var truncated by remember(server, key, text, html, collapsedLines) { mutableStateOf(false) }
     val inline = content.emoji.mapValues { (_, emoji) ->
-        var failed by remember(emoji.url) { mutableStateOf(false) }
+        val imageKey = rememberInstanceImageKey(emoji.url)
+        var failed by remember(emoji.url, imageKey) { mutableStateOf(false) }
         val width = if (failed) (emoji.alt.length * .6f).coerceIn(1.2f, 12f).em else 1.2.em
         InlineTextContent(Placeholder(width, 1.2.em, PlaceholderVerticalAlign.TextCenter)) {
             if (failed) Text(emoji.alt, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-            else AsyncImage(emoji.url, emoji.alt, Modifier.fillMaxSize(), onError = { failed = true })
+            else InstanceImage(emoji.url, emoji.alt, Modifier.fillMaxSize(), onError = { failed = true })
         }
     }
     SelectionContainer {

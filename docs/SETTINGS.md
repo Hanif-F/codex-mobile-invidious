@@ -22,8 +22,10 @@ opened occurrence; current player controls are described separately below.
 Required verification opens automatically in an embedded page and retries browsing
 after success. Required sign-in and unavailable verification retain their prompts.
 Cancel/Later leaves Server settings and local Downloads reachable; retry the
-failed action to reopen verification. Playback and downloads keep explicit Retry
-actions. Verification passes are instance-specific and
+failed action to reopen verification. Successful verification also restores visible
+failed images and retries verification-blocked playback, preserving position, options
+and playing/paused intent. Downloads keep explicit Retry actions. Verification
+passes are instance-specific and
 independent of the account. CAPTCHA, registration, required-login and Turnstile
 administration remain on the instance website.
 

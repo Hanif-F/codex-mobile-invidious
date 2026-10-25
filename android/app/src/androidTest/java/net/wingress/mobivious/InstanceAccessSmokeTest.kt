@@ -3,7 +3,15 @@ package net.wingress.mobivious
 import android.content.Intent
 import android.view.View
 import android.webkit.WebView
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
@@ -15,6 +23,10 @@ import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import kotlinx.coroutines.runBlocking
 import net.wingress.mobivious.data.*
+import net.wingress.mobivious.ui.ChannelHeader
+import net.wingress.mobivious.ui.CommunityPostCard
+import net.wingress.mobivious.ui.InstanceAccessPrompt
+import net.wingress.mobivious.ui.InstanceImage
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.hamcrest.Matcher
 import org.json.JSONObject
@@ -23,6 +35,9 @@ import org.junit.Assert.*
 import org.junit.runner.RunWith
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Only the disposable localhost fixture emits synthetic verification events. */
 @RunWith(AndroidJUnit4::class)
@@ -175,6 +190,8 @@ class InstanceAccessSmokeTest {
     @Test fun accountAndServerChangesDiscardVerificationAndRejectStaleCompletions() {
         for (changeAccount in listOf(true, false)) {
             command("access", """{"accessEnabled":true}"""); denied()
+            compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+            until { !vm.queue.value.loading && vm.queue.value.error != null }
             compose.onNodeWithTag("instance-verification").assertExists()
             val previous = vm.api.context()
             command("access", """{"accessEnabled":false}""")
@@ -185,6 +202,7 @@ class InstanceAccessSmokeTest {
                 vm.retryBrowseAfterVerification(previous)
             }
             until { vm.access.issue.value == null }
+            until { vm.queue.value.currentKey == null }
             compose.onNodeWithTag("instance-verification").assertDoesNotExist()
             runBlocking {
                 try { vm.access.complete(previous, "stale-pass", Long.MAX_VALUE, true); fail("Stale completion accepted") }
@@ -192,6 +210,26 @@ class InstanceAccessSmokeTest {
             }
             assertNull(vm.access.pass(vm.api.context()))
         }
+    }
+    @Test fun verificationCompletingInBackgroundKeepsPlaybackPausedWhenBackgroundIsDisabled() {
+        command("access", """{"accessEnabled":true}"""); denied(); verify()
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { vm.playback.value.playerState == Player.STATE_READY }
+        val background = vm.store.background
+        try {
+            command("access", """{"accessExpiry":1}""")
+            compose.runOnUiThread { vm.controller.value?.play(); vm.refreshBuffer() }
+            until { vm.queue.value.error != null && vm.access.issue.value != null }
+            compose.runOnUiThread { vm.store.background = false; activity.updatePip(false); activity.moveTaskToBack(true) }
+            until { !activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED) }
+            val expiry = System.currentTimeMillis() / 1000 + 3600
+            command("access", """{"accessExpiry":$expiry}""")
+            runBlocking { vm.access.complete(vm.api.context(), "fixture-pass-1", expiry, true) }
+            until { !vm.queue.value.loading && vm.queue.value.error == null && vm.playback.value.playerState == Player.STATE_READY }
+            assertFalse(vm.playback.value.playWhenReady)
+            returnToForeground()
+            assertFalse(vm.playback.value.playWhenReady)
+        } finally { compose.runOnUiThread { vm.store.background = background } }
     }
     @Test fun unavailableVerificationAndPolicyChangesRemainRetryableWithoutSigningOut() {
         compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", Long.MAX_VALUE, vm.store.server)) }
@@ -204,20 +242,122 @@ class InstanceAccessSmokeTest {
         command("access", """{"accessUnavailable":false}""")
         runBlocking { assertTrue(vm.api.discovery("popular").isNotEmpty()) }
     }
-    @Test fun playbackAccessExpiryPausesWithoutAutomaticRecoveryAndRetryKeepsPosition() {
+    @Test fun playbackVerificationAutomaticallyRetriesAndKeepsPositionAndOptions() {
         command("access", """{"accessEnabled":true}"""); denied(); verify()
         compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
         until { vm.playback.value.playerState == Player.STATE_READY }
-        compose.runOnUiThread { vm.controller.value?.pause(); vm.controller.value?.seekTo(4000) }
-        until { vm.playback.value.position >= 3500 }
-        command("access", """{"accessExpiry":1}""")
-        compose.runOnUiThread { vm.refreshBuffer() }
-        until { vm.access.issue.value?.reason == AccessReason.VERIFICATION }
-        assertFalse(vm.playback.value.playing)
+        val occurrence = vm.queue.value.currentKey
+        for (playing in listOf(false, true)) {
+            compose.runOnUiThread {
+                vm.controller.value?.pause(); vm.controller.value?.seekTo(4000)
+                vm.controller.value?.setPlaybackSpeed(1.5f); vm.audioOnly(true)
+                if (playing) vm.controller.value?.play()
+            }
+            until { vm.playback.value.position >= 3500 && vm.playback.value.playWhenReady == playing }
+            command("access", """{"accessExpiry":1}""")
+            compose.runOnUiThread { vm.refreshBuffer() }
+            until { vm.access.issue.value?.reason == AccessReason.VERIFICATION && vm.queue.value.error != null }
+            assertFalse(vm.playback.value.playing)
+            verify(duplicate = true)
+            until { vm.playback.value.playerState == Player.STATE_READY && vm.playback.value.error == null && !vm.queue.value.loading }
+            assertEquals(occurrence, vm.queue.value.currentKey)
+            assertTrue(vm.playback.value.position >= 3500)
+            assertEquals(playing, vm.playback.value.playWhenReady)
+            assertEquals(1.5f, vm.playback.value.speed, .01f)
+            compose.runOnUiThread {
+                assertTrue(vm.controller.value!!.trackSelectionParameters.disabledTrackTypes.contains(androidx.media3.common.C.TRACK_TYPE_VIDEO))
+            }
+        }
+    }
+    @Test fun initialMetadataVerificationRetriesOnceAndPreservesAutoplayIntent() {
+        for (autoplay in listOf(true, false)) {
+            command("access", """{"accessEnabled":true,"accessExpiry":1}""")
+            compose.runOnUiThread {
+                vm.openLink(VideoLinks.parse("http://127.0.0.1:18080/watch?v=testvideo01&autoplay=${if (autoplay) 1 else 0}", vm.store.server)!!)
+                activity.sharedVideo.value = true
+            }
+            until { !vm.queue.value.loading && vm.queue.value.error != null }
+            val token = vm.queue.value.token; val occurrence = vm.queue.value.currentKey
+            val before = verifiedBrowseRequests("/api/v1/videos/testvideo01")
+            verify(duplicate = true)
+            until { !vm.queue.value.loading && vm.queue.value.error == null && vm.playback.value.playerState == Player.STATE_READY }
+            assertEquals(token, vm.queue.value.token); assertEquals(occurrence, vm.queue.value.currentKey)
+            assertEquals(autoplay, vm.playback.value.playWhenReady)
+            assertEquals(before + 1, verifiedBrowseRequests("/api/v1/videos/testvideo01"))
+        }
+    }
+    @Test fun closingOrReplacingBlockedPlaybackDiscardsItsPendingRecovery() {
+        command("access", """{"accessEnabled":true}""")
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { vm.queue.value.error != null && !vm.queue.value.loading }
+        compose.onNodeWithTag("instance-verification-cancel").performClick()
+        compose.runOnUiThread { vm.closePlayer(); vm.retryBrowse() }
         verify()
-        compose.runOnUiThread { vm.refreshBuffer() }
-        until { vm.playback.value.playerState == Player.STATE_READY && vm.playback.value.error == null }
-        assertTrue(vm.playback.value.position >= 3500); assertFalse(vm.playback.value.playing)
+        assertNull(vm.queue.value.currentKey)
+        command("access", """{"accessExpiry":1}""")
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo01")); activity.sharedVideo.value = true }
+        until { vm.queue.value.error != null && !vm.queue.value.loading }
+        compose.onNodeWithTag("instance-verification-cancel").performClick()
+        compose.runOnUiThread { vm.openLink(VideoLink("testvideo02")); vm.retryBrowse() }
+        until { vm.queue.value.current?.video?.id == "testvideo02" && vm.queue.value.error != null && !vm.queue.value.loading }
+        verify()
+        until { vm.playback.value.playerState == Player.STATE_READY && vm.queue.value.error == null && !vm.queue.value.loading }
+        assertEquals("testvideo02", vm.queue.value.current?.video?.id)
+    }
+    @Test fun visibleImagesAndBannersRecoverWhileAnOldDenialArrivesAfterVerification() {
+        command("access", """{"accessEnabled":true,"accessDelayPath":"/media/thumbnail.jpg","accessDelayNext":1}""")
+        val client = vm.access.client()
+        val pending = CompletableFuture.supplyAsync {
+            client.newCall(okhttp3.Request.Builder().url("http://127.0.0.1:18080/media/thumbnail.jpg?delayed").build()).execute().use { it.code }
+        }
+        try {
+            until { fixture().getJSONArray("accessDelayedDenials").length() == 1 }
+            val failures = AtomicInteger(); val successes = AtomicInteger()
+            val request = coil.request.ImageRequest.Builder(activity).data("http://127.0.0.1:18080/media/thumbnail.jpg?visible")
+                .listener(onError = { _, _ -> failures.incrementAndGet() }, onSuccess = { _, _ -> successes.incrementAndGet() }).build()
+            val channel = Channel("UC${"a".repeat(22)}", "Recovery author", image = "/ggpht/studio=s88?recovery",
+                banner = "/ggpht/banner=w1060-h175?banner")
+            val post = CommunityPost(Comment("Recovery author", "Recovery post", "", null, id = "Ugrecovery"), channel.id,
+                attachment = PostAttachment.Images(listOf(PostImage("/ggpht/post=w1280?recovery-post", 1280, 720))))
+            compose.runOnUiThread {
+                activity.setContent {
+                    MaterialTheme {
+                        Column(Modifier.verticalScroll(rememberScrollState())) {
+                            InstanceImage(request, "Recovery thumbnail", Modifier.size(96.dp).testTag("recovery-thumbnail"))
+                            ChannelHeader(channel, vm.store.server, false, false, subscribe = {})
+                            CommunityPostCard(vm, post, comments = {}, channel = {}, link = {}, play = {}, playlist = {}, signIn = {})
+                        }
+                        InstanceAccessPrompt(vm, true, {})
+                    }
+                }
+            }
+            until { failures.get() > 0 && vm.access.issue.value != null }
+            // The banner's own fallback removes its painter after a denial.
+            until { compose.onAllNodesWithTag("channel-banner").fetchSemanticsNodes().isEmpty() }
+            until { compose.onAllNodesWithText("Image unavailable").fetchSemanticsNodes().isNotEmpty() }
+            verify()
+            until { successes.get() == 1 }
+            compose.onNodeWithTag("channel-banner").assertExists()
+            until { compose.onAllNodesWithText("Image unavailable").fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithTag("recovery-thumbnail").captureToImage()
+            captureWatchScreenshot("verification-image-recovery")
+            // Offscreen images defer Coil's size resolution until drawn; reveal the recovered post.
+            compose.onNodeWithTag("post-media-Ugrecovery").performScrollTo()
+            until {
+                val requests = fixture().getJSONArray("accessRequests")
+                (0 until requests.length()).any { requests.getJSONObject(it).let { row ->
+                    row.getString("path").contains("?banner") && row.getBoolean("verification")
+                } } && (0 until requests.length()).any { requests.getJSONObject(it).let { row ->
+                    row.getString("path").contains("?recovery-post") && row.getBoolean("verification")
+                } }
+            }
+            command("access", """{"accessReleaseDenials":true}""")
+            assertEquals(200, pending.get(10, TimeUnit.SECONDS))
+            assertNull(vm.access.issue.value); assertNotNull(vm.access.pass(vm.api.context()))
+            compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        } finally {
+            command("access", """{"accessReleaseDenials":true}""")
+        }
     }
     @Test fun protectedDownloadsRetryWithoutRepeatingCompleteAssetsAndPlayOffline() {
         command("access", """{"accessEnabled":true}"""); denied(); verify()
@@ -267,7 +407,7 @@ class InstanceAccessSmokeTest {
         runBlocking { app.downloads.retry(id) }
         until { app.downloads.find(id)?.playable == true }
     }
-    @Test fun backgroundAndPipAccessExpiryPauseUntilVerificationAndExplicitRetry() {
+    @Test fun backgroundAndPipAccessExpiryResumeAfterForegroundVerification() {
         command("access", """{"accessEnabled":true}"""); denied(); verify()
         val background = vm.store.background; val pip = vm.store.pip
         try {
@@ -292,10 +432,8 @@ class InstanceAccessSmokeTest {
                     ?.findAccessibilityNodeInfosByText("Verify access").isNullOrEmpty())
                 returnToForeground()
                 verify()
-                assertFalse(vm.playback.value.playing)
                 assertEquals(occurrence, vm.queue.value.currentKey)
-                compose.runOnUiThread { vm.refreshBuffer() }
-                until { vm.playback.value.playerState == Player.STATE_READY && vm.playback.value.error == null }
+                until { vm.playback.value.playerState == Player.STATE_READY && vm.playback.value.error == null && vm.playback.value.playWhenReady }
             }
         } finally { compose.runOnUiThread { vm.store.background = background; vm.store.pip = pip } }
     }

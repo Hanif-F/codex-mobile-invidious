@@ -133,7 +133,7 @@ class PlaybackService : MediaSessionService() {
                 }?.mediaMetadata?.extras?.getString("occurrence") ?: return
                 if (key != app.playbackQueue.value.currentKey) return
                 net.wingress.mobivious.data.InstanceAccess.failure(error)?.let {
-                    if (it.context == null || it.context == app.api.context()) { queue.playerError(it.message); player.pause() }
+                    queue.accessError(it)
                     return
                 }
                 val track = subtitle(loadEventInfo)
@@ -249,6 +249,7 @@ class PlaybackService : MediaSessionService() {
             }
         } }
         scope.launch { app.dearrowTitles.titles.collect { queue.syncDisplayTitle() } }
+        scope.launch { app.access.recovery.collect { restored -> restored?.let(queue::recoverAfterVerification) } }
         scope.launch { app.channelSpoilers.state.collect { queue.syncDisplayTitle(); sessionPlayer.refresh() } }
     }
     private fun queueCommand(action: String, args: Bundle): SessionResult {
@@ -323,7 +324,7 @@ class PlaybackService : MediaSessionService() {
         val state = app.playbackQueue.value
         net.wingress.mobivious.data.InstanceAccess.failure(error)?.let {
             if (it.context != null && it.context != app.api.context()) return
-            recovery.ready(); queue.playerError(it.message); player.pause(); return
+            recovery.ready(); queue.accessError(it); return
         }
         if (state.loading || state.context != app.api.context() || state.currentKey == null ||
             player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") != state.currentKey) return

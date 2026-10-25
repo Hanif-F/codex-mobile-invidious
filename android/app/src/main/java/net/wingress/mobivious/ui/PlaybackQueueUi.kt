@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import net.wingress.mobivious.data.*
 import net.wingress.mobivious.player.PlaybackService
 
@@ -60,7 +59,7 @@ internal fun PlaybackQueuePanel(vm: AppViewModel, signIn: () -> Unit, channel: (
             artwork = { modifier -> ChannelSpoilerArtwork(vm, entry.video, modifier, { vm.selectQueue(entry.key) }, offline = entry.downloadId != null) { revealed ->
                 val warning = if (entry.downloadId == null && !revealed) vm.aiDecision(entry.video, AiPageGroup.OTHER, aiState).warning else null
                 if (warning != null) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true)
-                else AsyncImage(resolved(vm.store.server, entry.video.thumbnail.ifBlank { "/vi/${entry.video.id}/mqdefault.jpg" }), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                else InstanceImage(resolved(vm.store.server, entry.video.thumbnail.ifBlank { "/vi/${entry.video.id}/mqdefault.jpg" }), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             } },
             play = { vm.selectQueue(entry.key) }, channel = channel,
             title = { modifier -> DeArrowTitle(vm, entry.video, MaterialTheme.typography.titleSmall, modifier, maxLines = 2,
@@ -154,7 +153,7 @@ internal fun QueueVideoRow(entry: QueueOccurrence, current: Boolean, server: Str
         artwork = if (!thinMode || aiWarning != null) ({ modifier -> Box(modifier.aspectRatio(16f / 9f).clip(RoundedCornerShape(6.dp)).background(MaterialTheme.colorScheme.surface)) {
             if (artwork != null) artwork(Modifier.fillMaxSize())
             else if (aiWarning != null) AiThumbnail(aiWarning, Modifier.fillMaxSize(), compact = true)
-            else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
+            else InstanceImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             indicator.bar?.let { fraction ->
                 LinearProgressIndicator(progress = { fraction }, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp)

@@ -87,7 +87,10 @@ connection retry. Authenticated calls validate server match/expiry and captured
 context. Same-instance content APIs, images, captions and media may carry a valid
 account bearer and independent verification pass. Network interceptors recheck
 the origin on every redirect and strip Authorization, verification and Cookie
-headers before external requests. Account/bootstrap credentials never enter URLs.
+headers before external requests. Each outgoing credential snapshot carries an
+in-memory access revision: obsolete denials and disabled-policy discovery responses
+cannot invalidate a newly accepted pass. Superseded GET/HEAD requests retry once;
+writes require explicit recovery. Account/bootstrap credentials never enter URLs.
 
 Avatar/GGPHT images normalize supported sources to the selected instance proxy;
 the avatar client follows no redirects and uses the shared access boundary. Banner/
@@ -132,6 +135,8 @@ is ordinary sandboxed text. It keeps at most 50 newest files, rejects writes ove
 write/rename avoids publishing a partly written snapshot. Feed keys include the
 account session when present, including content APIs. Image cache keys include a
 hashed account/instance context and access revision; stale results are discarded.
+Visible image painters and remembered error fallbacks observe recovery revisions,
+so accepted verification can reload them without recreating the activity.
 Access denials never use feed fallback. Sign-out/server switch
 clears the cache. No offline mutation replay exists.
 

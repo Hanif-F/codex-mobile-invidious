@@ -21,7 +21,11 @@ navigation is blocked. An outdated WebView shows update guidance.
 
 After successful verification, the dialog closes and browsing retries automatically
 after any current browse request settles, preserving a failed pagination retry.
-Playback and downloads retain their own explicit Retry actions. Access prompts
+Visible thumbnails, avatars, banners and community images retry without navigating
+away. Verification-blocked playback retries automatically, preserving the same queue
+occurrence, position, options and playing/paused intent. Closed/replaced playback or
+changed account/instance contexts discard pending recovery. Failed downloads retain
+their own explicit Retry actions. Access prompts
 wait until the activity leaves PiP; background playback failures retain their issue
 for the next foreground visit. Account or server changes discard the previous verification
 flow. Account and verification expiry remain separate. Cloudflare may still

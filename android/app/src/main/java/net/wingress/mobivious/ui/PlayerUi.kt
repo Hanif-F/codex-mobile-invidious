@@ -191,7 +191,7 @@ internal fun VideoPlayer(
         }
         else playback.details?.video?.let { video ->
             ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), playbackOccurrence = spoilerQueue.currentKey, offline = playback.downloadId != null) {
-            coil.compose.AsyncImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
+            InstanceImage(resolved(vm.store.server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null,
                 Modifier.fillMaxSize().testTag("mini-player-artwork"), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
             }
         }

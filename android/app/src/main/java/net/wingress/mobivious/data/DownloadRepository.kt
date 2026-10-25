@@ -71,10 +71,12 @@ class DownloadRepository(private val context: Context) {
     private suspend fun prepareTransfer(server: String) {
         val owner = app.store.positionContext()
         if (!InstanceAccess.sameOrigin(server.toHttpUrlOrNull()!!, owner.server)) return
+        val revision = app.access.revision.value
         val status = app.access.discover(owner)
         if (status?.required == true) {
-            app.access.report(owner, AccessReason.VERIFICATION)
-            throw InstanceAccessException(AccessReason.VERIFICATION)
+            if (app.access.report(owner, AccessReason.VERIFICATION, revision))
+                throw InstanceAccessException(AccessReason.VERIFICATION, owner, revision)
+            throw java.io.IOException("Instance access changed. Retry the download.")
         }
     }
     suspend fun create(server: String, catalog: DownloadCatalog, selection: DownloadSelection): String {

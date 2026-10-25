@@ -4,12 +4,14 @@ import kotlinx.coroutines.*
 import net.wingress.mobivious.data.*
 import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.mockwebserver.*
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class InstanceAccessTest {
     private class Memory : VerificationPersistence {
@@ -157,6 +159,112 @@ class InstanceAccessTest {
             server.enqueue(MockResponse().setBody("image"))
             client.newCall(stale.newBuilder().header(InstanceAccess.CONTEXT_HEADER, InstanceAccess.cacheScope(context)).build()).execute().close()
             assertNull(server.takeRequest().getHeader(InstanceAccess.CONTEXT_HEADER))
+        }
+    }
+    @Test fun supersededDenialsRetrySafeReadsOnceButNeverReplayWrites() = runBlocking {
+        for (method in listOf("GET", "HEAD", "POST")) MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val access = InstanceAccess({ context }, Memory()) { 10 }
+            val entered = CountDownLatch(1); val release = CountDownLatch(1); val attempts = AtomicInteger()
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == "/api/v1/verification") return acceptedPass()
+                    if (attempts.incrementAndGet() == 1) {
+                        entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                        return MockResponse().setResponseCode(403).setHeader("X-Invidious-Verification-Required", "verification_required")
+                    }
+                    assertEquals("fresh", request.getHeader(InstanceAccess.HEADER))
+                    assertEquals("bytes=10-", request.getHeader("Range"))
+                    return MockResponse().setBody("restored")
+                }
+            }
+            val request = Request.Builder().url(server.url("/media")).header("Range", "bytes=10-")
+                .method(method, if (method == "POST") "{}".toRequestBody() else null).build()
+            val result = async(Dispatchers.IO) { runCatching { access.client().newCall(request).execute().use { it.code } } }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                access.complete(context, "fresh", 100, true)
+            } finally { release.countDown() }
+            val response = result.await()
+            if (method == "POST") {
+                assertTrue(response.exceptionOrNull() is java.net.ProtocolException)
+                assertEquals(1, attempts.get())
+            } else {
+                assertEquals(200, response.getOrThrow()); assertEquals(2, attempts.get())
+            }
+            assertEquals("fresh", access.pass(context)?.token); assertNull(access.issue.value)
+            assertEquals(context, access.recovery.value?.context)
+        }
+    }
+    @Test fun aFreshPassRejectionAfterSafeReadReplayStillRequiresVerification() = runBlocking {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val access = InstanceAccess({ context }, Memory()) { 10 }
+            val entered = CountDownLatch(1); val release = CountDownLatch(1); val attempts = AtomicInteger()
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == "/api/v1/verification") return acceptedPass()
+                    if (attempts.incrementAndGet() == 1) { entered.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
+                    else assertEquals("fresh", request.getHeader(InstanceAccess.HEADER))
+                    return MockResponse().setResponseCode(403).setBody("""{"error":"verification_expired"}""")
+                }
+            }
+            val result = async(Dispatchers.IO) { runCatching { access.client().newCall(Request.Builder().url(server.url("/media")).build()).execute().close() } }
+            try { assertTrue(entered.await(5, TimeUnit.SECONDS)); access.complete(context, "fresh", 100, true) }
+            finally { release.countDown() }
+            assertTrue(result.await().exceptionOrNull() is InstanceAccessException)
+            assertEquals(2, attempts.get()); assertNull(access.pass(context))
+            assertEquals(AccessReason.VERIFICATION, access.issue.value?.reason)
+        }
+    }
+    @Test fun supersededReadRetriesAreBoundedAcrossRepeatedCompletions() = runBlocking {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val access = InstanceAccess({ context }, Memory()) { 10 }
+            val entered = List(2) { CountDownLatch(1) }; val release = List(2) { CountDownLatch(1) }; val attempts = AtomicInteger()
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == "/api/v1/verification") return acceptedPass()
+                    val index = attempts.getAndIncrement()
+                    check(index < 2); entered[index].countDown(); check(release[index].await(5, TimeUnit.SECONDS))
+                    return MockResponse().setResponseCode(403).setBody("""{"error":"verification_required"}""")
+                }
+            }
+            val result = async(Dispatchers.IO) { runCatching { access.client().newCall(Request.Builder().url(server.url("/media")).build()).execute().close() } }
+            try {
+                repeat(2) { index ->
+                    assertTrue(entered[index].await(5, TimeUnit.SECONDS))
+                    access.complete(context, "fresh-$index", 100, true); release[index].countDown()
+                }
+            } finally { release.forEach { it.countDown() } }
+            assertTrue(result.await().exceptionOrNull() is java.net.ProtocolException)
+            assertEquals(2, attempts.get()); assertNull(access.issue.value)
+            assertEquals("fresh-1", access.pass(context)?.token)
+            val revision = access.recovery.value
+            access.complete(context, "fresh-1", 100, true)
+            assertEquals(revision, access.recovery.value)
+        }
+    }
+    private fun acceptedPass() = MockResponse().setBody("""{"enabled":true,"required":false,"verified":true,"expiresAt":100}""")
+    @Test fun obsoleteDisabledDiscoveryCannotEraseAFreshPass() = runBlocking {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val access = InstanceAccess({ context }, Memory()) { 10 }
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.getHeader(InstanceAccess.HEADER) != null) return acceptedPass()
+                    entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                    return MockResponse().setBody("""{"enabled":false,"required":false,"verified":false,"expiresAt":null}""")
+                }
+            }
+            val discovery = async(Dispatchers.IO) { access.discover(context) }
+            val revision = access.revision.value
+            try { assertTrue(entered.await(5, TimeUnit.SECONDS)); access.complete(context, "fresh", 100, true) }
+            finally { release.countDown() }
+            assertFalse(discovery.await()!!.enabled)
+            assertFalse(access.report(context, AccessReason.VERIFICATION, revision))
+            assertNull(access.issue.value); assertEquals("fresh", access.pass(context)?.token)
         }
     }
 }

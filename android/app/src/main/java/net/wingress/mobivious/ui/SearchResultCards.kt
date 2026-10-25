@@ -21,7 +21,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import net.wingress.mobivious.data.*
 
 @Composable
@@ -63,7 +62,7 @@ internal fun SearchPlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Un
                     Spacer(Modifier.height(3.dp))
                     Box(Modifier.fillMaxWidth().then(if (prefs.thinMode) Modifier.height(64.dp) else Modifier.aspectRatio(16f / 9f)).clip(AppTokens.media).background(c.surfaceContainerHighest)
                         .testTag("search-playlist-cover-${list.id}")) {
-                        if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
+                        if (!prefs.thinMode && list.thumbnail.isNotBlank()) InstanceImage(resolved(vm.store.server, list.thumbnail), null,
                             Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         Surface(Modifier.align(Alignment.BottomEnd), color = c.secondaryContainer, shape = MaterialTheme.shapes.small) {
                             Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {

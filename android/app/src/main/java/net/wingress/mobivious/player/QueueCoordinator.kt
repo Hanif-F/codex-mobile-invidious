@@ -35,6 +35,10 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private var selectionPending = false
     private var decoderError = false
     private var requestedPlayWhenReady = false
+    private data class AccessPlayback(val token: String, val context: ApiContext, val occurrence: String,
+        val revision: Long, val position: Long?, var playing: Boolean)
+    private var accessPlayback: AccessPlayback? = null
+    private var recoveredAccessRevision = 0L
     private var baseRepeat = QueueRepeat.OFF
     private var enforcingBound = false
     private val playlistWrites = Mutex()
@@ -42,6 +46,10 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     var changed: () -> Unit = {}
     init { applySeekInterval() }
     fun update(value: PlaybackQueueSnapshot) {
+        accessPlayback?.let { pending ->
+            if (value.token != pending.token || value.context != pending.context || value.currentKey != pending.occurrence)
+                accessPlayback = null
+        }
         app.playbackQueue.value = value
         app.channelSpoilers.bindPlayback(value.currentKey)
         if (value.current?.downloadId == null) app.channelSpoilers.ensure(value.items.map { it.video } + value.details?.recommendations.orEmpty())
@@ -85,13 +93,52 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         return decision.pending || decision.thumbnail && !(spoilers.playback.occurrence == occurrence && spoilers.playback.thumbnail)
     }
     fun playerError(message: String?) {
-        if (message != null) { requestedPlayWhenReady = player.playWhenReady; decoderError = true; update(state.copy(loading = false, error = message)) }
+        if (message != null) { if (!decoderError) requestedPlayWhenReady = player.playWhenReady; decoderError = true; update(state.copy(loading = false, error = message)) }
         else if (decoderError) { decoderError = false; update(state.copy(error = null)) }
+    }
+    /** Capture intent before the access pause; Media3 may report the same failure more than once. */
+    fun accessError(error: InstanceAccessException, metadata: Boolean = false) {
+        val context = state.context ?: return
+        if (context != app.api.context() || error.context != null && error.context != context) return
+        if (error.revision?.let { it < recoveredAccessRevision } == true) return
+        val entry = state.current
+        if (error.reason != AccessReason.LOGIN && entry != null && entry.downloadId == null && accessPlayback == null) {
+            val active = player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == entry.key
+            accessPlayback = AccessPlayback(state.token, context, entry.key, error.revision ?: app.access.revision.value,
+                player.currentPosition.takeIf { active }, if (metadata || decoderError) requestedPlayWhenReady else player.playWhenReady)
+            if (active) accessSelection = capture()
+        }
+        if (accessPlayback == null && !metadata && !decoderError) requestedPlayWhenReady = player.playWhenReady
+        decoderError = true
+        player.pause()
+        update(state.copy(loading = false, sourceLoading = false, error = error.message))
+        app.access.recovery.value?.let(::recoverAfterVerification)
+    }
+    fun playIntent(playing: Boolean) {
+        accessPlayback?.playing = playing
+        if (state.error != null) requestedPlayWhenReady = playing
+    }
+    fun recoverAfterVerification(restored: VerificationRecovery) {
+        val pending = accessPlayback ?: return
+        if (restored.context != pending.context || restored.revision <= pending.revision) return
+        val loading = job
+        scope.launch {
+            loading?.join()
+            if (accessPlayback !== pending || job !== loading || !valid(pending.token, pending.context) ||
+                state.currentKey != pending.occurrence || app.access.issue.value != null) return@launch
+            accessPlayback = null
+            recoveredAccessRevision = restored.revision
+            val entry = state.current ?: return@launch
+            val playing = pending.playing && (app.playbackVisible || app.store.background)
+            requestedPlayWhenReady = playing
+            this@QueueCoordinator.launch { token, context -> load(entry, token, context, playing = playing, positionMs = pending.position) }
+        }
     }
     fun recovering(value: Boolean) {
         if (state.recovering != value) update(state.copy(recovering = value, error = if (value) null else state.error))
     }
     fun reauthenticate(context: ApiContext) {
+        accessPlayback = null
         job?.cancel()
         accessSelection = capture()
         requestedPlayWhenReady = player.playWhenReady
@@ -110,7 +157,11 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (valid(token, context)) {
                 if (sourceOnly) update(state.copy(sourceLoading = false, sourceError = e.message ?: "Queue could not load. Retry."))
-                else { player.pause(); update(state.copy(loading = false, sourceLoading = false, error = e.message ?: "Playback failed. Retry.")) }
+                else {
+                    val access = InstanceAccess.failure(e)
+                    if (access != null) accessError(access, metadata = true)
+                    else { player.pause(); update(state.copy(loading = false, sourceLoading = false, error = e.message ?: "Playback failed. Retry.")) }
+                }
             } }
         }
     }
@@ -247,6 +298,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         }
         else selection = null
         requestedPlayWhenReady = playing
+        decoderError = false
         beforeChange(); player.pause()
         update(state.copy(currentKey = entry.key, details = null, loading = true, error = null))
         if (!fresh && !sameOccurrence) {
@@ -533,6 +585,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         return true
     }
     fun retry() {
+        accessPlayback = null
         val entry = state.current ?: return
         val position = if (player.currentMediaItem?.mediaMetadata?.extras?.getString("occurrence") == entry.key) player.currentPosition else null
         val playing = if (state.error != null) requestedPlayWhenReady else player.playWhenReady

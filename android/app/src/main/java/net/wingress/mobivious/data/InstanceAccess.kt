@@ -1,6 +1,7 @@
 package net.wingress.mobivious.data
 
 import java.io.IOException
+import java.net.ProtocolException
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -19,9 +20,12 @@ enum class AccessReason(val message: String) {
     UNAVAILABLE("Verification is temporarily unavailable. Try again.")
 }
 
-class InstanceAccessException(val reason: AccessReason, val context: ApiContext? = null) : IOException(reason.message)
+class InstanceAccessException(val reason: AccessReason, val context: ApiContext? = null,
+    internal val revision: Long? = null) : IOException(reason.message)
 data class VerificationPass(val token: String, val expiresAt: Long)
 data class AccessIssue(val context: ApiContext, val reason: AccessReason)
+internal data class VerificationRecovery(val context: ApiContext, val revision: Long)
+private class SupersededAccessException : ProtocolException("Instance access changed. Retry the action.")
 data class VerificationStatus(val enabled: Boolean, val required: Boolean, val verified: Boolean, val expiresAt: Long?) {
     companion object {
         fun parse(value: JSONObject) = VerificationStatus(value.getBoolean("enabled"), value.getBoolean("required"),
@@ -40,6 +44,7 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
     private val now: () -> Long = { System.currentTimeMillis() / 1000 }) {
     val issue = MutableStateFlow<AccessIssue?>(null)
     val revision = MutableStateFlow(0L)
+    internal val recovery = MutableStateFlow<VerificationRecovery?>(null)
     val promptRevision = MutableStateFlow(0L)
     fun prompt() { promptRevision.value++ }
     private val rejected = mutableSetOf<String>()
@@ -82,17 +87,18 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
             pass(context)?.let { put(HEADER, it.token) }
         }
     }
-    @Synchronized fun report(context: ApiContext, reason: AccessReason) {
-        if (context != current()) return
+    @Synchronized fun report(context: ApiContext, reason: AccessReason, expectedRevision: Long = revision.value): Boolean {
+        if (context != current() || expectedRevision != revision.value) return false
         if (reason == AccessReason.VERIFICATION) rejected.add(origin(context.server.toHttpUrl()))
         // A required login precedes verification at the server. Do not let concurrent image failures replace it.
         if (issue.value?.reason != AccessReason.LOGIN || reason == AccessReason.LOGIN) issue.value = AccessIssue(context, reason)
+        return true
     }
     @Synchronized fun clear(context: ApiContext) {
         if (context != current()) throw CancellationException("Account or instance changed")
         issue.value = null; revision.value++; prompt()
     }
-    @Synchronized fun contextChanged() { issue.value = null; revision.value++; prompt() }
+    @Synchronized fun contextChanged() { issue.value = null; recovery.value = null; revision.value++; prompt() }
     /** Only a gate-driven sign-in to the same identity may retain the stopped player. */
     @Synchronized fun prepareLogin(context: ApiContext, account: Account) {
         reauthentication = if (issue.value == AccessIssue(context, AccessReason.LOGIN) && context.server == account.server &&
@@ -113,19 +119,29 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
             val target = chain.request().tag(ApiContext::class.java) ?: context()
             val imageContext = chain.request().header(CONTEXT_HEADER)
             if (imageContext != null && imageContext != cacheScope(target)) throw IOException("Account or instance changed")
-            chain.proceed(chain.request().newBuilder().removeHeader(CONTEXT_HEADER).tag(ApiContext::class.java, target).build())
+            val request = chain.request().newBuilder().removeHeader(CONTEXT_HEADER).tag(ApiContext::class.java, target).build()
+            try { chain.proceed(request) }
+            catch (e: SupersededAccessException) {
+                // Repeat only safe reads, once, after closing the obsolete response. Never replay a write.
+                if (target != current() || request.method !in listOf("GET", "HEAD")) throw e
+                chain.proceed(request)
+            }
         }.addNetworkInterceptor(Interceptor { chain ->
             val request = chain.request()
             val target = requireNotNull(request.tag(ApiContext::class.java))
-            if (target != current()) throw IOException("Account or instance changed")
-            val outgoing = request.newBuilder().removeHeader(HEADER).removeHeader("Authorization").removeHeader("Cookie")
-            // Explicit account API authentication remains valid on bootstrap-free same-origin requests.
-            headers(request.url, target).forEach { (key, value) -> outgoing.header(key, value) }
-            val response = chain.proceed(outgoing.build())
+            val (sentRevision, outgoing) = synchronized(this@InstanceAccess) {
+                if (target != current()) throw IOException("Account or instance changed")
+                val builder = request.newBuilder().removeHeader(HEADER).removeHeader("Authorization").removeHeader("Cookie")
+                headers(request.url, target).forEach { (key, value) -> builder.header(key, value) }
+                revision.value to builder.build()
+            }
+            val response = chain.proceed(outgoing)
             val reason = if (sameOrigin(request.url, target.server) && response.code in listOf(401, 403, 503))
                 classify(response.code, response.header("X-Invidious-Verification-Required"), response.peekBody(8192).string()) else null
             if (reason != null) {
-                response.close(); report(target, reason); throw InstanceAccessException(reason, target)
+                response.close()
+                if (!report(target, reason, sentRevision)) throw SupersededAccessException()
+                throw InstanceAccessException(reason, target, sentRevision)
             }
             if (target != current()) { response.close(); throw IOException("Account or instance changed") }
             response
@@ -133,6 +149,7 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
 
     suspend fun discover(context: ApiContext, candidate: VerificationPass? = pass(context)): VerificationStatus? = withContext(Dispatchers.IO) {
         check(context)
+        val expectedRevision = revision.value
         val request = Request.Builder().url(context.server.toHttpUrl().resolve("/api/v1/verification")!!)
             .apply { candidate?.let { header(HEADER, it.token) } }.build()
         val response = statusClient.newCall(request).awaitBody(8192)
@@ -142,9 +159,11 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
         VerificationStatus.parse(JSONObject(response.body)).also { status ->
             if (!status.enabled) synchronized(this@InstanceAccess) {
                 check(context)
-                val key = origin(context.server.toHttpUrl())
-                if (persistence.read(key) != null) persistence.write(key, null)
-                rejected.remove(key)
+                if (expectedRevision == revision.value) {
+                    val key = origin(context.server.toHttpUrl())
+                    if (persistence.read(key) != null) persistence.write(key, null)
+                    rejected.remove(key)
+                }
             }
         }
     }
@@ -160,8 +179,11 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
         synchronized(this) {
             check(context)
             val key = origin(context.server.toHttpUrl())
-            persistence.write(key, if (status.enabled) candidate!!.copy(expiresAt = status.expiresAt!!) else null)
+            val accepted = if (status.enabled) candidate!!.copy(expiresAt = status.expiresAt!!) else null
+            if (recovery.value?.context == context && issue.value == null && persistence.read(key) == accepted && key !in rejected) return
+            persistence.write(key, accepted)
             rejected.remove(key); clear(context)
+            recovery.value = VerificationRecovery(context, revision.value)
         }
     }
 }

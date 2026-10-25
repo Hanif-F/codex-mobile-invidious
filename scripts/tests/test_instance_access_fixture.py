@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -88,6 +89,28 @@ class InstanceAccessFixtureTest(unittest.TestCase):
         self.assertFalse(self.request('/api/v1/verification/complete', dict(transport='native', turnstileToken='fixture-response'))[2]['enabled'])
         self.request('/test/access', dict(accessMissing=True))
         self.assertEqual(404, self.request('/api/v1/verification')[0])
+
+    def test_delayed_denial_keeps_its_original_decision_after_verification(self):
+        self.request('/test/access', dict(accessEnabled=True, accessDelayPath='/media/thumbnail.jpg', accessDelayNext=1))
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            pending = executor.submit(self.request, '/media/thumbnail.jpg')
+            try:
+                for _ in range(100):
+                    if self.request('/test/state')[2]['accessDelayedDenials']: break
+                    time.sleep(.01)
+                else: self.fail('Denial did not reach the delay barrier')
+                _, _, completion = self.request('/api/v1/verification/complete', dict(transport='native', turnstileToken='fixture-response'))
+                headers = {'X-Invidious-Verification': completion['verificationToken']}
+                self.assertTrue(self.request('/api/v1/verification', headers=headers)[2]['verified'])
+                self.assertFalse(pending.done())
+            finally:
+                self.request('/test/access', dict(accessReleaseDenials=True))
+            status, _, body = pending.result(timeout=5)
+        self.assertEqual(403, status)
+        self.assertTrue(body['verification']['required'])
+        self.assertTrue(self.request('/test/state')[2]['accessDelayedDenials'][0]['released'])
+        self.request('/test/reset', {})
+        self.assertEqual([], self.request('/test/state')[2]['accessDelayedDenials'])
 
 
 if __name__ == '__main__':

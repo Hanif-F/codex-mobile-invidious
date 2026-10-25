@@ -52,7 +52,6 @@ import androidx.media3.common.*
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
-import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Size as CoilSize
 import kotlinx.coroutines.delay
@@ -86,7 +85,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             ChannelSpoilerArtwork(vm, clip.video, Modifier.fillMaxSize(), play) { revealed ->
             if (warning != null && !revealed) AiThumbnail(warning, Modifier.fillMaxSize(), compact = true,
                 bottomInset = with(androidx.compose.ui.platform.LocalDensity.current) { 12.sp.toDp() } + 16.dp)
-            else AsyncImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else InstanceImage(resolved(clip.server, clip.video.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
             Row(Modifier.align(Alignment.BottomEnd).padding(5.dp)
                 .padding(horizontal = 5.dp, vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -161,7 +160,7 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.width(128.dp).aspectRatio(16f / 9f).clip(RoundedCornerShape(8.dp))) {
                     ChannelSpoilerArtwork(vm, source, Modifier.fillMaxSize(), vm::watchFullClip) {
-                    AsyncImage(resolved(clip.server, source.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    InstanceImage(resolved(clip.server, source.thumbnail), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     }
                     DisplayFormats.duration(source.duration).takeIf(String::isNotBlank)?.let { Text(it, Modifier.align(Alignment.BottomEnd).padding(7.dp), color = Color.White, style = MaterialTheme.typography.labelSmall.copy(shadow = PlayerTextShadow)) }
                 }
@@ -377,8 +376,8 @@ private fun clippedDate(clip: Clip): String = DisplayFormats.timestamp(clip.crea
                 val time = viewport + window * (2 * n + 1) / 12
                 val frame = StoryboardRules.frame(editor.frames, time)
                 val request = frame?.let { ImageRequest.Builder(context).data(it.url).size(CoilSize.ORIGINAL).transformations(StoryboardCrop(it)).build() }
-                AsyncImage(request ?: resolved(editor.context?.server.orEmpty(), editor.details?.video?.thumbnail.orEmpty()), null, imageLoader = vm.storyboardImages.loader,
-                    Modifier.weight(1f).fillMaxHeight(), contentScale = ContentScale.Crop)
+                InstanceImage(request ?: resolved(editor.context?.server.orEmpty(), editor.details?.video?.thumbnail.orEmpty()), null, imageLoader = vm.storyboardImages.loader,
+                    modifier = Modifier.weight(1f).fillMaxHeight(), contentScale = ContentScale.Crop)
             } }
             Canvas(Modifier.fillMaxSize().semantics {
                 contentDescription = "Clip range"

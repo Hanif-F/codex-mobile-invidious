@@ -528,6 +528,15 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch { preferences.collect { configurePlayerTools(toolsVisible) } }
         viewModelScope.launch { while (isActive) { delay(500); updatePlayback() } }
+        viewModelScope.launch {
+            var handled = 0L
+            access.recovery.collect { restored ->
+                if (restored != null && restored.revision > handled) {
+                    handled = restored.revision
+                    retryBrowseAfterVerification(restored.context)
+                }
+            }
+        }
         viewModelScope.launch { var previous = queue.value; queue.collect { state ->
             preferenceSaves.discardKeys { it.startsWith("chat_delay:") && it.substringAfter(':')!=state.current?.video?.id }
             if (state.token != previous.token || state.hasExplicitQueue != previous.hasExplicitQueue)

@@ -40,7 +40,7 @@ class MainActivity : ComponentActivity() {
         }
     }
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleLink(intent) }
-    override fun onStart() { super.onStart(); model.refreshSharedSettings() }
+    override fun onStart() { super.onStart(); (application as MobiviousApplication).playbackVisible = true; model.refreshSharedSettings() }
     private fun handleLink(intent: Intent) {
         if (intent.getBooleanExtra("openDownloads", false)) { intent.removeExtra("openDownloads"); model.navigate("You", "downloads", rememberOrigin = true); return }
         val text = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT) else intent.dataString
@@ -104,6 +104,7 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         model.flushPreferenceEdits()
         super.onStop()
+        if (!isChangingConfigurations) (application as MobiviousApplication).playbackVisible = isInPictureInPictureMode
         if (!isChangingConfigurations) model.cancelAccumulatedSeek(isInPictureInPictureMode || model.store.background)
         if (!isChangingConfigurations && !isInPictureInPictureMode && !model.store.background) model.controller.value?.pause()
     }

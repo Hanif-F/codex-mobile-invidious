@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import net.wingress.mobivious.data.*
 
@@ -213,10 +212,11 @@ internal fun PostGallery(images: List<PostImage>, server: String, tag: String) {
 @Composable
 private fun PostMediaImage(image: PostImage, server: String, description: String, modifier: Modifier) {
     val url = remember(server, image.url) { ChannelImages.url(server, image.url) }
-    var failed by remember(url) { mutableStateOf(false) }
+    val imageKey = rememberInstanceImageKey(url)
+    var failed by remember(url, imageKey) { mutableStateOf(false) }
     Box(modifier.background(MaterialTheme.colorScheme.surfaceContainer), contentAlignment = Alignment.Center) {
         if (url == null || failed) Text("Image unavailable", Modifier.padding(16.dp))
-        else AsyncImage(url, description, modifier = Modifier.fillMaxSize(), imageLoader = AvatarImageLoader.get(LocalContext.current),
+        else InstanceImage(url, description, modifier = Modifier.fillMaxSize(), imageLoader = AvatarImageLoader.get(LocalContext.current),
             contentScale = ContentScale.Fit, onError = { failed = true })
     }
 }

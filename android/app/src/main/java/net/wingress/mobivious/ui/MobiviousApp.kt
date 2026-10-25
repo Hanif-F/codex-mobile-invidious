@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.view.WindowCompat
 import androidx.media3.common.Player
-import coil.compose.AsyncImage
 import kotlinx.coroutines.launch
 import net.wingress.mobivious.MainActivity
 import net.wingress.mobivious.data.*
@@ -689,7 +688,7 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
             ChannelSpoilerArtwork(vm, video, Modifier.fillMaxSize(), play) { revealed ->
             if (warning != null && !revealed) AiThumbnail(warning, Modifier.fillMaxSize(), compact = warningCompact,
                 topInset = if (indicator.watched) badgeInset else 0.dp, bottomInset = if (duration.isNotBlank()) badgeInset else 4.dp)
-            else AsyncImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            else InstanceImage(resolved(server, video.thumbnail.ifBlank { "/vi/${video.id}/mqdefault.jpg" }), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
             if (indicator.watched) {
                 Text("Watched", Modifier.align(Alignment.TopStart).padding(8.dp)

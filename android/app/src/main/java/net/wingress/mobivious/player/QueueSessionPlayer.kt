@@ -63,6 +63,7 @@ internal class QueueSessionPlayer(player: Player, private val queue: QueueCoordi
         return Futures.immediateVoidFuture()
     }
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
+        queue.playIntent(playWhenReady)
         val bound = snapshot().current?.linkPlayback
         if (playWhenReady && snapshot().current?.clip != null && player.playbackState == Player.STATE_ENDED) player.seekTo(0)
         if (playWhenReady && bound?.endMs != null && player.currentPosition >= bound.endMs) player.seekTo(bound.startMs ?: 0)

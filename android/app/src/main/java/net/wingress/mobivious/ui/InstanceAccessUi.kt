@@ -44,7 +44,7 @@ internal fun InstanceAccessPrompt(vm: AppViewModel, visible: Boolean, signIn: ()
     if (!visible || !lifecycle.isAtLeast(Lifecycle.State.RESUMED) || vm.route == "sign-in" ||
         active == null || attempt == dismissed) return
     if (active.reason == AccessReason.VERIFICATION || requested == attempt) key(attempt) {
-        VerificationDialog(vm, { dismissed = attempt }) { vm.retryBrowseAfterVerification(active.context) }
+        VerificationDialog(vm, { dismissed = attempt })
     } else {
         AlertDialog(onDismissRequest = { dismissed = attempt }, title = { Text("Instance access") },
             text = { Text(active.reason.message) }, confirmButton = {
@@ -60,7 +60,7 @@ internal fun InstanceAccessPrompt(vm: AppViewModel, visible: Boolean, signIn: ()
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit, complete: () -> Unit) {
+private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
     val target = remember { vm.api.context() }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -90,7 +90,7 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit, complete: 
                             val value = JSONObject(body)
                             vm.access.complete(target, if (value.isNull("verificationToken")) null else value.getString("verificationToken"),
                                 if (value.isNull("expiresAt")) null else value.getLong("expiresAt"), value.getBoolean("enabled"))
-                            completed = true; complete()
+                            completed = true
                         } catch (e: CancellationException) { throw e }
                         catch (e: Exception) { error = e.message ?: "Verification failed. Try again." }
                         finally { busy = false }

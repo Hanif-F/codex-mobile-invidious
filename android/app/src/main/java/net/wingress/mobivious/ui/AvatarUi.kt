@@ -28,7 +28,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.disk.DiskCache
+import coil.imageLoader
+import coil.request.ImageRequest
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import net.wingress.mobivious.MobiviousApplication
+import net.wingress.mobivious.data.InstanceAccess
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import net.wingress.mobivious.data.Avatars
 import net.wingress.mobivious.data.Channel
 import net.wingress.mobivious.data.ChannelImages
@@ -36,6 +43,27 @@ import net.wingress.mobivious.data.ContentVisibility
 import net.wingress.mobivious.data.Video
 import net.wingress.mobivious.data.DisplayFormats
 import java.io.File
+
+/** A failed painter must observe recovery before Coil can apply the new credential/cache revision. */
+@Composable
+internal fun rememberInstanceImageKey(model: Any?): Any? {
+    val app = LocalContext.current.applicationContext as MobiviousApplication
+    val revision by app.access.revision.collectAsStateWithLifecycle()
+    val address = ((model as? ImageRequest)?.data ?: model)?.toString()?.toHttpUrlOrNull() ?: return null
+    val context = app.api.context()
+    return InstanceAccess.cacheScope(context) to if (InstanceAccess.sameOrigin(address, context.server)) revision else 0L
+}
+
+@Composable
+internal fun InstanceImage(model: Any?, contentDescription: String?, modifier: Modifier = Modifier,
+    imageLoader: ImageLoader? = null, contentScale: ContentScale = ContentScale.Fit,
+    onError: ((AsyncImagePainter.State.Error) -> Unit)? = null) {
+    val context = LocalContext.current
+    key(rememberInstanceImageKey(model)) {
+        AsyncImage(model, contentDescription, modifier = modifier, imageLoader = imageLoader ?: context.imageLoader,
+            contentScale = contentScale, onError = onError)
+    }
+}
 
 /** Shared image cache, keyed by the complete instance URL. */
 internal object AvatarImageLoader {
@@ -58,7 +86,7 @@ internal fun ChannelAvatar(server: String, image: String, name: String, size: Dp
         if (initial != null) Text(initial, Modifier.clearAndSetSemantics {}, color = foreground,
             fontSize = (size.value * .43f / LocalDensity.current.fontScale).sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
         else Icon(Icons.Default.Person, null, Modifier.size(size * .6f), tint = foreground)
-        if (url != null) AsyncImage(url, null, modifier = Modifier.fillMaxSize(), imageLoader = AvatarImageLoader.get(LocalContext.current),
+        if (url != null) InstanceImage(url, null, modifier = Modifier.fillMaxSize(), imageLoader = AvatarImageLoader.get(LocalContext.current),
             contentScale = ContentScale.Crop)
     }
 }
@@ -123,12 +151,13 @@ internal fun ChannelHeader(channel: Channel, server: String, thinMode: Boolean, 
     actions: @Composable () -> Unit = {}, readDescription: () -> Unit = {},
     subscriptionBusy: Boolean = false, subscriptionKnown: Boolean = true, subscriptionChecking: Boolean = false,
     subscriptionError: String? = null, subscribe: () -> Unit) {
-    var bannerFailed by remember(server, channel.banner) { mutableStateOf(false) }
+    val bannerKey = rememberInstanceImageKey(ChannelImages.url(server, channel.banner))
+    var bannerFailed by remember(server, channel.banner, bannerKey) { mutableStateOf(false) }
     Box {
         Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
             .testTag("channel-header").padding(AppTokens.inset), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (!thinMode && !bannerFailed && channel.banner.isNotBlank()) ChannelImages.url(server, channel.banner)?.let { url ->
-                AsyncImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(AppTokens.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
+                InstanceImage(url, "${channel.name} channel banner", modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp).aspectRatio(3.8f).clip(AppTokens.media).testTag("channel-banner"), imageLoader = AvatarImageLoader.get(LocalContext.current), contentScale = ContentScale.Crop, onError = { bannerFailed = true })
             }
             BoxWithConstraints(Modifier.fillMaxWidth()) {
                 val identity: @Composable () -> Unit = {

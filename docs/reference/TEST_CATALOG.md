@@ -337,6 +337,10 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `accessErrorsAreExcludedFromAutomaticBufferRecovery`
 - `onlyGateDrivenSameIdentityAuthenticationMayRetainPlayback`
 - `queuedImageContextMarkersRejectNewAccountsBeforeSendingAndNeverReachTheWire`
+- `supersededDenialsRetrySafeReadsOnceButNeverReplayWrites`
+- `aFreshPassRejectionAfterSafeReadReplayStillRequiresVerification`
+- `supersededReadRetriesAreBoundedAcrossRepeatedCompletions`
+- `obsoleteDisabledDiscoveryCannotEraseAFreshPass`
 
 ### LiveChatTest
 
@@ -1134,12 +1138,16 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `requiredLoginUsesNativeSignInWithRegistrationDisabledAndThenVerification`
 - `cancelledAndRecreatedVerificationCanBeRetried`
 - `accountAndServerChangesDiscardVerificationAndRejectStaleCompletions`
+- `verificationCompletingInBackgroundKeepsPlaybackPausedWhenBackgroundIsDisabled`
 - `unavailableVerificationAndPolicyChangesRemainRetryableWithoutSigningOut`
-- `playbackAccessExpiryPausesWithoutAutomaticRecoveryAndRetryKeepsPosition`
+- `playbackVerificationAutomaticallyRetriesAndKeepsPositionAndOptions`
+- `initialMetadataVerificationRetriesOnceAndPreservesAutoplayIntent`
+- `closingOrReplacingBlockedPlaybackDiscardsItsPendingRecovery`
+- `visibleImagesAndBannersRecoverWhileAnOldDenialArrivesAfterVerification`
 - `protectedDownloadsRetryWithoutRepeatingCompleteAssetsAndPlayOffline`
 - `requiredSignInDuringPlaybackRetainsThePausedPlayerUntilExplicitRetry`
 - `protectedTransferOwnershipChangesStopWorkAndCancellationStaysRetryable`
-- `backgroundAndPipAccessExpiryPauseUntilVerificationAndExplicitRetry`
+- `backgroundAndPipAccessExpiryResumeAfterForegroundVerification`
 - `cancelledVerificationStaysDismissedAcrossBackgroundAndPipUntilExplicitRetry`
 - `rendererFailureOffersAFreshPageWithoutCrashingTheApp`
 - `subframeCompletionsAreIgnoredAndRetryReplacesTheVisiblePage`
@@ -1593,4 +1601,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **941 declared test methods** (including ignored tests).
+Inventory total: **949 declared test methods** (including ignored tests).

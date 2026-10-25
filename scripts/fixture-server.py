@@ -11,7 +11,7 @@ import time
 import xml.etree.ElementTree as ET
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
-from threading import Lock
+from threading import Event, Lock
 from urllib.parse import urlparse, parse_qs, unquote
 
 parser = argparse.ArgumentParser()
@@ -57,9 +57,15 @@ default_prefs.update(ai_filter_enabled=False, **{f'ai_{kind}_{group}_action': 'o
 state = dict(viewCounts=False, annotationRequests=[], annotationStatus=200, annotationDelayNext=0, position=0, watched=[], playlists=[], savedPlaylists=[], playlistRss=False, sourceTitle='Live owner playlist', failSubscribe=False, events=[], stream='dash', mediaRequests=0, mediaPaths=[],
              identityReady=True, identityConfigured=False, failContribution=False, failSubmissions=False,
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
+access_delay_lock = Lock()
+access_delays = []
 def reset_access():
+    with access_delay_lock:
+        for pending in access_delays: pending.set()
+        access_delays.clear()
     state.update(accessEnabled=False, accessLogin=False, accessUnavailable=False, accessMissing=False,
-                 accessPolicy=1, accessExpiry=int(time.time()) + 3600, accessRequests=[])
+                 accessPolicy=1, accessExpiry=int(time.time()) + 3600, accessRequests=[],
+                 accessDelayPath='', accessDelayNext=0, accessDelayedDenials=[])
 reset_access()
 
 def reset_comments():
@@ -408,7 +414,19 @@ class Handler(BaseHTTPRequestHandler):
             self.respond(dict(error='verification_unavailable'), 503); return True
         if state['accessEnabled'] and self.access_status()['required']:
             reason = 'verification_expired' if self.headers.get('X-Invidious-Verification') == f"fixture-pass-{state['accessPolicy']}" and state['accessExpiry'] <= time.time() else 'verification_required'
-            self.respond(dict(error=reason, verification=self.access_status(), challengeUrl='/verify'), 403,
+            # Capture the denial before waiting, so a later successful verification cannot rewrite it.
+            body = dict(error=reason, verification=self.access_status(), challengeUrl='/verify')
+            pending = None
+            with access_delay_lock:
+                if p == state['accessDelayPath'] and state['accessDelayNext'] > 0:
+                    state['accessDelayNext'] -= 1
+                    pending = Event(); access_delays.append(pending)
+                    trace = dict(path=self.path, released=False)
+                    state['accessDelayedDenials'].append(trace)
+            if pending is not None:
+                pending.wait(30)
+                trace['released'] = True
+            self.respond(body, 403,
                          {'X-Invidious-Verification-Required': reason}); return True
         return False
 
@@ -960,8 +978,12 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if self.access_gate(): return
         if p == '/test/access':
-            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry'):
+            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry', 'accessDelayPath', 'accessDelayNext'):
                 if key in data: state[key] = data[key]
+            if data.get('accessReleaseDenials'):
+                with access_delay_lock:
+                    for pending in access_delays: pending.set()
+                    access_delays.clear()
             if data.get('resetRequests'): state['accessRequests'] = []
             return self.respond(self.access_status())
         if p == '/api/v1/verification/complete':

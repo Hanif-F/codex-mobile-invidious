@@ -86,14 +86,22 @@ failure/recovery presentation. Run these through the focused device runner;
 ## Instance access verification
 
 `InstanceAccessTest` covers redirect credential boundaries, bootstrap exclusions,
-stale requests, pass validation, account cache isolation and recovery policy.
+stale requests, pass validation, account cache isolation and recovery policy. Delayed
+old denials cannot reject a fresh pass; safe reads replay at most once, writes never
+replay, and obsolete disabled discovery cannot erase a new pass.
 `InstanceAccessSmokeTest` uses the disposable fixture for automatic verification,
 coalesced denials, automatic browsing/pagination retry, in-flight browse completion,
 the native WebView event/Keystore round trip, either/both gates, disabled registration,
 cancellation/recreation, stale account/instance contexts, expiry/policy/outage
-recovery, retained playback and protected-download retry/cancellation. Its
-background/PiP cases check deferred presentation, retained cancellation and that
-access failures do not enter buffer recovery.
+recovery, automatic playback retry and protected-download retry/cancellation.
+Playback cases cover initial metadata and stream denials, playing/paused intent,
+position/options, duplicate completion and discarded closed/replaced playback.
+A held fixture denial (`accessDelayPath`/`accessDelayNext`, released with
+`accessReleaseDenials`) exercises late-response recovery alongside visible image
+and remembered banner fallback recovery. Background/PiP cases check deferred
+presentation, retained cancellation, resumed foreground playback and paused
+recovery when background playback is disabled. Access failures do not enter
+automatic buffer recovery.
 
 ```sh
 ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only \

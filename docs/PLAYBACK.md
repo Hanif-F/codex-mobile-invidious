@@ -14,11 +14,16 @@ cross-protocol redirects are disabled. Clip previews use the same transport.
 main scope. Compose connects with `MediaController` and does not own that player.
 
 Access denials pause playback and bypass automatic buffer recovery. Verification
-retains position, speed, captions and selected tracks; use Retry after completing
-the check. Required-login recovery can retain the stopped queue when signing in
+retains position, speed, captions and selected tracks; completing the check retries
+the same occurrence automatically, retaining its playing/paused intent. Repeated
+error callbacks cannot overwrite the intent captured before the access pause.
+Initial video-metadata denials use the same recovery path. Closing/replacing playback
+or changing account/instance discards its pending verification recovery.
+Required-login recovery can retain the stopped queue when signing in
 as the same identity (or upgrading a guest); changing identities closes the old
-queue. Neither flow automatically restarts playback. Background/PiP denials retain
-the access issue until the app is foregrounded.
+queue. Sign-in-only recovery retains explicit Retry. Background/PiP denials retain
+the access issue until the app is foregrounded. Verification finishing while the
+app is hidden prepares paused playback when Background playback is disabled.
 
 `player/PlaybackQueue.kt` owns the runtime snapshot, occurrences, repeat and
 merge/successor rules, plus occurrence-aware share URLs. `data/Models.kt` retains

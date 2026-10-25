@@ -17,7 +17,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
 import net.wingress.mobivious.data.Playlist
 import net.wingress.mobivious.data.DisplayFormats
 import net.wingress.mobivious.data.Avatars
@@ -50,7 +49,7 @@ internal fun PlaylistCard(vm: AppViewModel, list: Playlist, open: () -> Unit, si
         Column(Modifier.fillMaxWidth().clickable(onClick = open).testTag("playlist-card-${list.id}")
             .padding(horizontal = if (embedded) 0.dp else AppTokens.inset, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             MediaListLayout(prefs.uiDensity == "compact", artwork = if (!prefs.thinMode && list.thumbnail.isNotBlank()) ({ modifier ->
-                AsyncImage(resolved(vm.store.server, list.thumbnail), null,
+                InstanceImage(resolved(vm.store.server, list.thumbnail), null,
                     modifier.aspectRatio(16f / 9f).clip(AppTokens.media), contentScale = ContentScale.Crop)
             }) else null) { modifier ->
                 Column(modifier) {
@@ -77,7 +76,7 @@ internal fun PlaylistHeader(vm: AppViewModel, list: Playlist, play: () -> Unit, 
     val subscribed = library.any { it.id == list.id && it.saved && !it.owned }
     WatchContent(Modifier.fillMaxWidth()) {
     Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 20.dp).testTag("playlist-header"), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (!prefs.thinMode && list.thumbnail.isNotBlank()) AsyncImage(resolved(vm.store.server, list.thumbnail), null,
+        if (!prefs.thinMode && list.thumbnail.isNotBlank()) InstanceImage(resolved(vm.store.server, list.thumbnail), null,
             Modifier.fillMaxWidth().heightIn(max = 260.dp).aspectRatio(16f / 9f).clip(AppTokens.media), contentScale = ContentScale.Crop)
         Text(list.title, style = MaterialTheme.typography.headlineMedium)
         Text(if (owned) "My playlist · ${list.privacy}" else list.sourceLabel + if (subscribed) " · Subscribed" else "",
