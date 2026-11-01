@@ -148,6 +148,24 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `storyboardReadsArePublicAndLimitedToTheInstance`
 - `creationRejectsInvalidDraftsBeforeSendingAndDropsLateAccountResponses`
 
+### CloudflareAccessTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/CloudflareAccessTest.kt) — Cloudflare challenge classification, native acceptance, bootstrap/redirect isolation, rotation, expiry, cancellation and bounded recovery.
+
+- `challengeHeaderPrecedesStatusJsonAndAccountExpiry`
+- `clearanceUsesActualExpiryAgentOriginAndBootstrapIsolation`
+- `sessionCookiesAreNotPersistedAcrossInstances`
+- `rejectedNativeProbeDoesNotSaveCookieOrPublishRecovery`
+- `edgeClearanceAndBackendPassMustBothBeAccepted`
+- `edgeRecoveryPreservesUnsupportedDiscoveryButNotOutages`
+- `redirectsStripClearanceAndAgentButPreserveRange`
+- `rotationAndDeletionOnlyAcceptClearanceFromCurrentOrigin`
+- `lateChallengeReplaysOnlySafeReadsOnceAndCannotRejectNewClearance`
+- `cancelledAndStaleProbesCannotPersistClearance`
+- `successfulNativeProbePersistsItsRotatedCookie`
+- `cookieExpiringDuringProbeCannotPublishRecovery`
+- `cancellationClosesProbeWithoutSavingItsCandidate`
+
 ### CommentsTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/CommentsTest.kt) — Comments declared scenarios; exact cases are enumerated in the test catalog.
@@ -963,6 +981,19 @@ Test support/helper file; no declared `@Test` methods.
 - `trimAccessibilityKeyboardRotationAndWideEditorKeepTheDraftUsable`
 - `pictureInPictureKeepsTheRelativeTimelineAndScopedActions`
 
+### CloudflareAccessSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt) — Synthetic edge verification, encrypted/process-restored clearance, combined gates, native authentication, cancellation, playback and downloads.
+
+- `edgeOnlyRestoresBrowsingAndEncryptedClearanceSurvivesStoreRecreation`
+- `edgeThenBackendTurnstileKeepsTheSameDialogUntilBothPass`
+- `rejectedNativeClearanceStaysOpenUntilExplicitRetry`
+- `cancellationSurvivesRecreationAndServerChangeDiscardsThePrompt`
+- `edgeVerificationIsAvailableOnNativeSignInAndDoesNotReplayLogin`
+- `clearanceRestoresAfterProcessRestart`
+- `registrationBootstrapCanVerifyAndThenRefreshWithoutReplayingSignup`
+- `playbackRecoveryKeepsPausedIntentAndManagedDownloadsUseClearance`
+
 ### CommentsPresentationTest
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CommentsPresentationTest.kt) — Comments Presentation declared scenarios; exact cases are enumerated in the test catalog.
@@ -1195,8 +1226,9 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### LiveInstanceAccessSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt) — Explicitly opted-in automatic real-provider native verification and dismissal without account or policy changes.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt) — Opt-in real-provider backend verification and interactive Cloudflare native browsing/playback acceptance without policy changes.
 
+- `realCloudflareClearanceRestoresNativeBrowsingAndPlayback`
 - `realProviderCompletesWithoutAccountOrPolicyChanges`
 
 ### MediaListPresentationTest
@@ -1601,4 +1633,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **949 declared test methods** (including ignored tests).
+Inventory total: **971 declared test methods** (including ignored tests).

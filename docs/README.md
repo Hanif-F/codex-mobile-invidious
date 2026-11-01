@@ -33,6 +33,10 @@ baseline and records later feature updates with evidence in
 | Audit documentation completeness and freshness | [Coverage](reference/COVERAGE.md) |
 | Operate the sibling Invidious server | [Deployment guide](../deploy/README.md) |
 
+Cloudflare edge clearance support was added on **2 November 2026**. See the
+[API contract](API.md#instance-access-gates), [troubleshooting](TROUBLESHOOTING.md#cloudflare-verification)
+and [focused verification instructions](TESTING.md#instance-access-verification).
+
 ## Scope and terminology
 
 **Mobivious** is the product name; `net.wingress.mobivious` is the release package.

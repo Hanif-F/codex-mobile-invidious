@@ -36,3 +36,27 @@ For development failures, use [Development](DEVELOPMENT.md) and
 [Testing](TESTING.md). A device test compiled successfully is not a passed runtime
 test. [Cleanup results](CLEANUP.md) distinguish known baseline failures from
 regressions and record the tested source/device scope.
+
+## Cloudflare verification
+
+A `cf-mitigated: challenge` response opens **Verify access**. Complete any visible
+Cloudflare interaction. The app checks a native API request before closing the
+dialog; a cookie appearing in the WebView alone is insufficient. Retry reloads a
+fresh verification page. Cancel leaves settings, instance selection and local
+downloads reachable. Login, signup, other writes and failed downloads require
+explicit user retry after verification.
+
+Keep Android System WebView current. A WebView update, network change, cookie
+expiry or Cloudflare rejection may require verification again. Embedded browsers
+have [limited Cloudflare support](https://developers.cloudflare.com/cloudflare-challenges/reference/supported-browsers/).
+If native requests remain challenged after browser verification, the dialog
+reports the rejection. Check the zone's rules and Challenge Passage settings;
+no client-side cookie handoff guarantees acceptance under every edge policy.
+
+The existing backend Turnstile gate is optional and independent. Its ordinary
+response token does not clear an edge challenge. If an operator enables Turnstile
+pre-clearance, configure the exact instance hostname in the same Cloudflare zone
+and use `managed` clearance or higher for a Managed Challenge. Keep server-side
+Siteverify validation. Ensure the verification page and its assets are reachable
+under the intended edge policy. See [Cloudflare pre-clearance](https://developers.cloudflare.com/turnstile/get-started/pre-clearance/).
+This client change does not activate backend protection or change live rules.

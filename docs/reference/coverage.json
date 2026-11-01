@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "reviewedSourceCommit": "7cf9c7f25f74eafc15cd7db1f2e6006dd6a3a619",
-  "reviewedDate": "2026-10-22",
+  "reviewedDate": "2026-11-02",
   "version": "0.13.2",
   "documents": [
     "AGENTS.md",
@@ -529,7 +529,7 @@
       "area": "Application entry points",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Process-wide repositories, instance-access controller, context-fenced image loaders and playback state wiring.",
-      "sha256": "506cc1e46321cd2d8d1953c11d40f6f63373da7d16079b1e1aef86b5773a4a18"
+      "sha256": "749342b222d4e42e15c01fcf08b2d2e635b612ef6b630332256c1e4969c9b3cc"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/AccentPreset.kt": {
       "area": "Data and API",
@@ -721,7 +721,7 @@
       "area": "Data and domain",
       "guide": "docs/STORAGE_AND_SECURITY.md",
       "description": "Keystore-encrypted account and per-instance verification storage plus local profile preference ownership.",
-      "sha256": "6e9579446e2d633d3a1de833fc933c29c9900351209a7bb1fb7e2dfbf4769d68"
+      "sha256": "e3d1eca4c0e19dc1759f4ff5768f6a41d18a18ad6dab7002b8c1c2437f1295cc"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt": {
       "area": "Data and domain",
@@ -1627,7 +1627,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic APIs/media and single-use HTTP/empty-video failures.",
-      "sha256": "09c2577d3755d4344c9e98f11a776cde91294cc711b5e8bdaa651acb02ecb5d4"
+      "sha256": "f30b9bddb462e1fc93fa44861f06e8dc81996569f5b924e34f7c8c7f3ed0f839"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1788,8 +1788,8 @@
     "android/app/src/main/java/net/wingress/mobivious/data/InstanceAccess.kt": {
       "area": "Data and domain",
       "guide": "docs/API.md",
-      "description": "Instance access discovery, typed gate failures, origin-bound credential transport and native pass validation.",
-      "sha256": "6698687505f2880d0b4ce860e4348c2a74f3d2ef888aa462d9ba2d8c150e2f35"
+      "description": "Independent Cloudflare/backend access gates, origin-bound credentials, native validation, cookie rotation and stale-response recovery.",
+      "sha256": "799e171c555e74a388ba305faa83dd87a1b0d80afc3d2a0b96785526a8c21dac"
     },
     "android/app/src/main/java/net/wingress/mobivious/downloads/ProtectedDownloadService.kt": {
       "area": "Android foundation",
@@ -1800,8 +1800,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/InstanceAccessUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Automatic origin-restricted WebView verification, coalesced access prompts and cancellation retained across lifecycle changes.",
-      "sha256": "4f740d72ecea3069c89ad51c1e92acfc92bf9cc0e83a3c7d0673c6d73b302382"
+      "description": "Origin-restricted Cloudflare/Turnstile WebView verification, native cookie handoff, bounded recovery and lifecycle-retained cancellation.",
+      "sha256": "aad9c187c90a4df7261d4a749dd9a6693133bb99675dc692fe6167c058505f0b"
     },
     "android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt": {
       "area": "JVM tests",
@@ -1813,13 +1813,13 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Fixture-backed automatic verification, browsing retry, cancellation/lifecycle/context isolation, encryption, playback and protected-download recovery journeys.",
-      "sha256": "d88fc4d331a664b2ac1c433dfadd86fa040f3077a6e6d451021b32b6e0ee8a2f"
+      "sha256": "763f2dc5a623c8329701a13f29f42ceed36f33e778a34a9e5a6688edff3649bf"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Explicitly opted-in automatic real-provider native verification and dismissal without account or policy changes.",
-      "sha256": "538cb270b870c46215a0ef0f880fbf5d0a9800bf8829f34871ba8d5dc4e278f9"
+      "description": "Opt-in real-provider backend verification and interactive Cloudflare native browsing/playback acceptance without policy changes.",
+      "sha256": "307a444db6b96f4605e0904bb822adebbfaed99e962f113629f2c315715ff641"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ProtectedDownloadsPersistenceSmokeTest.kt": {
       "area": "Android device tests",
@@ -1831,7 +1831,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Local fixture HTTP access-gate precedence, bootstrap, expiry, policy and outage contract checks.",
-      "sha256": "8ea88105d9f38da939f8e651d01ad087ccebfae861dfd8df1f54b53f73a563c8"
+      "sha256": "e7cb9b9c2740f55f508f6b3c68fe3c1d61a3ebb1d138626f2917fbb8caa9e769"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ViewCountsSmokeTest.kt": {
       "area": "Android device tests",
@@ -1862,6 +1862,24 @@
       "guide": "docs/TESTING.md",
       "description": "Single-use empty video metadata response, recovery/reset and retained HTTP failure fixture contracts.",
       "sha256": "67a96d9bf4c9332dc05cc35724bca8da7e507bd6fec4173c70bdec8cbe13f906"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/data/CloudflareClearance.kt": {
+      "area": "Data and domain",
+      "guide": "docs/STORAGE_AND_SECURITY.md",
+      "description": "Origin-scoped browser clearance model, expiry/user-agent validation and injectable encrypted-persistence boundary.",
+      "sha256": "9ea3e071efc8f298881b3f1ff03ccaaa1e0cdb4d89567466c52d0848887f6f23"
+    },
+    "android/app/src/test/java/net/wingress/mobivious/CloudflareAccessTest.kt": {
+      "area": "JVM tests",
+      "guide": "docs/TESTING.md",
+      "description": "Cloudflare challenge classification, native acceptance, bootstrap/redirect isolation, rotation, expiry, cancellation and bounded recovery.",
+      "sha256": "ff16bd75a132dc91f90c8c78f2890a9848e9b53259f1b20b1adc0fd709b8f5f2"
+    },
+    "android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Synthetic edge verification, encrypted/process-restored clearance, combined gates, native authentication, cancellation, playback and downloads.",
+      "sha256": "898bbc007907a79ce2184af0888e51340959ee87e2d49fb07ea6ccf12e3ddb0e"
     }
   },
   "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md.",

@@ -87,7 +87,9 @@ connection retry. Authenticated calls validate server match/expiry and captured
 context. Same-instance content APIs, images, captions and media may carry a valid
 account bearer and independent verification pass. Network interceptors recheck
 the origin on every redirect and strip Authorization, verification and Cookie
-headers before external requests. Each outgoing credential snapshot carries an
+headers before external requests. Cloudflare clearance and its user agent are
+bound to the exact selected origin; bootstrap APIs receive clearance without
+account credentials. Each outgoing credential snapshot carries an
 in-memory access revision: obsolete denials and disabled-policy discovery responses
 cannot invalidate a newly accepted pass. Superseded GET/HEAD requests retry once;
 writes require explicit recovery. Account/bootstrap credentials never enter URLs.
@@ -106,6 +108,16 @@ in a WebView. Only the instance verification page executes in a WebView, with an
 origin-restricted AndroidX message bridge accepting main-frame messages only.
 External top-level navigation and file/content access are blocked. Unsupported
 WebView versions show update guidance; SSL failures never bypass validation.
+Cloudflare clearance is separate from the signed instance pass. Native copies of
+persistent `cf_clearance` cookies, their attributes/expiry and associated WebView
+user agent use Android Keystore AES-GCM encryption with origin- and purpose-bound
+additional data. Session cookies remain in process memory. Expired cookies or a
+changed WebView user agent are not sent; rejected clearance is suppressed until
+fresh native validation. The WebView retains its private browser cookie store;
+only `cf_clearance` crosses into native transport. Native Set-Cookie rotation and
+deletion are accepted only for the selected origin and current access revision.
+No challenge tokens or cookies enter URLs or logs.
+
 Private RSS links must be same-origin `/feed/private` with a token parameter.
 
 ## Exported Android components and permissions

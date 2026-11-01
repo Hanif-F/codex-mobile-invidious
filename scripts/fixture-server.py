@@ -5,6 +5,8 @@ Bind localhost only; ADB reverse exposes it to the emulator for instrumentation.
 """
 import argparse
 from datetime import date, datetime, timezone, timedelta
+from email.utils import formatdate
+from http.cookies import SimpleCookie
 import json
 import re
 import time
@@ -65,7 +67,9 @@ def reset_access():
         access_delays.clear()
     state.update(accessEnabled=False, accessLogin=False, accessUnavailable=False, accessMissing=False,
                  accessPolicy=1, accessExpiry=int(time.time()) + 3600, accessRequests=[],
-                 accessDelayPath='', accessDelayNext=0, accessDelayedDenials=[])
+                 accessDelayPath='', accessDelayNext=0, accessDelayedDenials=[],
+                 edgeEnabled=False, edgePolicy=1, edgeExpiry=int(time.time()) + 3600,
+                 edgeSession=False, edgeRejectNative=False, edgeUserAgent='', edgeRotateProbe=0, edgeRequests=[])
 reset_access()
 
 def reset_comments():
@@ -399,7 +403,32 @@ class Handler(BaseHTTPRequestHandler):
                     expiresAt=state['accessExpiry'] if valid else None, duration=3600, siteKey='fixture-only',
                     challengeUrl='/verify?client=native', verificationHeader='X-Invidious-Verification')
 
+    def edge_gate(self):
+        p = urlparse(self.path).path
+        if not state['edgeEnabled'] or p.startswith('/test/'): return False
+        cookies = SimpleCookie()
+        try: cookies.load(self.headers.get('Cookie', ''))
+        except Exception: pass
+        clearance = cookies.get('cf_clearance')
+        valid = (clearance is not None and clearance.value == f"fixture-edge-{state['edgePolicy']}" and
+                 state['edgeExpiry'] > time.time() and self.headers.get('User-Agent') == state['edgeUserAgent'])
+        state['edgeRequests'].append(dict(path=self.path, method=self.command, accepted=valid,
+                                         cookieNames=list(cookies), userAgent=self.headers.get('User-Agent', ''),
+                                         bearer=self.headers.get('Authorization') is not None))
+        if valid and not (state['edgeRejectNative'] and p != '/verify'): return False
+        page = """<!doctype html><meta name="viewport" content="width=device-width"><title>Fixture edge verification</title>
+<button id="edge-complete" onclick="fetch('/test/edge-complete',{method:'POST',body:'{}'}).then(function(){location.reload()})">Complete fixture edge verification</button>"""
+        self.send_response(403)
+        self.send_header('cf-mitigated', 'challenge')
+        self.send_header('Content-Type', 'text/html')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Connection', 'close')
+        self.end_headers()
+        if self.command != 'HEAD': self.wfile.write(page.encode())
+        return True
+
     def access_gate(self):
+        if self.edge_gate(): return True
         p = urlparse(self.path).path
         if p.startswith('/test/') or p in ('/verify', '/api/v1/verification', '/api/v1/verification/complete',
                 '/api/v1/mobile/registration', '/api/v1/mobile/login', '/api/v1/mobile/register'):
@@ -439,6 +468,11 @@ class Handler(BaseHTTPRequestHandler):
         p = url.path
         if self.access_gate(): return
         if p == '/api/v1/verification':
+            if state['edgeEnabled'] and state['edgeRotateProbe'] > 0:
+                state['edgeRotateProbe'] -= 1
+                state['edgePolicy'] += 1
+                cookie = f"cf_clearance=fixture-edge-{state['edgePolicy']}; Path=/; HttpOnly; Expires=" + formatdate(state['edgeExpiry'], usegmt=True)
+                return self.respond(self.access_status(), headers={'Set-Cookie': cookie})
             return self.respond(dict(error='Not found'), 404) if state['accessMissing'] else self.respond(self.access_status())
         if p == '/verify':
             return self.xml('''<!doctype html><meta name=viewport content="width=device-width"><title>Fixture verification</title>
@@ -977,8 +1011,13 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['allRequests'].append(dict(method=self.command, path=self.path))
         data = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
         if self.access_gate(): return
+        if p == '/test/edge-complete':
+            state['edgeUserAgent'] = self.headers.get('User-Agent', '')
+            cookie = f"cf_clearance=fixture-edge-{state['edgePolicy']}; Path=/; HttpOnly; SameSite=Lax"
+            if not state['edgeSession']: cookie += '; Expires=' + formatdate(state['edgeExpiry'], usegmt=True)
+            return self.respond({}, headers={'Set-Cookie': cookie})
         if p == '/test/access':
-            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry', 'accessDelayPath', 'accessDelayNext'):
+            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry', 'accessDelayPath', 'accessDelayNext', 'edgeEnabled', 'edgePolicy', 'edgeExpiry', 'edgeSession', 'edgeRejectNative', 'edgeUserAgent', 'edgeRotateProbe'):
                 if key in data: state[key] = data[key]
             if data.get('accessReleaseDenials'):
                 with access_delay_lock:

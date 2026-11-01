@@ -1,5 +1,34 @@
 # Focused implementation verification
 
+## Cloudflare Managed Challenge — 2 November 2026
+
+The client now handles Cloudflare edge challenges independently of backend
+Turnstile and account authentication. Native clearance is encrypted per origin,
+uses the actual WebView user agent and cookie expiry, and is accepted only after
+a native discovery request. Session cookies remain memory-only. Bootstrap,
+images, playback and managed downloads share the same transport boundary.
+No live Cloudflare settings, backend policy or account credentials were changed.
+
+Verified on Android 16 `emulator-5554`, WebView **155.0.8059.43**:
+
+- `JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME=/home/haha.m.lady/Android/Sdk android/gradlew -p android :app:testDebugUnitTest :app:lintDebug --console=plain --offline`: **469 JVM tests passed**, debug lint passed. After explicit WebView feature guards and an additional cookie-path assertion, `android/gradlew -p android :app:testDebugUnitTest --tests 'net.wingress.mobivious.CloudflareAccessTest' :app:lintDebug --console=plain --offline` passed **13 focused cases**, with final lint **0 errors, 18 warnings**. The renderer handler is implemented and device-tested despite lint's `MissingOnRenderProcessGone` warning.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.CloudflareAccessSmokeTest,net.wingress.mobivious.InstanceAccessSmokeTest`: the new seven ordinary edge cases and twenty existing access cases passed across the combined run and focused rerun. A repeated-run image test initially timed out on its fixed cached URL; unique fixture query parameters now make its required recovery requests observable, and the changed case passed on rerun. The opt-in restart case is intentionally skipped by the ordinary class run.
+- Seed/image rerun: `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.InstanceAccessSmokeTest#visibleImagesAndBannersRecoverWhileAnOldDenialArrivesAfterVerification,net.wingress.mobivious.CloudflareAccessSmokeTest#edgeOnlyRestoresBrowsingAndEncryptedClearanceSurvivesStoreRecreation -Pandroid.testInstrumentationRunnerArguments.cloudflareKeepClearance=true`: **2 passed**.
+- After `adb -s emulator-5554 shell am force-stop net.wingress.mobivious.debug`, `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.CloudflareAccessSmokeTest#clearanceRestoresAfterProcessRestart -Pandroid.testInstrumentationRunnerArguments.cloudflareRestart=true`: **1 passed**, confirming encrypted native clearance survives actual process death without another WebView handoff.
+- Live: `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveInstanceAccessSmokeTest#realCloudflareClearanceRestoresNativeBrowsingAndPlayback -Pandroid.testInstrumentationRunnerArguments.liveCloudflareAccess=true -Pandroid.testInstrumentationRunnerArguments.liveKeepInstance=true`: **1 passed** against `https://invidious.wingress.net`. Real edge clearance, native discovery/feed, playing media and an advancing playback position were accepted without an account. A subsequent normal cold app launch loaded the production feed without another verification dialog. The debug app remains on the production instance.
+- `python3 -m unittest discover -s scripts/tests`: **37 passed**. After adding probe rotation, the affected `test_instance_access_fixture.py` selection passed **6 tests**; documentation-checker selection passed **7 tests**.
+- `python3 scripts/check-documentation.py --refresh`, its normal check and `git diff --check`: passed. The sibling server change is documentation-only; its bot-protection guide passed `git diff --check -- docs/bot-protection.md`.
+
+This is **28 distinct fixture device cases plus one live case**, with no remaining
+focused failures. It does not establish full connected-suite, physical-device or
+optimized-release acceptance. Live acceptance covers the current zone/network;
+future expiry, browser updates or policy rejection can require verification again.
+
+Logs, XML reports, preserved full JVM results, final lint XML and reviewed live
+screenshots are under ignored `.tools/cloudflare-results/`. `live-playback.png`
+shows production playback; `live-restarted.png` shows the normal app's feed after
+a cold restart. No clearance values are recorded in this report.
+
 ## Video metadata recovery and release 0.13.2 — 24 October 2026
 
 Version **0.13.2**, code **32**, converts empty or malformed video metadata into

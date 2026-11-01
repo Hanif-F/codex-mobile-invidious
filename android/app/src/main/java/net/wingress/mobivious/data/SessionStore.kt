@@ -14,6 +14,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import okhttp3.HttpUrl.Companion.toHttpUrl
 
 private class SharedProfilePersistence(private val prefs: SharedPreferences, private val onError: (String?) -> Unit) : ProfilePersistence {
     override fun values(): Map<String, Any?> = prefs.all
@@ -150,6 +151,31 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore, 
             if (pass == null) checked(emptyMap(), setOf(name(origin))) else {
                 val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()); updateAAD(origin.toByteArray()) }
                 val json = JSONObject().put("token", pass.token).put("expiresAt", pass.expiresAt).toString()
+                checked(mapOf(name(origin) to Base64.encodeToString(cipher.iv + cipher.doFinal(json.toByteArray()), Base64.NO_WRAP)))
+            }
+        }
+    }
+    val cloudflarePersistence: CloudflarePersistence = object : CloudflarePersistence {
+        private fun name(origin: String) = "cloudflare." + java.security.MessageDigest.getInstance("SHA-256")
+            .digest(origin.toByteArray()).joinToString("") { "%02x".format(it) }
+        override fun read(origin: String): CloudflareClearance? = synchronized(this@SessionStore) {
+            runCatching {
+                val encoded = prefs.getString(name(origin), null) ?: return@synchronized null
+                val bytes = Base64.decode(encoded, Base64.NO_WRAP)
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                    init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, bytes.copyOfRange(0, 12)))
+                    updateAAD(("cloudflare:" + origin).toByteArray())
+                }
+                val json = JSONObject(String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8))
+                CloudflareClearance.parse(origin.toHttpUrl(), json.getString("cookie"), json.getString("userAgent"))
+            }.getOrNull()
+        }
+        override fun write(origin: String, clearance: CloudflareClearance?) = synchronized(this@SessionStore) {
+            if (clearance == null || !clearance.cookie.persistent) checked(emptyMap(), setOf(name(origin))) else {
+                val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                    init(Cipher.ENCRYPT_MODE, key()); updateAAD(("cloudflare:" + origin).toByteArray())
+                }
+                val json = JSONObject().put("cookie", clearance.cookie.toString()).put("userAgent", clearance.userAgent).toString()
                 checked(mapOf(name(origin) to Base64.encodeToString(cipher.iv + cipher.doFinal(json.toByteArray()), Base64.NO_WRAP)))
             }
         }

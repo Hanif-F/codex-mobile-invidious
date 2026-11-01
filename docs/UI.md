@@ -8,15 +8,22 @@ record the latest tested scope and known failures.
 
 ## Instance access
 
-Required verification opens the embedded verification dialog automatically when
-the activity is resumed, outside PiP and sign-in. Required sign-in and unavailable
+Required backend or Cloudflare edge verification opens the embedded dialog automatically when
+the activity is resumed, outside PiP. Cloudflare verification is also available
+over native sign-in and registration, because the edge can challenge bootstrap
+requests. Other access prompts remain suppressed on sign-in. Required sign-in and unavailable
 verification retain their access prompts. Later/Cancel or Back leaves navigation,
 Server settings and local Downloads usable; cancellation survives recreation and
 PiP until Retry on the failed action reopens verification. Concurrent access
 failures share one dialog. Verification shows the selected origin,
 an origin-restricted WebView, load/error feedback and Retry/Cancel actions. It
 retains the default browser user agent, JavaScript and DOM storage for Turnstile.
-Only same-origin main-frame completion messages are accepted; external top-level
+Cloudflare clearance is checked by a native API request before recovery. If the
+backend also requires Turnstile, the same dialog remains until its pass is accepted.
+Rejected native clearance shows Retry/Cancel without repeatedly reopening the
+dialog. Cookies and their expiry are read through supported WebView metadata APIs;
+unsupported versions show update guidance. Only main-frame completion messages
+from the same-origin verification page are accepted; external top-level
 navigation is blocked. An outdated WebView shows update guidance.
 
 After successful verification, the dialog closes and browsing retries automatically

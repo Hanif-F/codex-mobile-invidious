@@ -21,10 +21,22 @@ POST/PUT/PATCH send JSON bodies (an empty object when no fields are supplied).
 Valid same-instance bearer authorization also accompanies content and media
 requests so private instances can enforce required sign-in. Verification uses
 the separate `X-Invidious-Verification` header. Bootstrap login, registration and
-verification requests omit stored bearer/verification headers and browser cookies.
+verification requests omit stored bearer/verification headers. Cloudflare clearance
+alone may accompany these bootstrap requests; browser account cookies are never
+imported.
 Every request is fenced against a changed live context before accepting its body.
 
 ## Instance access gates
+
+Cloudflare edge responses carrying `cf-mitigated: challenge` open the existing
+verification dialog before JSON or account-error handling. The native cookie
+adapter imports only `cf_clearance`, with its real expiry and the WebView's user
+agent, after a native `GET /api/v1/verification` accepts the candidate. Native
+requests send it only to the exact selected scheme/host/port, including bootstrap
+APIs. Normal 404/405 discovery responses retain older-instance compatibility;
+provider errors and malformed discovery responses do not establish verification.
+Backend Turnstile passes and account authentication remain independent. A failed
+native probe stays in the dialog until explicit Retry/Cancel.
 
 `GET /api/v1/verification` discovers Turnstile policy and checks an existing pass.
 Only 404/405 mean unsupported; outages remain errors. The embedded same-origin

@@ -85,6 +85,43 @@ failure/recovery presentation. Run these through the focused device runner;
 
 ## Instance access verification
 
+`CloudflareAccessTest` covers challenge headers before status/body handling,
+bootstrap isolation, native candidate rejection, expiry/user-agent/origin fences,
+session-only cookies, redirects, rotation/deletion, separate gates and bounded
+safe-read recovery without replaying writes. `CloudflareAccessSmokeTest` uses a
+synthetic localhost challenge to check browser/native cookie handoff, encrypted
+store recreation, both gates, cancellation, sign-in/signup, playback and managed
+downloads. The ordinary class run skips the opt-in force-stop restoration method.
+
+Run both affected classes through the focused runner:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.CloudflareAccessSmokeTest,net.wingress.mobivious.InstanceAccessSmokeTest
+```
+
+For actual process-restart acceptance, run the edge-only seed with
+`-Pandroid.testInstrumentationRunnerArguments.cloudflareKeepClearance=true`,
+force-stop only `net.wingress.mobivious.debug`, then select
+`CloudflareAccessSmokeTest#clearanceRestoresAfterProcessRestart` with
+`-Pandroid.testInstrumentationRunnerArguments.cloudflareRestart=true`.
+The fixture is recreated and configured from the encrypted credential's user
+agent; no browser-cookie handoff occurs in the restoration phase.
+
+The separate opt-in live edge case is intentionally interactive:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveInstanceAccessSmokeTest#realCloudflareClearanceRestoresNativeBrowsingAndPlayback \
+  -Pandroid.testInstrumentationRunnerArguments.liveCloudflareAccess=true
+```
+
+It waits up to four minutes for visible provider interaction and native clearance,
+then requires native browsing, ready/playing media and advancing playback position.
+It changes no account or server policy. A failed provider interaction, native
+challenge rejection or unavailable live stream remains an explicit production
+acceptance gap, separate from fixture success.
+
 `InstanceAccessTest` covers redirect credential boundaries, bootstrap exclusions,
 stale requests, pass validation, account cache isolation and recovery policy. Delayed
 old denials cannot reject a fresh pass; safe reads replay at most once, writes never

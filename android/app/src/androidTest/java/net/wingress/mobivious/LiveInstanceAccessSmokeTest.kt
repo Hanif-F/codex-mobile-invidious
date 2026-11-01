@@ -17,6 +17,42 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class LiveInstanceAccessSmokeTest {
     @get:Rule val compose = createServiceComposeRule()
+    @Test fun realCloudflareClearanceRestoresNativeBrowsingAndPlayback() {
+        Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("liveCloudflareAccess") == "true")
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
+        val vm = activity.model
+        val before = vm.store.server
+        try {
+            compose.runOnUiThread { vm.store.save(null); vm.switchServer("https://invidious.wingress.net"); vm.refresh() }
+            // Allow the visitor to interact with a real managed widget in the visible emulator.
+            compose.waitUntil(240_000) {
+                vm.access.clearance(vm.api.context()) != null
+            }
+            assertNotNull(runBlocking { vm.access.discover(vm.api.context()) })
+            val liveVideos = try { runBlocking { vm.api.discovery("popular") } }
+                catch (e: InstanceAccessException) { throw AssertionError("Native Cloudflare clearance accepted; live ${e.reason} prevents browsing/playback without account credentials.", e) }
+            assertTrue(liveVideos.isNotEmpty())
+            compose.waitUntil(60_000) { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+            compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+            val video = liveVideos.first { !it.unavailable && !it.membersOnly && !it.live }
+            compose.runOnUiThread { vm.openLink(VideoLink(video.id)); activity.sharedVideo.value = true }
+            compose.waitUntil(90_000) { vm.playback.value.playerState == androidx.media3.common.Player.STATE_READY && vm.playback.value.playing }
+            val start = vm.playback.value.position
+            compose.waitUntil(30_000) { vm.playback.value.position > start + 1000 }
+            assertNull(vm.access.issue.value); assertNull(vm.account.value)
+        } finally {
+            instrumentation.uiAutomation.takeScreenshot()?.let { bitmap ->
+                File(activity.filesDir, "access-live-cloudflare.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            }
+            compose.runOnUiThread {
+                vm.closePlayer(); vm.access.contextChanged()
+                if (InstrumentationRegistry.getArguments().getString("liveKeepInstance") != "true") { vm.switchServer(before); activity.finishAndRemoveTask() }
+            }
+        }
+    }
+
     @Test fun realProviderCompletesWithoutAccountOrPolicyChanges() {
         Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("liveInstanceAccess") == "true")
         val instrumentation = InstrumentationRegistry.getInstrumentation()

@@ -305,20 +305,22 @@ class InstanceAccessSmokeTest {
         assertEquals("testvideo02", vm.queue.value.current?.video?.id)
     }
     @Test fun visibleImagesAndBannersRecoverWhileAnOldDenialArrivesAfterVerification() {
+        // A prior instrumentation process may have successfully cached these fixture images.
+        val runId = System.nanoTime()
         command("access", """{"accessEnabled":true,"accessDelayPath":"/media/thumbnail.jpg","accessDelayNext":1}""")
         val client = vm.access.client()
         val pending = CompletableFuture.supplyAsync {
-            client.newCall(okhttp3.Request.Builder().url("http://127.0.0.1:18080/media/thumbnail.jpg?delayed").build()).execute().use { it.code }
+            client.newCall(okhttp3.Request.Builder().url("http://127.0.0.1:18080/media/thumbnail.jpg?delayed=$runId").build()).execute().use { it.code }
         }
         try {
             until { fixture().getJSONArray("accessDelayedDenials").length() == 1 }
             val failures = AtomicInteger(); val successes = AtomicInteger()
-            val request = coil.request.ImageRequest.Builder(activity).data("http://127.0.0.1:18080/media/thumbnail.jpg?visible")
+            val request = coil.request.ImageRequest.Builder(activity).data("http://127.0.0.1:18080/media/thumbnail.jpg?visible=$runId")
                 .listener(onError = { _, _ -> failures.incrementAndGet() }, onSuccess = { _, _ -> successes.incrementAndGet() }).build()
-            val channel = Channel("UC${"a".repeat(22)}", "Recovery author", image = "/ggpht/studio=s88?recovery",
-                banner = "/ggpht/banner=w1060-h175?banner")
+            val channel = Channel("UC${"a".repeat(22)}", "Recovery author", image = "/ggpht/studio=s88?recovery=$runId",
+                banner = "/ggpht/banner=w1060-h175?banner=$runId")
             val post = CommunityPost(Comment("Recovery author", "Recovery post", "", null, id = "Ugrecovery"), channel.id,
-                attachment = PostAttachment.Images(listOf(PostImage("/ggpht/post=w1280?recovery-post", 1280, 720))))
+                attachment = PostAttachment.Images(listOf(PostImage("/ggpht/post=w1280?recovery-post=$runId", 1280, 720))))
             compose.runOnUiThread {
                 activity.setContent {
                     MaterialTheme {

@@ -51,10 +51,47 @@ class InstanceAccessFixtureTest(unittest.TestCase):
             response = error
         with response:
             body = response.read()
-            return response.status, response.headers, json.loads(body) if body else None
+            return response.status, response.headers, (json.loads(body) if 'application/json' in response.headers.get('Content-Type', '') else body.decode()) if body else None
 
     def setUp(self):
         self.request('/test/reset', {})
+
+    def test_edge_challenges_bootstrap_and_requires_matching_cookie_and_agent(self):
+        self.request('/test/access', dict(edgeEnabled=True))
+        for path in ('/api/v1/verification', '/api/v1/mobile/registration', '/api/v1/popular', '/verify?client=native'):
+            status, headers, body = self.request(path)
+            self.assertEqual(403, status)
+            self.assertEqual('challenge', headers['cf-mitigated'])
+            self.assertIn('edge-complete', body)
+        _, headers, _ = self.request('/test/edge-complete', {}, {'User-Agent': 'Fixture WebView'})
+        self.assertIn('HttpOnly', headers['Set-Cookie'])
+        self.assertIn('Expires=', headers['Set-Cookie'])
+        credentials = {'Cookie': headers['Set-Cookie'].split(';')[0], 'User-Agent': 'Fixture WebView'}
+        self.assertEqual(200, self.request('/api/v1/verification', headers=credentials)[0])
+        self.assertEqual(200, self.request('/media/file', headers=credentials, method='HEAD')[0])
+        self.assertEqual(403, self.request('/api/v1/popular', headers=dict(credentials, **{'User-Agent': 'Wrong agent'}))[0])
+        self.request('/test/access', dict(edgeRotateProbe=1))
+        status, rotated, _ = self.request('/api/v1/verification', headers=credentials)
+        self.assertEqual(200, status)
+        self.assertIn('fixture-edge-2', rotated['Set-Cookie'])
+        self.assertEqual(403, self.request('/api/v1/verification', headers=credentials)[0])
+        credentials['Cookie'] = rotated['Set-Cookie'].split(';')[0]
+        self.assertEqual(200, self.request('/api/v1/verification', headers=credentials)[0])
+        self.request('/test/access', dict(edgePolicy=3))
+        self.assertEqual(403, self.request('/api/v1/verification', headers=credentials)[0])
+        self.request('/test/reset', {})
+        self.assertFalse(self.request('/test/state')[2]['edgeEnabled'])
+
+    def test_edge_and_backend_gates_remain_independent_and_session_cookie_has_no_expiry(self):
+        self.request('/test/access', dict(edgeEnabled=True, edgeSession=True, accessEnabled=True, accessLogin=True))
+        _, headers, _ = self.request('/test/edge-complete', {}, {'User-Agent': 'Fixture WebView'})
+        self.assertNotIn('Expires=', headers['Set-Cookie'])
+        credentials = {'Cookie': headers['Set-Cookie'].split(';')[0], 'User-Agent': 'Fixture WebView'}
+        self.assertEqual('login_required', self.request('/api/v1/popular', headers=credentials)[2]['error'])
+        credentials['Authorization'] = 'Bearer fixture-token'
+        self.assertEqual('verification_required', self.request('/api/v1/popular', headers=credentials)[2]['error'])
+        self.request('/test/access', dict(edgeRejectNative=True))
+        self.assertEqual('challenge', self.request('/api/v1/verification', headers=credentials)[1]['cf-mitigated'])
 
     def test_both_gates_preserve_bootstrap_and_require_separate_credentials(self):
         self.request('/test/access', dict(accessEnabled=True, accessLogin=True))

@@ -42,7 +42,9 @@ class MobiviousApplication : Application(), coil.ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         store = SessionStore(this)
-        access = net.wingress.mobivious.data.InstanceAccess(store::positionContext, store.verificationPersistence)
+        val verificationUserAgent = android.webkit.WebSettings.getDefaultUserAgent(this)
+        access = net.wingress.mobivious.data.InstanceAccess(store::positionContext, store.verificationPersistence,
+            store.cloudflarePersistence, { verificationUserAgent })
         downloads = net.wingress.mobivious.data.DownloadRepository(this)
         net.wingress.mobivious.downloads.DownloadExportService.restore(this)
         cache = ResponseCache(File(cacheDir, "feeds"))
