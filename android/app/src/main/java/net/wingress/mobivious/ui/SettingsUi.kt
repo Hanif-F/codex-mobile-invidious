@@ -279,8 +279,7 @@ private fun PreferenceSettingsScreen(vm: AppViewModel, page: String, prefs: Acco
                         SettingsToggle("Show related videos", "Display recommendations below the video", value.relatedVideos) { update(value.copy(relatedVideos = it)) }
                         SettingsToggle("Expand descriptions by default", "Show the full description when opening a video", value.extendDescription) { update(value.copy(extendDescription = it)) }
                         SettingsToggle("Show YouTube comments", "Show a comments entry on video pages; text stays hidden until opened", value.showYoutubeComments) { enabled ->
-                            val others = value.comments.filter { it != "youtube" && it.isNotBlank() }
-                            update(value.copy(comments = ((if (enabled) listOf("youtube") else emptyList()) + others).take(2).let { it + List((2 - it.size).coerceAtLeast(0)) { "" } }))
+                            update(value.copy(comments = PreferenceRules.youtubeComments(enabled)))
                         }
                     } }
                 }

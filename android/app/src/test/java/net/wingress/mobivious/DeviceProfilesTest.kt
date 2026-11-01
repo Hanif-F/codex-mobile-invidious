@@ -18,6 +18,20 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DeviceProfilesTest {
+    @Test fun legacyGuestCommentsNormalizeOnRestoreAndRemainScopedToTheirInstance() {
+        val memory = Memory(); val profiles = DeviceProfiles(memory)
+        profiles.write(guest, "preferences", """{"comments":["","reddit"],"speed":1.5}""")
+        val other = guest.copy(server = "https://other.test")
+        profiles.write(other, "preferences", """{"comments":["",""],"speed":0.75}""")
+        val reopened = DeviceProfiles(memory)
+        val restored = LocalPreferences.read(JSONObject(reopened.value(guest, "preferences") as String))
+        assertEquals(listOf("", "youtube"), restored.comments); assertTrue(restored.showYoutubeComments)
+        assertEquals(1.5f, restored.speed)
+        profiles.write(guest, "preferences", restored.json().toString())
+        assertFalse((profiles.value(guest, "preferences") as String).contains("reddit"))
+        assertFalse(LocalPreferences.read(JSONObject(reopened.value(other, "preferences") as String)).showYoutubeComments)
+        assertNull(profiles.value(alice, "preferences"))
+    }
     @Test fun seekPreferencesSurviveRecreationAndStayWithinTheirGuestAccountAndInstance() {
         val memory = Memory(); val profiles = DeviceProfiles(memory)
         val other = guest.copy(server = "https://other.test")

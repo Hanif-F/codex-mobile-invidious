@@ -1,5 +1,85 @@
 # Focused implementation verification
 
+## Upstream mobile compatibility (`588135f5`) — 2 November 2026
+
+Implemented legacy Reddit → YouTube normalization for account/guest preferences
+and link overrides; advertised playlist-based Shows tabs and `/show/VL…` links;
+and typed Invidious/YouTube/FreeTube OPML plus NewPipe JSON exports. Open, Save and
+Share use the selected MIME type, preserve attachment names and reject obsolete
+format/account/instance responses. Successful export retries now clear the old
+error instead of leaving file actions hidden. Existing DASH 720p remains supported.
+
+Checks after the relevant final edits:
+
+- Focused JVM: from `android/`, `./gradlew :app:testDebugUnitTest --offline --console=plain`
+  with repeated `--tests` selectors for `net.wingress.mobivious.PreferencesTest`,
+  `DeviceProfilesTest`, `ContentLinksTest`, `ChannelTest`, `CommunityTest` and
+  `PlaylistRssTest`: **69 passed**. Device sources also compiled through
+  `:app:compileDebugAndroidTestKotlin`.
+- Final Android gate: from `android/`, `./gradlew :app:testDebugUnitTest :app:lintDebug --offline --console=plain`:
+  **474 JVM tests passed, 0 failures/errors/skips**; debug lint **0 errors, 18 warnings**,
+  matching the existing warning count. Gradle incremental outputs were retained.
+- Emulator: `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=<selectors below>`:
+  **27 distinct selected cases accepted**, no selected ignored/skipped cases. The
+  first eight-case batch found the export-retry error-retention bug; after its fix,
+  the two export cases and shared-consumer regressions passed in a **22-case batch**.
+  Earlier passing checks of unaffected comments, Shows and presentation behavior
+  remain valid. Connected tasks built and installed their debug app/test APKs.
+- Python: `python3 -m unittest discover -s scripts/tests`: **39 passed**.
+  `python3 scripts/check-community-fixture.py`: **passed**, including ten channel
+  tabs and Shows continuation contracts. A concurrent Python workflow attempt
+  initially collided with the emulator fixture's port 18080; the complete Python
+  run passed after the device runner released the port.
+- Server: in the sibling checkout, `ACCOUNT_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55435/invidious_accounts_test CRYSTAL_CACHE_DIR=/tmp/invidious-merge-accounts-cache crystal run tests/database/accounts.cr -Dskip_videojs_download`:
+  **full guarded account harness passed**. New route cases cover all four formats,
+  165 subscriptions including an uncached channel, empty lists, NewPipe metadata,
+  MIME/filenames, no-store, unchanged export scope and rejected unsupported formats.
+  PostgreSQL ran in a dedicated disposable container, removed after completion.
+- Server source: `crystal tool format --check src/invidious/routes/api/v1/native_library.cr tests/database/playlist_rss_checks.cr`;
+  `crystal build src/invidious.cr -Dskip_videojs_download --no-codegen`; and
+  `crystal build src/invidious.cr -Dapi_only -Dskip_videojs_download --no-codegen`:
+  **passed**.
+- Documentation: Android `python3 scripts/check-documentation.py --refresh` then
+  `python3 scripts/check-documentation.py`; sibling
+  `python3 docs/tools/generate_reference.py --check` and
+  `python3 docs/tools/check_docs.py`; both repositories' `git diff --check`:
+  **passed**.
+
+The exact selected device methods use package `net.wingress.mobivious`; the
+OpeningLinks class was selected in full. Each `Class#method` is a comma-separated
+selector to the focused command above.
+
+| Class | Selected methods |
+| --- | --- |
+| `ChannelSmokeTest` | `channelTabsRetainTheirSortLoadedPagesAndVisiblePositionWithinTheAccount`, `delayedPagesCannotReplaceTheSelectedTabOrAppendToAnotherChannelRoute`, `streamsOnlyChannelsOpenOnStreamsAndRetryPreservesTheSelection` |
+| `CommentsSmokeTest` | `entryHidesSpoilersAndFetchesOnlyWhenOpenedAndReusesLoadedComments`, `initialRetryEmptyStateAndDisabledPreferenceAreExplicit` |
+| `CommunityPresentationTest` | `showsAndExportChoicesRemainReachableAtNarrowLargeFontSizes` |
+| `CommunitySmokeTest` | `showsRetryTheirCursorAndIncomingLinksRestoreTheAdvertisedTab`, `specializedTabsSortAndRestoreAfterSearchAndChildNavigation` |
+| `ContentLinksSmokeTest` | `recreationRetainsOverridesAndSuccessorsKeepOnlyCarriedOptions`, `sharedChannelAliasesResolveAndRetryWithoutSearching`, `sourceOnlyLinksApplyOptionsAndBoundsToTheFirstOccurrence`, `youtubeViewIntentsOpenColdAndWarmWithPreciseTimestampsAndDoNotReplayOnRecreation` |
+| `DeviceProfileStorageTest` | `guestTwoAccountsAndRestartRestoreOnlyTheirOwnDeviceSaves`, `legacyCommentSourcesRestoreWithoutCrossingGuestAccountOrInstanceBoundaries` |
+| `DeviceProfilesSmokeTest` | `guestAccountTransitionsRestoreSettingsAndNeverRewriteGuestSpeed` |
+| `OpeningLinksPresentationTest` | `manifestExcludesUnrelatedPagesHostsAndSchemes`, `manifestMatchesAllEightHostsOverHttpAndHttps`, `settingsScreenExplainsSelectionAndOffersTheSystemShortcut`, `shortcutTargetsTheInstalledPackageAndFallsBackToAppDetails` |
+| `PlaylistRssSmokeTest` | `allSubscriptionExportsOpenSaveAndShareTheSelectedBodyAndMimeType`, `rssSheetsOfferCorrectLinksFilesAndClearOnAccountChange`, `subscriptionExportRetryLegacyServersAndLateFormatsNeverReplaceTheCurrentSelection`, `typedDiscoveryAndChannelPaginationKeepMixSeeds` |
+| `SettingsSmokeTest` | `failedAutomaticSaveKeepsRequestedValueAcrossNavigationRecreationAndRetry`, `guestPlaybackDefaultsAndLocalResumeReachPlayer`, `legacyCommentsNormalizeForGuestsAndAccountsAndFailedTogglesRetryAfterRecreation` |
+| `SubscriptionJourneyTest` | `darkOpaqueFeedAndExportsRetainAccessibleControls` |
+
+Visual QA inspected the actual Shows page/export sheet and the production tab
+controls at 320dp width with 2× font scaling. Selected chips remained readable and
+all choices were reachable by horizontal scrolling. Screenshots are retained under
+ignored `.tools/upstream-screenshots/`; logs and result snapshots use
+`.tools/upstream-*` and `/tmp/mobivious-upstream-*`.
+
+The new file-intent test reads the actual Open/Share content URIs and saved bytes
+for all formats, checks MIME types and filenames, verifies document cancellation,
+and prevents an account switch from writing a pending export. The recovery case
+covers old servers, delayed failing formats, recreation, dismissal and instance
+changes. These fixture results do **not** establish full-device-suite acceptance;
+existing ignored/known failures outside the selections remain as documented.
+Actual import into NewPipe/FreeTube and production deployment were not performed.
+Deploy the sibling export extension before relying on the two new formats. It
+reuses `GET:subscriptions/export`; no migration or renewed sign-in is required.
+No release publishing or production configuration changes were made.
+
 ## Cloudflare Managed Challenge — 2 November 2026
 
 The client now handles Cloudflare edge challenges independently of backend

@@ -27,6 +27,28 @@ import org.junit.runner.RunWith
 class CommunityPresentationTest {
     @get:Rule val compose = createComposeRule()
     private val owner = "UC" + "a".repeat(22)
+    @Test fun showsAndExportChoicesRemainReachableAtNarrowLargeFontSizes() {
+        var selectedTab by mutableStateOf(ChannelTab.SHOWS)
+        var selectedExport by mutableStateOf(SubscriptionExportFormat.INVIDIOUS_OPML)
+        compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {
+                Surface(Modifier.width(320.dp)) {
+                    Column {
+                        ChannelBrowseControls(Channel(owner, "Creator", tabs = ChannelTab.entries.map { it.path }), selectedTab, ChannelSort.NEWEST, "last", "", "",
+                            {}, {}, {}, { selectedTab = it }, {}, {})
+                        SubscriptionExportFormats(selectedExport) { selectedExport = it }
+                    }
+                }
+            }
+        } }
+        compose.onNodeWithTag("channel-tab-shows").performScrollTo().assertIsDisplayed().assertIsSelected()
+        captureWatchScreenshot("shows-tabs-narrow-large-font")
+        for (format in SubscriptionExportFormat.entries) {
+            compose.onNodeWithTag("feed-format-${format.apiValue}").performScrollTo().performClick().assertIsSelected()
+            assertEquals(format, selectedExport)
+            if (format == SubscriptionExportFormat.NEWPIPE_JSON) captureWatchScreenshot("subscription-exports-narrow-large-font")
+        }
+    }
 
     @Test fun postActionsSeparateLikesAndShareAboveAFullWidthCommentsButton() {
         var dark by mutableStateOf(false)

@@ -106,7 +106,7 @@ Progressive sources retain embedded audio; downloads keep their saved tracks.
 | Region | `region` | `US` | Two uppercase letters; picker uses the fixed content-region catalog. Shared. |
 | Related videos | `related_videos` | true | Watch recommendations and standalone continuation eligibility. Shared. |
 | Expanded description / `extendDescription` | `extend_desc` | false | Initial watch disclosure state. Shared. |
-| Comments | `comments` | `["youtube", ""]` | UI toggles the YouTube entry; preserved other website values do not create a native Reddit comment implementation. Shared. |
+| Comments | `comments` | `["youtube", ""]` | Legacy `reddit` sources normalize to `youtube` on read/write. The toggle saves `["youtube", ""]` or `["", ""]`; unrelated edits stay sparse. Shared. |
 | Trending category | local `discovery.category` | `livestreams` | `livestreams` or `gaming`; profile-local, immediate. |
 | Search members override | local search `showMembers` | null | null inherits current shared preference; true/false explicitly override it. Profile-local. |
 | Search include blocked | local search `includeBlocked` | false | Profile-local search visibility exception. |

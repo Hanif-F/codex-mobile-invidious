@@ -202,6 +202,7 @@ def community_posts():
 
 def reset_home_subscriptions():
     state.update(subscriptionChannels=[dict(author=video['author'], authorId=video['authorId'], authorThumbnails=video['authorThumbnails'])],
+                 exportRequests=[], exportDelayNext=0, exportFailNext=False, exportLegacy=False,
                  subscriptionRequests=[], subscriptionDelayNext=0, failSubscriptionRead=False,
                  subscriptionStatsMode='full', subscriptionStats={}, subscriptionWriteDelayNext=0, failSubscriptionWrite=False,
                  discoveryRequests=[], discoveryDelayNext=0, discoveryDistinct=False, discoveryCategories=False,
@@ -302,11 +303,12 @@ class Handler(BaseHTTPRequestHandler):
         if data is not None and self.command != 'HEAD':
             self.wfile.write(json.dumps(data).encode())
 
-    def xml(self, text, content_type='application/xml'):
+    def xml(self, text, content_type='application/xml', headers=None):
         self.send_response(200)
         self.send_header('Content-Type', content_type)
         self.send_header('Connection', 'close')
         self.send_header('Cache-Control', 'private, no-store')
+        for name, value in (headers or {}).items(): self.send_header(name, value)
         self.end_headers()
         self.wfile.write(text.encode())
 
@@ -345,7 +347,7 @@ class Handler(BaseHTTPRequestHandler):
             if tab == 'channels':
                 related = dict(author='Related creator', authorId='UC' + 'c' * 22, authorVerified=True, subCount=24, description='Related channel description', authorThumbnails=video['authorThumbnails'])
                 return self.respond(dict(relatedChannels=[related] if token is None else [], continuation=next_token if token is None else None))
-            if tab in ('playlists', 'podcasts', 'releases', 'courses'):
+            if tab in ('playlists', 'podcasts', 'releases', 'courses', 'shows'):
                 state['events'].append(dict(action='channel-playlists', sort=params.get('sort_by', ['last'])[0], continuation=token))
                 return self.respond(dict(playlists=[source_playlist('PLlive' if token is None else 'RDopaque')], continuation=next_token if token is None else None))
             if tab in ('videos', 'shorts'):
@@ -888,8 +890,28 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
         elif p == '/api/v1/auth/subscriptions/search': self.search('subscriptions', url.query)
         elif p == '/api/v1/auth/feed/rss': self.respond(dict(feedPath='/feed/private?token=fixture-rss-secret'))
         elif p == '/api/v1/auth/subscriptions/export':
-            feed = 'https://www.youtube.com/feeds/videos.xml?channel_id=' if parse_qs(url.query).get('format') == ['newpipe'] else 'http://127.0.0.1:18080/feed/channel/'
-            self.xml('<opml version="1.1"><body><outline text="Subscriptions"><outline type="rss" xmlUrl="' + feed + video['authorId'] + '"/></outline></body></opml>')
+            format = parse_qs(url.query, keep_blank_values=True).get('format', ['rss'])[0]
+            event = dict(format=format, authorized=bool(self.headers.get('Authorization')), completed=False)
+            state['exportRequests'].append(event)
+            channels = {channel['authorId']: dict(channel) for channel in state['subscriptionChannels']}
+            delay, fail, legacy = state['exportDelayNext'], state['exportFailNext'], state['exportLegacy']
+            state['exportDelayNext'] = 0; state['exportFailNext'] = False
+            if delay: time.sleep(min(5000, max(0, delay)) / 1000)
+            event['completed'] = True
+            if fail: return self.respond(dict(error='Fixture subscription export unavailable'), 503)
+            if format not in ('rss', 'newpipe', 'opml', 'newpipe_json') or legacy and format in ('opml', 'newpipe_json'):
+                return self.respond(dict(error='Unsupported subscription export format.'), 400)
+            filename = 'newpipe_subscriptions' if format == 'newpipe_json' else 'freetube_subscriptions.opml' if format == 'opml' else 'subscriptions.opml'
+            headers = {'Content-Disposition': f'attachment; filename="{filename}"'}
+            if format == 'newpipe_json':
+                data = dict(app_version='0.29.0', app_version_int=1014, subscriptions=[dict(service_id=0,
+                    url='https://www.youtube.com/channel/' + id, name=channel.get('author', id)) for id, channel in channels.items()])
+                return self.xml(json.dumps(data), 'application/json', headers)
+            root = ET.Element('opml', version='1.1')
+            group = ET.SubElement(ET.SubElement(root, 'body'), 'outline', text='Subscriptions')
+            feed = 'http://127.0.0.1:18080/feed/channel/' if format == 'rss' else 'https://www.youtube.com/feeds/videos.xml?channel_id='
+            for id, channel in channels.items(): ET.SubElement(group, 'outline', type='rss', text=channel.get('author', id), xmlUrl=feed + id)
+            self.xml(ET.tostring(root, encoding='unicode'), headers=headers)
         elif p.endswith('/feed') and p.startswith('/api/v1/auth/playlists/'):
             self.xml('<feed xmlns="http://www.w3.org/2005/Atom"><id>iv:playlist:IVowned</id><title>My private playlist</title><updated>2026-10-04T00:00:00Z</updated></feed>', 'application/atom+xml')
         elif p == '/api/v1/auth/playlists': self.respond([dict(pl, isOwned=True, isSaved=False) for pl in state['playlists']] + [source_playlist(id) for id in state['savedPlaylists']])
@@ -946,7 +968,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             self.respond(dict(position=state['positions'][id], videoId=id) if id in state['positions'] else dict(error='Playback position does not exist.'), 200 if id in state['positions'] else 404)
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
         elif p == '/api/v1/channels/' + 'UC' + 'c' * 22: self.channel('metadata', url.query, 'UC' + 'c' * 22)
-        elif p.startswith('/api/v1/channels/') and p.rsplit('/', 1)[-1] in ('videos', 'shorts', 'streams', 'playlists', 'podcasts', 'releases', 'courses', 'posts', 'channels'):
+        elif p.startswith('/api/v1/channels/') and p.rsplit('/', 1)[-1] in ('videos', 'shorts', 'streams', 'playlists', 'podcasts', 'releases', 'courses', 'shows', 'posts', 'channels'):
             self.channel(p.rsplit('/', 1)[-1], url.query, p.split('/')[4])
         elif p.startswith('/api/v1/post/') and p.endswith('/comments'):
             self.comments(p.split('/')[4], url.query, is_post=True)
@@ -1073,7 +1095,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             return self.respond({})
         if p == '/test/playlist-rss':
             state['playlistRss'] = True
-            for key in ('sourceTitle', 'failSubscribe'):
+            for key in ('sourceTitle', 'failSubscribe', 'exportDelayNext', 'exportFailNext', 'exportLegacy'):
                 if key in data: state[key] = data[key]
             state['channelTabs'] = ['videos', 'streams', 'playlists']
             if not state['playlists']: state['playlists'] = [dict(playlistId='IVowned', title='My private playlist', privacy='private', videoCount=1, videos=[dict(video, indexId='A', index=0)])]
@@ -1184,7 +1206,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
                                           videos=[dict(video, indexId='A'), dict(visibility_member, indexId='B')])]
             return self.respond({})
         if p in ('/test/channel', '/test/community'):
-            if p == '/test/community': state.update(channelTabs=['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'playlists', 'posts', 'channels'], channelRichHeader=True)
+            if p == '/test/community': state.update(channelTabs=['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'shows', 'playlists', 'posts', 'channels'], channelRichHeader=True)
             for key in ('channelTabs', 'channelDescription', 'channelFailNext', 'channelDelayNext', 'shortsMetadata', 'postFailNext', 'postDelayNext', 'postEmpty', 'postLongText'):
                 if key in data: state[key] = data[key]
             return self.respond({})
@@ -1337,6 +1359,8 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['chatTimingRequests'].append(dict(method='PUT', video=id, offsetMs=offset))
             return self.respond(dict(offsetMs=offset))
         elif p == '/api/v1/auth/preferences':
+            if 'comments' in data and (not isinstance(data['comments'], list) or len(data['comments']) > 2 or any(source not in ('', 'youtube') for source in data['comments'])):
+                return self.respond(dict(error='Invalid comments'), 400)
             if state.get('performancePatchDelay'): time.sleep(state['performancePatchDelay']/1000)
             if 'seek_seconds' in data and (type(data['seek_seconds']) is not int or data['seek_seconds'] not in (5, 10, 20, 30)):
                 return self.respond(dict(error='Invalid seek interval'), 400)

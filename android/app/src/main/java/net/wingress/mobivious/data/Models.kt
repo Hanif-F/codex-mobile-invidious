@@ -30,10 +30,10 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
 data class MusicCredit(val song: String, val artist: String, val album: String, val license: String = "")
 enum class ChannelTab(val path: String, val label: String) {
     VIDEOS("videos", "Videos"), SHORTS("shorts", "Shorts"), STREAMS("streams", "Streams"),
-    PODCASTS("podcasts", "Podcasts"), RELEASES("releases", "Releases"), COURSES("courses", "Courses"),
+    PODCASTS("podcasts", "Podcasts"), RELEASES("releases", "Releases"), COURSES("courses", "Courses"), SHOWS("shows", "Shows"),
     PLAYLISTS("playlists", "Playlists"), CLIPS("clips", "Clips"), POSTS("posts", "Posts"), CHANNELS("channels", "Channels");
     val videoTab get() = this in listOf(VIDEOS, SHORTS, STREAMS)
-    val playlistTab get() = this in listOf(PODCASTS, RELEASES, COURSES, PLAYLISTS)
+    val playlistTab get() = this in listOf(PODCASTS, RELEASES, COURSES, SHOWS, PLAYLISTS)
 }
 enum class ChannelSort(val apiValue: String, val label: String) {
     NEWEST("newest", "Newest"), OLDEST("oldest", "Oldest"), POPULAR("popular", "Popular")

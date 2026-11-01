@@ -15,7 +15,7 @@ data class PlaybackLinkOptions(val listen: Boolean? = null, val speed: Float? = 
         local = local ?: base.local, autoplay = autoplay ?: base.autoplay, continueNext = continueNext ?: base.continueNext,
         continueAutoplay = continueAutoplay ?: base.continueAutoplay, videoLoop = loop ?: base.videoLoop,
         qualityDash = quality ?: base.qualityDash, videoCodec = codec ?: base.videoCodec, captions = captions ?: base.captions,
-        region = region ?: base.region, comments = comments ?: base.comments, relatedVideos = related ?: base.relatedVideos,
+        region = region ?: base.region, comments = PreferenceRules.commentSources(comments ?: base.comments), relatedVideos = related ?: base.relatedVideos,
         extendDescription = description ?: base.extendDescription, savePosition = savePosition ?: base.savePosition, annotations = annotations ?: base.annotations, vrMode = vrMode ?: base.vrMode)
     fun carried() = PlaybackLinkOptions(listen, speed, local)
     fun json() = JSONObject().apply {
@@ -23,7 +23,7 @@ data class PlaybackLinkOptions(val listen: Boolean? = null, val speed: Float? = 
             "continue_autoplay" to continueAutoplay, "loop" to loop, "quality_dash" to quality, "video_codec" to codec,
             "region" to region, "related_videos" to related, "extend_desc" to description, "save_player_pos" to savePosition, "annotations" to annotations, "vr_mode" to vrMode)
             .forEach { (key, value) -> if (value != null) put(key, value) }
-        captions?.let { put("subtitles", it.joinToString(",")) }; comments?.let { put("comments", it.joinToString(",")) }
+        captions?.let { put("subtitles", it.joinToString(",")) }; comments?.let { put("comments", PreferenceRules.commentSources(it).joinToString(",")) }
     }
     companion object {
         fun parse(j: JSONObject): PlaybackLinkOptions {
@@ -34,7 +34,8 @@ data class PlaybackLinkOptions(val listen: Boolean? = null, val speed: Float? = 
                 (j.opt("quality_dash") as? String)?.takeIf { it in PreferenceRules.qualities },
                 (j.opt("video_codec") as? String)?.takeIf { value -> PreferenceRules.videoCodecs.any { it.first == value } },
                 choices("subtitles")?.take(3), (j.opt("region") as? String)?.uppercase()?.takeIf { it.matches(Regex("[A-Z]{2}")) },
-                choices("comments")?.takeIf { values -> values.all { it.lowercase() in listOf("youtube", "reddit") } }?.map { it.lowercase() },
+                (j.opt("comments") as? String)?.takeIf { it.length <= 300 }?.split(',')?.map { it.trim().lowercase() }
+                    ?.takeIf { values -> values.all { it in listOf("", "youtube", "reddit") } }?.let(PreferenceRules::commentSources),
                 bool("related_videos"), bool("extend_desc"), bool("save_player_pos"),
                 bool("annotations") ?: when (j.opt("iv_load_policy")?.toString()) { "1" -> true; "3" -> false; else -> null }, bool("vr_mode"))
         }
@@ -141,14 +142,19 @@ object VideoLinks {
         if (!ContentLinks.accepted(url, instance)) return null
         val path = url.pathSegments.dropLastWhile { it.isEmpty() }
         val route = path.firstOrNull()
+        val show = if (route == "show") {
+            if (path.size != 2 || !path[1].startsWith("VL")) return null
+            path[1].removePrefix("VL").takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) } ?: return null
+        } else null
         val id = when {
             url.host in setOf("youtu.be", "www.youtu.be") && path.size == 1 -> path[0]
             route == "watch" && path.size == 1 -> url.queryParameter("v")
             route in listOf("watch", "w", "v", "e", "shorts", "embed", "live") && path.size == 2 -> path[1]
             route in listOf("playlist", "mix") && path.size == 1 -> null
+            show != null -> null
             else -> return null
         }
-        val list = url.queryParameter("list")?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) }
+        val list = url.queryParameter("list")?.takeIf { it.matches(Regex("^[A-Za-z0-9_-]{1,100}$")) } ?: show
         if (id == null && list == null || id != null && !idPattern.matches(id)) return null
         val index = url.queryParameter("index")?.toLongOrNull()?.let { if (ContentLinks.youtube(url)) it - 1 else it }
             ?.takeIf { it in 0..Int.MAX_VALUE.toLong() }?.toInt()

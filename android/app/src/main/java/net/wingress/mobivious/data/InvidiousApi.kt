@@ -180,10 +180,14 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     }
     suspend fun subscriptionFeedLink(context: ApiContext): String = RssLinks.privateFeed(context.server,
         JSONObject(scopedRead("api/v1/auth/feed/rss", emptyMap(), true, context)).getString("feedPath"))
-    suspend fun subscriptionOpml(format: String, context: ApiContext): String {
-        require(format in listOf("rss", "newpipe"))
-        return request("api/v1/auth/subscriptions/export", auth = true, query = mapOf("format" to format), context = context, accept = "application/xml")
+    suspend fun subscriptionExport(format: SubscriptionExportFormat, context: ApiContext): String = try {
+        request("api/v1/auth/subscriptions/export", auth = true, query = mapOf("format" to format.apiValue), context = context, accept = format.mimeType)
             .also { if (context != this.context()) throw CancellationException("Account or instance changed") }
+    } catch (e: ApiException) {
+        if (e.status == 400 && format in listOf(SubscriptionExportFormat.FREETUBE_OPML, SubscriptionExportFormat.NEWPIPE_JSON) &&
+            e.message?.contains("Unsupported", ignoreCase = true) == true)
+            throw ApiException(400, "This server needs the Mobivious subscription export update for ${format.label}. The existing OPML formats are still available.")
+        throw e
     }
     suspend fun playlistAtom(id: String, context: ApiContext): String = request("api/v1/auth/playlists/$id/feed", auth = true,
         context = context, accept = "application/atom+xml").also { if (context != this.context()) throw CancellationException("Account or instance changed") }

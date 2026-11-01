@@ -424,7 +424,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             AppIconButton(Icons.Default.Search,"Search",Modifier.testTag("global-search"),onClick=::openGlobalSearch)
                             if(account!=null) OverflowMenu("Subscription actions", vm.api.context(), Modifier.testTag("subscription-actions")) { close ->
                                 ActionMenuItem("RSS", Icons.Default.RssFeed, onClick = { close(); vm.openSubscriptionRss() })
-                                ActionMenuItem("Export OPML", Icons.Default.FileDownload, onClick = { close(); vm.openOpml() })
+                                ActionMenuItem("Export subscriptions", Icons.Default.FileDownload, onClick = { close(); vm.openSubscriptionExport() })
                             }
                         }
                         else if (channelPage) ChannelBrowseToolbar(channel, channelTab, channelVideoSort, channelPlaylistSort,

@@ -29,7 +29,16 @@ object RssLinks {
     }
 }
 
+enum class SubscriptionExportFormat(val apiValue: String, val label: String, val mimeType: String, val filename: String) {
+    INVIDIOUS_OPML("rss", "Invidious OPML", "application/xml", "subscriptions.opml"),
+    YOUTUBE_OPML("newpipe", "YouTube OPML", "application/xml", "subscriptions.opml"),
+    FREETUBE_OPML("opml", "FreeTube OPML", "application/xml", "freetube_subscriptions.opml"),
+    NEWPIPE_JSON("newpipe_json", "NewPipe JSON", "application/json", "newpipe_subscriptions")
+}
+
 data class RssState(val open: Boolean = false, val title: String = "", val context: ApiContext? = null,
-    val url: String? = null, val xml: String? = null, val filename: String = "feed.xml",
+    val url: String? = null, val body: String? = null, val filename: String = "feed.xml",
     val loading: Boolean = false, val error: String? = null, val privateLink: Boolean = false,
-    val playlist: Playlist? = null, val opml: Boolean = false, val format: String = "rss")
+    val playlist: Playlist? = null, val exportFormat: SubscriptionExportFormat? = null, val channel: Channel? = null) {
+    val mimeType get() = exportFormat?.mimeType ?: "application/atom+xml"
+}

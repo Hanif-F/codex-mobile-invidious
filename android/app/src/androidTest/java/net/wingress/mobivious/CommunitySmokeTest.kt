@@ -105,7 +105,7 @@ class CommunitySmokeTest {
         more(); assertEquals(2, activity.model.browse.value.videos.size)
         choose(ChannelTab.STREAMS)
         assertEquals(ChannelSort.POPULAR, activity.model.channelVideoSort.value)
-        for (tab in listOf(ChannelTab.PODCASTS, ChannelTab.RELEASES, ChannelTab.COURSES)) {
+        for (tab in listOf(ChannelTab.PODCASTS, ChannelTab.RELEASES, ChannelTab.COURSES, ChannelTab.SHOWS)) {
             choose(tab); assertEquals("PLlive", activity.model.browse.value.lists.single().id)
             more(); assertEquals(listOf("PLlive", "RDopaque"), activity.model.browse.value.lists.map { it.id })
         }
@@ -118,12 +118,12 @@ class CommunitySmokeTest {
         ui { activity.model.openGlobalSearch("fixture") }
         until { !activity.model.browse.value.loading }
         back(); until { activity.model.route == "channel:$owner" }
-        assertEquals(ChannelTab.COURSES, activity.model.channelTab.value)
+        assertEquals(ChannelTab.SHOWS, activity.model.channelTab.value)
         assertEquals(original.lists, activity.model.browse.value.lists)
         ui { activity.model.openPlaylist(original.lists.first()) }
         until { !activity.model.browse.value.loading }
         back(); until { activity.model.route == "channel:$owner" }
-        assertEquals(ChannelTab.COURSES, activity.model.channelTab.value)
+        assertEquals(ChannelTab.SHOWS, activity.model.channelTab.value)
         assertEquals(original.lists, activity.model.browse.value.lists)
         choose(ChannelTab.CHANNELS)
         compose.onNodeWithTag("browse-video-list").performScrollToNode(hasTestTag("related-channel-UC${"c".repeat(22)}"))
@@ -133,6 +133,35 @@ class CommunitySmokeTest {
         assertEquals(ChannelTab.CHANNELS, activity.model.channelTab.value)
         assertEquals(1, activity.model.browse.value.channels.size)
         assertTrue(events("channelRequests").filter { it.optString("tab") in listOf("shorts", "streams") && it.optString("sort") == "popular" }.isNotEmpty())
+    }
+
+    @Test fun showsRetryTheirCursorAndIncomingLinksRestoreTheAdvertisedTab() {
+        choose(ChannelTab.SHOWS)
+        assertEquals("PLlive", activity.model.browse.value.lists.single().id)
+        command("channel", """{"channelFailNext":true}""")
+        more(); assertNotNull(activity.model.browse.value.error)
+        assertEquals(1, activity.model.browse.value.lists.size)
+        compose.revealInBrowse(hasText("Retry")); compose.onNodeWithText("Retry").performClick()
+        until { !activity.model.browse.value.loading && activity.model.browse.value.error == null }
+        assertEquals(listOf("PLlive", "RDopaque"), activity.model.browse.value.lists.map { it.id })
+        val requests = events("channelRequests").filter { it.getString("tab") == "shows" }
+        assertEquals(listOf(null, "shows+/page=2%&", "shows+/page=2%&"), requests.map { if (it.isNull("continuation")) null else it.getString("continuation") })
+        recreate()
+        assertEquals(ChannelTab.SHOWS, activity.model.channelTab.value)
+        assertEquals(2, activity.model.browse.value.lists.size)
+        ui { activity.startActivity(Intent(activity, MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, "http://127.0.0.1:18080/show/VLPLlive")) }
+        until { activity.model.route == "playlist:PLlive" && !activity.model.browse.value.loading }
+        back(); until { activity.model.route == "channel:$owner" && !activity.model.browse.value.loading }
+        assertEquals(ChannelTab.SHOWS, activity.model.channelTab.value)
+        ui { activity.startActivity(Intent(activity, MainActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, "http://127.0.0.1:18080/channel/$owner/shows")) }
+        until { activity.model.channelTab.value == ChannelTab.SHOWS && !activity.model.browse.value.loading }
+        captureWatchScreenshot("channel-shows")
+        command("channel", """{"channelTabs":["videos"]}""")
+        ui { activity.model.refresh() }
+        until { !activity.model.browse.value.loading && activity.model.channelTab.value == ChannelTab.VIDEOS }
+        compose.onNodeWithTag("channel-tab-shows").assertDoesNotExist()
     }
 
     @Test fun postsPaginationRetainsRowsAndRetriesTheSameCursor() {

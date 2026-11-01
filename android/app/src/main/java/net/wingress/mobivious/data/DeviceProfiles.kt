@@ -171,7 +171,7 @@ object LocalPreferences {
             defaultHome = p.defaultHome.takeIf { it in allowedHomes } ?: "Popular",
             feedMenu = p.feedMenu.filter { it in allowedHomes }.take(4).ifEmpty { listOf("Popular", "Trending") },
             captions = p.captions.take(3).map { it.take(128) }.let { it + List(3 - it.size) { "" } },
-            comments = p.comments.filter { it in listOf("", "youtube", "reddit") }.take(2),
+            comments = p.comments.filter { it in listOf("", "youtube") }.take(2),
             chat = p.chat.copy(users = p.chat.users.takeIf { runCatching { ChatFilters.validate(p.chat.copy(words = "")) }.isSuccess } ?: "",
                 words = p.chat.words.takeIf { runCatching { ChatFilters.validate(p.chat.copy(users = "")) }.isSuccess } ?: ""),
             sponsorBlock = p.sponsorBlock.copy(channels = p.sponsorBlock.channels.entries.take(1000).associate { (id, v) -> id to v.copy(name = v.name.take(200)) }))

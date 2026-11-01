@@ -35,7 +35,7 @@ data class AccountPreferences(
         put("seek_seconds", PreferenceRules.seekSeconds(seekSeconds))
         put("dark_mode", darkMode); put("ui_density", uiDensity); put("thin_mode", thinMode)
         put("default_home", defaultHome); put("feed_menu", JSONArray(feedMenu)); put("region", region)
-        put("related_videos", relatedVideos); put("extend_desc", extendDescription); put("comments", JSONArray(comments))
+        put("related_videos", relatedVideos); put("extend_desc", extendDescription); put("comments", JSONArray(PreferenceRules.commentSources(comments)))
         put("max_results", maxResults); put("sort", feedSort); put("latest_only", latestOnly)
         put("unseen_only", unseenOnly); put("notifications_only", notificationsOnly)
         put("default_playlist", defaultPlaylist.ifBlank { null } ?: JSONObject.NULL)
@@ -62,7 +62,7 @@ data class AccountPreferences(
         return parse(current)
     }
     val maxHeight: Int get() = when (qualityDash) { "worst" -> 144; else -> qualityDash.removeSuffix("p").toIntOrNull() ?: Int.MAX_VALUE }
-    val showYoutubeComments: Boolean get() = "youtube" in comments
+    val showYoutubeComments: Boolean get() = "youtube" in PreferenceRules.commentSources(comments)
 
     companion object {
         fun parse(j: JSONObject): AccountPreferences {
@@ -84,7 +84,7 @@ data class AccountPreferences(
                 captions = strings("captions", defaults.captions), darkMode = j.text("dark_mode").takeIf { it in listOf("", "light", "dark") } ?: "",
                 uiDensity = j.text("ui_density", "balanced").takeIf { it == "compact" } ?: "balanced", thinMode = j.optBoolean("thin_mode"),
                 defaultHome = j.text("default_home", "Popular"), feedMenu = strings("feed_menu", defaults.feedMenu), region = j.text("region", "US"),
-                relatedVideos = j.optBoolean("related_videos", true), extendDescription = j.optBoolean("extend_desc"), comments = strings("comments", defaults.comments),
+                relatedVideos = j.optBoolean("related_videos", true), extendDescription = j.optBoolean("extend_desc"), comments = PreferenceRules.commentSources(strings("comments", defaults.comments)),
                 maxResults = j.optInt("max_results", 40).coerceIn(0, 1500), feedSort = j.text("sort", "published"),
                 latestOnly = j.optBoolean("latest_only"), unseenOnly = j.optBoolean("unseen_only"), notificationsOnly = j.optBoolean("notifications_only"), defaultPlaylist = j.text("default_playlist"), showMemberVideos = j.optBoolean("show_member_videos"))
         }
@@ -92,6 +92,8 @@ data class AccountPreferences(
 }
 
 object PreferenceRules {
+    fun commentSources(values: List<String>) = values.map { if (it == "reddit") "youtube" else it }
+    fun youtubeComments(enabled: Boolean) = listOf(if (enabled) "youtube" else "", "")
     val seekIntervals = listOf(5, 10, 20, 30)
     fun seekSeconds(value: Any?): Int = (value as? Number)?.takeIf { it is Int || it is Long }?.let { number ->
         seekIntervals.firstOrNull { it.toDouble() == number.toDouble() }

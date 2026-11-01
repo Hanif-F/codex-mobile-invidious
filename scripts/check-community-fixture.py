@@ -29,7 +29,7 @@ def main():
         owner = 'UC' + 'a' * 22
         channel_path = '/api/v1/channels/' + owner
         metadata = api(channel_path)
-        assert metadata['tabs'] == ['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'playlists', 'posts', 'channels']
+        assert metadata['tabs'] == ['videos', 'shorts', 'streams', 'podcasts', 'releases', 'courses', 'shows', 'playlists', 'posts', 'channels']
         assert metadata['authorVerified'] and metadata['pronouns'] and metadata['descriptionHtml']
         assert metadata['authorBanners'][0]['width'] > metadata['authorBanners'][0]['height'] * 2
         for tab in metadata['tabs']:
@@ -72,7 +72,7 @@ def main():
         image_path = '/ggpht/post-photo=s1280'
         headers, image = read(image_path)
         assert headers['Content-Type'] == 'image/jpeg' and image
-        print('Channel/community fixture passed: nine tabs, pagination, header metadata, all attachments, post resolution/retry, comment sorting/replies, public requests and proxy images.')
+        print('Channel/community fixture passed: ten tabs, pagination, header metadata, all attachments, post resolution/retry, comment sorting/replies, public requests and proxy images.')
 
 
 if __name__ == '__main__':

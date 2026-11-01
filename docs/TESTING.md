@@ -714,3 +714,20 @@ These checks verify emulator rendering and interactions. Physical-device motion
 accuracy, broad live archive availability, production server deployment and
 headset viewing are not established by the fixture. Results and emulator recovery
 are recorded in [VERIFICATION.md](../VERIFICATION.md).
+
+## Upstream comments, Shows and subscription exports
+
+`PreferencesTest`, `DeviceProfilesTest` and `ContentLinksTest` cover legacy Reddit
+normalization, sparse patches, guest restoration and Shows/override links.
+`CommunityTest` exercises advertised tab ordering and playlist endpoints, including
+Shows. `PlaylistRssTest` covers format-specific queries/MIME types, older-server
+errors and stale-account export rejection.
+
+Run `scripts/tests/test_subscription_exports_fixture.py` through unittest discovery
+and `scripts/check-community-fixture.py` for the updated fixture contracts. Device
+regressions are in `SettingsSmokeTest`, `CommunitySmokeTest`,
+`PlaylistRssSmokeTest`, `DeviceProfileStorageTest`, `OpeningLinksPresentationTest`
+and the narrow/large-font choices case in `CommunityPresentationTest`. Select
+affected methods with the focused runner. File-intent tests inspect the actual
+shared/saved bytes, MIME types, cancellation and account fencing using intercepted
+Android intents; actual NewPipe/FreeTube import acceptance remains separate.

@@ -153,6 +153,7 @@ Video comments load on demand when the entry is opened. Choose Top or Newest,
 load additional comments, open replies and return to retained positions. Rows
 may show verification, creator/pinned/member badges, hearts, likes, dates and
 rich links. Comments are read-only; there is no post, like or moderation action.
+Legacy Reddit comment preferences and link options normalize to YouTube.
 The Show YouTube comments preference controls the video entry, not community post
 comments. Closing a drawer retains its loaded session state.
 
@@ -213,7 +214,9 @@ resume positions. Removing a history entry preserves its saved position; clearin
 history removes both. Guests can save positions locally, but have no shared history.
 
 RSS support provides channel/public-playlist/mix links, a private subscription
-feed link, OPML (`rss` or `newpipe`) and private owned playlist Atom exports.
+feed link, Invidious/YouTube/FreeTube OPML, NewPipe subscription JSON and private
+owned playlist Atom exports. Subscriptions → More → Export subscriptions selects
+the format; the two new formats require the sibling server export update.
 Files can be shared or saved through Android. Private feed URLs contain access
 tokens and are labeled accordingly. There is no in-app RSS reader.
 

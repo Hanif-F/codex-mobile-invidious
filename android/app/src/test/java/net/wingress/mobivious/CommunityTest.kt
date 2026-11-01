@@ -22,7 +22,7 @@ class CommunityTest {
     private fun comment(id: String, replies: String = "") = Comment("Viewer", "Body", "today", 1, id = id, replyContinuation = replies)
 
     @Test fun channelTabsNormalizeAliasesFollowWebsiteOrderAndDeferClips() {
-        val value = Channel(channel, "Creator", tabs = listOf("channels", "clips", "community", "posts", "courses", "shorts", "videos", "live", "podcasts", "releases", "playlists"))
+        val value = Channel(channel, "Creator", tabs = listOf("channels", "clips", "community", "posts", "shows", "courses", "shorts", "videos", "live", "podcasts", "releases", "playlists"))
         assertEquals(ChannelTab.entries, value.contentTabs)
         assertEquals(ChannelTab.VIDEOS, value.preferredTab())
         assertEquals(listOf(ChannelTab.POSTS), value.copy(tabs = listOf("community", "posts")).contentTabs)

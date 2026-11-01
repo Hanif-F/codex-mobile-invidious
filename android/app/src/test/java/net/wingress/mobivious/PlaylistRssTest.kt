@@ -9,6 +9,34 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PlaylistRssTest {
+    @Test fun allSubscriptionFormatsUseTheirMimeTypeAndKeepExistingFormatsAvailableOnOlderServers() = runBlocking {
+        MockWebServer().use { server ->
+            val account = account(server); val api = InvidiousApi({ account.server }, { account })
+            for (format in SubscriptionExportFormat.entries) {
+                val body = if (format == SubscriptionExportFormat.NEWPIPE_JSON) """{"subscriptions":[],"app_version":"0.29.0","app_version_int":1014}""" else "<opml><body/></opml>"
+                server.enqueue(MockResponse().setBody(body))
+                assertEquals(body, api.subscriptionExport(format, api.context()))
+                val request = server.takeRequest()
+                assertEquals("/api/v1/auth/subscriptions/export", request.requestUrl!!.encodedPath)
+                assertEquals(format.apiValue, request.requestUrl!!.queryParameter("format"))
+                assertEquals(format.mimeType, request.getHeader("Accept"))
+                assertEquals("Bearer native-secret", request.getHeader("Authorization"))
+                assertFalse(body.contains(account.token))
+            }
+            assertEquals("newpipe_subscriptions", SubscriptionExportFormat.NEWPIPE_JSON.filename)
+            for (format in listOf(SubscriptionExportFormat.NEWPIPE_JSON, SubscriptionExportFormat.FREETUBE_OPML)) {
+                server.enqueue(MockResponse().setResponseCode(400).setBody("""{"error":"Unsupported OPML format."}"""))
+                try { api.subscriptionExport(format, api.context()); fail("Old server accepted new format") }
+                catch (e: ApiException) { assertEquals(400, e.status); assertTrue(e.message!!.contains("subscription export update")) }
+                server.takeRequest()
+            }
+            server.enqueue(MockResponse().setBody("<opml><body/></opml>"))
+            assertTrue(api.subscriptionExport(SubscriptionExportFormat.INVIDIOUS_OPML, api.context()).startsWith("<opml"))
+            server.enqueue(MockResponse().setResponseCode(503).setBody("""{"error":"Temporary export failure"}"""))
+            try { api.subscriptionExport(SubscriptionExportFormat.NEWPIPE_JSON, api.context()); fail("Server failure ignored") }
+            catch (e: ApiException) { assertEquals(503, e.status); assertEquals("Temporary export failure", e.message) }
+        }
+    }
     private fun account(server: MockWebServer) = Account("native-secret", "Alice", Long.MAX_VALUE, server.url("/").toString().trimEnd('/'))
 
     @Test fun subscribedNativePlaylistIsReadOnlyAndRetainsSourcePrivacy() {
@@ -96,7 +124,7 @@ class PlaylistRssTest {
             val link = api.subscriptionFeedLink(api.context()); assertFalse(link.contains(account.token)); assertTrue(link.contains("rss-only-secret"))
             assertEquals("Bearer native-secret", server.takeRequest().getHeader("Authorization"))
             server.enqueue(MockResponse().setBody("<opml version=\"1.1\"><body/></opml>"))
-            assertTrue(api.subscriptionOpml("newpipe", api.context()).startsWith("<opml"))
+            assertTrue(api.subscriptionExport(SubscriptionExportFormat.YOUTUBE_OPML, api.context()).startsWith("<opml"))
             val opml = server.takeRequest(); assertEquals("newpipe", opml.requestUrl!!.queryParameter("format")); assertEquals("application/xml", opml.getHeader("Accept"))
             server.enqueue(MockResponse().setBody("<feed xmlns=\"http://www.w3.org/2005/Atom\"/>"))
             api.playlistAtom("IVown", api.context())
@@ -114,6 +142,11 @@ class PlaylistRssTest {
                 return MockResponse().setBody("[]")
             } }
             try { api.playlists(context); fail("Stale account response accepted") } catch (_: CancellationException) { }
+            for (format in SubscriptionExportFormat.entries) {
+                selected = account(server)
+                val exportContext = api.context()
+                try { api.subscriptionExport(format, exportContext); fail("Stale export response accepted") } catch (_: CancellationException) { }
+            }
         }
     }
 

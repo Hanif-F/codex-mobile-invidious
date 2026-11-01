@@ -9,6 +9,35 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class PreferencesTest {
+    @Test fun legacyCommentSourcesNormalizeWithoutRewritingUnrelatedPreferences() = runBlocking {
+        val raw = JSONObject("""{"comments":["","reddit"],"speed":1.5,"unrelated":"kept"}""")
+        val parsed = AccountPreferences.parse(raw)
+        assertEquals(listOf("", "youtube"), parsed.comments)
+        assertTrue(parsed.showYoutubeComments)
+        assertEquals(parsed, AccountPreferences.parse(parsed.json()))
+        assertEquals(listOf("youtube", "youtube"), AccountPreferences.parse(JSONObject("""{"comments":["reddit","youtube"]}""")).comments)
+        val legacy = parsed.copy(comments = listOf("", "reddit"))
+        assertEquals(0, parsed.changesFrom(legacy).length())
+        assertEquals(setOf("speed"), legacy.copy(speed = 2f).changesFrom(legacy).keys().asSequence().toSet())
+        for (enabled in listOf(false, true)) {
+            val value = parsed.copy(comments = PreferenceRules.youtubeComments(enabled))
+            val delta = value.changesFrom(legacy)
+            assertEquals(setOf("comments"), delta.keys().asSequence().toSet())
+            assertFalse(delta.toString().contains("reddit"))
+            assertEquals(enabled, parsed.merge(delta).showYoutubeComments)
+            assertEquals(1.5f, parsed.merge(delta).speed)
+        }
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val api = InvidiousApi({ address }, { Account("token", "Alice", Long.MAX_VALUE, address) })
+            server.enqueue(MockResponse().setBody(raw.toString()))
+            val before = api.preferences()
+            server.takeRequest()
+            server.enqueue(MockResponse().setBody(before.copy(comments = listOf("", "")).json().toString()))
+            assertFalse(api.preferences(before.copy(comments = PreferenceRules.youtubeComments(false)).changesFrom(before), api.context()).showYoutubeComments)
+            assertEquals("""{"comments":["",""]}""", server.takeRequest().body.readUtf8())
+        }
+    }
     @Test fun seekIntervalsRoundTripAndStaySparseForAccountsAndGuests() = runBlocking {
         val before = AccountPreferences()
         for (seconds in PreferenceRules.seekIntervals) {
@@ -70,7 +99,7 @@ class PreferencesTest {
         assertEquals(1.5f, p.speed); assertEquals(720, p.maxHeight); assertEquals("Indonesian", p.captions.first())
         assertEquals("dark", p.darkMode); assertEquals("compact", p.uiDensity); assertTrue(p.thinMode)
         assertEquals("ID", p.region); assertEquals(60, p.maxResults); assertEquals("channel name", p.feedSort)
-        assertTrue(p.latestOnly && p.unseenOnly && p.notificationsOnly); assertFalse(p.showYoutubeComments)
+        assertTrue(p.latestOnly && p.unseenOnly && p.notificationsOnly); assertTrue(p.showYoutubeComments)
         assertEquals(p, ApiParser.preferences(p.json()))
     }
     @Test fun sparseDeltasPreserveOtherSettingsAndNestedSponsorBlock() {
@@ -79,7 +108,7 @@ class PreferencesTest {
         assertEquals(setOf("speed", "thin_mode"), delta.keys().asSequence().toSet())
         val concurrent = before.copy(region = "ID", sponsorBlock = before.sponsorBlock.copy(colors = before.sponsorBlock.colors + (SponsorBlockCategory.INTRO to "#123456")))
         val merged = concurrent.merge(delta)
-        assertEquals("ID", merged.region); assertEquals("#123456", merged.sponsorBlock.colors[SponsorBlockCategory.INTRO]); assertEquals(before.comments, merged.comments)
+        assertEquals("ID", merged.region); assertEquals("#123456", merged.sponsorBlock.colors[SponsorBlockCategory.INTRO]); assertEquals(listOf("youtube", "youtube"), merged.comments)
         assertEquals(0, before.changesFrom(before).length())
     }
     @Test fun captionsUsePriorityAndAvailableTracks() {

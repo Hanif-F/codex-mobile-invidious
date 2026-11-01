@@ -34,6 +34,7 @@
                 <data android:pathPrefix="/watch/" />
                 <data android:path="/playlist" />
                 <data android:path="/mix" />
+                <data android:pathPrefix="/show/" />
                 <data android:pathPrefix="/w/" />
                 <data android:pathPrefix="/v/" />
                 <data android:pathPrefix="/e/" />
@@ -70,6 +71,7 @@
                 <data android:pathPrefix="/watch" />
                 <data android:pathPrefix="/playlist" />
                 <data android:pathPrefix="/mix" />
+                <data android:pathPrefix="/show/" />
                 <data android:pathPrefix="/w/" />
                 <data android:pathPrefix="/v/" />
                 <data android:pathPrefix="/e/" />

@@ -12,6 +12,7 @@ import java.net.URL
 import net.wingress.mobivious.data.AccountPreferences
 import net.wingress.mobivious.data.SessionStore
 import net.wingress.mobivious.data.AccentPreset
+import net.wingress.mobivious.data.DeviceProfile
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -58,6 +59,42 @@ class SettingsSmokeTest {
         val previous=activity;compose.runOnUiThread {activity.recreate()}
         until {var ready=false;compose.runOnUiThread {ready=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).any {it is MainActivity && it!==previous}};ready}
         compose.runOnUiThread {activity=ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single()}
+    }
+    @Test fun legacyCommentsNormalizeForGuestsAndAccountsAndFailedTogglesRetryAfterRecreation() {
+        val guest = activity.model.api.context()
+        val key = DeviceProfile.of(guest).prefix + "preferences"
+        compose.runOnUiThread {
+            activity.getSharedPreferences("mobivious", android.content.Context.MODE_PRIVATE).edit()
+                .putString(key, """{"comments":["","reddit"],"autoplay":false}""").commit()
+            activity.model.refreshSharedSettings()
+        }
+        until { activity.model.preferences.value.comments == listOf("", "youtube") }
+        open("Browsing")
+        toggle("Show YouTube comments"); save("Browsing")
+        assertEquals(listOf("", ""), SessionStore(activity).guestPreferences().comments)
+        recreate(); open("Browsing")
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("Show YouTube comments"))
+        compose.onNodeWithText("Show YouTube comments").assertIsOff()
+        toggle("Show YouTube comments"); save("Browsing")
+        assertEquals(listOf("youtube", ""), SessionStore(activity).guestPreferences().comments)
+        command("preferences", """{"comments":["reddit",""],"unrelated_setting":"preserved"}""")
+        compose.runOnUiThread { activity.model.action { activity.model.login("Fixture", "transient-password") } }
+        until { activity.model.account.value != null && activity.model.tab == "You" && !activity.model.accountBusy.value && activity.model.preferences.value.showYoutubeComments }
+        open("Browsing")
+        command("sponsorblock", """{"failPreferences":true}""")
+        toggle("Show YouTube comments")
+        until { activity.model.preferenceSaves.edits.value["comments"]?.error != null }
+        assertTrue(activity.model.preferences.value.showYoutubeComments)
+        recreate()
+        compose.onNodeWithTag("settings-list").performScrollToNode(hasText("Show YouTube comments"))
+        compose.onNodeWithText("Show YouTube comments").assertIsOff()
+        command("sponsorblock", """{"failPreferences":false}""")
+        compose.onNodeWithText("Retry").performScrollTo().performClick(); save("Browsing")
+        assertEquals("[\"\",\"\"]", state().getJSONObject("preferences").getJSONArray("comments").toString())
+        assertEquals("preserved", state().getJSONObject("preferences").getString("unrelated_setting"))
+        compose.runOnUiThread { activity.model.logout() }
+        until { activity.model.account.value == null && !activity.model.accountBusy.value }
+        assertEquals(listOf("youtube", ""), activity.model.preferences.value.comments)
     }
     @Test fun openingLinksIsReachableAndSurvivesRecreation() {
         compose.selectFeed("You"); compose.openAppSettings()

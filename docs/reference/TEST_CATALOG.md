@@ -207,6 +207,8 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/ContentLinksTest.kt) — Content Links declared scenarios; exact cases are enumerated in the test catalog.
 
+- `showsResolveAsPlaylistsAndChannelTabsWithinAcceptedOrigins`
+- `legacyCommentLinkOverridesNormalizeAndPreserveEmptySlotsWithoutEditingDefaults`
 - `aliasesPreservePreciseTimesAndNormalizeOnlyYoutubeIndexes`
 - `unsafeOriginsPathsAndOverflowAreRejected`
 - `sharedAndRichLinksResolveChannelsTabsPostsAndHashtags`
@@ -269,6 +271,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/DeviceProfilesTest.kt) — Device Profiles declared scenarios; exact cases are enumerated in the test catalog.
 
+- `legacyGuestCommentsNormalizeOnRestoreAndRemainScopedToTheirInstance`
 - `seekPreferencesSurviveRecreationAndStayWithinTheirGuestAccountAndInstance`
 - `identitiesNormalizeInstancesAndIgnoreSessionsButDistinguishReusedNames`
 - `savesSurviveRecreationAndRemainIndependentForGuestAndTwoAccounts`
@@ -484,6 +487,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/PlaylistRssTest.kt) — Playlist Rss declared scenarios; exact cases are enumerated in the test catalog.
 
+- `allSubscriptionFormatsUseTheirMimeTypeAndKeepExistingFormatsAvailableOnOlderServers`
 - `subscribedNativePlaylistIsReadOnlyAndRetainsSourcePrivacy`
 - `typedSearchPreservesMixSeedsAndSendsNoVideoFilters`
 - `channelPlaylistContinuationAndSortingAreEncoded`
@@ -498,6 +502,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/PreferencesTest.kt) — Preferences declared scenarios; exact cases are enumerated in the test catalog.
 
+- `legacyCommentSourcesNormalizeWithoutRewritingUnrelatedPreferences`
 - `seekIntervalsRoundTripAndStaySparseForAccountsAndGuests`
 - `codecPreferencesRoundTripAndProduceSparseAccountPatches`
 - `webPreferencesParseAndRoundTrip`
@@ -1017,6 +1022,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CommunityPresentationTest.kt) — Community Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
+- `showsAndExportChoicesRemainReachableAtNarrowLargeFontSizes`
 - `postActionsSeparateLikesAndShareAboveAFullWidthCommentsButton`
 - `invalidPostIdentifiersDisableOnlyTheUnavailableActions`
 - `postExpansionRestoresAndKeepsRichLinksInsideTheCard`
@@ -1031,6 +1037,7 @@ Test support/helper file; no declared `@Test` methods.
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CommunitySmokeTest.kt) — Community Smoke declared scenarios; exact cases are enumerated in the test catalog.
 
 - `specializedTabsSortAndRestoreAfterSearchAndChildNavigation`
+- `showsRetryTheirCursorAndIncomingLinksRestoreTheAdvertisedTab`
 - `postsPaginationRetainsRowsAndRetriesTheSameCursor`
 - `postMediaPollsQuizzesAndUnknownAttachmentsRemainReadable`
 - `postCommentsSheetSortsRepliesRetriesAndIgnoresVideoCommentVisibility`
@@ -1067,6 +1074,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DeviceProfileStorageTest.kt) — Device Profile Storage declared scenarios; exact cases are enumerated in the test catalog.
 
+- `legacyCommentSourcesRestoreWithoutCrossingGuestAccountOrInstanceBoundaries`
 - `guestTwoAccountsAndRestartRestoreOnlyTheirOwnDeviceSaves`
 - `capturedWritesRejectSwitchesAndTokenReplacement`
 - `trendingCategoryPersistsByAccountAndInstanceAndRejectsStaleWrites`
@@ -1368,6 +1376,8 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlaylistRssSmokeTest.kt) — Playlist Rss Smoke declared scenarios; exact cases are enumerated in the test catalog.
 
+- `allSubscriptionExportsOpenSaveAndShareTheSelectedBodyAndMimeType`
+- `subscriptionExportRetryLegacyServersAndLateFormatsNeverReplaceTheCurrentSelection`
 - `pendingSubscriptionAtSignInKeepsOwnedAndSubscribedPlaylists`
 - `libraryGroupsAndReadOnlySubscriptionsFollowOwnerUpdates`
 - `nestedPlaylistSubscriptionDoesNotOpenThePlaylist`
@@ -1476,6 +1486,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SettingsSmokeTest.kt) — Automatic per-field saves and invalid/failed edits, playback/codec settings, device appearance persistence, recreation/account isolation and System mode updates.
 
+- `legacyCommentsNormalizeForGuestsAndAccountsAndFailedTogglesRetryAfterRecreation`
 - `openingLinksIsReachableAndSurvivesRecreation`
 - `seekIntervalPersistsForGuestsAndAccountsAndPreservesFailedSaves`
 - `outstandingChatValidationLinksToTheActualControlsAndReverts`
@@ -1633,4 +1644,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **971 declared test methods** (including ignored tests).
+Inventory total: **982 declared test methods** (including ignored tests).

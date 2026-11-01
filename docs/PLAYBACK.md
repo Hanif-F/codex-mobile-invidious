@@ -232,6 +232,11 @@ annotations (or legacy iv_load_policy) and vr_mode.
 Only listen/speed/local carry to successor occurrences. Saved preferences are
 unchanged by link options.
 
+Legacy `comments=reddit` link values normalize to `youtube`, preserving empty
+slots and explicit disabled overrides. `/show/VL<playlistId>` opens the underlying
+playlist through the existing source navigation; channel `/shows` links select
+the advertised Shows tab. Native DASH `720p` remains supported.
+
 Valid `end` is clamped to duration and enforced in the service. At the bound,
 playback pauses without advancing, or loops to requested start when repeating.
 Replaying restarts at start. Invalid end is ignored with explanatory UI state.

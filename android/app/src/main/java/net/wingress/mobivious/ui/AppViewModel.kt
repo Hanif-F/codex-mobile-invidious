@@ -190,6 +190,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var playlistSeed: String? = null
     private var playlistLink: VideoLink? = null
     private var rssJob: Job? = null
+    private var rssGeneration = 0L
     private val subscriptionsController = SubscriptionsController(viewModelScope, api::context, api::subscriptionDirectory, ::friendly,
         store::subscriptionSort, store::subscriptionSort, api::subscribe)
     val subscriptionChannels = subscriptionsController.state
@@ -589,7 +590,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             playlist.value = null; playlistSeed = null; playlistLink = null; playlists.value = emptyList()
             playlistLibrarySection.value = "owned"; playlistLibraryPositions.clear()
             postDetail.value = PostDetailState(); postCommentController.bind(null); browseReturns.clear(); tabBrowse.clear(); tabScreens.clear(); tabBackStacks.clear(); channelSearchOrigin = null; channelScreens.clear()
-            rssJob?.cancel(); rss.value = RssState()
+            dismissRss()
             val pendingList = pendingPlaylistSubscription
             if (it != null && pendingList?.first == api.context().server) {
                 pendingPlaylistSubscription = null
@@ -960,52 +961,38 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun setChannelPlaylistSort(value: String) { if (value in listOf("last", "newest", "oldest")) { channelPlaylistSort.value = value; load(false, refreshChannel = false) } }
     fun openChannelRss(info: Channel) {
-        rssJob?.cancel()
-        val context = api.context()
-        rss.value = RssState(true, "${info.name} RSS", context, loading = true)
-        rssJob = viewModelScope.launch {
-            try {
-                val link = RssLinks.channel(context.server, info.id, api.originalTitlePreference(context))
-                if (context == api.context()) rss.value = rss.value.copy(url = link, loading = false)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (context == api.context()) rss.value = rss.value.copy(loading = false, error = friendly(e)) }
-        }
+        rss.value = RssState(true, "${info.name} RSS", api.context(), channel = info)
+        retryRss()
     }
     fun openPlaylistRss(list: Playlist) {
-        rssJob?.cancel()
-        val privateFile = list.owned && list.privacy == "private"
         rss.value = RssState(true, "${list.title} RSS", api.context(), playlist = list,
             filename = "playlist.atom")
-        if (privateFile) retryRss() else {
-            val context = api.context()
-            rss.value = rss.value.copy(loading = true)
-            rssJob = viewModelScope.launch {
-                try {
-                    val link = RssLinks.playlist(context.server, list, api.originalTitlePreference(context))
-                    if (context == api.context()) rss.value = rss.value.copy(url = link, loading = false)
-                } catch (e: CancellationException) { throw e }
-                catch (e: Exception) { if (context == api.context()) rss.value = rss.value.copy(loading = false, error = friendly(e)) }
-            }
-        }
+        retryRss()
     }
     fun openSubscriptionRss() { rss.value = RssState(true, "Subscriptions RSS", api.context(), privateLink = true); retryRss() }
-    fun openOpml(format: String = "rss") { rss.value = RssState(true, "Subscription OPML", api.context(), opml = true, format = format, filename = "subscriptions.opml"); retryRss() }
-    fun dismissRss() { rssJob?.cancel(); rss.value = RssState() }
+    fun openSubscriptionExport(format: SubscriptionExportFormat = SubscriptionExportFormat.INVIDIOUS_OPML) {
+        rss.value = RssState(true, "Export subscriptions", api.context(), exportFormat = format, filename = format.filename)
+        retryRss()
+    }
+    fun dismissRss() { rssGeneration++; rssJob?.cancel(); rss.value = RssState() }
     fun retryRss() {
         val initial = rss.value; val context = initial.context ?: return
-        if (initial.playlist?.let { !it.owned || it.privacy != "private" } == true) { openPlaylistRss(initial.playlist); return }
-        if (!initial.privateLink && !initial.opml && initial.playlist == null) return
+        if (!initial.open) return
+        val generation = ++rssGeneration
         rssJob?.cancel(); rss.value = initial.copy(loading = true, error = null)
         rssJob = viewModelScope.launch {
             try {
                 val loaded = when {
-                    initial.opml -> initial.copy(xml = api.subscriptionOpml(initial.format, context))
-                    initial.playlist != null -> initial.copy(xml = api.playlistAtom(initial.playlist.id, context))
+                    initial.exportFormat != null -> initial.copy(body = api.subscriptionExport(initial.exportFormat, context))
+                    initial.channel != null -> initial.copy(url = RssLinks.channel(context.server, initial.channel.id, api.originalTitlePreference(context)))
+                    initial.playlist?.let { !it.owned || it.privacy != "private" } == true ->
+                        initial.copy(url = RssLinks.playlist(context.server, initial.playlist, api.originalTitlePreference(context)))
+                    initial.playlist != null -> initial.copy(body = api.playlistAtom(initial.playlist.id, context))
                     else -> initial.copy(url = api.subscriptionFeedLink(context))
                 }
-                if (context == api.context() && rss.value.open) rss.value = loaded.copy(loading = false)
+                if (generation == rssGeneration && context == api.context() && rss.value.open) rss.value = loaded.copy(loading = false, error = null)
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (context == api.context() && rss.value.open) rss.value = initial.copy(loading = false, error = friendly(e)) }
+            catch (e: Exception) { if (generation == rssGeneration && context == api.context() && rss.value.open) rss.value = initial.copy(loading = false, error = friendly(e)) }
         }
     }
     fun editSearch(value: String, scoped: Boolean) {

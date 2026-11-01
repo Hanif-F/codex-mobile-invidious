@@ -155,10 +155,10 @@ class SubscriptionJourneyTest {
         capture("subscriptions-dark")
         capture("subscriptions-dark-opaque")
         compose.onNodeWithTag("subscription-actions").performClick()
-        compose.onNodeWithText("Export OPML").performClick()
-        until { vm.rss.value.xml != null }
-        compose.onNodeWithText("YouTube feeds").performClick()
-        until { vm.rss.value.xml?.contains("youtube.com/feeds/") == true }
+        compose.onNodeWithText("Export subscriptions").performClick()
+        until { vm.rss.value.body != null }
+        compose.onNodeWithText("YouTube OPML").performClick()
+        until { vm.rss.value.body?.contains("youtube.com/feeds/") == true }
         compose.onNodeWithText("Save file").assertIsDisplayed()
         capture("subscriptions-opml-dark-opaque")
         compose.onNodeWithContentDescription("Close feed").assertWidthIsAtLeast(48.dp).performClick()

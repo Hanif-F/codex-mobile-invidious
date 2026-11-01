@@ -70,7 +70,7 @@ on each hop. Same-instance HEAD and Range requests retain their access headers.
 | GET `/api/v1/videos/:id` | `local=true|false`, optional link `region`; VideoDetails and stream/caption metadata. |
 | GET `/api/v1/channels/:id` | Channel metadata, advertised tabs, banner/avatar and optional fields. |
 | GET `/api/v1/channels/:id/videos`, `/shorts`, `/streams` | Optional opaque `continuation`, non-default `sort_by`; `{videos, continuation}`. |
-| GET `/api/v1/channels/:id/playlists`, `/podcasts`, `/releases`, `/courses` | Opaque continuation; only playlists sends `sort_by=last|newest|oldest`; `{playlists, continuation}`. |
+| GET `/api/v1/channels/:id/playlists`, `/podcasts`, `/releases`, `/courses`, `/shows` | Opaque continuation; only playlists sends `sort_by=last|newest|oldest`; `{playlists, continuation}`. |
 | GET `/api/v1/channels/:id/channels` | Opaque continuation; `{relatedChannels, continuation}`. |
 | GET `/api/v1/channels/:id/posts` | Opaque continuation; root author and community rows/attachments. |
 | GET `/api/v1/channels/:id/search` | `q`, numeric `page`; video array, page heuristic ≥20 raw rows. |
@@ -198,7 +198,7 @@ are described in [Library](LIBRARY.md).
 | `/feed/channel/:id` | Public generated channel RSS URL. |
 | `/feed/playlist/:id` | Public playlist URL; mixes include seed continuation. |
 | GET `/api/v1/auth/feed/rss` | `{feedPath}` validated as same-origin `/feed/private?token=…`. |
-| GET `/api/v1/auth/subscriptions/export` | `format=rss|newpipe`, Accept application/xml, OPML string. |
+| GET `/api/v1/auth/subscriptions/export` | `format=rss|newpipe|opml|newpipe_json`. Invidious/YouTube/FreeTube OPML use Accept application/xml; NewPipe JSON uses application/json. Complete subscription export, including uncached channels. Existing `GET:subscriptions/export` permission; no new token renewal. |
 | GET `/api/v1/auth/playlists/:id/feed` | Private owned playlist Atom, Accept application/atom+xml. |
 
 Private feed URLs and exported account data should be treated as access-bearing

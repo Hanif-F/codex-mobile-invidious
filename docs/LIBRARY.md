@@ -194,10 +194,20 @@ removed with the app's original download entry.
 
 ## RSS and optional community metadata
 
-RSS/OPML/Atom panels either expose validated feed URLs or fetch XML on demand.
-Account/instance changes dismiss them and discard pending responses. Private
-owned playlists export Atom instead of publishing a private feed URL. File sharing
-uses the restricted RSS FileProvider directory; saving uses a document URI.
+RSS/export panels either expose validated feed URLs or fetch files on demand.
+Subscriptions → More → Export subscriptions offers Invidious OPML (`rss`), YouTube
+OPML (`newpipe`), FreeTube OPML (`opml`) and NewPipe JSON (`newpipe_json`). XML
+exports use `.opml`; NewPipe uses the extensionless `newpipe_subscriptions` filename.
+The sibling mobile export extension is required for the two new formats; the
+existing export permission is sufficient. Older servers show an update explanation,
+and the original OPML choices remain available.
+
+Account/instance changes dismiss panels and discard pending responses; a format
+change also rejects obsolete responses. Private owned playlists export Atom instead
+of publishing a private feed URL. Open, Share and Save file use the selected MIME
+type (`application/xml`, `application/json` or `application/atom+xml`). Sharing
+uses the restricted RSS FileProvider directory with temporary read permission;
+saving uses a document URI and cancellation leaves its content untouched.
 
 DeArrow title reads deduplicate with four concurrent slots and cache even missing
 results until clear/invalidate. Contributions require ready server identity,

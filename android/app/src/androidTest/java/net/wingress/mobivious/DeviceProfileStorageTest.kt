@@ -34,6 +34,25 @@ class DeviceProfileStorageTest {
     private fun stale(block: () -> Unit) {
         try { block(); fail("A stale device save was accepted") } catch (_: CancellationException) { }
     }
+    @Test fun legacyCommentSourcesRestoreWithoutCrossingGuestAccountOrInstanceBoundaries() {
+        val guest = store.positionContext()
+        context.getSharedPreferences("mobivious", Context.MODE_PRIVATE).edit()
+            .putString(DeviceProfile.of(guest).prefix + "preferences", """{"comments":["reddit",""],"speed":1.5}""").commit()
+        store = SessionStore(context)
+        assertEquals(listOf("youtube", ""), store.guestPreferences().comments)
+        store.save(account("Alice", 'a'))
+        assertEquals(listOf("youtube", ""), store.initialPreferences().comments)
+        stale { store.guestPreferences(AccountPreferences(comments = listOf("", "")), guest) }
+        store.save(null)
+        assertEquals(1.5f, store.guestPreferences().speed)
+        assertTrue(store.guestPreferences().showYoutubeComments)
+        store.server = "https://other.test"
+        store.guestPreferences(AccountPreferences(comments = listOf("", "")), store.positionContext())
+        store = SessionStore(context)
+        assertFalse(store.guestPreferences().showYoutubeComments)
+        store.server = address
+        assertTrue(store.guestPreferences().showYoutubeComments)
+    }
     @Test fun guestTwoAccountsAndRestartRestoreOnlyTheirOwnDeviceSaves() {
         store.background = false; store.pip = false; store.chatAppearance(ChatAppearance(fontScale = 145))
         store.guestPreferences(AccountPreferences(speed = .75f, savePosition = true)); store.position("abcdefghijk", 35)

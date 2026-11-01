@@ -9,12 +9,38 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.*
 import org.junit.Test
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class ContentLinksTest {
     private val server = "https://instance.test"
     private val id = "abcdefghijk"
     private val channel = "UC" + "a".repeat(22)
+    @Test fun showsResolveAsPlaylistsAndChannelTabsWithinAcceptedOrigins() {
+        for (origin in listOf(server, "https://www.youtube.com", "https://mobivious.wingress.net")) {
+            val link = VideoLinks.parse("$origin/show/VLPLshows?index=3&t=12.345&quality_dash=720p", server)!!
+            assertEquals("", link.id); assertEquals("PLshows", link.playlistId)
+            assertEquals(if (origin.contains("youtube.com")) 2 else 3, link.index)
+            assertEquals(12345L, link.startMs); assertEquals("720p", link.playback.options.quality)
+            assertEquals(ChannelTab.SHOWS, (ContentLinks.parse("$origin/channel/$channel/shows", server) as ContentLink.Channel).link.tab)
+            assertEquals(ChannelTab.SHOWS, (ContentLinks.parse("$origin/@creator/shows", server) as ContentLink.Channel).link.tab)
+        }
+        for (path in listOf("/show/VL", "/show/PLshows", "/show/VLPLshows/extra", "/show/VLbad%2Fid"))
+            assertNull(path, VideoLinks.parse(server + path, server))
+        assertNull(VideoLinks.parse("https://evil.test/show/VLPLshows", server))
+        assertNull(VideoLinks.parse("https://user:secret@www.youtube.com/show/VLPLshows", server))
+    }
+    @Test fun legacyCommentLinkOverridesNormalizeAndPreserveEmptySlotsWithoutEditingDefaults() {
+        val saved = AccountPreferences(comments = listOf("", ""))
+        val options = VideoLinks.parse("$server/watch?v=$id&comments=,reddit", server)!!.playback.options
+        assertEquals(listOf("", "youtube"), options.comments)
+        assertTrue(options.apply(saved).showYoutubeComments); assertFalse(saved.showYoutubeComments)
+        assertEquals(options, PlaybackLinkOptions.parse(options.json()))
+        assertFalse(PlaybackLinkOptions.parse(JSONObject("""{"comments":","}""")).apply(AccountPreferences()).showYoutubeComments)
+        assertNull(PlaybackLinkOptions.parse(JSONObject("""{"comments":"unsupported"}""")).comments)
+        assertTrue(PlaybackLinkOptions(comments = listOf("reddit")).apply(saved).showYoutubeComments)
+        assertFalse(PlaybackLinkOptions(comments = listOf("reddit")).json().toString().contains("reddit"))
+    }
 
     @Test fun aliasesPreservePreciseTimesAndNormalizeOnlyYoutubeIndexes() {
         for (route in listOf("watch", "w", "v", "e", "shorts", "live", "embed")) {
@@ -55,7 +81,7 @@ class ContentLinksTest {
         val effective = options.apply(saved)
         assertFalse(effective.listen); assertFalse(effective.local); assertFalse(effective.autoplay); assertFalse(effective.savePosition)
         assertTrue(effective.videoLoop); assertEquals(1.25f, effective.speed); assertEquals("720p", effective.qualityDash)
-        assertEquals("h264", effective.videoCodec); assertTrue(effective.captions.isEmpty()); assertFalse(effective.showYoutubeComments)
+        assertEquals("h264", effective.videoCodec); assertTrue(effective.captions.isEmpty()); assertTrue(effective.showYoutubeComments)
         assertEquals("ID", effective.region); assertFalse(effective.relatedVideos); assertTrue(effective.extendDescription)
         assertFalse(effective.continueNext); assertFalse(effective.continueAutoplay)
         assertTrue(saved.listen); assertTrue(saved.savePosition); assertEquals(listOf("English"), saved.captions)

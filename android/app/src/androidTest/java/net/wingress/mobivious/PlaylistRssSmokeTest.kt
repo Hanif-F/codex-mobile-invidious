@@ -1,6 +1,11 @@
 package net.wingress.mobivious
 
 import android.content.Intent
+import android.app.Activity
+import android.app.Instrumentation
+import androidx.core.content.FileProvider
+import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 import androidx.compose.ui.test.*
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -8,6 +13,7 @@ import net.wingress.mobivious.data.*
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
+import org.json.JSONObject
 import java.net.URL
 
 /** Uses only the disposable localhost API fixture, like AppSmokeTest. */
@@ -25,6 +31,116 @@ class PlaylistRssSmokeTest {
     private fun signIn() {
         compose.runOnUiThread { vm.store.save(Account("fixture-token", "Viewer", Long.MAX_VALUE, "http://127.0.0.1:18080")) }
         until { vm.playlists.value.any { it.owned } }
+    }
+    @Test fun allSubscriptionExportsOpenSaveAndShareTheSelectedBodyAndMimeType() {
+        signIn()
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val intents = CopyOnWriteArrayList<Intent>()
+        val target = File(activity.cacheDir, "rss/test-save-result").apply { parentFile!!.mkdirs(); writeText("untouched") }
+        val uri = FileProvider.getUriForFile(activity, "${BuildConfig.APPLICATION_ID}.rss", target)
+        var saveResult = Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+        var switchAccountOnSave = false
+        val monitor = object : Instrumentation.ActivityMonitor() {
+            override fun onStartActivity(intent: Intent): Instrumentation.ActivityResult? {
+                if (intent.action !in listOf(Intent.ACTION_VIEW, Intent.ACTION_CHOOSER, Intent.ACTION_CREATE_DOCUMENT)) return null
+                intents.add(Intent(intent))
+                if (switchAccountOnSave && intent.action == Intent.ACTION_CREATE_DOCUMENT) vm.store.save(null)
+                return if (intent.action == Intent.ACTION_CREATE_DOCUMENT) saveResult else Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+            }
+        }
+        instrumentation.addMonitor(monitor)
+        try {
+            compose.runOnUiThread { vm.openSubscriptionExport() }
+            until { vm.rss.value.body != null }
+            for (format in SubscriptionExportFormat.entries) {
+                compose.onNodeWithTag("feed-format-${format.apiValue}").performScrollTo().performClick()
+                until { !vm.rss.value.loading && vm.rss.value.exportFormat == format && vm.rss.value.body != null }
+                val selected = vm.rss.value
+                assertEquals(format.filename, selected.filename)
+                if (format == SubscriptionExportFormat.NEWPIPE_JSON) assertTrue(JSONObject(selected.body!!).has("subscriptions"))
+                else assertTrue(selected.body!!.startsWith("<opml"))
+                assertFalse(selected.body!!.contains("fixture-token"))
+                val count = intents.size
+                compose.onNodeWithText("Open", substring = false).performScrollTo().performClick()
+                until { intents.size > count }
+                val opened = intents.last()
+                assertEquals(Intent.ACTION_VIEW, opened.action); assertEquals(format.mimeType, opened.type)
+                assertTrue(opened.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+                assertEquals(selected.body, activity.contentResolver.openInputStream(opened.data!!)!!.bufferedReader().use { it.readText() })
+                val shareCount = intents.size
+                compose.onNodeWithText("Share", substring = false).performScrollTo().performClick()
+                until { intents.size > shareCount }
+                @Suppress("DEPRECATION") val send = intents.last().getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+                assertEquals(Intent.ACTION_SEND, send.action); assertEquals(format.mimeType, send.type)
+                @Suppress("DEPRECATION") val shared = send.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)!!
+                assertEquals(format.filename, shared.lastPathSegment)
+                assertEquals(selected.body, activity.contentResolver.openInputStream(shared)!!.bufferedReader().use { it.readText() })
+                target.writeText("untouched")
+                saveResult = Instrumentation.ActivityResult(Activity.RESULT_CANCELED, null)
+                val cancelCount = intents.size
+                compose.onNodeWithText("Save file").performScrollTo().performClick()
+                until { intents.size > cancelCount }
+                compose.waitForIdle(); assertEquals("untouched", target.readText())
+                saveResult = Instrumentation.ActivityResult(Activity.RESULT_OK, Intent().setData(uri))
+                compose.onNodeWithText("Save file").performScrollTo().performClick()
+                until { target.readText() == selected.body }
+                assertEquals(format.mimeType, intents.last().type)
+                assertEquals(format.filename, intents.last().getStringExtra(Intent.EXTRA_TITLE))
+            }
+            captureWatchScreenshot("subscription-export-sheet")
+            target.writeText("untouched")
+            switchAccountOnSave = true
+            compose.onNodeWithText("Save file").performScrollTo().performClick()
+            until { !vm.rss.value.open }
+            assertEquals("untouched", target.readText())
+        } finally { instrumentation.removeMonitor(monitor); target.delete() }
+    }
+
+    @Test fun subscriptionExportRetryLegacyServersAndLateFormatsNeverReplaceTheCurrentSelection() {
+        signIn()
+        command("playlist-rss", """{"exportFailNext":true}""")
+        compose.runOnUiThread { vm.openSubscriptionExport(SubscriptionExportFormat.NEWPIPE_JSON) }
+        until { vm.rss.value.error != null }
+        compose.onNodeWithText("Retry").performClick()
+        until { vm.rss.value.body != null && vm.rss.value.error == null }
+        command("playlist-rss", """{"exportLegacy":true}""")
+        compose.runOnUiThread { vm.openSubscriptionExport(SubscriptionExportFormat.FREETUBE_OPML) }
+        until { vm.rss.value.error?.contains("subscription export update") == true }
+        compose.onNodeWithTag("feed-format-rss").performScrollTo().performClick()
+        until { vm.rss.value.body != null && vm.rss.value.error == null }
+        command("playlist-rss", """{"exportLegacy":false,"exportDelayNext":1000,"exportFailNext":true}""")
+        compose.runOnUiThread { vm.openSubscriptionExport(SubscriptionExportFormat.NEWPIPE_JSON) }
+        until {
+            val requests = JSONObject(URL("http://127.0.0.1:18080/test/state").readText()).getJSONArray("exportRequests")
+            (0 until requests.length()).any { !requests.getJSONObject(it).getBoolean("completed") }
+        }
+        compose.onNodeWithTag("feed-format-opml").performScrollTo().performClick()
+        until { vm.rss.value.exportFormat == SubscriptionExportFormat.FREETUBE_OPML && vm.rss.value.body != null }
+        until {
+            val requests = JSONObject(URL("http://127.0.0.1:18080/test/state").readText()).getJSONArray("exportRequests")
+            (0 until requests.length()).all { requests.getJSONObject(it).getBoolean("completed") }
+        }
+        assertEquals(SubscriptionExportFormat.FREETUBE_OPML, vm.rss.value.exportFormat)
+        assertNull(vm.rss.value.error); assertTrue(vm.rss.value.body!!.startsWith("<opml"))
+        val old = activity
+        compose.runOnUiThread { old.recreate() }
+        until { old.isDestroyed }
+        compose.runOnUiThread {
+            activity = androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry.getInstance()
+                .getActivitiesInStage(androidx.test.runner.lifecycle.Stage.RESUMED).filterIsInstance<MainActivity>().single()
+        }
+        assertEquals(SubscriptionExportFormat.FREETUBE_OPML, vm.rss.value.exportFormat)
+        assertNotNull(vm.rss.value.body)
+        command("playlist-rss", """{"exportDelayNext":1000}""")
+        compose.runOnUiThread { vm.openSubscriptionExport(SubscriptionExportFormat.NEWPIPE_JSON); vm.dismissRss() }
+        assertFalse(vm.rss.value.open)
+        compose.runOnUiThread { vm.openSubscriptionExport(); vm.store.save(null) }
+        until { !vm.rss.value.open }
+        assertNull(vm.rss.value.body)
+        signIn()
+        compose.runOnUiThread { vm.openSubscriptionExport(); vm.switchServer("http://localhost:18080") }
+        until { !vm.rss.value.open }
+        assertNull(vm.rss.value.body)
     }
     @Before fun launch() {
         command("reset"); command("playlist-rss")
@@ -171,15 +287,15 @@ class PlaylistRssSmokeTest {
         assertFalse(vm.rss.value.url!!.contains("fixture-token"))
         compose.onNodeWithText("Copy").assertExists()
         compose.runOnUiThread { vm.dismissRss(); vm.openPlaylistRss(vm.playlists.value.single { it.owned }) }
-        until { vm.rss.value.xml != null }
+        until { vm.rss.value.body != null }
         assertNull(vm.rss.value.url)
         compose.onNodeWithText("Save file").assertExists()
         compose.onNodeWithContentDescription("Close feed").performClick()
         compose.onNodeWithTag("subscription-actions").performClick()
-        compose.onNodeWithText("Export OPML").performClick()
-        until { vm.rss.value.xml != null }
-        compose.onNodeWithText("YouTube feeds").performClick()
-        until { vm.rss.value.xml?.contains("youtube.com/feeds/") == true }
+        compose.onNodeWithText("Export subscriptions").performClick()
+        until { vm.rss.value.body != null }
+        compose.onNodeWithText("YouTube OPML").performClick()
+        until { vm.rss.value.body?.contains("youtube.com/feeds/") == true }
         compose.runOnUiThread { vm.store.save(null) }
         until { !vm.rss.value.open && vm.playlists.value.isEmpty() }
     }

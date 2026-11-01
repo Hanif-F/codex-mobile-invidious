@@ -33,7 +33,7 @@ class OpeningLinksPresentationTest {
             assertTrue("$scheme://$host$path", matches("$scheme://$host$path"))
         }
         for (path in listOf("/shorts/testvideo01", "/live/testvideo01", "/embed/testvideo01", "/w/testvideo01",
-            "/v/testvideo01", "/e/testvideo01", "/watch/testvideo01", "/playlist?list=PLlive", "/mix?list=RDtestvideo01",
+            "/v/testvideo01", "/e/testvideo01", "/watch/testvideo01", "/playlist?list=PLlive", "/mix?list=RDtestvideo01", "/show/VLPLlive",
             "/channel/UCaaaaaaaaaaaaaaaaaaaaaa", "/@creator", "/c/Creator", "/user/Creator", "/hashtag/music",
             "/post/Ugfixture", "/clip/legacy-id", "/profile?user=Creator", "/attribution_link?u=%2Fwatch%3Fv%3Dtestvideo01")) {
             assertTrue(path, matches("https://www.youtube.com$path"))
@@ -42,6 +42,8 @@ class OpeningLinksPresentationTest {
         assertTrue(matches("https://youtu.be/testvideo01/"))
         assertTrue(matches("https://mobivious.wingress.net/watch?v=testvideo01"))
         assertTrue(matches("https://invidious.wingress.net/watch?v=testvideo01"))
+        assertTrue(matches("https://invidious.wingress.net/show/VLPLlive"))
+        assertTrue(matches("https://mobivious.wingress.net/show/VLPLlive"))
     }
 
     @Test fun manifestExcludesUnrelatedPagesHostsAndSchemes() {
