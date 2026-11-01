@@ -1,5 +1,58 @@
 # Focused implementation verification
 
+## Patch release 0.13.3 — 2 November 2026
+
+Version **0.13.3**, code **33**, packages the changes through
+`8f3a52e4f4862040fb3fc1f3f170729568e0104e`: Cloudflare Managed Challenge/native
+clearance and refresh recovery, legacy Reddit preference normalization, channel
+Shows tabs/links, and FreeTube OPML/NewPipe JSON subscription exports. The only
+application-source edit for this release is the version/code increment.
+
+Release checks:
+
+- `scripts/build-release.sh`: **474 JVM tests passed**, signed release build and
+  release lint passed (**0 errors, 36 warnings**). Existing signing material was
+  reused; checksum generation and nonempty matching R8 mapping archival passed.
+- From `android/`, `./gradlew :app:lintDebug --offline --console=plain`:
+  **passed, 0 errors and 18 warnings**.
+- SDK 36.0.0 `apksigner verify --verbose --print-certs` and `aapt dump badging`:
+  correct package `net.wingress.mobivious`, version/code, minimum SDK 33, target
+  SDK 37, non-debuggable APK and unchanged certificate. The previous local APK's
+  SHA-256 was checked against the GitHub v0.13.2 asset digest before comparing
+  certificates. All four CPU architectures remain present.
+- `sha256sum -c Mobivious-0.13.3.apk.sha256`: **passed**. ZIP inspection confirms
+  uncompressed DEX. Archived `mapping.txt` matches the build output; `apk.sha256`
+  identifies this APK and all archive `SHA256SUMS` entries passed.
+- `python3 scripts/check-documentation.py --refresh`, its normal check and
+  `git diff --check`: **passed** after the version/reference update.
+
+APK: **7,319,300 bytes**, DEX: **6,306,444 bytes**. SHA-256:
+`3d81252a893995bb82ecb16aee870e7ad3187d374fbb6ec748f209ecb44d1248`.
+The same signing certificate as v0.13.2 supports in-place updates.
+Matching R8 archive: `artifacts/r8/0.13.3/<APK-SHA256>/`. Raw build/package evidence
+is under ignored `.tools/release-0.13.3-*` and `artifacts/release-0.13.3/`.
+
+Optimized runtime acceptance is **pending**, not a passing gate: two attempts at
+`ANDROID_SERIAL=emulator-5554 scripts/test-ui-performance.sh --record --label release-0-13-3 --journey navigation`
+were interrupted by the Gboard microphone permission dialog while locating
+`Benchmark video 000`. The emulator then stopped and ADB reported no connected
+devices, preventing the planned watch, settings-saving, downloads and channels
+journeys. The failed attempts and first recording are retained under
+`.tools/ui-performance/release-0-13-3/emulator-5554/20261101T191004Z/` and
+`20261101T191416Z/`. They are diagnostic evidence, not optimized runtime acceptance.
+The benchmark package was isolated; no installed release package/data was changed.
+
+The underlying implementation's **27 selected debug emulator cases**, earlier
+**474 JVM tests** and **39 Python tests** remain recorded below; they do not
+establish signed/optimized runtime or full connected-suite acceptance. Existing
+ignored/known device cases, including accepted-video-conversion on this emulator,
+remain unaccepted. NewPipe/FreeTube application import acceptance remains separate.
+
+Live backend checks were deferred while the server
+recompiled. Shows requires advertised server support; the two new export formats
+require the sibling mobile endpoint extension. Existing export-authorized tokens
+need no renewed sign-in. This release does not deploy the backend.
+
 ## Upstream mobile compatibility (`588135f5`) — 2 November 2026
 
 Implemented legacy Reddit → YouTube normalization for account/guest preferences
