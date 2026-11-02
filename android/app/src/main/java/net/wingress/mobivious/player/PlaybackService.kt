@@ -174,8 +174,8 @@ class PlaybackService : MediaSessionService() {
                     if (customCommand.customAction == SET_HISTORY_SETTINGS) {
                         if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
-                        if (player.currentMediaItem?.mediaMetadata?.extras?.getString("downloadId") != null) return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
                         history = args.getBoolean("history") && owner != null && player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true
+                        if (!history) marked = false
                         savePosition = player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true && (app.playbackQueue.value.current?.linkPlayback?.options?.savePosition ?: args.getBoolean("savePosition"))
                         app.watched.configure(ownerContext!!, savePosition)
                         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -206,7 +206,7 @@ class PlaybackService : MediaSessionService() {
                 started = false
                 marked = false
                 playbackGeneration++
-                if (mediaItem != null && mediaItem.mediaMetadata.extras?.getString("downloadId") == null) app.watched.configure(ownerContext!!, savePosition)
+                if (mediaItem != null) app.watched.configure(ownerContext!!, savePosition)
                 resetSponsor(mediaItem)
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -240,6 +240,17 @@ class PlaybackService : MediaSessionService() {
         })
         scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
         scope.launch { while (isActive) { delay(100); recovery.sample(player.isPlaying, player.currentPosition); queue.enforceEnd(); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
+        scope.launch { app.playbackSync.configurationChanges.collect {
+            val context = ownerContext
+            if (context == app.api.context() && current?.mediaMetadata?.extras?.getString("downloadId") != null) {
+                val settings = app.playbackSync.settings(context!!)
+                history = sameOwner(owner) && settings?.history == true
+                if (!history) marked = false
+                savePosition = settings?.position == true
+                app.watched.configure(context, savePosition)
+                if (player.isPlaying) recordHistory()
+            }
+        } }
         scope.launch { app.store.account.collect { if (sponsorContext != null && sponsorContext != app.api.context()) resetSponsor(player.currentMediaItem, readSettings = false) } }
         scope.launch { app.playbackContext.collect { context ->
             val previous = app.playbackQueue.value.context
@@ -425,7 +436,7 @@ class PlaybackService : MediaSessionService() {
         val context = ownerContext ?: return
         val generation = playbackGeneration
         marked = true
-        scope.launch {
+        app.playbackScope.launch {
             try { app.watched.recordWatched(context, item.mediaId) }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { if (generation == playbackGeneration && context == ownerContext) marked = false }
@@ -433,14 +444,14 @@ class PlaybackService : MediaSessionService() {
     }
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {
         item?.mediaMetadata?.extras?.getString("downloadId")?.let { id ->
-            if (started) scope.launch { app.downloads.position(id, if (ended || player.duration > 0 && position >= player.duration - 2000) 0 else position) }
-            return
+            val localPosition = if (ended || player.duration > 0 && position >= player.duration - 2000) 0 else position
+            if (started) app.playbackScope.launch { app.downloads.position(id, localPosition) }
         }
         if (!started || !savePosition || item == null || item.mediaMetadata.extras?.getBoolean("clip") == true || ownerContext != app.api.context()) return
         val duration = player.duration.takeIf { it > 0 }?.div(1000) ?: 0
         val value = PlaybackRules.save(position / 1000, duration, ended)
         val context = ownerContext ?: return
-        scope.launch {
+        app.playbackScope.launch {
             try { app.watched.savePosition(context, item.mediaId, value) }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { /* Device resume and indicators retain the local save. */ }

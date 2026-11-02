@@ -816,3 +816,59 @@ existing failures/ignored cases remain unaccepted, including the emulator-crashi
 accepted video-conversion case. Production account-gated content was verified
 with disposable fixtures; real-account content access was not tested. No release,
 optimized-runtime or performance acceptance is claimed.
+
+## Downloaded playback synchronization — 2 November 2026
+
+Downloaded playback now shares account history/progress with streamed playback,
+using a durable per-profile journal and revision-safe acknowledgements. Downloads
+retain independent local resume. Confirmed history/resume settings apply to a
+running download, including recovery when no settings/activity were cached.
+Pending progress precedes remote resume, initial online resolution is bounded to
+two seconds, and late responses cannot replace newer checkpoints or completion.
+Retries run only while the application process lives, with recovery/next-launch
+triggers; no persistent scheduler or server contract was added.
+
+Final acceptance after production edits:
+
+- **496 JVM tests passed**, zero failures/errors/skips (49 classes), including
+  16 dedicated playback-sync persistence, ownership, settings, retry and race cases.
+- **Debug lint passed**, zero errors and 36 warnings. The compiler also reports
+  existing deprecation diagnostics and an unnecessary non-null assertion in the
+  new service observer; neither blocks the checks.
+- **24 focused Android 16 emulator cases passed**, zero failures/skips, on
+  `emulator-5554` (Pixel 8 Pro AVD). Connected tasks built/installed debug app/test
+  APKs. Seven new sync journeys cover history/progress/completion, server resume,
+  retry/recreation, settings changes and authentication/account isolation. Existing
+  consumers cover offline decode/background controls, indicators, stable-profile
+  storage/transfer, settings, streamed playback and access recovery.
+- **8 Python checks passed**: one sync fixture contract and seven documentation
+  checker regressions. Documentation inventory/fingerprint/link checks passed for
+  **314 maintained files and 21 documents**. `git diff --check` passed.
+
+From `android/`:
+
+```sh
+JAVA_HOME=/opt/android-studio/jbr ./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain
+```
+
+From the repository root, the final device selector was:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DownloadSyncSmokeTest,net.wingress.mobivious.DownloadsSmokeTest#allModesAndCaptionsDecodeOfflineWithoutMediaOrMetadataRequests,net.wingress.mobivious.DownloadsSmokeTest#offlinePlaybackUsesWatchMiniFullscreenPipAndBackgroundControls,net.wingress.mobivious.WatchedIndicatorsSmokeTest,net.wingress.mobivious.DeviceProfilesSmokeTest#guestAccountTransitionsRestoreSettingsAndNeverRewriteGuestSpeed,net.wingress.mobivious.DeviceProfilesSmokeTest#existingSessionDiscoversStableIdentityAndLateGuestSavesAreRejected,net.wingress.mobivious.DeviceProfileStorageTest#playbackJournalMigratesWithIdentitySurvivesRestartAndPurgesWithItsOwner,net.wingress.mobivious.SettingsSmokeTest#guestPlaybackDefaultsAndLocalResumeReachPlayer,net.wingress.mobivious.SettingsSmokeTest#failedAutomaticSaveKeepsRequestedValueAcrossNavigationRecreationAndRetry,net.wingress.mobivious.AppSmokeTest#hlsExplicitResumeCaptionsAndAudioOnly,net.wingress.mobivious.AppSmokeTest#accountBrowsingAndServicePlayback,net.wingress.mobivious.InstanceAccessSmokeTest#playbackVerificationAutomaticallyRetriesAndKeepsPositionAndOptions,net.wingress.mobivious.InstanceAccessSmokeTest#protectedDownloadsRetryWithoutRepeatingCompleteAssetsAndPlayOffline
+python3 -m unittest discover -s scripts/tests -p test_download_sync_fixture.py
+python3 -m unittest discover -s scripts/tests -p test_documentation.py
+python3 scripts/check-documentation.py
+git diff --check
+```
+
+Device XML/results are under `android/app/build/outputs/androidTest-results/connected/debug/`;
+JVM XML is under `android/app/build/test-results/testDebugUnitTest/`; lint details
+are in `android/app/build/reports/lint-results-debug.html`.
+
+Acceptance covers repository recreation and actual preference-store/activity
+recreation, not a new force-stop/reboot journey. Server outage/recovery is exercised
+through controlled fixture failures and coordinator recovery; this does not claim
+real network-radio outage or live-server acceptance. The full connected suite and
+release checks were not run. Existing ignored export/conversion and opt-in restart
+cases remain unchanged and were not selected. No server source/contracts changed,
+so server checks were not required.

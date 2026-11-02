@@ -228,8 +228,8 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/DeviceProfileStorageTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Device Profile Storage declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "fd68c7eaad78030342e58ff5bd8b5a47a882bfd113ff868aebf0c7916ccb4d8f"
+      "description": "Actual device profile persistence, identity transfers, stale writes, journal restoration and purge coverage.",
+      "sha256": "faf3aadea6f469571c41c81c313b8b8618de45f1bca346920eee321639cc9e08"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/DeviceProfilesSmokeTest.kt": {
       "area": "Android device tests",
@@ -528,8 +528,8 @@
     "android/app/src/main/java/net/wingress/mobivious/MobiviousApplication.kt": {
       "area": "Application entry points",
       "guide": "docs/ARCHITECTURE.md",
-      "description": "Process-wide repositories, instance-access controller, context-fenced image loaders and playback state wiring.",
-      "sha256": "749342b222d4e42e15c01fcf08b2d2e635b612ef6b630332256c1e4969c9b3cc"
+      "description": "Application-owned repositories, media state, network/access recovery synchronization and guarded image loading.",
+      "sha256": "687490d6058990faf3818a0a81ed3e05b6139c875a61033cada114a9c7fe5b68"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/AccentPreset.kt": {
       "area": "Data and API",
@@ -679,7 +679,7 @@
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "Complete instance HTTP client, auth/error/cache semantics, actionable invalid video JSON errors and consumed API endpoint methods.",
-      "sha256": "80c3d586c26afdc58387170e7c8de552139abd53455a8f30f866f5d9ee51880c"
+      "sha256": "0daf027e2fd1e229773f3a17dac416b3b236f17d7a70c3734410a0c97db76ac3"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/LiveChat.kt": {
       "area": "Data and domain",
@@ -721,7 +721,7 @@
       "area": "Data and domain",
       "guide": "docs/STORAGE_AND_SECURITY.md",
       "description": "Keystore-encrypted account and per-instance verification storage plus local profile preference ownership.",
-      "sha256": "e3d1eca4c0e19dc1759f4ff5768f6a41d18a18ad6dab7002b8c1c2437f1295cc"
+      "sha256": "cc8a0bce57eb1707ee1de757b5472d86d48732228cc34a14d50908700c6d91de"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/SponsorBlock.kt": {
       "area": "Data and domain",
@@ -744,8 +744,8 @@
     "android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt": {
       "area": "Data and domain",
       "guide": "docs/LIBRARY.md",
-      "description": "Watched/progress models and indicators plus revision-fenced history/progress reconciliation and local fallback.",
-      "sha256": "6fa5d75f2b7609b4e00bf71fd23b12c85e051afd12d017d856b37102945025ce"
+      "description": "Watched/progress indicators, revision-fenced reconciliation, durable sync integration and local fallback.",
+      "sha256": "b2ddcea3924c15d477fb267c373506f569363dc6d64d236e0a819dcf7145aa95"
     },
     "android/app/src/main/java/net/wingress/mobivious/downloads/DownloadExportService.kt": {
       "area": "File export",
@@ -775,7 +775,7 @@
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "Local single/paired media sources and completed captions without remote metadata.",
-      "sha256": "1de516cf0933c883732044380fd12ea177c2ff77eb49683a24b696ca501e7060"
+      "sha256": "56bbe205bc9761881dd6d9ffaa8a3056ccad07258d3719b7ae5a69febe387dcd"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/PlaybackQueue.kt": {
       "area": "Playback",
@@ -793,13 +793,13 @@
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "ExoPlayer/MediaSession lifetime, trusted commands, history/progress ownership, SponsorBlock and PiP transport actions. Integrates session playback statistics.",
-      "sha256": "7999fbd68741fe244387d4258ddf29c62dd45ab6364ec6da066ed6c780d23857"
+      "sha256": "aaa9f9d639d89c6baf04c944a74fda099f6171aa315ab7004464639c43ccc31b"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueCoordinator.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
       "description": "Service-owned lazy resolution, source pagination, occurrence transitions, tracks, bounds, offline media, clips and successor behavior; integrates channel title/thumbnail rules.",
-      "sha256": "80711826bb3bd2094ebaaa20198bd1294fb061616c794104906f5877cf80c599"
+      "sha256": "91564a2311ebfbb72e916b3a57571422895bbbeaf1cd12b26b176209a07c364d"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueSessionPlayer.kt": {
       "area": "Playback",
@@ -901,7 +901,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination. Integrates session playback statistics.",
-      "sha256": "fa45eacbeebdf1e762f01176c32af4673be2132ce0a1a0e14bb92b28dded0ffa"
+      "sha256": "2e096771abb02bcaa5ee0cc3c9b141adfc08df5f3f2c089a74740809b2ad96e4"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1627,7 +1627,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local API/media fixture, scenario tracing, controlled challenge/rotation barriers and single-use HTTP/empty-video failures.",
-      "sha256": "460b00548aedee0753f6bd0cd937dd16b4ddc83322d0f07396a48da80c93290f"
+      "sha256": "964230a803888b8905023a61fec80c3d49dc045e1b2a139e388e40c2658b1a5c"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1639,7 +1639,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Canonical base audiovisual/DASH/HLS/caption/artwork fixtures plus codec, geometry and separate download tracks.",
-      "sha256": "c88da0419faa3206ee6d7c6319f03e14b1308fde92d3ac4f3c56df69a8cb3542"
+      "sha256": "06d748ce46b9726cbff9e7b6ffb48a72860abafe04d622d69c74df5141382137"
     },
     "scripts/lib/android-fixture.sh": {
       "area": "Scripts",
@@ -1886,6 +1886,30 @@
       "description": "Subscription export format, MIME/filename, complete/empty list, legacy failure and retired comment-source fixture contracts.",
       "guide": "docs/TESTING.md",
       "sha256": "ef63ad54f900f1d4af8aebdc41180974e7cdc3d9b4bea2cdd22b2248ae8f0710"
+    },
+    "android/app/src/main/java/net/wingress/mobivious/data/PlaybackSync.kt": {
+      "area": "Data and domain",
+      "guide": "docs/PLAYBACK.md",
+      "description": "Profile-scoped durable playback journal, revision-safe uploads, shared resume resolution and process-lifetime retry coordinator.",
+      "sha256": "b31491f96b47b949a4619a08304dbdcf4df7851dff27839e77e91b1815ba2f57"
+    },
+    "android/app/src/test/java/net/wingress/mobivious/PlaybackSyncTest.kt": {
+      "area": "JVM tests",
+      "guide": "docs/TESTING.md",
+      "description": "Playback journal persistence/coalescing, ownership, settings, stale responses, authentication and virtual-time retry/reconnect regression coverage.",
+      "sha256": "80e68c7b0b56c0a0bf1943ca1e9428e2ffc039c1f7f9ed0320aac12322ae366d"
+    },
+    "android/app/src/androidTest/java/net/wingress/mobivious/DownloadSyncSmokeTest.kt": {
+      "area": "Android device tests",
+      "guide": "docs/TESTING.md",
+      "description": "Downloaded history/progress, server/local resume, recreation/recovery, live settings and authentication/account isolation journeys.",
+      "sha256": "e9772249505a8e2fc52812c557615fde6094a5711894adfe970b198758035743"
+    },
+    "scripts/tests/test_download_sync_fixture.py": {
+      "area": "Scripts",
+      "guide": "docs/TESTING.md",
+      "description": "Opt-in long download media, playback read/write failure, recovery and reset fixture contracts.",
+      "sha256": "312b8fcc0ab430cabf51bb47ba0d9e06ab6cb75e7f04d7fa0739faa7f4535770"
     }
   },
   "reviewedSourceState": "Cloudflare recovery working tree; current acceptance evidence and limitations are recorded in VERIFICATION.md.",

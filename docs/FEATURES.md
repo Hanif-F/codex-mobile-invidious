@@ -239,7 +239,12 @@ entry without redownloading completed assets. Active/upcoming streams and
 server-restricted media are unavailable for download.
 
 Saved media and artwork play offline through the usual player. Downloads remain
-available after sign-out or server changes and have independent resume positions.
+available after sign-out or server changes and keep independent local resume positions.
+When signed in, viewing also syncs history and playback progress according to the
+active account's settings. Pending offline progress takes precedence over the server
+when resuming; otherwise online downloads load the shared account position. Offline
+activity survives restarts and retries while the app/service is running or next opens.
+Disabling account resume does not disable the download's local resume.
 Deleting an entry deletes its app-specific files. Clearing app storage or
 uninstalling removes the local library. Save to files creates a user-owned copy.
 Single tracks/captions copy unchanged; a paired download first attempts an MP4

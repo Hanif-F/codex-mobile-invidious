@@ -57,9 +57,10 @@ interface LocalPlaybackPositions {
 }
 
 /** Shared by the UI and service, including while no Activity is attached. */
-class WatchedRepository(private val api: InvidiousApi, private val local: LocalPlaybackPositions) {
+class WatchedRepository(private val api: InvidiousApi, private val local: LocalPlaybackPositions,
+    private val sync: PlaybackSyncRepository? = null) {
     private val lock = Any()
-    private val writes = Mutex()
+    private val writes = sync?.writes ?: Mutex()
     private val mutableState = MutableStateFlow(WatchedState())
     val state = mutableState.asStateFlow()
     private var epoch = 0L
@@ -71,6 +72,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     private val historyRevisions = mutableMapOf<String, Long>()
     private val positionRevisions = mutableMapOf<String, Long>()
     private val pendingPositions = mutableSetOf<String>()
+    private var journalPending = emptyMap<String, PendingPlayback>()
     private var clearedAt = 0L
     private var positionsClearedAt = 0L
     private var savePosition = false
@@ -85,8 +87,9 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         epoch++; revision++; clearGeneration++; positionGeneration++
         historyGeneration.clear(); historyRevisions.clear(); positionRevisions.clear(); pendingPositions.clear()
         historyRevision = 0
+        journalPending = sync?.pending(context).orEmpty()
         refreshing = null; clearedAt = revision; positionsClearedAt = revision
-        savePosition = false; positionsConfigured = false; snapshot = PlaybackSnapshot()
+        savePosition = sync?.settings(context)?.position == true; positionsConfigured = false; snapshot = PlaybackSnapshot(positions = if (savePosition) local.positions(context) else emptyMap())
         mutableState.value = WatchedState(context)
     }
     fun configure(context: ApiContext, rememberPosition: Boolean) = synchronized(lock) {
@@ -110,9 +113,40 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         if (context.account == null) snapshot = PlaybackSnapshot(positions = if (savePosition) local.positions(context) else emptyMap())
         publish()
     }
+    fun reconcilePending() = synchronized(lock) {
+        val context = api.context()
+        if (mutableState.value.context == context) {
+            val next = sync?.pending(context).orEmpty()
+            (journalPending.keys + next.keys).forEach { id ->
+                val before = journalPending[id]; val after = next[id]
+                if (before?.history != after?.history) {
+                    historyRevisions[id] = ++revision
+                    if (before?.history != null && after?.history == null) {
+                        if (sync?.settings(context)?.history == true) snapshot = snapshot.copy(watched = snapshot.watched + id)
+                        historyRevision++
+                    }
+                }
+                if (before?.position != after?.position) {
+                    positionRevisions[id] = ++revision
+                    if (after?.position != null) snapshot = snapshot.copy(positions = if (after.seconds == 0L)
+                        snapshot.positions - id else snapshot.positions + (id to after.seconds))
+                }
+            }
+            journalPending = next
+            savePosition = sync?.settings(context)?.position ?: savePosition
+            publish()
+        }
+    }
     private fun publish() {
-        mutableState.value = mutableState.value.copy(watched = snapshot.watched,
-            positions = if (savePosition) snapshot.positions else emptyMap(), historyRevision = historyRevision)
+        val context = mutableState.value.context
+        val pending = if (context == api.context() && context.account != null) sync?.pending(context).orEmpty() else emptyMap()
+        val watched = snapshot.watched + pending.filterValues { it.history != null }.keys
+        val positions = snapshot.positions.toMutableMap()
+        pending.forEach { (id, entry) -> if (entry.position != null) {
+            if (entry.seconds == 0L) positions.remove(id) else positions[id] = entry.seconds
+        } }
+        mutableState.value = mutableState.value.copy(watched = watched,
+            positions = if (savePosition) positions else emptyMap(), historyRevision = historyRevision)
     }
     suspend fun refresh() {
         val request = synchronized(lock) {
@@ -184,6 +218,14 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     suspend fun recordWatched(context: ApiContext, id: String) {
         val ticket = ticket(context, id)
         if (context.account == null) return
+        if (sync != null) {
+            if (sync.enqueueHistory(context, id)) synchronized(lock) {
+                if (valid(ticket) && ticket.history == (historyGeneration[id] ?: 0L)) {
+                    historyRevisions[id] = ++revision; historyRevision++; publish()
+                }
+            }
+            return
+        }
         write(ticket, { ticket.history == (historyGeneration[id] ?: 0L) }, operation = { api.watched(id, context) }) {
             snapshot = snapshot.copy(watched = snapshot.watched + id)
             historyRevisions[id] = revision + 1
@@ -193,6 +235,15 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     suspend fun savePosition(context: ApiContext, id: String, seconds: Long) {
         val ticket = ticket(context)
         val value = seconds.coerceIn(0, Int.MAX_VALUE.toLong())
+        if (sync != null && context.account != null) {
+            if (sync.enqueuePosition(context, id, value)) synchronized(lock) {
+                if (valid(ticket) && savePosition && ticket.position == positionGeneration) {
+                    snapshot = snapshot.copy(positions = if (value == 0L) snapshot.positions - id else snapshot.positions + (id to value))
+                    positionRevisions[id] = ++revision; publish()
+                }
+            }
+            return
+        }
         write(ticket, { savePosition && ticket.position == positionGeneration }, positionId = id, operation = {
             // Keep the existing local resume fallback even when the network write fails.
             synchronized(lock) { if (valid(ticket) && savePosition && ticket.position == positionGeneration) {
@@ -206,6 +257,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     suspend fun removeHistory(context: ApiContext, id: String) {
         val ticket = ticket(context)
         write(ticket, operation = { api.removeHistory(id, context) }) {
+            sync?.discard(context, id)
             historyGeneration[id] = (historyGeneration[id] ?: 0L) + 1
             snapshot = snapshot.copy(watched = snapshot.watched - id)
             historyRevisions[id] = revision + 1
@@ -215,6 +267,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     suspend fun clearHistory(context: ApiContext) {
         val ticket = ticket(context)
         write(ticket, operation = { api.clearHistory(context) }) {
+            sync?.discard(context)
             clearGeneration++; clearedAt = revision + 1; positionsClearedAt = clearedAt
             local.clearPositions(context); snapshot = PlaybackSnapshot()
             historyRevision++

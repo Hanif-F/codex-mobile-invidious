@@ -15,6 +15,7 @@ import net.wingress.mobivious.data.OriginalTitlePreferences
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -25,6 +26,10 @@ class MobiviousApplication : Application(), coil.ImageLoaderFactory {
     lateinit var store: SessionStore
     lateinit var api: InvidiousApi
     lateinit var cache: ResponseCache
+    lateinit var playbackSync: net.wingress.mobivious.data.PlaybackSyncRepository
+    lateinit var syncCoordinator: net.wingress.mobivious.data.PlaybackSyncCoordinator
+    internal val playbackScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    @Volatile private var networkAvailable = true
     lateinit var watched: WatchedRepository
     lateinit var blocked: BlockedRepository
     lateinit var dearrowTitles: DeArrowTitles
@@ -51,17 +56,30 @@ class MobiviousApplication : Application(), coil.ImageLoaderFactory {
         val originalTitles = OriginalTitlePreferences(store::positionContext,
             { store.guestPreferences(it).showOriginalTitle }, { api.preferences(it) })
         api = InvidiousApi({ store.server }, { store.account.value }, { store.save(null) }, cache = cache, onOffline = { offline.value = it }, generation = { store.contextGeneration }, onProfile = store::confirmProfile,
-            originalTitles = originalTitles, access = access)
+            originalTitles = originalTitles, access = access, onPreferences = { context, preferences ->
+                if (::playbackSync.isInitialized) playbackSync.configure(context, preferences)
+            })
         dearrowTitles = DeArrowTitles(titleScope, { store.server }) { api.dearrowTitle(it) }
         channelSpoilers = net.wingress.mobivious.data.ChannelSpoilerRepository(titleScope, api::context, api::spoilerPublications)
         channelSpoilers.reset(preferences = if (store.account.value == null) store.guestPreferences() else null)
         aiFilter = net.wingress.mobivious.data.AiFilterRepository(titleScope, api::context, api::aiStatus, api::aiChannels)
         aiFilter.reset()
-        watched = WatchedRepository(api, store)
+        playbackSync = net.wingress.mobivious.data.PlaybackSyncRepository(api, store)
+        watched = WatchedRepository(api, store, playbackSync)
+        syncCoordinator = net.wingress.mobivious.data.PlaybackSyncCoordinator(playbackScope, playbackSync) { networkAvailable }
+        playbackSync.changed = { watched.reconcilePending(); syncCoordinator.request() }
+        val connectivity = getSystemService(android.net.ConnectivityManager::class.java)
+        networkAvailable = connectivity.activeNetwork != null
+        connectivity.registerDefaultNetworkCallback(object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) { networkAvailable = true; syncCoordinator.resume() }
+            override fun onLost(network: android.net.Network) { networkAvailable = connectivity.activeNetwork != null }
+        })
+        playbackScope.launch { access.recovery.collect { if (it != null) syncCoordinator.resume() } }
         blocked = BlockedRepository(api, store)
         val main = Handler(Looper.getMainLooper())
         fun changed(context: ApiContext) {
             if (context != api.context()) return
+            syncCoordinator.resume()
             access.contextChanged()
             downloads.stopManagedCalls()
             watched.reset(context); blocked.reset(context); dearrowTitles.clear(); offline.value = false; playbackContext.value = context
@@ -74,6 +92,7 @@ class MobiviousApplication : Application(), coil.ImageLoaderFactory {
         playbackContext.value = api.context()
         blocked.reset()
         watched.reset()
+        syncCoordinator.resume()
         if (store.account.value == null) watched.configure(api.context(), store.guestPreferences().savePosition)
     }
     fun imageLoaderBuilder(base: okhttp3.OkHttpClient = okhttp3.OkHttpClient()): coil.ImageLoader.Builder = coil.ImageLoader.Builder(this)

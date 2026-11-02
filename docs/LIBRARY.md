@@ -80,9 +80,11 @@ the client reloads the first page instead of mixing calendar groups. Legacy arra
 retain basic viewing, including unavailable IDs, with organized search disabled.
 
 `WatchedRepository` maintains watched IDs, optional positions and history revision.
-Reads merge untouched entries while retaining newer confirmed writes; clear and
-per-video generations stop old writes resurrecting removed history. Position writes
-keep local fallback even when the server upload fails. Guests have progress only
+Reads merge untouched entries while retaining newer local/confirmed writes; clear and
+per-video generations stop old writes resurrecting removed history. Account history
+and progress writes share a durable per-profile journal for streamed and downloaded
+videos. Pending entries update indicators immediately; successful upload also advances
+the history revision. Position writes keep local fallback when the server upload fails. Guests have progress only
 when enabled, not shared watch history. Removing one history entry leaves progress;
 clear removes both. Badges/progress bars hide unknown percentages for live/unknown
 duration; known progress has a small visible floor and near-complete fill.
@@ -161,7 +163,13 @@ A record becomes playable when every selected video/audio asset is Complete;
 caption/artwork failure need not block media. Offline details use only completed
 local artwork/captions, remove remote streams/recommendations/chat/storyboards and
 keep original saved title metadata. Local video/audio are merged for playback.
-No network metadata lookup is required to play a saved record.
+No network video-metadata lookup is required to play a saved record. Signed-in playback
+can load shared resume progress and sync history/progress using the current account's
+settings. These optional calls cannot block startup beyond two seconds or stop local
+playback on failure. The record's independent local resume continues even with account
+position saving disabled. See [Playback](PLAYBACK.md#progress-and-history) for journal,
+retry, account isolation and completion rules. Deleting media does not discard pending
+account viewing activity.
 
 Tap a playable entry's artwork, title, status or padding to open offline playback.
 The trailing three-dot menu contains Details, Cancel/Retry when applicable, Save

@@ -24,7 +24,9 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         .connectTimeout(15, TimeUnit.SECONDS).readTimeout(30, TimeUnit.SECONDS).followRedirects(false).followSslRedirects(false).build(),
     private val cache: ResponseCache? = null, private val onOffline: (Boolean) -> Unit = {}, private val generation: () -> Long = { 0 },
     private val onProfile: (ApiContext, String) -> Unit = { _, _ -> },
-    private val originalTitles: OriginalTitlePreferences? = null, private val access: InstanceAccess? = null) {
+    private val originalTitles: OriginalTitlePreferences? = null, private val access: InstanceAccess? = null,
+    private val onPreferences: (ApiContext, AccountPreferences) -> Unit = { _, _ -> }) {
+    private val preferencesRevision = java.util.concurrent.atomic.AtomicLong()
     private val accessClient = access?.client(client) ?: client
     private val contributionClient = accessClient.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
     fun context() = ApiContext(server(), account(), generation())
@@ -42,7 +44,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         .addPathSegments(path.removePrefix("/")).apply { query.forEach { (k, v) -> addQueryParameter(k, v) } }.build()
     suspend fun request(path: String, method: String = "GET", data: JSONObject? = null, auth: Boolean = false,
         query: Map<String, String> = emptyMap(), context: ApiContext? = null, accept: String = "application/json",
-        allowCachedFallback: Boolean = true, maxResponseBytes: Long = Long.MAX_VALUE): String = withContext(Dispatchers.IO) {
+        allowCachedFallback: Boolean = true, maxResponseBytes: Long = Long.MAX_VALUE, optionalSync: Boolean = false): String = withContext(Dispatchers.IO) {
         val target = context ?: this@InvidiousApi.context()
         if ((path.startsWith("api/v1/mobile/") || path.startsWith("api/v1/auth/account/")) && target != this@InvidiousApi.context())
             throw CancellationException("Account or instance changed")
@@ -58,7 +60,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         val builder = Request.Builder().url(address).header("Accept", accept).tag(ApiContext::class.java, target)
         if (auth) {
             val session = target.account ?: throw ApiException(401, "Sign in to use your account.")
-            if (session.server.toHttpUrl() != target.server.toHttpUrl() || session.expiresAt <= System.currentTimeMillis() / 1000) { if (target == this@InvidiousApi.context()) expired(); throw ApiException(401, "Your session expired. Sign in again.") }
+            if (session.server.toHttpUrl() != target.server.toHttpUrl() || session.expiresAt <= System.currentTimeMillis() / 1000) { if (!optionalSync && target == this@InvidiousApi.context()) expired(); throw ApiException(401, "Your session expired. Sign in again.") }
             builder.header("Authorization", "Bearer ${session.token}")
         }
         builder.method(method, if (method in listOf("POST", "PUT", "PATCH")) (data ?: JSONObject()).toString().toRequestBody("application/json".toMediaType()) else null)
@@ -73,11 +75,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                 val chatSettings = path == "api/v1/auth/chat_preferences" || path.startsWith("api/v1/auth/chat_timing/")
                 val invalidPassword = path.startsWith("api/v1/auth/account/") &&
                     runCatching { JSONObject(body).text("code") == "invalid_password" }.getOrDefault(false)
-                // Optional chat sync must not revoke the active playback owner on an auth failure.
-                if (response.code == 401 && auth && !invalidPassword && !chatSettings && target == this@InvidiousApi.context()) expired()
+                // Optional playback/chat sync must not revoke the active playback owner on an auth failure.
+                if (response.code == 401 && auth && !invalidPassword && !chatSettings && !optionalSync && target == this@InvidiousApi.context()) expired()
                 val error = runCatching { JSONObject(body).text("error") }.getOrDefault("")
-                if (auth && !chatSettings && response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired")) && target == this@InvidiousApi.context()) expired()
+                if (auth && !chatSettings && !optionalSync && response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired")) && target == this@InvidiousApi.context()) expired()
                 throw ApiException(response.code, when {
+                    optionalSync && response.code in listOf(401, 403) -> "Sign in again to restore playback sync."
                     chatSettings && (response.code == 401 || response.code == 403 && (error == "Request must be authenticated" || error.startsWith("Token is expired"))) -> "Sign out and sign in again to restore chat settings sync. Playback can continue."
                     response.code in listOf(404, 405) && (path == "api/v1/auth/clips" || path.startsWith("api/v1/channels/") && path.endsWith("/clips")) -> "This server needs the native Clips API update."
                     response.code == 403 && error == "Invalid scope" && path.startsWith("api/v1/auth/clips") -> "Sign out and sign in again to enable Clips with an updated token."
@@ -100,7 +103,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
                     else -> "Request failed (${response.code})."
                 }, response.header("Retry-After"))
             }
-            if (auth && path == "api/v1/auth/preferences" && method == "GET") {
+            if (!optionalSync && auth && path == "api/v1/auth/preferences" && method == "GET") {
                 DeviceProfile.validId(response.header("X-Invidious-Account-Profile"))?.let { onProfile(target, it) }
                 if (target != this@InvidiousApi.context()) throw CancellationException("Account profile resolved")
             }
@@ -365,10 +368,12 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun deletePlaylist(id: String) { request("api/v1/auth/playlists/$id", "DELETE", auth = true) }
     suspend fun addToPlaylist(id: String, video: String, context: ApiContext = context()): Video = ApiParser.video(JSONObject(scopedPlaylistWrite("api/v1/auth/playlists/$id/videos", "POST", context, JSONObject().put("videoId", video))))
     suspend fun removeFromPlaylist(id: String, index: String, context: ApiContext = context()) { require(index.matches(Regex("^[A-Fa-f0-9]+$"))) { "Missing playlist occurrence ID." }; scopedPlaylistWrite("api/v1/auth/playlists/$id/videos/$index", "DELETE", context) }
-    suspend fun preferences(context: ApiContext = context()): AccountPreferences {
+    suspend fun preferences(context: ApiContext = context(), optionalSync: Boolean = false): AccountPreferences {
         val version = originalTitles?.version()
-        return ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context))).also {
+        val syncVersion = preferencesRevision.get()
+        return ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", auth = true, context = context, optionalSync = optionalSync))).also {
             originalTitles?.confirm(context, it.showOriginalTitle, version)
+            if (preferencesRevision.get() == syncVersion) onPreferences(context, it)
         }
     }
 
@@ -390,19 +395,22 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
         require(value in -3_600_000..3_600_000)
         request("api/v1/auth/chat_timing/$id", "PUT", JSONObject().put("offsetMs", value), true, context = context)
     }
-    suspend fun preferences(changes: JSONObject, context: ApiContext): AccountPreferences =
-        ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", "PATCH", changes, true, context = context))).also {
+    suspend fun preferences(changes: JSONObject, context: ApiContext): AccountPreferences {
+        val syncVersion = preferencesRevision.incrementAndGet()
+        return ApiParser.preferences(JSONObject(request("api/v1/auth/preferences", "PATCH", changes, true, context = context))).also {
             originalTitles?.confirm(context, it.showOriginalTitle)
+            if (preferencesRevision.compareAndSet(syncVersion, syncVersion + 1)) onPreferences(context, it)
         }
+    }
     suspend fun dearrowTitle(id: String, context: ApiContext = context()): String? = JSONObject(request("api/v1/dearrow/$id", context = context)).text("title").trim().takeIf { it.isNotEmpty() }
     suspend fun dearrowIdentity(context: ApiContext = context()) = JSONObject(request("api/v1/auth/dearrow/identity", auth = true, context = context)).let { DeArrowIdentity(it.getBoolean("ready"), it.getBoolean("configured")) }
     suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) { request("api/v1/auth/dearrow/identity", "PUT", JSONObject().put("privateId", privateId), true, context = context) }
     suspend fun dearrowSubmissions(id: String, context: ApiContext) = ApiParser.dearrowSubmissions(JSONObject(request("api/v1/auth/dearrow/$id/submissions", auth = true, context = context)))
     suspend fun contributeDeArrow(id: String, fields: JSONObject, context: ApiContext) { request("api/v1/auth/dearrow/$id", "POST", fields, true, context = context) }
     suspend fun playback(context: ApiContext = context()) = PlaybackSnapshot.parse(JSONObject(request("api/v1/auth/playback", auth = true, context = context)))
-    suspend fun position(id: String, context: ApiContext = context()): Long = try { JSONObject(request("api/v1/auth/playback/$id", auth = true, context = context)).optLong("position") } catch (e: ApiException) { if (e.status == 404) 0 else throw e }
-    suspend fun position(id: String, seconds: Long, context: ApiContext = context()) { if (seconds == 0L) request("api/v1/auth/playback/$id", "DELETE", auth = true, context = context) else request("api/v1/auth/playback/$id", "PUT", JSONObject().put("position", seconds.coerceAtMost(Int.MAX_VALUE.toLong())), true, context = context) }
-    suspend fun watched(id: String, context: ApiContext = context()) { request("api/v1/auth/history/$id", "POST", auth = true, context = context) }
+    suspend fun position(id: String, context: ApiContext = context(), optionalSync: Boolean = false): Long = try { JSONObject(request("api/v1/auth/playback/$id", auth = true, context = context, optionalSync = optionalSync)).optLong("position") } catch (e: ApiException) { if (e.status == 404) 0 else throw e }
+    suspend fun position(id: String, seconds: Long, context: ApiContext = context(), optionalSync: Boolean = false) { if (seconds == 0L) request("api/v1/auth/playback/$id", "DELETE", auth = true, context = context, optionalSync = optionalSync) else request("api/v1/auth/playback/$id", "PUT", JSONObject().put("position", seconds.coerceAtMost(Int.MAX_VALUE.toLong())), true, context = context, optionalSync = optionalSync) }
+    suspend fun watched(id: String, context: ApiContext = context(), optionalSync: Boolean = false) { request("api/v1/auth/history/$id", "POST", auth = true, context = context, optionalSync = optionalSync) }
     suspend fun removeHistory(id: String, context: ApiContext = context()) { request("api/v1/auth/history/$id", "DELETE", auth = true, context = context) }
     suspend fun clearHistory(context: ApiContext = context()) { request("api/v1/auth/history", "DELETE", auth = true, context = context) }
     suspend fun logout() { request("api/v1/auth/tokens/unregister", "POST", auth = true) }

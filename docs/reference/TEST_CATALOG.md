@@ -464,6 +464,27 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `exportedSnapshotHasAllowlistedFieldsAndExplicitAvailability`
 - `closingTheSessionResetsVisibilityButNewSourceMeasurementsKeepItEnabled`
 
+### PlaybackSyncTest
+
+[Source](../../android/app/src/test/java/net/wingress/mobivious/PlaybackSyncTest.kt) — Playback journal persistence/coalescing, ownership, settings, stale responses, authentication and virtual-time retry/reconnect regression coverage.
+
+- `journalCoalescesPositionsPreservesCompletionAndSurvivesRecreation`
+- `oldAcknowledgementCannotEraseNewerSeek`
+- `accountInstanceAndTokenChangesKeepOwnershipWithoutCredentialsInJournal`
+- `confirmedSettingsAndRemovalDiscardOnlyTheAppropriateFields`
+- `resumeUsesRemoteIncludingMissingPositionAndNeverOverwritesPendingProgress`
+- `optionalAuthenticationFailuresPauseWithoutExpiringThePlaybackOwner`
+- `serverPreferenceChangesAreRecheckedBeforeRestartedUploads`
+- `streamedProgressSupersedesDownloadProgressAndHistoryClearCannotResurrectIt`
+- `reconnectRefreshesPreviouslyUnknownSettingsEvenWithoutPendingActivity`
+- `delayedRemoteResumeLosesToANewerLocalSeek`
+- `delayedRemoteResumeCannotOverwriteANewerAcknowledgedCompletion`
+- `stalePreferenceReadCannotReenableSyncAfterANewerSave`
+- `delayedSnapshotCannotEraseAnAlreadyAcknowledgedUpload`
+- `pendingHistorySurvivesRepositoryRestartAndDisabledUnsentHistoryDisappears`
+- `reconnectRetriesSettingsFailuresWithoutPendingActivity`
+- `coordinatorBackoffSurvivesCheckpointsAndReconnectWakesIt`
+
 ### PlaybackVisibilityTest
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/PlaybackVisibilityTest.kt) — Playback Visibility declared scenarios; exact cases are enumerated in the test catalog.
@@ -1081,8 +1102,9 @@ Test support/helper file; no declared `@Test` methods.
 
 ### DeviceProfileStorageTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DeviceProfileStorageTest.kt) — Device Profile Storage declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DeviceProfileStorageTest.kt) — Actual device profile persistence, identity transfers, stale writes, journal restoration and purge coverage.
 
+- `playbackJournalMigratesWithIdentitySurvivesRestartAndPurgesWithItsOwner`
 - `legacyCommentSourcesRestoreWithoutCrossingGuestAccountOrInstanceBoundaries`
 - `guestTwoAccountsAndRestartRestoreOnlyTheirOwnDeviceSaves`
 - `capturedWritesRejectSwitchesAndTokenReplacement`
@@ -1119,6 +1141,18 @@ Test support/helper file; no declared `@Test` methods.
 - `unsupportedOnlyAndRepeatedPagesHaveCorrectEndBehavior`
 - `delayedRequestsCannotReplaceNewSearchModeCategoryOrNavigation`
 - `controlsAndMixedCardsRemainReachableOnCompactDisplays`
+
+### DownloadSyncSmokeTest
+
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/DownloadSyncSmokeTest.kt) — Downloaded history/progress, server/local resume, recreation/recovery, live settings and authentication/account isolation journeys.
+
+- `onlineDownloadSharesHistoryProgressAndCompletion`
+- `serverResumeLoadsAndRetryKeepsTheCurrentPosition`
+- `failedSyncPersistsAcrossRecreationAndReconnectDrainsWithoutReopeningVideo`
+- `preferencesDisableAccountWritesButKeepLocalDownloadResume`
+- `settingChangesDuringPlaybackImmediatelyStopAndRestartPositionSync`
+- `resumeAuthenticationFailureFallsBackToLocalWithoutRevokingPlayback`
+- `authenticationFailureKeepsLocalPlaybackAndOtherAccountsCannotDrainTheQueue`
 
 ### DownloadsPersistenceSmokeTest
 
@@ -1653,4 +1687,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **991 declared test methods** (including ignored tests).
+Inventory total: **1015 declared test methods** (including ignored tests).

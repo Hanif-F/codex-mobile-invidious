@@ -202,6 +202,10 @@ def generate_downloads():
         if not target.exists():
             subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', f'sine=frequency={frequency}:sample_rate=48000',
                             '-t', '12', '-c:a', 'aac', '-b:a', '96k', str(target)], check=True)
+    target = directory / 'audioen-long.m4a'
+    if not target.exists():
+        subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:sample_rate=48000',
+                        '-t', '120', '-c:a', 'aac', '-b:a', '64k', str(target)], check=True)
     target = directory / 'video-vp8.webm'
     if not target.exists():
         subprocess.run(['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error', '-i', str(directory / 'video144.mp4'), '-an', '-c:v', 'libvpx', '-deadline', 'realtime', '-cpu-used', '8', '-threads', '2', str(target)], check=True)

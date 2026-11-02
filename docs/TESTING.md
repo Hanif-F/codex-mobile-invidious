@@ -59,6 +59,39 @@ Production timeouts and real-dispatcher concurrency cases remain unchanged.
 Measured timings and runner acceptance are recorded in
 [the verification report](../VERIFICATION.md#testing-workflow-optimization--21-october-2026).
 
+## Downloaded playback synchronization
+
+`PlaybackSyncTest` covers journal round trips/coalescing, completion deletions,
+revision-safe acknowledgements, account/instance/token isolation, settings/removal,
+remote and pending resume precedence, stale preference/snapshot/position responses,
+authentication pauses, unknown-settings recovery without pending activity, and
+virtual-time retry/reconnect behavior. Existing
+`WatchedStateTest` retains the shared indicator/read-write generation regressions.
+`DeviceProfileStorageTest#playbackJournalMigratesWithIdentitySurvivesRestartAndPurgesWithItsOwner`
+checks the actual checked preference store and legacy/stable profile transfer.
+
+`DownloadSyncSmokeTest` covers online history/progress/completion, shared resume and
+retry positions, failed uploads retained across activity/store recreation, recovery
+without reopening the video, disabled account settings with local resume, and
+authentication/account isolation while file playback remains usable. Additional cases
+check live settings without a ViewModel refresh and non-disruptive failed resume reads. Its opt-in
+`/test/download-sync` control supplies 120-second audio and read/write error statuses.
+The normal download catalog remains 12 seconds. `test_download_sync_fixture.py`
+checks these controls, recovery and reset independently of Android.
+
+Run focused cases through the standard fixture runner:
+
+```sh
+scripts/test-android.sh --device-only \
+  -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.DownloadSyncSmokeTest,net.wingress.mobivious.DeviceProfileStorageTest#playbackJournalMigratesWithIdentitySurvivesRestartAndPurgesWithItsOwner
+python3 -m unittest discover -s scripts/tests -p test_download_sync_fixture.py
+```
+
+Include the existing offline decode/background-control journeys, watched indicators,
+relevant account-profile/settings cases and streamed playback/access-recovery
+regressions when changing their shared integration. Activity/store recreation is
+not force-stop acceptance; no persistent background scheduler is used.
+
 ## Video metadata failures
 
 `NetworkReliabilityTest` covers empty, whitespace, malformed and non-object video

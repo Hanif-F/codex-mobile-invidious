@@ -34,6 +34,27 @@ class DeviceProfileStorageTest {
     private fun stale(block: () -> Unit) {
         try { block(); fail("A stale device save was accepted") } catch (_: CancellationException) { }
     }
+    @Test fun playbackJournalMigratesWithIdentitySurvivesRestartAndPurgesWithItsOwner() {
+        val id = "abcdefghijk"
+        store.save(account("Alice", 'a').copy(profileId = null))
+        val legacy = store.positionContext()
+        val journal = PlaybackJournal(3, PlaybackSyncSettings(true, true), mapOf(id to PendingPlayback(2, 3, 45)))
+        store.savePlaybackJournal(legacy, journal, id to 45L)
+        store.confirmProfile(legacy, "a".repeat(64))
+        store = SessionStore(context)
+        assertEquals(journal, store.playbackJournal(store.positionContext()))
+        assertEquals(45L, store.position(id))
+        stale { store.savePlaybackJournal(legacy, PlaybackJournal()) }
+        store.save(account("Alice", 'a', "replacement"))
+        assertEquals(journal, store.playbackJournal(store.positionContext()))
+        store.save(account("Bob", 'b'))
+        assertTrue(store.playbackJournal(store.positionContext()).pending.isEmpty())
+        store.save(null)
+        assertTrue(store.playbackJournal(store.positionContext()).pending.isEmpty())
+        store.save(account("Alice", 'a'))
+        store.deleteProfile(store.positionContext())
+        assertTrue(store.playbackJournal(store.positionContext()).pending.isEmpty())
+    }
     @Test fun legacyCommentSourcesRestoreWithoutCrossingGuestAccountOrInstanceBoundaries() {
         val guest = store.positionContext()
         context.getSharedPreferences("mobivious", Context.MODE_PRIVATE).edit()

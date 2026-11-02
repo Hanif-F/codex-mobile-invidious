@@ -246,17 +246,39 @@ to the current unbounded video seek the current occurrence instead of replacing 
 
 ## Progress and history
 
-First real online playback marks history once per transition when account history
+First real full-video playback, including a download, marks history once per transition when account history
 is enabled. Failures can retry on later ticks. Position is persisted on pause,
 seek/removal transitions and every 15 seconds while playing. Online position is
 in seconds; ending or reaching the final 15 seconds clears it. Local fallback is
 saved before account progress upload. Ownership must still match the original
 context. Removing history and clearing history have separate repository rules.
 
-Clip playback does not write ordinary full-video history/progress. Offline playback
-writes `DownloadRecord.positionMs`, independent of account resume preferences;
-ending/last two seconds resets that download position. Offline playback omits
-recommendations/chat/storyboards and network-based tools. A completed media pair
+Clip playback does not write ordinary full-video history/progress. Download playback
+also writes `DownloadRecord.positionMs`, independent of account resume preferences;
+ending/last two seconds resets that download position. Signed-in downloads use the
+active account/instance's history and resume settings, even for a different download
+origin. Shared history/positions enter a durable per-profile journal before upload.
+The newest position replaces older pending positions, including an explicit zero
+for completion. Acknowledgements remove only the revision actually uploaded.
+
+On opening a download, unsynced account progress wins; otherwise an enabled account
+resume setting loads the server position, with local fallback. Initial preference/
+position reads share a two-second budget. Late results cannot seek an already-started
+player, and retry/reload preserves its explicit current position. Streamed playback
+uses the same pending-progress precedence. Guests retain local behavior and never
+upload their viewing after signing in.
+
+An application-owned coordinator retries while the app or playback service is alive,
+on connectivity/access recovery and next launch. Failure backoff grows from five
+seconds to five minutes; new checkpoints do not reset it. Relaunch/reconnect refreshes
+account settings before draining, including when no activity is queued yet. Confirmed
+settings reach an already-playing download without reopening it. Disabled settings
+discard their pending fields;
+removing history cancels its pending mark, and clearing history cancels positions too.
+Authentication/access failures pause sync without stopping file playback. No persistent
+background scheduler is installed. History dates use the server's upload time.
+
+Offline playback omits recommendations/chat/storyboards and network-based tools. A completed media pair
 uses `MergingMediaSource(true,true)`; only completed captions are attached.
 
 ## Chapters, discussions and replay

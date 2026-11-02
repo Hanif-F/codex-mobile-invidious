@@ -152,7 +152,7 @@ unknown_video = dict(video, videoId='unknownvid1', title='Unknown duration fixtu
 live_video = dict(video, videoId='streamvid01', title='Live indicator fixture', liveNow=True)
 def reset_playback():
     state.update(positions={}, playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False,
-                 duplicateRecommendations=False)
+                 duplicateRecommendations=False, downloadSync=False, playbackWriteStatus=0, playbackReadStatus=0)
 reset_playback()
 
 visibility_member = dict(recommended, videoId='membervid01', title='Members-only fixture video', isMember=True, authorId='UC' + 'b' * 22)
@@ -241,6 +241,7 @@ def download_choices():
     choices = []
     for key, filename, kind, height, language in [('v360', 'video360.mp4', 'video', 360, ''), ('v144', 'video144.mp4', 'video', 144, ''),
             ('vp8', 'video-vp8.webm', 'video', 144, ''), ('aen', 'audioen.m4a', 'audio', 0, 'en'), ('aes', 'audioes.m4a', 'audio', 0, 'es')]:
+        if key == 'aen' and state['downloadSync']: filename = 'audioen-long.m4a'
         item = dict(key=key, kind=kind, url='/api/v1/videos/testvideo01/download?key=' + key, itag='140' if kind == 'audio' else key,
                     type='audio/mp4; codecs="mp4a.40.2"' if kind == 'audio' else 'video/webm; codecs="vp8"' if key == 'vp8' else 'video/mp4; codecs="avc1.42E01E"',
                     bitrate='96000' if kind == 'audio' else '500000', clen=str((args.media_dir / 'downloads' / filename).stat().st_size), filename=filename)
@@ -604,7 +605,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             except (BrokenPipeError, ConnectionResetError): pass
         elif p.endswith('/downloads') and p.startswith('/api/v1/videos/'):
             if state.get('downloadEndpointsMissing'): return self.respond(dict(error='Not found'), 404)
-            metadata = dict(video, description='Downloaded fixture description', lengthSeconds=state.get('downloadDuration', 12))
+            metadata = dict(video, description='Downloaded fixture description', lengthSeconds=120 if state['downloadSync'] else state.get('downloadDuration', 12))
             if state.get('performance'): metadata.update(videoId=p.split('/')[4], title='Benchmark download')
             state['downloadRequests'].append(dict(kind='catalog', path=p))
             disabled = state.get('downloadDisabled', False)
@@ -983,6 +984,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             if delay: time.sleep(min(5000, max(0, delay)) / 1000)
             self.respond(dict(error='Fixture indicators unavailable') if state['failPlayback'] else payload, 503 if state['failPlayback'] else 200)
         elif p.startswith('/api/v1/auth/playback/'):
+            if state['playbackReadStatus']: return self.respond(dict(error='Fixture playback read unavailable'), state['playbackReadStatus'])
             id = p.rsplit('/', 1)[-1]
             self.respond(dict(position=state['positions'][id], videoId=id) if id in state['positions'] else dict(error='Playback position does not exist.'), 200 if id in state['positions'] else 404)
         elif p == '/api/v1/channels/' + video['authorId']: self.channel('metadata', url.query)
@@ -1109,6 +1111,10 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['channelTabs'] = ['videos', 'playlists', 'clips', 'posts', 'channels']
             if 'count' in data: state['clips'] = [native_clip(n) for n in range(data['count'])]
             for key in ('clipFailNext', 'clipCreateFailNext', 'clipDeleteFailNext', 'clipScopeFail', 'clipDelayNext', 'clipLegacyInvalid', 'clipStoryboardFail'):
+                if key in data: state[key] = data[key]
+            return self.respond({})
+        if p == '/test/download-sync':
+            for key in ('downloadSync', 'playbackWriteStatus', 'playbackReadStatus'):
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/downloads':
@@ -1308,6 +1314,8 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
                 state['clips'].remove(clip); return self.respond(None, 204)
         if p.startswith(('/api/v1/auth/playback', '/api/v1/auth/history', '/api/v1/auth/blocked_channels')) and self.headers.get('Authorization') != 'Bearer fixture-token':
             return self.respond(dict(error='Request must be authenticated'), 403)
+        if p.startswith(('/api/v1/auth/playback/', '/api/v1/auth/history/')) and state['playbackWriteStatus']:
+            return self.respond(dict(error='Fixture playback sync unavailable'), state['playbackWriteStatus'])
         if p.startswith('/api/v1/auth/blocked_channels/'):
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
             if state['failBlockedWrite']: return self.respond(dict(error='Fixture channel update failed'), 503)

@@ -169,7 +169,8 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         val record = app.downloads.find(id) ?: return
         beforeChange(); job?.cancel(); selection = null; accessSelection = null; decoderError = false
         player.pause()
-        prefs = app.store.initialPreferences(); prefsContext = app.api.context()
+        if (prefsContext != app.api.context()) prefs = app.store.initialPreferences()
+        prefsContext = app.api.context()
         baseRepeat = QueueRepeat.OFF; mixContinuations.clear()
         val entry = QueueOccurrence.local(record.details.video).copy(downloadId = id)
         val context = app.api.context()
@@ -179,6 +180,27 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
     private suspend fun loadDownload(entry: QueueOccurrence, playing: Boolean, positionMs: Long?, fresh: Boolean) {
         app.downloads.reconcile()
         val record = app.downloads.find(entry.downloadId!!) ?: error("This download was deleted.")
+        val context = state.context ?: return
+        var resume = record.positionMs
+        // File playback never waits for an upload or an unbounded network timeout.
+        if (fresh && positionMs == null && context.account != null) {
+            kotlinx.coroutines.withTimeoutOrNull(2_000) {
+                try {
+                    app.playbackSync.refreshSettings(context)
+                    val settings = app.playbackSync.settings(context)
+                    if (settings?.position == true) resume = PlaybackRules.resume(
+                        app.playbackSync.resolvePosition(context, entry.video.id, app.store.positions(context)[entry.video.id] ?: record.positionMs / 1000),
+                        record.details.video.duration, null) * 1000
+                } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+                catch (_: Exception) { /* Keep the saved local resume. */ }
+            }
+            check(state.token, context)
+            // Unsynced progress still wins if preference/position reads timed out.
+            if (app.playbackSync.settings(context)?.position == true) app.playbackSync.pending(context)[entry.video.id]?.takeIf { it.position != null }?.let {
+                resume = PlaybackRules.resume(it.seconds, record.details.video.duration, null) * 1000
+            }
+        }
+        val syncSettings = app.playbackSync.settings(context)
         val snapshot = if (fresh) null else capture()
         beforeChange(); player.pause()
         val details = app.downloads.localDetails(record)
@@ -195,7 +217,9 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         player.setPlaybackSpeed(snapshot?.speed ?: prefs.speed)
         pendingSelection = snapshot; selectionPending = true
         player.setMediaSource(DownloadPlayback.source(app, app.downloads, record, entry.key,
-            displayTitle(details.video, entry.key), artworkHidden(details.video, entry.key)), positionMs ?: record.positionMs)
+            displayTitle(details.video, entry.key), artworkHidden(details.video, entry.key),
+            history = context.account != null && syncSettings?.history == true,
+            savePosition = if (context.account == null) prefs.savePosition else syncSettings?.position == true), positionMs ?: resume)
         player.prepare(); player.playWhenReady = playing; requestedPlayWhenReady = playing
         update(state.copy(details = details, loading = false, error = null))
     }
@@ -328,7 +352,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         update(state.copy(details = details, repeat = repeat, items = state.items.map { if (it.key == entry.key) it.copy(linkPlayback = bounded) else it }))
         check(token, context)
         val saved = if (entry.clip != null || !prefs.savePosition) 0 else if (context.account == null) app.store.position(entry.video.id, context)
-            else try { app.api.position(entry.video.id, context) } catch (e: CancellationException) { throw e } catch (_: Exception) { app.store.position(entry.video.id, context) }
+            else try { app.playbackSync.resolvePosition(context, entry.video.id, app.store.position(entry.video.id, context), optional = false) } catch (e: CancellationException) { throw e } catch (_: Exception) { app.store.position(entry.video.id, context) }
         check(token, context)
         val base = context.server.toHttpUrlOrNull()!!
         fun resolve(url: String) = base.resolve(url)?.takeIf { it.isHttps || net.wingress.mobivious.BuildConfig.ALLOW_FIXTURE_HTTP && it.host in listOf("10.0.2.2", "127.0.0.1", "localhost") }?.toString().orEmpty()

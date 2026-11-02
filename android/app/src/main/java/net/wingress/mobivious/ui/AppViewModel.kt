@@ -1605,7 +1605,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         requestPreferences(change(before),before,"Playback")
     }
     private fun syncHistorySettings() {
-        if (queue.value.current?.downloadId != null) return
         if (preferencesContext != api.context()) return
         val prefs = preferences.value
         app.watched.configure(api.context(), prefs.savePosition)

@@ -11,7 +11,7 @@ Paths describe Android sandbox locations, not host repository paths.
 | SharedPreferences `mobivious` | Selected server, encrypted current session, local profile values, migration version, device-wide accent settings; dormant legacy colored-background/adaptive-control keys. |
 | AndroidKeyStore alias `mobivious.session` | AES key for session encryption; the key is not a checked-in file. |
 | `verification.<SHA-256(origin)>` preference keys | AES-GCM encrypted instance passes/expiry; origin is authenticated as additional data. Independent of account sign-out; expired/rejected passes are not used. |
-| `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions, search assistance/recents and visibility snapshots. |
+| `device.v2.<SHA-256>.…` preference keys | Account/guest + normalized instance-owned background/PiP, guest preferences, category/sort, chat appearance/delay, resume positions, playback sync journal/settings, search assistance/recents and visibility snapshots. |
 | `cacheDir/feeds/` | Selected successful feed/search response snapshots, hashed keys, bounded count/age/size. |
 | SQLite `downloads.db`, schema version 1 | Table `downloads(id TEXT PRIMARY KEY, record TEXT NOT NULL)` storing JSON download journals. Upgrade hook currently has no migration logic. |
 | `getExternalFilesDir(null)/downloads/<UUID>/` | App-specific video/audio/caption/thumbnail/avatar assets; selected tracks plus unique attempt filenames. |
@@ -58,6 +58,16 @@ are restored and a storage error is surfaced; state flows do not pretend the sav
 succeeded. Guest normalization disables watch history/account-only filters and
 default playlists, bounds captions and channel overrides and validates chat filters.
 
+The profile's `playback.sync` JSON stores the last confirmed history/resume flags,
+a monotonic revision and coalesced pending history/position fields by video ID.
+It contains no bearer tokens. Position checkpoints commit the journal and device
+fallback together. Zero is retained as a pending remote deletion even though the
+ordinary local position map removes that video. Stable-profile transfers include
+this key, and profile deletion purges it. Guest viewing is never queued for upload.
+Only the active profile's live credentials may drain its journal; other profiles'
+activity remains dormant. Optional sync requests do not revoke the playback owner
+on authentication failures or initiate stable-identity discovery during local playback.
+
 ## Session and credential handling
 
 Current Account JSON (token, username, expiry, server, optional profile ID) is
@@ -92,7 +102,9 @@ bound to the exact selected origin; bootstrap APIs receive clearance without
 account credentials. Each outgoing credential snapshot carries an
 in-memory access revision: obsolete denials and disabled-policy discovery responses
 cannot invalidate a newly accepted pass. Superseded GET/HEAD requests retry once;
-writes require explicit recovery. Account/bootstrap credentials never enter URLs.
+the transport never replays writes. The playback journal separately retries retained
+operations after recovery, with profile/revision checks. Account/bootstrap credentials
+never enter URLs.
 
 Avatar/GGPHT images normalize supported sources to the selected instance proxy;
 the avatar client follows no redirects and uses the shared access boundary. Banner/

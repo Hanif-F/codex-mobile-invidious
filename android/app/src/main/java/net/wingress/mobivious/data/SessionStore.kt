@@ -41,7 +41,7 @@ private class SharedProfilePersistence(private val prefs: SharedPreferences, pri
     }
 }
 
-class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore, SearchAssistanceStore {
+class SessionStore(context: Context) : PlaybackSyncStore, LocalPlaybackPositions, VisibilityStore, SearchAssistanceStore {
     private val prefs = context.getSharedPreferences("mobivious", Context.MODE_PRIVATE)
     val accentPreset = MutableStateFlow(AccentPreset.saved(prefs.all["appearance.accentPreset"] as? String))
     @Synchronized fun accentPreset(value: AccentPreset) {
@@ -230,6 +230,18 @@ class SessionStore(context: Context) : LocalPlaybackPositions, VisibilityStore, 
         onContextChanged(changed)
     }
     @Synchronized fun deleteProfile(context: ApiContext) { current(context); profiles.purge(context) }
+    override fun playbackJournal(context: ApiContext) = PlaybackJournal.parse(profiles.value(context, "playback.sync") as? String)
+    @Synchronized override fun savePlaybackJournal(context: ApiContext, journal: PlaybackJournal, position: Pair<String, Long>?) {
+        current(context)
+        val changes = mutableMapOf<String, Any>(profiles.key(context, "playback.sync") to journal.json().toString())
+        position?.let { (id, seconds) ->
+            require(SponsorBlockRules.validVideo(id) && seconds in 0..Int.MAX_VALUE.toLong())
+            val values = JSONObject(positions(context))
+            if (seconds == 0L) values.remove(id) else values.put(id, seconds)
+            changes[profiles.key(context, "positions")] = values.toString()
+        }
+        checked(changes)
+    }
     override fun positions(context: ApiContext): Map<String, Long> = runCatching {
         DeviceProfiles.positions(JSONObject(profiles.value(context, "positions") as? String ?: "{}"))
     }.getOrDefault(emptyMap())
