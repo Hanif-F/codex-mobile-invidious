@@ -1,5 +1,30 @@
 # Focused implementation verification
 
+## Cloudflare recovery without relaunch — 2 November 2026
+
+The working tree over `4a9668f` fixes a process-local access-state race: a delayed
+successful clearance rotation could leave a Cloudflare issue set even though the
+replacement credential was saved. Restarting cleared that issue. Late rotations
+now receive a coalesced native confirmation before publishing recovery; successful
+in-flight native discovery also reconciles obsolete denials. A remaining backend
+challenge receives the confirmed cookie in the open WebView. Account/origin/revision
+fences, explicit write/download retry and encrypted credential formats remain intact.
+
+Verified on Android 16 `emulator-5554`:
+
+- From `android/`, `JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME=/home/haha.m.lady/Android/Sdk ./gradlew :app:testDebugUnitTest --tests 'net.wingress.mobivious.CloudflareAccessTest' --tests 'net.wingress.mobivious.InstanceAccessTest' --console=plain --offline`: **34 passed**. New cases cover both response orders, duplicate confirmations, rejection/outage/malformed/deleted candidates, context cancellation, unchanged/rotated discovery acceptance and an independent login gate.
+- After final production edits, the same Gradle environment with `./gradlew :app:testDebugUnitTest :app:lintDebug --console=plain --offline`: **480 JVM tests passed**, **0 skipped**, debug lint **0 errors, 18 existing warnings**.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.CloudflareAccessSmokeTest#lateCookieRotationRestoresBrowsingAndImagesWithoutRelaunching,net.wingress.mobivious.CloudflareAccessSmokeTest#aDelayedEdgeChallengeCannotUndoCompletedVerification,net.wingress.mobivious.CloudflareAccessSmokeTest#lateRotationLoadsTheRemainingBackendChallengeInTheOpenDialog`: **3 passed**. The activity/model identity, loaded feed/images, discarded late challenge and remaining backend WebView completion are checked.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.CloudflareAccessSmokeTest,net.wingress.mobivious.InstanceAccessSmokeTest`: **30 passed, 1 skipped, 0 failures**. This includes authentication, renderer/subframe safety, cancellation/recreation/background/PiP, browsing/pagination, playback and managed downloads. `clearanceRestoresAfterProcessRestart` remains intentionally skipped without its opt-in restart argument; no new force-stop acceptance is claimed.
+- `python3 -m unittest discover -s scripts/tests -p 'test_instance_access_fixture.py' -v`: **8 passed**, including controlled delayed rotation and edge-denial contracts.
+- `python3 scripts/check-documentation.py --refresh`, `python3 scripts/check-documentation.py` and `git diff --check`: **passed**; source descriptions, fingerprints, test inventory and local links were reviewed.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveInstanceAccessSmokeTest#realCloudflareClearanceRestoresNativeBrowsingAndPlayback -Pandroid.testInstrumentationRunnerArguments.liveCloudflareAccess=true -Pandroid.testInstrumentationRunnerArguments.liveKeepInstance=true`: **1 failed**. Native clearance was present and the native verification probe completed, but the subsequent guest feed request failed with `ApiException: login_required`. Live browsing/playback acceptance was not reached; no account credentials or production policy were changed.
+
+Logs are under ignored `.tools/cloudflare-recovery-*.log`; preserved JVM, lint
+and device XML reports are under `.tools/cloudflare-recovery-results/`, including
+the failed live result and its final screen. This is focused emulator acceptance;
+the full connected suite and live account-gated playback remain unverified.
+
 ## Patch release 0.13.3 — 2 November 2026
 
 Version **0.13.3**, code **33**, packages the changes through

@@ -25,6 +25,9 @@ dialog. Cookies and their expiry are read through supported WebView metadata API
 unsupported versions show update guidance. Only main-frame completion messages
 from the same-origin verification page are accepted; external top-level
 navigation is blocked. An outdated WebView shows update guidance.
+If a delayed native cookie rotation clears Cloudflare while backend verification
+is still required, the open WebView receives the confirmed cookie and loads the
+remaining backend challenge. It does not require cancelling or relaunching.
 
 After successful verification, the dialog closes and browsing retries automatically
 after any current browse request settles, preserving a failed pagination retry.

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "8f3a52e4f4862040fb3fc1f3f170729568e0104e",
+  "reviewedSourceCommit": "4a9668f3e3520c8b4be1cba380d2a5e22654ac07",
   "reviewedDate": "2026-11-02",
   "version": "0.13.3",
   "documents": [
@@ -1626,8 +1626,8 @@
     "scripts/fixture-server.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Threaded local HTTP fixture, scenario controls, request tracing, synthetic APIs/media and single-use HTTP/empty-video failures.",
-      "sha256": "18730c0da51bba4b2cda25b5c82c4474b51706c19d1c54ac575e66ce7cb5df24"
+      "description": "Threaded local API/media fixture, scenario tracing, controlled challenge/rotation barriers and single-use HTTP/empty-video failures.",
+      "sha256": "460b00548aedee0753f6bd0cd937dd16b4ddc83322d0f07396a48da80c93290f"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1788,8 +1788,8 @@
     "android/app/src/main/java/net/wingress/mobivious/data/InstanceAccess.kt": {
       "area": "Data and domain",
       "guide": "docs/API.md",
-      "description": "Independent Cloudflare/backend access gates, origin-bound credentials, native validation, cookie rotation and stale-response recovery.",
-      "sha256": "799e171c555e74a388ba305faa83dd87a1b0d80afc3d2a0b96785526a8c21dac"
+      "description": "Independent Cloudflare/backend access gates, native validation, coalesced late-rotation confirmation and revision-fenced recovery.",
+      "sha256": "1064517a298387e9d16904da7964c882bbc7dc32591fa99390342f13808af938"
     },
     "android/app/src/main/java/net/wingress/mobivious/downloads/ProtectedDownloadService.kt": {
       "area": "Android foundation",
@@ -1800,8 +1800,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/InstanceAccessUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Origin-restricted Cloudflare/Turnstile WebView verification, native cookie handoff, bounded recovery and lifecycle-retained cancellation.",
-      "sha256": "aad9c187c90a4df7261d4a749dd9a6693133bb99675dc692fe6167c058505f0b"
+      "description": "Origin-restricted verification WebView, confirmed native-cookie handoff to remaining backend challenges and lifecycle-retained cancellation.",
+      "sha256": "411944083c884682f432a55b4cceec4c3f02f3d7ef5bfe15de471173566b4948"
     },
     "android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt": {
       "area": "JVM tests",
@@ -1830,8 +1830,8 @@
     "scripts/tests/test_instance_access_fixture.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Local fixture HTTP access-gate precedence, bootstrap, expiry, policy and outage contract checks.",
-      "sha256": "e7cb9b9c2740f55f508f6b3c68fe3c1d61a3ebb1d138626f2917fbb8caa9e769"
+      "description": "Local access-gate precedence, bootstrap, expiry, outage and delayed edge/backend denial or clearance-rotation contract checks.",
+      "sha256": "27031b1623ab504e5d444e00df4e0c5ab14ba73f59b4eaa448fa02200cb61c25"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ViewCountsSmokeTest.kt": {
       "area": "Android device tests",
@@ -1872,14 +1872,14 @@
     "android/app/src/test/java/net/wingress/mobivious/CloudflareAccessTest.kt": {
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
-      "description": "Cloudflare challenge classification, native acceptance, bootstrap/redirect isolation, rotation, expiry, cancellation and bounded recovery.",
-      "sha256": "ff16bd75a132dc91f90c8c78f2890a9848e9b53259f1b20b1adc0fd709b8f5f2"
+      "description": "Cloudflare classification, credential isolation, concurrent rotation/discovery recovery, bounded confirmation, expiry and cancellation.",
+      "sha256": "ad4bfd47ba842a60b9ee951bbdb4c3e5f085fad6720b4204c41b946577eb7a9f"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Synthetic edge verification, encrypted/process-restored clearance, combined gates, native authentication, cancellation, playback and downloads.",
-      "sha256": "898bbc007907a79ce2184af0888e51340959ee87e2d49fb07ea6ccf12e3ddb0e"
+      "description": "Synthetic edge verification, recovery without relaunch, delayed challenges/rotations, combined gates, encrypted persistence, authentication, playback and downloads.",
+      "sha256": "9fc5fd92e628ec37e0defd4c4d72e07037a5c42b3e76dd0fb6b83253c218127e"
     },
     "scripts/tests/test_subscription_exports_fixture.py": {
       "area": "Scripts",
@@ -1888,7 +1888,7 @@
       "sha256": "ef63ad54f900f1d4af8aebdc41180974e7cdc3d9b4bea2cdd22b2248ae8f0710"
     }
   },
-  "reviewedSourceState": "Repository cleanup working tree over the recorded commit; current validation and retained risks are in docs/CLEANUP.md.",
+  "reviewedSourceState": "Cloudflare recovery working tree; current acceptance evidence and limitations are recorded in VERIFICATION.md.",
   "historicalDocuments": [
     "FEATURE_PARITY.md"
   ]

@@ -150,7 +150,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### CloudflareAccessTest
 
-[Source](../../android/app/src/test/java/net/wingress/mobivious/CloudflareAccessTest.kt) — Cloudflare challenge classification, native acceptance, bootstrap/redirect isolation, rotation, expiry, cancellation and bounded recovery.
+[Source](../../android/app/src/test/java/net/wingress/mobivious/CloudflareAccessTest.kt) — Cloudflare classification, credential isolation, concurrent rotation/discovery recovery, bounded confirmation, expiry and cancellation.
 
 - `challengeHeaderPrecedesStatusJsonAndAccountExpiry`
 - `clearanceUsesActualExpiryAgentOriginAndBootstrapIsolation`
@@ -165,6 +165,12 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `successfulNativeProbePersistsItsRotatedCookie`
 - `cookieExpiringDuringProbeCannotPublishRecovery`
 - `cancellationClosesProbeWithoutSavingItsCandidate`
+- `lateRotationsAfterAChallengeConfirmOnceBeforePublishingRecovery`
+- `rotationBeforeALateChallengeReplaysTheReadWithoutReopeningVerification`
+- `rejectedRotationConfirmationRetainsTheGateWithoutRetryingDuplicateResponses`
+- `aContextChangeCancelsRotationConfirmationWithoutSavingOrRecovering`
+- `nativeDiscoveryAfterAChallengeRecoversWithOrWithoutRotationButKeepsARequiredBackendGate`
+- `normalRotationDoesNotClearAnIndependentLoginGate`
 
 ### CommentsTest
 
@@ -988,10 +994,13 @@ Test support/helper file; no declared `@Test` methods.
 
 ### CloudflareAccessSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt) — Synthetic edge verification, encrypted/process-restored clearance, combined gates, native authentication, cancellation, playback and downloads.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt) — Synthetic edge verification, recovery without relaunch, delayed challenges/rotations, combined gates, encrypted persistence, authentication, playback and downloads.
 
 - `edgeOnlyRestoresBrowsingAndEncryptedClearanceSurvivesStoreRecreation`
 - `edgeThenBackendTurnstileKeepsTheSameDialogUntilBothPass`
+- `lateCookieRotationRestoresBrowsingAndImagesWithoutRelaunching`
+- `aDelayedEdgeChallengeCannotUndoCompletedVerification`
+- `lateRotationLoadsTheRemainingBackendChallengeInTheOpenDialog`
 - `rejectedNativeClearanceStaysOpenUntilExplicitRetry`
 - `cancellationSurvivesRecreationAndServerChangeDiscardsThePrompt`
 - `edgeVerificationIsAvailableOnNativeSignInAndDoesNotReplayLogin`
@@ -1644,4 +1653,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **982 declared test methods** (including ignored tests).
+Inventory total: **991 declared test methods** (including ignored tests).

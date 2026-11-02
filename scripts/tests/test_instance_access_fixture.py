@@ -93,6 +93,46 @@ class InstanceAccessFixtureTest(unittest.TestCase):
         self.request('/test/access', dict(edgeRejectNative=True))
         self.assertEqual('challenge', self.request('/api/v1/verification', headers=credentials)[1]['cf-mitigated'])
 
+    def test_delayed_edge_rotation_holds_the_replacement_while_old_clearance_is_challenged(self):
+        self.request('/test/access', dict(edgeEnabled=True))
+        _, headers, _ = self.request('/test/edge-complete', {}, {'User-Agent': 'Fixture WebView'})
+        credentials = {'Cookie': headers['Set-Cookie'].split(';')[0], 'User-Agent': 'Fixture WebView'}
+        self.request('/test/access', dict(edgeRotatePath='/api/v1/edge-rotation-fixture', edgeRotateNext=1))
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            pending = executor.submit(self.request, '/api/v1/edge-rotation-fixture', headers=credentials)
+            try:
+                for _ in range(100):
+                    if self.request('/test/state')[2]['edgeDelayedRotations']: break
+                    time.sleep(.01)
+                else: self.fail('Rotation did not reach the delay barrier')
+                self.assertEqual('challenge', self.request('/api/v1/verification', headers=credentials)[1]['cf-mitigated'])
+                self.assertFalse(pending.done())
+            finally:
+                self.request('/test/access', dict(edgeReleaseRotations=True))
+            status, replacement, _ = pending.result(timeout=5)
+        self.assertEqual(200, status)
+        credentials['Cookie'] = replacement['Set-Cookie'].split(';')[0]
+        self.assertEqual(200, self.request('/api/v1/verification', headers=credentials)[0])
+        self.assertTrue(self.request('/test/state')[2]['edgeDelayedRotations'][0]['released'])
+        self.request('/test/reset', {})
+        self.assertEqual([], self.request('/test/state')[2]['edgeDelayedRotations'])
+
+    def test_delayed_edge_challenge_keeps_its_decision_after_clearance_is_issued(self):
+        self.request('/test/access', dict(edgeEnabled=True, accessDelayPath='/api/v1/popular', accessDelayNext=1))
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            pending = executor.submit(self.request, '/api/v1/popular')
+            try:
+                for _ in range(100):
+                    if self.request('/test/state')[2]['accessDelayedDenials']: break
+                    time.sleep(.01)
+                else: self.fail('Challenge did not reach the delay barrier')
+                _, headers, _ = self.request('/test/edge-complete', {}, {'User-Agent': 'Fixture WebView'})
+                credentials = {'Cookie': headers['Set-Cookie'].split(';')[0], 'User-Agent': 'Fixture WebView'}
+                self.assertEqual(200, self.request('/api/v1/popular', headers=credentials)[0])
+            finally:
+                self.request('/test/access', dict(accessReleaseDenials=True))
+            self.assertEqual('challenge', pending.result(timeout=5)[1]['cf-mitigated'])
+
     def test_both_gates_preserve_bootstrap_and_require_separate_credentials(self):
         self.request('/test/access', dict(accessEnabled=True, accessLogin=True))
         self.assertTrue(self.request('/api/v1/mobile/registration')[2]['loginRequired'])

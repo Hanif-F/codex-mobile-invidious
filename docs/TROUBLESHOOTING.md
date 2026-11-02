@@ -45,6 +45,9 @@ dialog; a cookie appearing in the WebView alone is insufficient. Retry reloads a
 fresh verification page. Cancel leaves settings, instance selection and local
 downloads reachable. Login, signup, other writes and failed downloads require
 explicit user retry after verification.
+Accepted native verification also clears obsolete Cloudflare warnings caused by
+concurrent requests or delayed cookie rotation, then retries browsing and visible
+images automatically. Restarting the app is not part of the recovery flow.
 
 Keep Android System WebView current. A WebView update, network change, cookie
 expiry or Cloudflare rejection may require verification again. Embedded browsers

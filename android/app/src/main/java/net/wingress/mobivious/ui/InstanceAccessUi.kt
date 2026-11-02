@@ -123,6 +123,14 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
         var failed = false
         val started = android.os.SystemClock.elapsedRealtime()
         while (isActive && !completed && target == vm.api.context()) {
+            // A delayed native response may clear the edge while this page still shows its challenge.
+            val accepted = vm.access.clearance(target)
+            if (edgeRequired && !edgeAccepted && accepted != null) {
+                setClearanceCookie(target.server, accepted)
+                if (view !in liveViews) return@LaunchedEffect
+                edgeAccepted = true; failed = false; error = null; completionBody = null; pageReady = false
+                view.loadUrl(target.server + "/verify?client=native")
+            }
             val edge = clearanceCookies(target.server, view.settings.userAgentString)
                 .filter { it.usable(target.server.toHttpUrl(), view.settings.userAgentString, System.currentTimeMillis() / 1000) }
                 .singleOrNull()
@@ -146,11 +154,7 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
                     edgeAccepted = true
                     // The confirmation request may rotate clearance before the widget submits its pass.
                     val accepted = vm.access.clearance(target)
-                    if (!completed && accepted != null && accepted != edge) suspendCancellableCoroutine { continuation ->
-                        CookieManager.getInstance().setCookie(target.server + "/", accepted.cookie.toString()) {
-                            if (continuation.isActive) continuation.resume(Unit)
-                        }
-                    }
+                    if (!completed && accepted != null && accepted != edge) setClearanceCookie(target.server, accepted)
                 }
                 catch (e: CancellationException) { throw e }
                 catch (e: Exception) { error = e.message ?: "Verification failed. Try again."; failed = true }
@@ -179,6 +183,12 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+private suspend fun setClearanceCookie(server: String, edge: CloudflareClearance) = suspendCancellableCoroutine { continuation ->
+    CookieManager.getInstance().setCookie(server + "/", edge.cookie.toString()) {
+        if (continuation.isActive) continuation.resume(Unit)
     }
 }
 

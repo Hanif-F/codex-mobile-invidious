@@ -10,6 +10,7 @@ import org.junit.Assert.*
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 class CloudflareAccessTest {
     private class Passes : VerificationPersistence {
@@ -221,6 +222,161 @@ class CloudflareAccessTest {
             val pending = launch(Dispatchers.IO) { access.completeClearance(context, cookie(server.url("/"))) }
             assertTrue(entered.await(5, TimeUnit.SECONDS)); pending.cancelAndJoin(); release.countDown()
             assertTrue(cookies.values.isEmpty()); assertEquals(0L, access.revision.value)
+        }
+    }
+
+    @Test fun lateRotationsAfterAChallengeConfirmOnceBeforePublishingRecovery() = runBlocking {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies().apply { write(InstanceAccess.origin(server.url("/")), cookie(server.url("/"))) }
+            val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            val entered = CountDownLatch(2); val release = CountDownLatch(1)
+            val probing = CountDownLatch(1); val confirm = CountDownLatch(1); val probes = AtomicInteger()
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                    "/api/v1/verification" -> {
+                        probes.incrementAndGet(); probing.countDown(); check(confirm.await(5, TimeUnit.SECONDS))
+                        assertEquals("cf_clearance=rotated", request.getHeader("Cookie")); disabled()
+                    }
+                    "/denied" -> challenge()
+                    else -> {
+                        entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                        MockResponse().setBody("accepted").addHeader("Set-Cookie", cookie(server.url("/"), "rotated").cookie.toString())
+                    }
+                }
+            }
+            val client = access.client()
+            val pending = List(2) { async(Dispatchers.IO) { client.newCall(Request.Builder().url(server.url("/rotate")).build()).execute().close() } }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                assertTrue(runCatching { client.newCall(Request.Builder().url(server.url("/denied")).build()).execute().close() }.exceptionOrNull() is InstanceAccessException)
+                release.countDown(); pending.awaitAll()
+                assertTrue(probing.await(5, TimeUnit.SECONDS))
+                assertNull(access.clearance(context)); assertNull(access.recovery.value)
+                assertEquals("candidate", cookies.values.values.single().cookie.value)
+                confirm.countDown(); withTimeout(5000) { access.clearanceRecovery!!.join() }
+                assertEquals(1, probes.get()); assertNull(access.issue.value)
+                assertEquals("rotated", access.clearance(context)?.cookie?.value)
+                assertEquals(1L, access.recovery.value?.revision)
+            } finally { release.countDown(); confirm.countDown() }
+        }
+    }
+
+    @Test fun rotationBeforeALateChallengeReplaysTheReadWithoutReopeningVerification() = runBlocking {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies().apply { write(InstanceAccess.origin(server.url("/")), cookie(server.url("/"))) }
+            val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            val entered = CountDownLatch(1); val release = CountDownLatch(1); val attempts = AtomicInteger()
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == "/rotate") return MockResponse().addHeader("Set-Cookie", cookie(server.url("/"), "rotated").cookie.toString())
+                    if (attempts.incrementAndGet() == 1) {
+                        entered.countDown(); check(release.await(5, TimeUnit.SECONDS)); return challenge()
+                    }
+                    assertEquals("cf_clearance=rotated", request.getHeader("Cookie"))
+                    return MockResponse().setBody("restored")
+                }
+            }
+            val client = access.client()
+            val pending = async(Dispatchers.IO) { client.newCall(Request.Builder().url(server.url("/read")).build()).execute().use { it.body!!.string() } }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS))
+                client.newCall(Request.Builder().url(server.url("/rotate")).build()).execute().close()
+            } finally { release.countDown() }
+            assertEquals("restored", pending.await()); assertEquals(2, attempts.get())
+            assertNull(access.issue.value); assertNull(access.clearanceRecovery)
+            assertEquals("rotated", access.clearance(context)?.cookie?.value)
+        }
+    }
+
+    @Test fun rejectedRotationConfirmationRetainsTheGateWithoutRetryingDuplicateResponses() = runBlocking {
+        for (failure in listOf(challenge(), MockResponse().setResponseCode(503), MockResponse().setBody("invalid"),
+            disabled().addHeader("Set-Cookie", "cf_clearance=; Path=/; Max-Age=0"))) MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies().apply { write(InstanceAccess.origin(server.url("/")), cookie(server.url("/"))) }
+            val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            val entered = CountDownLatch(2); val first = CountDownLatch(1); val duplicate = CountDownLatch(1); val probes = AtomicInteger()
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == "/api/v1/verification") { probes.incrementAndGet(); return failure }
+                    entered.countDown(); check((if (request.path == "/first") first else duplicate).await(5, TimeUnit.SECONDS))
+                    return MockResponse().addHeader("Set-Cookie", cookie(server.url("/"), "rotated").cookie.toString())
+                }
+            }
+            val client = access.client()
+            val pending = listOf("first", "duplicate").map { path -> async(Dispatchers.IO) { client.newCall(Request.Builder().url(server.url("/$path")).build()).execute().close() } }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS)); access.report(context, AccessReason.CLOUDFLARE)
+                first.countDown(); pending[0].await(); withTimeout(5000) { access.clearanceRecovery!!.join() }
+                duplicate.countDown(); pending[1].await(); withTimeout(5000) { access.clearanceRecovery!!.join() }
+                assertEquals(1, probes.get()); assertNull(access.clearance(context)); assertNull(access.recovery.value)
+                assertEquals(AccessReason.CLOUDFLARE, access.issue.value?.reason)
+                assertEquals("candidate", cookies.values.values.single().cookie.value)
+            } finally { first.countDown(); duplicate.countDown() }
+        }
+    }
+
+    @Test fun aContextChangeCancelsRotationConfirmationWithoutSavingOrRecovering() = runBlocking {
+        MockWebServer().use { server ->
+            var context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies().apply { write(InstanceAccess.origin(server.url("/")), cookie(server.url("/"))) }
+            val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            val entered = CountDownLatch(1); val rotate = CountDownLatch(1); val probing = CountDownLatch(1); val confirm = CountDownLatch(1)
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    if (request.path == "/api/v1/verification") { probing.countDown(); confirm.await(5, TimeUnit.SECONDS); return disabled() }
+                    entered.countDown(); rotate.await(5, TimeUnit.SECONDS)
+                    return MockResponse().addHeader("Set-Cookie", cookie(server.url("/"), "rotated").cookie.toString())
+                }
+            }
+            val pending = async(Dispatchers.IO) { access.client().newCall(Request.Builder().url(server.url("/rotate")).build()).execute().close() }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS)); access.report(context, AccessReason.CLOUDFLARE)
+                rotate.countDown(); pending.await(); assertTrue(probing.await(5, TimeUnit.SECONDS))
+                val job = access.clearanceRecovery!!
+                context = context.copy(generation = 1); access.contextChanged()
+                withTimeout(5000) { job.join() }; confirm.countDown()
+                assertTrue(job.isCancelled); assertNull(access.issue.value); assertNull(access.recovery.value)
+                assertEquals("candidate", cookies.values.values.single().cookie.value)
+            } finally { rotate.countDown(); confirm.countDown() }
+        }
+    }
+
+    @Test fun nativeDiscoveryAfterAChallengeRecoversWithOrWithoutRotationButKeepsARequiredBackendGate() = runBlocking {
+        for (required in listOf(false, true)) for (rotated in listOf(false, true)) MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies().apply { write(InstanceAccess.origin(server.url("/")), cookie(server.url("/"))) }
+            val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            val entered = CountDownLatch(1); val release = CountDownLatch(1)
+            server.dispatcher = object : okhttp3.mockwebserver.Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    entered.countDown(); check(release.await(5, TimeUnit.SECONDS))
+                    return MockResponse().setBody("""{"enabled":$required,"required":$required,"verified":false,"expiresAt":null}""").apply {
+                        if (rotated) addHeader("Set-Cookie", cookie(server.url("/"), "rotated").cookie.toString())
+                    }
+                }
+            }
+            val pending = async(Dispatchers.IO) { access.discover(context) }
+            try {
+                assertTrue(entered.await(5, TimeUnit.SECONDS)); access.report(context, AccessReason.CLOUDFLARE); release.countDown()
+                assertEquals(required, pending.await()?.required)
+                assertEquals(if (rotated) "rotated" else "candidate", access.clearance(context)?.cookie?.value)
+                assertEquals(required, access.issue.value != null); assertEquals(!required, access.recovery.value != null)
+            } finally { release.countDown() }
+        }
+    }
+
+    @Test fun normalRotationDoesNotClearAnIndependentLoginGate() {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies().apply { write(InstanceAccess.origin(server.url("/")), cookie(server.url("/"))) }
+            val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            access.report(context, AccessReason.LOGIN)
+            server.enqueue(MockResponse().addHeader("Set-Cookie", cookie(server.url("/"), "rotated").cookie.toString()))
+            access.client().newCall(Request.Builder().url(server.url("/media")).build()).execute().close()
+            assertEquals("rotated", access.clearance(context)?.cookie?.value)
+            assertEquals(AccessReason.LOGIN, access.issue.value?.reason); assertNull(access.recovery.value)
         }
     }
 

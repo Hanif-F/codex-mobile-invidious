@@ -88,10 +88,19 @@ failure/recovery presentation. Run these through the focused device runner;
 `CloudflareAccessTest` covers challenge headers before status/body handling,
 bootstrap isolation, native candidate rejection, expiry/user-agent/origin fences,
 session-only cookies, redirects, rotation/deletion, separate gates and bounded
-safe-read recovery without replaying writes. `CloudflareAccessSmokeTest` uses a
+safe-read recovery without replaying writes. Its concurrent-response regressions
+cover both challenge/rotation arrival orders, coalesced confirmation, rejected
+replacements, context cancellation and native discovery reconciliation.
+`CloudflareAccessSmokeTest` uses a
 synthetic localhost challenge to check browser/native cookie handoff, encrypted
 store recreation, both gates, cancellation, sign-in/signup, playback and managed
 downloads. The ordinary class run skips the opt-in force-stop restoration method.
+It also checks delayed rotation restoring browsing/images in the same activity,
+late challenges after verification and native cookie handoff to a remaining
+backend challenge. Fixture controls `edgeRotatePath`/`edgeRotateNext` hold a
+successful rotation until `edgeReleaseRotations`; `accessDelayPath`/`accessDelayNext`
+and `accessReleaseDenials` hold either edge or backend denials without changing
+their original decision. `test_instance_access_fixture.py` checks these contracts.
 
 Run both affected classes through the focused runner:
 

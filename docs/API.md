@@ -35,6 +35,12 @@ agent, after a native `GET /api/v1/verification` accepts the candidate. Native
 requests send it only to the exact selected scheme/host/port, including bootstrap
 APIs. Normal 404/405 discovery responses retain older-instance compatibility;
 provider errors and malformed discovery responses do not establish verification.
+If a delayed response rotates clearance after another request has reported a
+challenge, the replacement is confirmed through native discovery before the
+obsolete denial is cleared and recovery is published. Duplicate replacements
+share one bounded confirmation; failures retain explicit verification Retry.
+An already-running successful native discovery can also reconcile a denial
+reported while it was in flight, with or without cookie rotation.
 Backend Turnstile passes and account authentication remain independent. A failed
 native probe stays in the dialog until explicit Retry/Cancel.
 

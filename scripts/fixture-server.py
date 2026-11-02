@@ -61,15 +61,17 @@ state = dict(viewCounts=False, annotationRequests=[], annotationStatus=200, anno
              originalMode='unlocked', titleLookups={}, contributions=[], avatarRequests=[], avatarFail=False)
 access_delay_lock = Lock()
 access_delays = []
+edge_rotations = []
 def reset_access():
     with access_delay_lock:
-        for pending in access_delays: pending.set()
-        access_delays.clear()
+        for pending in access_delays + edge_rotations: pending.set()
+        access_delays.clear(); edge_rotations.clear()
     state.update(accessEnabled=False, accessLogin=False, accessUnavailable=False, accessMissing=False,
                  accessPolicy=1, accessExpiry=int(time.time()) + 3600, accessRequests=[],
                  accessDelayPath='', accessDelayNext=0, accessDelayedDenials=[],
                  edgeEnabled=False, edgePolicy=1, edgeExpiry=int(time.time()) + 3600,
-                 edgeSession=False, edgeRejectNative=False, edgeUserAgent='', edgeRotateProbe=0, edgeRequests=[])
+                 edgeSession=False, edgeRejectNative=False, edgeUserAgent='', edgeRotateProbe=0, edgeRequests=[],
+                 edgeRotatePath='', edgeRotateNext=0, edgeDelayedRotations=[])
 reset_access()
 
 def reset_comments():
@@ -417,9 +419,23 @@ class Handler(BaseHTTPRequestHandler):
         state['edgeRequests'].append(dict(path=self.path, method=self.command, accepted=valid,
                                          cookieNames=list(cookies), userAgent=self.headers.get('User-Agent', ''),
                                          bearer=self.headers.get('Authorization') is not None))
-        if valid and not (state['edgeRejectNative'] and p != '/verify'): return False
+        if valid and not (state['edgeRejectNative'] and p != '/verify'):
+            pending = None
+            with access_delay_lock:
+                if p == state['edgeRotatePath'] and state['edgeRotateNext'] > 0:
+                    state['edgeRotateNext'] -= 1; state['edgePolicy'] += 1
+                    cookie = f"cf_clearance=fixture-edge-{state['edgePolicy']}; Path=/; HttpOnly"
+                    if not state['edgeSession']: cookie += '; Expires=' + formatdate(state['edgeExpiry'], usegmt=True)
+                    pending = Event(); edge_rotations.append(pending)
+                    trace = dict(path=self.path, released=False)
+                    state['edgeDelayedRotations'].append(trace)
+            if pending is None: return False
+            pending.wait(30); trace['released'] = True
+            self.respond({}, headers={'Set-Cookie': cookie})
+            return True
         page = """<!doctype html><meta name="viewport" content="width=device-width"><title>Fixture edge verification</title>
 <button id="edge-complete" onclick="fetch('/test/edge-complete',{method:'POST',body:'{}'}).then(function(){location.reload()})">Complete fixture edge verification</button>"""
+        self.delay_access_denial(p)
         self.send_response(403)
         self.send_header('cf-mitigated', 'challenge')
         self.send_header('Content-Type', 'text/html')
@@ -428,6 +444,18 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         if self.command != 'HEAD': self.wfile.write(page.encode())
         return True
+
+    def delay_access_denial(self, path):
+        # Keep the original decision while a different request completes verification or rotation.
+        pending = None
+        with access_delay_lock:
+            if path == state['accessDelayPath'] and state['accessDelayNext'] > 0:
+                state['accessDelayNext'] -= 1
+                pending = Event(); access_delays.append(pending)
+                trace = dict(path=self.path, released=False)
+                state['accessDelayedDenials'].append(trace)
+        if pending is not None:
+            pending.wait(30); trace['released'] = True
 
     def access_gate(self):
         if self.edge_gate(): return True
@@ -447,16 +475,7 @@ class Handler(BaseHTTPRequestHandler):
             reason = 'verification_expired' if self.headers.get('X-Invidious-Verification') == f"fixture-pass-{state['accessPolicy']}" and state['accessExpiry'] <= time.time() else 'verification_required'
             # Capture the denial before waiting, so a later successful verification cannot rewrite it.
             body = dict(error=reason, verification=self.access_status(), challengeUrl='/verify')
-            pending = None
-            with access_delay_lock:
-                if p == state['accessDelayPath'] and state['accessDelayNext'] > 0:
-                    state['accessDelayNext'] -= 1
-                    pending = Event(); access_delays.append(pending)
-                    trace = dict(path=self.path, released=False)
-                    state['accessDelayedDenials'].append(trace)
-            if pending is not None:
-                pending.wait(30)
-                trace['released'] = True
+            self.delay_access_denial(p)
             self.respond(body, 403,
                          {'X-Invidious-Verification-Required': reason}); return True
         return False
@@ -1039,12 +1058,16 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             if not state['edgeSession']: cookie += '; Expires=' + formatdate(state['edgeExpiry'], usegmt=True)
             return self.respond({}, headers={'Set-Cookie': cookie})
         if p == '/test/access':
-            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry', 'accessDelayPath', 'accessDelayNext', 'edgeEnabled', 'edgePolicy', 'edgeExpiry', 'edgeSession', 'edgeRejectNative', 'edgeUserAgent', 'edgeRotateProbe'):
+            for key in ('accessEnabled', 'accessLogin', 'accessUnavailable', 'accessMissing', 'accessPolicy', 'accessExpiry', 'accessDelayPath', 'accessDelayNext', 'edgeEnabled', 'edgePolicy', 'edgeExpiry', 'edgeSession', 'edgeRejectNative', 'edgeUserAgent', 'edgeRotateProbe', 'edgeRotatePath', 'edgeRotateNext'):
                 if key in data: state[key] = data[key]
             if data.get('accessReleaseDenials'):
                 with access_delay_lock:
                     for pending in access_delays: pending.set()
                     access_delays.clear()
+            if data.get('edgeReleaseRotations'):
+                with access_delay_lock:
+                    for pending in edge_rotations: pending.set()
+                    edge_rotations.clear()
             if data.get('resetRequests'): state['accessRequests'] = []
             return self.respond(self.access_status())
         if p == '/api/v1/verification/complete':

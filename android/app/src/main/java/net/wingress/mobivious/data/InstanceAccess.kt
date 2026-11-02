@@ -4,10 +4,15 @@ import java.io.IOException
 import java.net.ProtocolException
 import java.security.MessageDigest
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrl
@@ -56,6 +61,10 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
     private val rejected = mutableSetOf<String>()
     private val rejectedClearance = mutableSetOf<String>()
     private val sessionClearance = mutableMapOf<String, CloudflareClearance>()
+    private val clearanceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var rotationAttempt: Triple<ApiContext, Long, CloudflareClearance>? = null
+    internal var clearanceRecovery: Job? = null
+        private set
     private var reauthentication: Pair<ApiContext, Account>? = null
     private val statusClient = OkHttpClient.Builder().followRedirects(false).followSslRedirects(false).build()
 
@@ -124,7 +133,10 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
         if (context != current()) throw CancellationException("Account or instance changed")
         issue.value = null; revision.value++; prompt()
     }
-    @Synchronized fun contextChanged() { issue.value = null; recovery.value = null; revision.value++; prompt() }
+    @Synchronized fun contextChanged() {
+        clearanceRecovery?.cancel(); clearanceRecovery = null; rotationAttempt = null
+        issue.value = null; recovery.value = null; revision.value++; prompt()
+    }
     /** Only a gate-driven sign-in to the same identity may retain the stopped player. */
     @Synchronized fun prepareLogin(context: ApiContext, account: Account) {
         reauthentication = if (issue.value == AccessIssue(context, AccessReason.LOGIN) && context.server == account.server &&
@@ -180,7 +192,11 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
                         .filter { it.cookie.matches(target.server.toHttpUrl()) }
                     updates.lastOrNull()?.let { update ->
                         val next = update.takeIf { it.usable(target.server.toHttpUrl(), userAgent(), now()) }
-                        if (next != clearance(target)) { saveClearance(target, next); revision.value++ }
+                        if (next != clearance(target)) {
+                            if (next != null && issue.value == AccessIssue(target, AccessReason.CLOUDFLARE))
+                                confirmRotation(target, next, sentRevision)
+                            else { saveClearance(target, next); revision.value++ }
+                        }
                     }
                 }
             } } catch (e: Exception) { response.close(); throw e }
@@ -231,7 +247,9 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
                     if (persistence.read(key) != null) persistence.write(key, null)
                     rejected.remove(key)
                 }
-                if (result.edge != edge) { saveClearance(context, result.edge); revision.value++ }
+                if (result.edge?.usable(context.server.toHttpUrl(), userAgent(), now()) == true &&
+                    issue.value == AccessIssue(context, AccessReason.CLOUDFLARE)) acceptClearance(context, result)
+                else if (result.edge != edge) { saveClearance(context, result.edge); revision.value++ }
             }
         }
         return result.status
@@ -242,7 +260,32 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
         // Session cookies must never acquire an invented persistent expiry.
         clearancePersistence.write(key, value?.takeIf { it.cookie.persistent })
         if (value != null && !value.cookie.persistent) sessionClearance[key] = value else sessionClearance.remove(key)
-        rejectedClearance.remove(key)
+        if (value != null) rejectedClearance.remove(key)
+    }
+    /** A late successful rotation can supersede a denial without another browser interaction. */
+    private fun confirmRotation(context: ApiContext, edge: CloudflareClearance, expectedRevision: Long) {
+        val attempt = Triple(context, expectedRevision, edge)
+        // Repeated responses must not turn a rejected candidate into an automatic retry loop.
+        if (rotationAttempt == attempt) return
+        clearanceRecovery?.cancel()
+        rotationAttempt = attempt
+        clearanceRecovery = clearanceScope.launch(start = CoroutineStart.LAZY) {
+            try { completeClearance(context, edge, expectedRevision) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* Keep the existing verification prompt and explicit Retry/Cancel. */ }
+        }.also { it.start() }
+    }
+    /** Called under the state lock, after the native probe and revision checks. */
+    private fun acceptClearance(context: ApiContext, result: VerificationProbe): Boolean {
+        require(result.edge?.usable(context.server.toHttpUrl(), userAgent(), now()) == true) { "Cloudflare clearance expired. Retry verification." }
+        saveClearance(context, result.edge)
+        if (result.status?.required == true) { revision.value++; return false }
+        if (result.status?.enabled == false) {
+            persistence.write(origin(context.server.toHttpUrl()), null)
+            rejected.remove(origin(context.server.toHttpUrl()))
+        }
+        recovered(context)
+        return true
     }
     private fun checkAttempt(context: ApiContext, expectedRevision: Long) {
         check(context)
@@ -260,15 +303,7 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
         currentCoroutineContext().ensureActive()
         synchronized(this) {
             checkAttempt(context, expectedRevision)
-            require(result.edge?.usable(context.server.toHttpUrl(), userAgent(), now()) == true) { "Cloudflare clearance expired. Retry verification." }
-            saveClearance(context, result.edge)
-            if (result.status?.required == true) { revision.value++; return false }
-            if (result.status?.enabled == false) {
-                persistence.write(origin(context.server.toHttpUrl()), null)
-                rejected.remove(origin(context.server.toHttpUrl()))
-            }
-            recovered(context)
-            return true
+            return acceptClearance(context, result)
         }
     }
 

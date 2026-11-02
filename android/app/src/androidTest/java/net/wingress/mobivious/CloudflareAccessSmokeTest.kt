@@ -13,9 +13,12 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import net.wingress.mobivious.data.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
+import okhttp3.Request
 import org.hamcrest.Matcher
 import org.json.JSONObject
 import org.junit.*
@@ -126,6 +129,81 @@ class CloudflareAccessSmokeTest {
         assertNotNull(vm.access.pass(vm.api.context()))
         assertEquals("fixture-edge-2", vm.access.clearance(vm.api.context())?.cookie?.value)
         assertTrue(runBlocking { vm.api.discovery("popular").isNotEmpty() })
+    }
+
+    @Test fun lateCookieRotationRestoresBrowsingAndImagesWithoutRelaunching() = runBlocking {
+        block(); solveEdge(); recovered()
+        val originalActivity = activity; val originalModel = vm
+        command("""{"edgeRotatePath":"/api/v1/edge-rotation-fixture","edgeRotateNext":1}""")
+        val pending = async(Dispatchers.IO) {
+            vm.access.client().newCall(Request.Builder().url(vm.store.server + "/api/v1/edge-rotation-fixture").build()).execute().use { it.code }
+        }
+        try {
+            until { state().getJSONArray("edgeDelayedRotations").length() == 1 }
+            compose.runOnUiThread { vm.refresh() }
+            until { vm.access.issue.value?.reason == AccessReason.CLOUDFLARE && !vm.browse.value.loading }
+            val before = state().getJSONArray("edgeRequests").length()
+            compose.onNodeWithTag("instance-verification").assertExists()
+            command("""{"edgeReleaseRotations":true}""")
+            assertEquals(200, pending.await()); recovered()
+            until { vm.browse.value.error == null && vm.browse.value.videos.isNotEmpty() }
+            until {
+                val requests = state().getJSONArray("edgeRequests")
+                (before until requests.length()).any { index -> requests.getJSONObject(index).let {
+                    it.getBoolean("accepted") && it.getString("path").startsWith("/media/thumbnail.jpg")
+                } }
+            }
+            assertEquals("fixture-edge-2", vm.access.clearance(vm.api.context())?.cookie?.value)
+            compose.runOnUiThread {
+                assertSame(originalActivity, ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single())
+                assertSame(originalModel, vm)
+            }
+        } finally { command("""{"edgeReleaseRotations":true}""") }
+    }
+
+    @Test fun aDelayedEdgeChallengeCannotUndoCompletedVerification() = runBlocking {
+        command("""{"edgeEnabled":true,"accessDelayPath":"/api/v1/popular","accessDelayNext":1}""")
+        val pending = async(Dispatchers.IO) {
+            vm.access.client().newCall(Request.Builder().url(vm.store.server + "/api/v1/popular").build()).execute().use { it.code }
+        }
+        try {
+            until { state().getJSONArray("accessDelayedDenials").length() == 1 }
+            compose.runOnUiThread { vm.refresh() }
+            until { vm.access.issue.value?.reason == AccessReason.CLOUDFLARE }
+            solveEdge(); recovered()
+            val accepted = vm.access.clearance(vm.api.context())
+            command("""{"accessReleaseDenials":true}""")
+            assertEquals(200, pending.await())
+            assertEquals(accepted, vm.access.clearance(vm.api.context())); assertNull(vm.access.issue.value)
+            assertNull(vm.browse.value.error)
+            compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        } finally { command("""{"accessReleaseDenials":true}""") }
+    }
+
+    @Test fun lateRotationLoadsTheRemainingBackendChallengeInTheOpenDialog() = runBlocking {
+        block(); solveEdge(); recovered()
+        command("""{"edgeRotatePath":"/api/v1/edge-rotation-fixture","edgeRotateNext":1}""")
+        val pending = async(Dispatchers.IO) {
+            vm.access.client().newCall(Request.Builder().url(vm.store.server + "/api/v1/edge-rotation-fixture").build()).execute().use { it.code }
+        }
+        try {
+            until { state().getJSONArray("edgeDelayedRotations").length() == 1 }
+            command("""{"accessEnabled":true}""")
+            compose.runOnUiThread { vm.refresh() }
+            until { vm.access.issue.value?.reason == AccessReason.CLOUDFLARE }
+            val before = state().getJSONArray("edgeRequests").length()
+            command("""{"edgeReleaseRotations":true}"""); assertEquals(200, pending.await())
+            until {
+                val requests = state().getJSONArray("edgeRequests")
+                (before until requests.length()).any { index -> requests.getJSONObject(index).let {
+                    it.getBoolean("accepted") && it.getString("path").startsWith("/verify?")
+                } }
+            }
+            compose.onNodeWithTag("instance-verification").assertExists()
+            assertNull(vm.access.pass(vm.api.context())); assertNotNull(vm.access.issue.value)
+            clickFixture("complete"); recovered()
+            assertNotNull(vm.access.pass(vm.api.context())); assertNull(vm.browse.value.error)
+        } finally { command("""{"edgeReleaseRotations":true}""") }
     }
 
     @Test fun rejectedNativeClearanceStaysOpenUntilExplicitRetry() {
