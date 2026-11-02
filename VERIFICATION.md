@@ -1,5 +1,47 @@
 # Focused implementation verification
 
+## Patch release 0.13.4 — 2 November 2026
+
+Bumped `versionName` to **0.13.4** and `versionCode` to **34**. Release sources
+include `8a307da` (downloaded-video sync) and `a3c9c17` (Cloudflare recovery without
+relaunch). Only version metadata changed in app sources after the completed
+functional checks. The existing **496 JVM tests**, **24 focused Android 16 emulator
+cases**, debug lint and fixture/documentation results below were reused as requested;
+**no JVM/device tests were rerun for this release**.
+
+The one-time ignored `.tools/build-release-patch.sh` driver copies
+`scripts/build-release.sh` with only its completed `:app:testDebugUnitTest` task
+omitted. Signing-material checks, release lint, APK/checksum output and immutable
+R8 mapping archival remain intact. The tracked release script is unchanged.
+
+New release commands/checks:
+
+- `bash .tools/build-release-patch.sh`: passed; executes
+  `./gradlew :app:assembleRelease :app:lintRelease --console=plain` from `android/`.
+  Release lint: **0 errors, 36 warnings**. No test tasks appear in the build log.
+- SDK build-tools 36.0.0 `apksigner verify --verbose --print-certs`: passed;
+  the certificate SHA-256 matches the previously published 0.13.3 APK.
+- `aapt2 dump badging`: package `net.wingress.mobivious`, version **0.13.4**,
+  code **34**, min SDK **33**, target SDK **37**.
+- `zipalign -c -P 16 4`: passed. Every `classes*.dex` ZIP entry is uncompressed.
+- APK checksum, current/archived R8 mapping identity and every archive
+  `SHA256SUMS` entry: passed.
+- Documentation inventory/fingerprint/link checks and `git diff --check`: passed.
+
+APK: **7,352,072 bytes**. SHA-256:
+`af2bbc13a06f7820e7126c81bdc78b984515a42c0c66520309ea938e5d688961`.
+R8 archive: `artifacts/r8/0.13.4/af2bbc13a06f7820e7126c81bdc78b984515a42c0c66520309ea938e5d688961/`.
+Raw build/packaging evidence and release notes are under ignored
+`artifacts/release-build-0.13.4.log`, `artifacts/release-0.13.4/` and
+`artifacts/release-notes-0.13.4.md`.
+
+Published artifacts are the APK and its `.apk.sha256` file under tag
+[v0.13.4](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.13.4).
+Download sync uses existing account APIs; no server contract/deployment was added.
+Optimized runtime, full connected-suite and new download-sync force-stop/reboot
+acceptance remain unestablished. Earlier implementation results are not presented
+as release-runtime results, and existing ignored device cases remain unchanged.
+
 ## Cloudflare recovery without relaunch — 2 November 2026
 
 The working tree over `4a9668f` fixes a process-local access-state race: a delayed

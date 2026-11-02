@@ -7,7 +7,7 @@ tree, including the 2 November 2026 Cloudflare clearance/recovery fixes,
 23 October automatic verification flow,
 22 October instance-access client support and the
 21 October scroll tracking and Android link setup changes.
-Current release version is **0.13.3**, code **33**.
+Current release version is **0.13.4**, code **34**.
 The [testing guide](TESTING.md) defines repeatable validation; the
 [cleanup report](CLEANUP.md) records the latest audit results and known failures.
 The [feature parity checklist](../FEATURE_PARITY.md) retains its 9 October
