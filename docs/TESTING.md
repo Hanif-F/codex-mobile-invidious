@@ -126,11 +126,18 @@ cover both challenge/rotation arrival orders, coalesced confirmation, rejected
 replacements, context cancellation and native discovery reconciliation.
 `CloudflareAccessSmokeTest` uses a
 synthetic localhost challenge to check browser/native cookie handoff, encrypted
-store recreation, both gates, cancellation, sign-in/signup, playback and managed
+store recreation, separate dialogs for both gates, cancellation, sign-in/signup, playback and managed
 downloads. The ordinary class run skips the opt-in force-stop restoration method.
 It also checks delayed rotation restoring browsing/images in the same activity,
 late challenges after verification and native cookie handoff to a remaining
-backend challenge. Fixture controls `edgeRotatePath`/`edgeRotateNext` hold a
+backend challenge. Signed-in cold-settings regressions cover Popular/History
+recovery in the same activity, preservation of configured spoiler rules and the
+visible settings Retry action after a failed recovery read. Another regression
+accepts a newer browser cookie after native rejection without reloading the dialog.
+Cancellation remains in force when delayed native rotation reveals a separate
+backend gate; explicit Retry opens the remaining dialog. Choosing required sign-in
+does not suppress a later Cloudflare challenge on authentication bootstrap requests.
+Fixture controls `edgeRotatePath`/`edgeRotateNext` hold a
 successful rotation until `edgeReleaseRotations`; `accessDelayPath`/`accessDelayNext`
 and `accessReleaseDenials` hold either edge or backend denials without changing
 their original decision. `test_instance_access_fixture.py` checks these contracts.
@@ -163,6 +170,13 @@ then requires native browsing, ready/playing media and advancing playback positi
 It changes no account or server policy. A failed provider interaction, native
 challenge rejection or unavailable live stream remains an explicit production
 acceptance gap, separate from fixture success.
+
+`LiveInstanceAccessSmokeTest#signedInPopularAndHistoryLoadWithConfirmedSettings`
+is selected separately with `-Pandroid.testInstrumentationRunnerArguments.liveSignedInAccess=true`.
+It requires an existing signed-in production session on the emulator and retains
+it without accepting credentials as arguments. It checks confirmed settings,
+Popular and organized History, and captures screenshots. It does not force new
+Cloudflare clearance or establish acceptance of an undeployed server handoff page.
 
 `InstanceAccessTest` covers redirect credential boundaries, bootstrap exclusions,
 stale requests, pass validation, account cache isolation and recovery policy. Delayed

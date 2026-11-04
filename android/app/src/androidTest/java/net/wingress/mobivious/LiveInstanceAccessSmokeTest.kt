@@ -17,6 +17,35 @@ import java.io.File
 @RunWith(AndroidJUnit4::class)
 class LiveInstanceAccessSmokeTest {
     @get:Rule val compose = createServiceComposeRule()
+    @Test fun signedInPopularAndHistoryLoadWithConfirmedSettings() {
+        Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("liveSignedInAccess") == "true")
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val activity = instrumentation.startActivitySync(Intent(instrumentation.targetContext, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)) as MainActivity
+        val vm = activity.model
+        val account = vm.account.value
+        assertNotNull("Sign in on the emulator before selecting this opt-in check", account)
+        assertEquals("https://invidious.wingress.net", vm.store.server)
+        try {
+            compose.runOnUiThread { vm.refreshSharedSettings(); vm.navigate("Popular") }
+            compose.waitUntil(240_000) { vm.channelSpoilers.state.value.ready && !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+            assertNull(vm.browse.value.error); assertNull(vm.spoilerSettingsError.value)
+            assertNull(vm.access.issue.value)
+            compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+            captureWatchScreenshot("live-signed-in-popular")
+            compose.runOnUiThread { vm.navigate("You", "history") }
+            compose.waitUntil(60_000) { !vm.browse.value.loading }
+            assertNull(vm.browse.value.error); assertNotNull(vm.browse.value.history)
+            val total = requireNotNull(vm.browse.value.history?.total) { "Expected organized live History" }
+            compose.onNodeWithText(DisplayFormats.inventory(total.toLong(), "video")).assertExists()
+            assertTrue(vm.browse.value.videos.all { !vm.channelSpoilers.state.value.decision(it).pending })
+            assertTrue("The live check changed the signed-in session", vm.account.value?.token == account?.token)
+            captureWatchScreenshot("live-signed-in-history")
+        } finally {
+            compose.runOnUiThread { vm.closePlayer(); vm.navigate("Popular") }
+        }
+    }
+
     @Test fun realCloudflareClearanceRestoresNativeBrowsingAndPlayback() {
         Assume.assumeTrue(InstrumentationRegistry.getArguments().getString("liveCloudflareAccess") == "true")
         val instrumentation = InstrumentationRegistry.getInstrumentation()

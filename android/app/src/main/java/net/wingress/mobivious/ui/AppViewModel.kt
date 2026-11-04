@@ -711,27 +711,47 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         requestLocalPreference("profile:subscriptionSort","Channels",store.subscriptionSort(context).key,sort.key,context)
     }
     fun refreshSharedSettings() {
+        reloadSharedSettings(preserveBrowse = false)
+    }
+    private fun reloadSharedSettings(preserveBrowse: Boolean): Job? {
         val context = api.context()
         refreshBlockedChannels()
         refreshWatched()
-        if (context.account == null) { preferencesContext = context; preferences.value = store.guestPreferences(); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return }
+        if (context.account == null) { preferencesContext = context; preferences.value = store.guestPreferences(); channelSpoilers.configure(preferences.value, context); syncSponsorSettings(); syncHistorySettings(); refreshWatched(); return null }
         val prefsGeneration = ++preferenceGeneration
         val identityVersion = ++identityGeneration
         val navigationAtRequest = navigationRevision
-        action { val value = try { api.preferences(context) } catch (e: CancellationException) { throw e } catch (e: Exception) { if (api.context() == context) spoilerSettingsError.value = friendly(e); throw e }; if (api.context() == context && prefsGeneration == preferenceGeneration) {
-            val refreshCurrent = currentBrowseAffected(preferences.value, value)
-            invalidateSavedTabs(preferences.value, value)
-            preferencesContext = context; preferences.value = value; channelSpoilers.configure(value, context); spoilerSettingsError.value = null; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
-            val applyHome = homeAppliedContext != context && navigationRevision == navigationAtRequest && route != "sign-in" && signInReturn == null
-            homeAppliedContext = context
-            if (applyHome) openDefaultHome()
-            else if (refreshCurrent) refresh()
-        } }
+        val settings = viewModelScope.launch {
+            try {
+                val value = api.preferences(context)
+                if (api.context() == context && prefsGeneration == preferenceGeneration) {
+                    val refreshCurrent = currentBrowseAffected(preferences.value, value)
+                    invalidateSavedTabs(preferences.value, value)
+                    preferencesContext = context; preferences.value = value; channelSpoilers.configure(value, context)
+                    spoilerSettingsError.value = null; syncSponsorSettings(); syncHistorySettings(); refreshWatched()
+                    val applyHome = !preserveBrowse && homeAppliedContext != context && navigationRevision == navigationAtRequest && route != "sign-in" && signInReturn == null
+                    homeAppliedContext = context
+                    if (applyHome) openDefaultHome()
+                    else if (!preserveBrowse && refreshCurrent) refresh()
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                if (api.context() == context && prefsGeneration == preferenceGeneration) {
+                    spoilerSettingsError.value = friendly(e)
+                    message.value = friendly(e)
+                }
+            }
+        }
         viewModelScope.launch {
             try { val identity = api.dearrowIdentity(context); if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = identity; dearrowIdentityError.value = null } }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (api.context() == context && identityVersion == identityGeneration) { dearrowIdentity.value = null; dearrowIdentityError.value = friendly(e) } }
         }
+        return settings
+    }
+    fun retryChannelSettings() {
+        access.prompt()
+        reloadSharedSettings(preserveBrowse = true)
     }
     fun ensureDeArrow(id: String) { if (queue.value.current?.downloadId == null && preferences.value.dearrowEnabled) dearrowTitles.ensure(id) }
     fun refreshBlockedChannels() { viewModelScope.launch { app.blocked.refresh() } }
@@ -1050,6 +1070,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         // A denial can open verification before its browse coroutine has published retryMore.
         val pending = browseJob
         viewModelScope.launch {
+            if (context != api.context()) return@launch
+            val settings = reloadSharedSettings(preserveBrowse = true)
+            if (context.account != null) { refreshSubscriptions(); refreshPlaylists() }
+            settings?.join()
             pending?.join()
             if (context == api.context()) retryBrowse()
         }

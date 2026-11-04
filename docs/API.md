@@ -28,8 +28,10 @@ Every request is fenced against a changed live context before accepting its body
 
 ## Instance access gates
 
-Cloudflare edge responses carrying `cf-mitigated: challenge` open the existing
-verification dialog before JSON or account-error handling. The native cookie
+Cloudflare edge responses carrying `cf-mitigated: challenge` open **Cloudflare
+verification**, using `/verify?client=native-cloudflare`, before JSON or account-error handling. This dedicated
+server page is independent of Turnstile policy and emits no backend completion.
+Deploy the server addition before distributing this client. The native cookie
 adapter imports only `cf_clearance`, with its real expiry and the WebView's user
 agent, after a native `GET /api/v1/verification` accepts the candidate. Native
 requests send it only to the exact selected scheme/host/port, including bootstrap
@@ -42,7 +44,10 @@ share one bounded confirmation; failures retain explicit verification Retry.
 An already-running successful native discovery can also reconcile a denial
 reported while it was in flight, with or without cookie rotation.
 Backend Turnstile passes and account authentication remain independent. A failed
-native probe stays in the dialog until explicit Retry/Cancel.
+native probe retains Retry/Cancel; a newly issued browser cookie gets one fresh
+probe without recreating the dialog. The same rejected candidate is not polled repeatedly.
+Accepted clearance removes the Cloudflare issue. A remaining backend requirement
+opens a separate **Instance verification** dialog; full recovery waits for both gates.
 
 `GET /api/v1/verification` discovers Turnstile policy and checks an existing pass.
 Only 404/405 mean unsupported; outages remain errors. The embedded same-origin

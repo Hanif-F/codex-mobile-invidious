@@ -157,6 +157,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `sessionCookiesAreNotPersistedAcrossInstances`
 - `rejectedNativeProbeDoesNotSaveCookieOrPublishRecovery`
 - `edgeClearanceAndBackendPassMustBothBeAccepted`
+- `aFreshBrowserCandidateCanRecoverAfterNativeRejection`
 - `edgeRecoveryPreservesUnsupportedDiscoveryButNotOutages`
 - `redirectsStripClearanceAndAgentButPreserveRange`
 - `rotationAndDeletionOnlyAcceptClearanceFromCurrentOrigin`
@@ -1018,13 +1019,20 @@ Test support/helper file; no declared `@Test` methods.
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt) — Synthetic edge verification, recovery without relaunch, delayed challenges/rotations, combined gates, encrypted persistence, authentication, playback and downloads.
 
 - `edgeOnlyRestoresBrowsingAndEncryptedClearanceSurvivesStoreRecreation`
-- `edgeThenBackendTurnstileKeepsTheSameDialogUntilBothPass`
+- `edgeThenBackendTurnstileUsesSeparateDialogsUntilBothPass`
 - `lateCookieRotationRestoresBrowsingAndImagesWithoutRelaunching`
 - `aDelayedEdgeChallengeCannotUndoCompletedVerification`
-- `lateRotationLoadsTheRemainingBackendChallengeInTheOpenDialog`
+- `lateRotationOpensTheSeparateBackendDialog`
+- `cancelledCloudflareStaysDismissedWhenRotationRevealsBackendVerification`
 - `rejectedNativeClearanceStaysOpenUntilExplicitRetry`
+- `aNewBrowserCookieRecoversAfterARejectedCandidateWithoutReloadingTheDialog`
+- `challengedInitialAccountSettingsRestoreHistoryAndPopularWithoutReopening`
+- `challengedInitialAccountSettingsPreserveIntentionalSpoilerRules`
+- `backendVerificationAlsoRestoresInitialAccountSettings`
+- `failedAccountSettingsRecoveryOffersRetryOnTheAffectedHistory`
 - `cancellationSurvivesRecreationAndServerChangeDiscardsThePrompt`
 - `edgeVerificationIsAvailableOnNativeSignInAndDoesNotReplayLogin`
+- `choosingRequiredSignInDoesNotSuppressALaterCloudflareChallenge`
 - `clearanceRestoresAfterProcessRestart`
 - `registrationBootstrapCanVerifyAndThenRefreshWithoutReplayingSignup`
 - `playbackRecoveryKeepsPausedIntentAndManagedDownloadsUseClearance`
@@ -1279,6 +1287,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt) — Opt-in real-provider backend verification and interactive Cloudflare native browsing/playback acceptance without policy changes.
 
+- `signedInPopularAndHistoryLoadWithConfirmedSettings`
 - `realCloudflareClearanceRestoresNativeBrowsingAndPlayback`
 - `realProviderCompletesWithoutAccountOrPolicyChanges`
 
@@ -1687,4 +1696,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **1015 declared test methods** (including ignored tests).
+Inventory total: **1024 declared test methods** (including ignored tests).

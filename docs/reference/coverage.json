@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "8a307da4e43237ef80e8a2e102589dd7ccf6a637",
-  "reviewedDate": "2026-11-02",
+  "reviewedSourceCommit": "14d3539c8da4ebb56d9464f0f8beab62b59c5e80",
+  "reviewedDate": "2026-11-04",
   "version": "0.13.4",
   "documents": [
     "AGENTS.md",
@@ -901,7 +901,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination. Integrates session playback statistics.",
-      "sha256": "2e096771abb02bcaa5ee0cc3c9b141adfc08df5f3f2c089a74740809b2ad96e4"
+      "sha256": "76b75e11c39be4459a91e6f3fcb242649520b0cfaf9b3dfaa6d3496ec0636934"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1027,7 +1027,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "36605c238c7c0a3cf97689ca809b0f4acbb3e15631ca0494df21ede00af2acf9"
+      "sha256": "856f3c95e73bf6d4a99f4800c55b62ba98113a15139dfe97e168ccd7f5e4deae"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
       "area": "Compose UI",
@@ -1627,7 +1627,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Threaded local API/media fixture, scenario tracing, controlled challenge/rotation barriers and single-use HTTP/empty-video failures.",
-      "sha256": "964230a803888b8905023a61fec80c3d49dc045e1b2a139e388e40c2658b1a5c"
+      "sha256": "e4b5e428288590e49c2e37587fb0761619a3482fe4aaa4ae1defc383ea3e4b4b"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1789,7 +1789,7 @@
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "Independent Cloudflare/backend access gates, native validation, coalesced late-rotation confirmation and revision-fenced recovery.",
-      "sha256": "1064517a298387e9d16904da7964c882bbc7dc32591fa99390342f13808af938"
+      "sha256": "d869af2ad352d10d59830a9a402ce94f9dc4429922945aba83b4ab28b86596c4"
     },
     "android/app/src/main/java/net/wingress/mobivious/downloads/ProtectedDownloadService.kt": {
       "area": "Android foundation",
@@ -1801,7 +1801,7 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Origin-restricted verification WebView, confirmed native-cookie handoff to remaining backend challenges and lifecycle-retained cancellation.",
-      "sha256": "411944083c884682f432a55b4cceec4c3f02f3d7ef5bfe15de471173566b4948"
+      "sha256": "327a6922cc410904bdc693c56f423415f58dc7cd0b11cbeefaa0f344aeb1f026"
     },
     "android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt": {
       "area": "JVM tests",
@@ -1819,7 +1819,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Opt-in real-provider backend verification and interactive Cloudflare native browsing/playback acceptance without policy changes.",
-      "sha256": "307a444db6b96f4605e0904bb822adebbfaed99e962f113629f2c315715ff641"
+      "sha256": "7381f1f69cf777eadd2ccacc0a6653fcd86ec895e53d9fa1fd4d18969b9d6e8f"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ProtectedDownloadsPersistenceSmokeTest.kt": {
       "area": "Android device tests",
@@ -1831,7 +1831,7 @@
       "area": "Scripts",
       "guide": "docs/TESTING.md",
       "description": "Local access-gate precedence, bootstrap, expiry, outage and delayed edge/backend denial or clearance-rotation contract checks.",
-      "sha256": "27031b1623ab504e5d444e00df4e0c5ab14ba73f59b4eaa448fa02200cb61c25"
+      "sha256": "b4ea1ad5b6aa1fabe69e52a9d68a8f86e645d2210b5f70ed7965f227164a044f"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ViewCountsSmokeTest.kt": {
       "area": "Android device tests",
@@ -1873,13 +1873,13 @@
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
       "description": "Cloudflare classification, credential isolation, concurrent rotation/discovery recovery, bounded confirmation, expiry and cancellation.",
-      "sha256": "ad4bfd47ba842a60b9ee951bbdb4c3e5f085fad6720b4204c41b946577eb7a9f"
+      "sha256": "0a7d7727618ffdcdfc2b3d054c266b86e924616889cc4877df2d404e39ddaa40"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/CloudflareAccessSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Synthetic edge verification, recovery without relaunch, delayed challenges/rotations, combined gates, encrypted persistence, authentication, playback and downloads.",
-      "sha256": "9fc5fd92e628ec37e0defd4c4d72e07037a5c42b3e76dd0fb6b83253c218127e"
+      "sha256": "a3ac7cbca34dfb2c1c237075e94949cbcfcf8e119bd2a21c72c00c0fb38d73db"
     },
     "scripts/tests/test_subscription_exports_fixture.py": {
       "area": "Scripts",

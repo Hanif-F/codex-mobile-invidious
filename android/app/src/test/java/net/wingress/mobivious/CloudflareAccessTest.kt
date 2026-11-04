@@ -107,12 +107,29 @@ class CloudflareAccessTest {
             access.report(context, AccessReason.CLOUDFLARE)
             server.enqueue(MockResponse().setBody("""{"enabled":true,"required":true,"verified":false,"expiresAt":null}"""))
             assertFalse(access.completeClearance(context, cookie(server.url("/"))))
-            assertNotNull(access.clearance(context)); assertNull(passes.value); assertNotNull(access.issue.value)
+            assertNotNull(access.clearance(context)); assertNull(passes.value)
+            assertEquals(AccessReason.VERIFICATION, access.issue.value?.reason)
+            assertNull(access.recovery.value)
             server.enqueue(MockResponse().setBody("""{"enabled":true,"required":false,"verified":true,"expiresAt":100}"""))
             access.complete(context, "signed-pass", 100, true)
             assertNull(access.issue.value); assertEquals("signed-pass", passes.value?.token)
             server.takeRequest(); val request = server.takeRequest()
             assertEquals("signed-pass", request.getHeader(InstanceAccess.HEADER)); assertEquals("cf_clearance=candidate", request.getHeader("Cookie"))
+        }
+    }
+
+    @Test fun aFreshBrowserCandidateCanRecoverAfterNativeRejection() = runBlocking {
+        MockWebServer().use { server ->
+            val context = ApiContext(server.url("/").toString().trimEnd('/'), null)
+            val cookies = Cookies(); val access = InstanceAccess({ context }, Passes(), cookies, { agent })
+            access.report(context, AccessReason.CLOUDFLARE)
+            server.enqueue(challenge())
+            assertTrue(runCatching { access.completeClearance(context, cookie(server.url("/"), "rejected")) }.isFailure)
+            assertNull(access.clearance(context)); assertNull(access.recovery.value)
+            server.enqueue(disabled())
+            assertTrue(access.completeClearance(context, cookie(server.url("/"), "fresh")))
+            assertEquals("fresh", access.clearance(context)?.cookie?.value)
+            assertNull(access.issue.value); assertNotNull(access.recovery.value)
         }
     }
 

@@ -39,7 +39,7 @@ regressions and record the tested source/device scope.
 
 ## Cloudflare verification
 
-A `cf-mitigated: challenge` response opens **Verify access**. Complete any visible
+A `cf-mitigated: challenge` response opens **Cloudflare verification**. Complete any visible
 Cloudflare interaction. The app checks a native API request before closing the
 dialog; a cookie appearing in the WebView alone is insufficient. Retry reloads a
 fresh verification page. Cancel leaves settings, instance selection and local
@@ -47,7 +47,11 @@ downloads reachable. Login, signup, other writes and failed downloads require
 explicit user retry after verification.
 Accepted native verification also clears obsolete Cloudflare warnings caused by
 concurrent requests or delayed cookie rotation, then retries browsing and visible
-images automatically. Restarting the app is not part of the recovery flow.
+images automatically. Account settings reload before browsing retries, restoring
+titles and thumbnails without restarting. If settings still fail, use **Retry
+loading settings** above the affected list. Intentional spoiler rules remain masked.
+Backend Turnstile opens its own **Instance verification** dialog only when required.
+The Cloudflare handoff page requires the matching server update to be deployed first.
 
 Keep Android System WebView current. A WebView update, network change, cookie
 expiry or Cloudflare rejection may require verification again. Embedded browsers

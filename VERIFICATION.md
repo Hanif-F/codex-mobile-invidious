@@ -1,5 +1,52 @@
 # Focused implementation verification
 
+## Separate verification flows and settings recovery — 4 November 2026
+
+Cloudflare and backend Turnstile now have separately owned dialogs. The server
+adds `/verify?client=native-cloudflare`, a localized, private/no-store handoff
+page that does not read Turnstile policy/readiness or emit its widget/completion.
+Accepted native clearance switches to the backend issue only when required;
+recovery waits for both gates. A rejected cookie is tried once, while a newer
+browser candidate may recover without reloading. Cancellation also survives a
+delayed rotation exposing the remaining backend gate.
+
+Full recovery reloads shared account settings before retrying browsing, configures
+channel masking, refreshes blocked/watched/subscription/playlist reads and preserves
+the current destination and failed pagination. A settings failure retains safe
+masking and offers Retry on the affected browse list. Existing credential formats,
+origin/user-agent/expiry fences and explicit write/download retries are preserved.
+
+Final checks on Android 16 `emulator-5554`, WebView 155.0.8059.43:
+
+- `JAVA_HOME=/opt/android-studio/jbr android/gradlew -p android :app:testDebugUnitTest --tests 'net.wingress.mobivious.CloudflareAccessTest' --tests 'net.wingress.mobivious.InstanceAccessTest' --console=plain --offline`: **35 focused tests passed**.
+- After the final production edit, `JAVA_HOME=/opt/android-studio/jbr android/gradlew -p android :app:testDebugUnitTest :app:lintDebug --console=plain --offline`: **497 JVM tests passed, 0 skipped**; debug lint **0 errors, 24 warnings**. After tightening the live screenshot assertion, only the affected `:app:lintDebug` check was repeated and passed.
+- All device selections used `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=...` with explicit class/method selectors. The initial six selected cases passed. The next **31 passed**: nine remaining Cloudflare journeys, all 20 `InstanceAccessSmokeTest` cases, and `ChannelSpoilersSmokeTest#accountPreferenceReadFailureKeepsSafePlaceholdersAndCanRetry` / `#accountSparseSaveFailureRetryAndResetPreserveOtherRules`. The Gradle build and XML report completed successfully; that wrapper received SIGTERM afterward during teardown.
+- After the cancellation change and explicit History artwork fixture, **nine affected device cases passed**: `CloudflareAccessSmokeTest#cancelledCloudflareStaysDismissedWhenRotationRevealsBackendVerification`, `#lateRotationOpensTheSeparateBackendDialog`, `#cancellationSurvivesRecreationAndServerChangeDiscardsThePrompt`, all four initial-account-settings recovery cases, and `InstanceAccessSmokeTest#cancelledAndRecreatedVerificationCanBeRetried` / `#cancelledVerificationStaysDismissedAcrossBackgroundAndPipUntilExplicitRetry`.
+- Final review separated sign-in dismissal from verification cancellation. **Seven affected device cases passed**: the new `CloudflareAccessSmokeTest#choosingRequiredSignInDoesNotSuppressALaterCloudflareChallenge`, existing native sign-in/Cloudflare and required-login/registration/backend-verification journeys, and the four affected cancellation/recreation/background/PiP cases. This is **39 distinct fixture device cases**, all passing, with no selected skips. Saved XML inventories and exact reproduction selectors are under ignored `.tools/verification-results/` and `device-reproduction-commands.txt` there.
+- `python3 -m unittest discover -s scripts/tests -p test_instance_access_fixture.py`: **9 passed**.
+- In the sibling server, `crystal run tests/frontend/render_fixtures.cr -Dskip_videojs_download` and `crystal run tests/frontend/render_recovery_fixtures.cr -Dapi_only -Dskip_videojs_download`: **passed**. From its `tests/frontend`, `node --test verification-surfaces.test.cjs bot-protection.test.cjs`: **28 passed**, covering Chromium/Firefox, ordinary/API-only pages, disabled/unconfigured backend policy, localization, no-JavaScript rendering and retained backend contracts.
+- `BOT_PROTECTION_TEST_DATABASE_URL=postgres://postgres@127.0.0.1:55435/invidious_bot_protection_test crystal run tests/database/bot_protection.cr -Dskip_videojs_download`, then the same command with `-Dapi_only`: **both passed**, using a newly created disposable PostgreSQL 18 container and empty schema for each run. The container was removed afterward; no production database or policy was changed.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.LiveInstanceAccessSmokeTest#signedInPopularAndHistoryLoadWithConfirmedSettings -Pandroid.testInstrumentationRunnerArguments.liveSignedInAccess=true`: **1 passed** after asserting the rendered History count. Confirmed settings, populated Popular/History, retained account session and absence of pending channel settings were checked. Screenshots were inspected. The original encrypted session was restored after fixture tests; its temporary backup was removed. The updated debug app was left open on that account.
+- Android documentation inventory/fingerprint/link checks, server generated-reference/link checks, focused Crystal formatting and `git diff --check`: **passed**.
+
+The initial History regressions needed actual history/playlist fixture rows; the
+server assertion was corrected to allow the ordinary preference cookie while
+forbidding issuance of a backend pass. Those setup failures are resolved.
+
+Screenshots and preserved XML reports are under ignored
+`.tools/verification-results/`; server browser screenshots are in the sibling
+`tests/frontend/artifacts/d7-verification/`. Controlled History/Popular thumbnail
+recovery and intentional masking were visually inspected. The live check retains
+the existing account and clearance; it does not force a fresh Cloudflare challenge.
+The earlier guest live check failed with `login_required` after native clearance
+acceptance. The screenshot's native rejection was not reproduced on this emulator.
+
+**Deployment remains pending:** deploy the backward-compatible server page before
+distributing this client, then repeat fresh live Cloudflare handoff acceptance.
+No production deployment, release publishing, new force-stop clearance check,
+physical-device run or full connected-suite acceptance is claimed. Existing
+unselected/ignored connected cases remain outside these focused results.
+
 ## Patch release 0.13.4 — 2 November 2026
 
 Bumped `versionName` to **0.13.4** and `versionCode` to **34**. Release sources

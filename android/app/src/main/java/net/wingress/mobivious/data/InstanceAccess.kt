@@ -279,7 +279,12 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
     private fun acceptClearance(context: ApiContext, result: VerificationProbe): Boolean {
         require(result.edge?.usable(context.server.toHttpUrl(), userAgent(), now()) == true) { "Cloudflare clearance expired. Retry verification." }
         saveClearance(context, result.edge)
-        if (result.status?.required == true) { revision.value++; return false }
+        if (result.status?.required == true) {
+            rejected.add(origin(context.server.toHttpUrl()))
+            issue.value = AccessIssue(context, AccessReason.VERIFICATION)
+            revision.value++
+            return false
+        }
         if (result.status?.enabled == false) {
             persistence.write(origin(context.server.toHttpUrl()), null)
             rejected.remove(origin(context.server.toHttpUrl()))

@@ -93,6 +93,19 @@ class InstanceAccessFixtureTest(unittest.TestCase):
         self.request('/test/access', dict(edgeRejectNative=True))
         self.assertEqual('challenge', self.request('/api/v1/verification', headers=credentials)[1]['cf-mitigated'])
 
+    def test_cloudflare_handoff_never_embeds_the_backend_verification_flow(self):
+        for enabled in (False, True):
+            self.request('/test/access', dict(edgeEnabled=True, accessEnabled=enabled))
+            self.assertEqual('challenge', self.request('/verify?client=native-cloudflare')[1]['cf-mitigated'])
+            _, headers, _ = self.request('/test/edge-complete', {}, {'User-Agent': 'Fixture WebView'})
+            credentials = {'Cookie': headers['Set-Cookie'].split(';')[0], 'User-Agent': 'Fixture WebView'}
+            status, _, body = self.request('/verify?client=native-cloudflare', headers=credentials)
+            self.assertEqual(200, status)
+            self.assertIn('Cloudflare verification', body)
+            for forbidden in ('id=complete', 'invidious-verification-complete', 'disabled', 'return to the app'):
+                self.assertNotIn(forbidden, body)
+            self.assertIn('id=complete', self.request('/verify?client=native', headers=credentials)[2])
+
     def test_delayed_edge_rotation_holds_the_replacement_while_old_clearance_is_challenged(self):
         self.request('/test/access', dict(edgeEnabled=True))
         _, headers, _ = self.request('/test/edge-complete', {}, {'User-Agent': 'Fixture WebView'})

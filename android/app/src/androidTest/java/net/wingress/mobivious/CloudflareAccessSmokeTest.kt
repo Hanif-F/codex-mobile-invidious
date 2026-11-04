@@ -120,9 +120,13 @@ class CloudflareAccessSmokeTest {
         recreate(); compose.onNodeWithTag("instance-verification").assertDoesNotExist()
     }
 
-    @Test fun edgeThenBackendTurnstileKeepsTheSameDialogUntilBothPass() {
-        block("""{"edgeEnabled":true,"accessEnabled":true,"edgeRotateProbe":1}"""); solveEdge()
-        until { vm.access.clearance(vm.api.context()) != null }
+    @Test fun edgeThenBackendTurnstileUsesSeparateDialogsUntilBothPass() {
+        block("""{"edgeEnabled":true,"accessEnabled":true,"edgeRotateProbe":1}""")
+        compose.onNodeWithText("Cloudflare verification").assertExists()
+        solveEdge()
+        until { vm.access.issue.value?.reason == AccessReason.VERIFICATION }
+        compose.onNodeWithText("Instance verification").assertExists()
+        compose.onNodeWithText("Cloudflare verification").assertDoesNotExist()
         compose.onNodeWithTag("instance-verification").assertExists()
         assertNull(vm.access.pass(vm.api.context()))
         clickFixture("complete"); recovered()
@@ -180,7 +184,11 @@ class CloudflareAccessSmokeTest {
         } finally { command("""{"accessReleaseDenials":true}""") }
     }
 
-    @Test fun lateRotationLoadsTheRemainingBackendChallengeInTheOpenDialog() = runBlocking {
+    @Test fun lateRotationOpensTheSeparateBackendDialog() = remainingBackendAfterRotation(cancel = false)
+
+    @Test fun cancelledCloudflareStaysDismissedWhenRotationRevealsBackendVerification() = remainingBackendAfterRotation(cancel = true)
+
+    private fun remainingBackendAfterRotation(cancel: Boolean) = runBlocking {
         block(); solveEdge(); recovered()
         command("""{"edgeRotatePath":"/api/v1/edge-rotation-fixture","edgeRotateNext":1}""")
         val pending = async(Dispatchers.IO) {
@@ -191,8 +199,14 @@ class CloudflareAccessSmokeTest {
             command("""{"accessEnabled":true}""")
             compose.runOnUiThread { vm.refresh() }
             until { vm.access.issue.value?.reason == AccessReason.CLOUDFLARE }
+            if (cancel) compose.onNodeWithTag("instance-verification-cancel").performClick()
             val before = state().getJSONArray("edgeRequests").length()
             command("""{"edgeReleaseRotations":true}"""); assertEquals(200, pending.await())
+            until { vm.access.issue.value?.reason == AccessReason.VERIFICATION }
+            if (cancel) {
+                compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+                compose.runOnUiThread { vm.retryBrowse() }
+            }
             until {
                 val requests = state().getJSONArray("edgeRequests")
                 (before until requests.length()).any { index -> requests.getJSONObject(index).let {
@@ -200,6 +214,8 @@ class CloudflareAccessSmokeTest {
                 } }
             }
             compose.onNodeWithTag("instance-verification").assertExists()
+            compose.onNodeWithText("Instance verification").assertExists()
+            assertEquals(AccessReason.VERIFICATION, vm.access.issue.value?.reason)
             assertNull(vm.access.pass(vm.api.context())); assertNotNull(vm.access.issue.value)
             clickFixture("complete"); recovered()
             assertNotNull(vm.access.pass(vm.api.context())); assertNull(vm.browse.value.error)
@@ -214,6 +230,100 @@ class CloudflareAccessSmokeTest {
         command("""{"edgeRejectNative":false}""")
         compose.onNodeWithTag("instance-verification-retry").performClick(); solveEdge(); recovered()
     }
+
+    @Test fun aNewBrowserCookieRecoversAfterARejectedCandidateWithoutReloadingTheDialog() {
+        block("""{"edgeEnabled":true,"edgeRejectNative":true}"""); solveEdge()
+        val rejection = "Cloudflare did not accept verification for native requests. Retry verification."
+        until { compose.onAllNodesWithText(rejection).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Cloudflare verification").assertExists()
+        val before = state().getJSONArray("edgeRequests").length()
+        android.os.SystemClock.sleep(800)
+        assertEquals("A rejected cookie must not be probed repeatedly", before, state().getJSONArray("edgeRequests").length())
+        command("""{"edgeRejectNative":false,"edgePolicy":2}""")
+        onView(isAssignableFrom(WebView::class.java)).inRoot(androidx.test.espresso.matcher.RootMatchers.isDialog()).perform(object : ViewAction {
+            override fun getConstraints(): Matcher<View> = isAssignableFrom(WebView::class.java)
+            override fun getDescription() = "Issue a newer disposable browser cookie without recreating the page"
+            override fun perform(controller: UiController, view: View) {
+                (view as WebView).evaluateJavascript("fetch('/test/edge-complete',{method:'POST',body:'{}'});", null)
+            }
+        })
+        recovered()
+        assertEquals("fixture-edge-2", vm.access.clearance(vm.api.context())?.cookie?.value)
+        assertNull(vm.browse.value.error)
+    }
+
+    private fun recoverInitialAccountSettings(hidden: Boolean, backend: Boolean = false, failedRead: Boolean = false) {
+        val originalActivity = activity; val originalModel = vm
+        val video = vm.browse.value.videos.first()
+        command(JSONObject().put("watched", org.json.JSONArray(listOf(video.id))).put("seedPlaylist", true).toString(), "watched")
+        val imageMarker = "verified-history=$hidden-$backend-$failedRead"
+        val thumbnail = video.thumbnail + (if ('?' in video.thumbnail) "&" else "?") + imageMarker
+        val history = JSONObject().put("video_id", video.id).put("title", video.title).put("channel_name", video.author)
+            .put("channel_id", video.channelId).put("length_seconds", video.duration).put("latest_watched", "2026-10-04")
+            .put("videoThumbnails", org.json.JSONArray().put(JSONObject().put("url", thumbnail)))
+        command(JSONObject().put("historyEntries", org.json.JSONArray().put(history)).toString(), "search-history")
+        val rules = if (hidden) mapOf(video.channelId to ChannelSpoilerRule(video.author, true, true)) else emptyMap()
+        command(JSONObject().put("default_home", "Trending").put("channel_spoiler_settings", ChannelSpoilerRules.json(rules)).toString(), "preferences")
+        command(JSONObject().put("edgeEnabled", !backend).put("accessEnabled", backend).toString())
+        compose.runOnUiThread { vm.store.save(Account("fixture-token", "Fixture", 9999999999, vm.store.server)) }
+        until { vm.access.issue.value != null && vm.spoilerSettingsError.value != null }
+        assertFalse(vm.channelSpoilers.state.value.ready)
+        compose.runOnUiThread { vm.navigate("You", "history") }
+        until { !vm.browse.value.loading }
+        if (failedRead) command("""{"failRead":true}""", "spoilers")
+        if (backend) clickFixture("complete") else solveEdge()
+        until { vm.access.issue.value == null }
+        if (failedRead) {
+            until { vm.spoilerSettingsError.value != null && !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+            assertFalse(vm.channelSpoilers.state.value.ready)
+            compose.onNodeWithTag("channel-settings-retry").assertExists()
+            compose.onNodeWithText(video.title).assertDoesNotExist()
+            command("""{"failRead":false}""", "spoilers")
+            compose.onNodeWithTag("channel-settings-retry").performClick()
+        }
+        until { vm.channelSpoilers.state.value.ready && !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+        until { vm.blocked.value.error == null && vm.subscriptionChannels.value.loaded && vm.playlists.value.isNotEmpty() }
+        assertEquals("history", vm.route); assertEquals("You", vm.tab)
+        assertEquals("Trending", vm.preferences.value.defaultHome)
+        assertNull(vm.spoilerSettingsError.value); assertNull(vm.browse.value.error)
+        assertEquals(rules, vm.channelSpoilers.state.value.rules)
+        compose.onNodeWithTag("instance-verification").assertDoesNotExist()
+        if (!hidden && !backend) until {
+            val requests = state().getJSONArray("edgeRequests")
+            (0 until requests.length()).any { index -> requests.getJSONObject(index).let {
+                it.getBoolean("accepted") && it.getString("path").contains(imageMarker)
+            } }
+        }
+        captureWatchScreenshot(if (hidden) "verified-account-history-masked" else "verified-account-history")
+        compose.runOnUiThread { vm.navigate("Popular") }
+        until { !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+        if (hidden) {
+            compose.onNodeWithText(video.title).assertDoesNotExist()
+            compose.onNodeWithTag("spoiler-thumbnail-${video.id}").assertExists()
+        } else {
+            compose.onNodeWithText(video.title).assertExists()
+            compose.onNodeWithTag("spoiler-thumbnail-${video.id}").assertDoesNotExist()
+            until {
+                val requests = state().getJSONArray("edgeRequests")
+                (0 until requests.length()).any { index -> requests.getJSONObject(index).let {
+                    it.getBoolean("accepted") && it.getString("path").startsWith("/media/thumbnail.jpg")
+                } }
+            }
+        }
+        compose.runOnUiThread {
+            assertSame(originalActivity, ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).filterIsInstance<MainActivity>().single())
+            assertSame(originalModel, vm)
+        }
+        captureWatchScreenshot(if (hidden) "verified-account-popular-masked" else "verified-account-popular")
+    }
+
+    @Test fun challengedInitialAccountSettingsRestoreHistoryAndPopularWithoutReopening() = recoverInitialAccountSettings(hidden = false)
+
+    @Test fun challengedInitialAccountSettingsPreserveIntentionalSpoilerRules() = recoverInitialAccountSettings(hidden = true)
+
+    @Test fun backendVerificationAlsoRestoresInitialAccountSettings() = recoverInitialAccountSettings(hidden = true, backend = true)
+
+    @Test fun failedAccountSettingsRecoveryOffersRetryOnTheAffectedHistory() = recoverInitialAccountSettings(hidden = false, failedRead = true)
 
     @Test fun cancellationSurvivesRecreationAndServerChangeDiscardsThePrompt() {
         block(); compose.onNodeWithTag("instance-verification-cancel").performClick(); recreate()
@@ -242,6 +352,22 @@ class CloudflareAccessSmokeTest {
         compose.onNodeWithTag("account-password").performTextInput("fixture-password")
         compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
         until { vm.account.value != null }
+    }
+
+    @Test fun choosingRequiredSignInDoesNotSuppressALaterCloudflareChallenge() {
+        command("""{"accessLogin":true}""")
+        compose.runOnUiThread { vm.refresh() }
+        until { vm.access.issue.value?.reason == AccessReason.LOGIN }
+        compose.onNodeWithTag("instance-access-action").performClick()
+        until { vm.route == "sign-in" }
+        command("""{"edgeEnabled":true}""")
+        compose.runOnUiThread { vm.action { vm.api.registration(vm.api.context()) } }
+        until { vm.access.issue.value?.reason == AccessReason.CLOUDFLARE }
+        compose.onNodeWithText("Cloudflare verification").assertExists()
+        command("""{"accessLogin":false}""")
+        solveEdge(); recovered()
+        assertEquals("sign-in", vm.route)
+        assertNull(vm.account.value)
     }
 
 

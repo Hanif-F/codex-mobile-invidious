@@ -18,19 +18,27 @@ PiP until Retry on the failed action reopens verification. Concurrent access
 failures share one dialog. Verification shows the selected origin,
 an origin-restricted WebView, load/error feedback and Retry/Cancel actions. It
 retains the default browser user agent, JavaScript and DOM storage for Turnstile.
+**Cloudflare verification** loads the dedicated `/verify?client=native-cloudflare`
+handoff page, which contains no backend widget or disabled-verification message.
 Cloudflare clearance is checked by a native API request before recovery. If the
-backend also requires Turnstile, the same dialog remains until its pass is accepted.
+backend also requires Turnstile, Cloudflare closes and a separate **Instance
+verification** dialog opens until its pass is accepted.
 Rejected native clearance shows Retry/Cancel without repeatedly reopening the
 dialog. Cookies and their expiry are read through supported WebView metadata APIs;
 unsupported versions show update guidance. Only main-frame completion messages
 from the same-origin verification page are accepted; external top-level
 navigation is blocked. An outdated WebView shows update guidance.
 If a delayed native cookie rotation clears Cloudflare while backend verification
-is still required, the open WebView receives the confirmed cookie and loads the
-remaining backend challenge. It does not require cancelling or relaunching.
+is still required, the new backend WebView receives the confirmed cookie. A newer
+browser cookie can also recover a rejected native candidate without reloading;
+the same failed candidate is not repeatedly probed.
 
-After successful verification, the dialog closes and browsing retries automatically
-after any current browse request settles, preserving a failed pagination retry.
+After successful verification, the dialog closes, account settings reload and
+browsing retries automatically after any current browse request settles,
+preserving a failed pagination retry and the current destination. Recovery never
+applies the account's default home. Blocked channels, watched state, subscriptions
+and playlists refresh too. Unknown channel rules retain safe placeholders; a
+failed settings reload offers **Retry loading settings** on affected browse lists.
 Visible thumbnails, avatars, banners and community images retry without navigating
 away. Verification-blocked playback retries automatically, preserving the same queue
 occurrence, position, options and playing/paused intent. Closed/replaced playback or

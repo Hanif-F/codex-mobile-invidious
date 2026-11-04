@@ -74,6 +74,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val playback by vm.playback.collectAsStateWithLifecycle()
     val account by vm.account.collectAsStateWithLifecycle()
     val accountBusy by vm.accountBusy.collectAsStateWithLifecycle()
+    val spoilerSettingsError by vm.spoilerSettingsError.collectAsStateWithLifecycle()
+    val channelSpoilers by vm.channelSpoilers.state.collectAsStateWithLifecycle()
     val controller by vm.controller.collectAsStateWithLifecycle()
     val channel by vm.channel.collectAsStateWithLifecycle()
     val channelTab by vm.channelTab.collectAsStateWithLifecycle()
@@ -473,6 +475,12 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         item { LibraryEmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", Icons.Default.Subscriptions, "Sign in") { signIn() } }
                     }
                     else LazyColumn(Modifier.fillMaxSize().testTag("browse-video-list"), state = browseList, contentPadding = PaddingValues(top = browseTopInset, bottom = LocalContentBottomInset.current)) {
+                        if (!channelSpoilers.ready && spoilerSettingsError != null) item(key = "channel-settings-retry") {
+                            Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 8.dp).semantics { liveRegion = androidx.compose.ui.semantics.LiveRegionMode.Polite }) {
+                                Text(spoilerSettingsError!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                                TextButton(vm::retryChannelSettings, Modifier.testTag("channel-settings-retry")) { Text("Retry loading settings") }
+                            }
+                        }
                         if (account != null && blocked.error != null && vm.contentSurface() in listOf(ContentSurface.DISCOVERY, ContentSurface.SEARCH)) item {
                             Column(Modifier.padding(horizontal = AppTokens.inset, vertical = 8.dp)) {
                                 Text(blocked.error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)

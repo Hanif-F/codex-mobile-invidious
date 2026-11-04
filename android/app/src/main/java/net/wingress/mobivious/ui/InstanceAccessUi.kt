@@ -27,8 +27,6 @@ import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlin.coroutines.resume
 import net.wingress.mobivious.data.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -45,21 +43,25 @@ internal fun InstanceAccessPrompt(vm: AppViewModel, visible: Boolean, signIn: ()
     var dismissed by rememberSaveable(contextKey) { mutableStateOf<String?>(null) }
     var requested by rememberSaveable(contextKey) { mutableStateOf<String?>(null) }
     val active = issue?.takeIf { it.context == vm.api.context() }
-    val attempt = active?.let { "$contextKey:${it.reason}:$revision" }
+    val flow = "$contextKey:$revision"
+    val attempt = active?.let { "$flow:${it.reason}" }
+    // Cancelling verification covers both stages, but choosing sign-in must not
+    // suppress a later edge challenge on the native authentication endpoints.
+    val dismissal = if (active?.reason == AccessReason.LOGIN) attempt else "$flow:verification"
     if (!visible || !lifecycle.isAtLeast(Lifecycle.State.RESUMED) || (vm.route == "sign-in" && active?.reason != AccessReason.CLOUDFLARE) ||
-        active == null || attempt == dismissed) return
+        active == null || dismissal == dismissed) return
     if (active.reason in listOf(AccessReason.VERIFICATION, AccessReason.CLOUDFLARE) || requested == attempt) key(attempt) {
-        VerificationDialog(vm, { dismissed = attempt })
+        VerificationDialog(vm, { dismissed = dismissal })
     } else {
-        AlertDialog(onDismissRequest = { dismissed = attempt }, title = { Text("Instance access") },
+        AlertDialog(onDismissRequest = { dismissed = dismissal }, title = { Text("Instance access") },
             text = { Text(active.reason.message) }, confirmButton = {
                 TextButton(onClick = {
-                    if (active.reason == AccessReason.LOGIN) { dismissed = attempt; signIn() }
+                    if (active.reason == AccessReason.LOGIN) { dismissed = dismissal; signIn() }
                     else requested = attempt
                 }, modifier = Modifier.testTag("instance-access-action")) {
                     Text(if (active.reason == AccessReason.LOGIN) "Sign in" else "Verify")
                 }
-            }, dismissButton = { TextButton({ dismissed = attempt }) { Text("Later") } })
+            }, dismissButton = { TextButton({ dismissed = dismissal }) { Text("Later") } })
     }
 }
 
@@ -75,11 +77,13 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
     var failedView by remember { mutableStateOf<WebView?>(null) }
     val liveViews = remember { mutableSetOf<WebView>() }
     val edgeRequired = remember { vm.access.issue.value?.reason == AccessReason.CLOUDFLARE }
+    val client = if (edgeRequired) "native-cloudflare" else "native"
     var completionBody by remember { mutableStateOf<String?>(null) }
     var pageReady by remember { mutableStateOf(false) }
     val cookieInfoSupported = remember { WebViewFeature.isFeatureSupported(WebViewFeature.GET_COOKIE_INFO) }
-    val supported = remember { WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
-        WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) && (!edgeRequired || cookieInfoSupported) }
+    val supported = remember { if (edgeRequired) cookieInfoSupported else
+        WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER) &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) }
     val view = remember(reload) {
         if (!supported) null else WebView(context).apply {
             liveViews.add(this)
@@ -91,16 +95,16 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
             val origin = target.server.toHttpUrl()
             val rules = setOf(InstanceAccess.origin(origin))
             val generation = reload
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) WebViewCompat.addWebMessageListener(this, "mobiviousVerification", rules) { webView, message, source, main, _ ->
-                val trustedPage = webView.url?.toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, target.server) && it.encodedPath == "/verify" } == true
+            if (!edgeRequired && WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) WebViewCompat.addWebMessageListener(this, "mobiviousVerification", rules) { webView, message, source, main, _ ->
+                val trustedPage = webView.url?.toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, target.server) && it.encodedPath == "/verify" && it.queryParameter("client") == client } == true
                 if (webView !in liveViews || !main || !trustedPage || source.toString().toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, target.server) } != true ||
                     completed || generation != reload || target != vm.api.context()) return@addWebMessageListener
-                // Retain a completion arriving while the native clearance probe is in flight.
                 message.data?.takeIf { it.length <= 4096 }?.let { completionBody = it }
             }
-            if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) WebViewCompat.addDocumentStartJavaScript(this,
+            if (!edgeRequired && WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) WebViewCompat.addDocumentStartJavaScript(this,
                 "if(window===window.top)window.addEventListener('invidious-verification-complete',function(e){mobiviousVerification.postMessage(JSON.stringify(e.detail));});", rules)
-            webViewClient = VerificationWebClient(target.server, { error = it }, { liveViews.remove(it); failedView = it }, { pageReady = true })
+            webViewClient = VerificationWebClient(target.server, client, { error = it }, { liveViews.remove(it); failedView = it },
+                { pageReady = false }, { pageReady = true })
             val cookies = CookieManager.getInstance()
             cookies.setAcceptCookie(true)
             cookies.setAcceptThirdPartyCookies(this, true)
@@ -110,7 +114,7 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
             val changes = old.map { it.cookie.toString() + "; Max-Age=0" } + listOfNotNull(accepted?.cookie?.toString())
             fun prepare(index: Int) {
                 if (this !in liveViews || generation != reload || target != vm.api.context()) return
-                if (index == changes.size) loadUrl(target.server + "/verify?client=native")
+                if (index == changes.size) loadUrl(target.server + "/verify?client=$client")
                 else cookies.setCookie(target.server + "/", changes[index]) { prepare(index + 1) }
             }
             prepare(0)
@@ -118,24 +122,14 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
     }
     LaunchedEffect(view, failedView) {
         if (view == null || view === failedView) return@LaunchedEffect
-        var triedCookie: String? = null
-        var edgeAccepted = false
+        val triedCookies = mutableSetOf<String>()
         var failed = false
-        val started = android.os.SystemClock.elapsedRealtime()
         while (isActive && !completed && target == vm.api.context()) {
-            // A delayed native response may clear the edge while this page still shows its challenge.
-            val accepted = vm.access.clearance(target)
-            if (edgeRequired && !edgeAccepted && accepted != null) {
-                setClearanceCookie(target.server, accepted)
-                if (view !in liveViews) return@LaunchedEffect
-                edgeAccepted = true; failed = false; error = null; completionBody = null; pageReady = false
-                view.loadUrl(target.server + "/verify?client=native")
-            }
             val edge = clearanceCookies(target.server, view.settings.userAgentString)
                 .filter { it.usable(target.server.toHttpUrl(), view.settings.userAgentString, System.currentTimeMillis() / 1000) }
                 .singleOrNull()
             val body = completionBody
-            if (!failed && body != null && (!edgeRequired || edge != null)) {
+            if (!edgeRequired && !failed && body != null) {
                 completionBody = null
                 busy = true
                 try {
@@ -146,21 +140,17 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) { error = e.message ?: "Verification failed. Try again."; failed = true }
                 finally { busy = false }
-            } else if (!failed && !edgeAccepted && edgeRequired && pageReady && edge != null && triedCookie != edge.cookie.toString()) {
-                triedCookie = edge.cookie.toString()
-                busy = true
+            } else if (edgeRequired && pageReady && edge != null && triedCookies.add(edge.cookie.toString())) {
+                // Rejection belongs to this candidate, not to a later browser-issued cookie.
+                busy = true; error = null
                 try {
-                    completed = vm.access.completeClearance(target, edge)
-                    edgeAccepted = true
-                    // The confirmation request may rotate clearance before the widget submits its pass.
-                    val accepted = vm.access.clearance(target)
-                    if (!completed && accepted != null && accepted != edge) setClearanceCookie(target.server, accepted)
+                    vm.access.completeClearance(target, edge)
+                    // A remaining backend gate opens a new, separately owned dialog.
+                    completed = true
                 }
                 catch (e: CancellationException) { throw e }
-                catch (e: Exception) { error = e.message ?: "Verification failed. Try again."; failed = true }
+                catch (e: Exception) { error = e.message ?: "Verification failed. Try again." }
                 finally { busy = false }
-            } else if (!failed && body != null && edgeRequired && edge == null && android.os.SystemClock.elapsedRealtime() - started > 30_000) {
-                error = "Cloudflare has not issued clearance. Retry verification."; failed = true
             }
             delay(250)
         }
@@ -169,7 +159,7 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
     Dialog(dismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().fillMaxHeight(.9f).padding(16.dp), shape = MaterialTheme.shapes.large) {
             Column(Modifier.padding(16.dp).testTag("instance-verification"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Verify access", style = MaterialTheme.typography.titleLarge)
+                Text(if (edgeRequired) "Cloudflare verification" else "Instance verification", style = MaterialTheme.typography.titleLarge)
                 Text(target.server, style = MaterialTheme.typography.bodySmall)
                 if (!supported) Text("Update Android System WebView to verify access on this device.")
                 error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -186,12 +176,6 @@ private fun VerificationDialog(vm: AppViewModel, dismiss: () -> Unit) {
     }
 }
 
-private suspend fun setClearanceCookie(server: String, edge: CloudflareClearance) = suspendCancellableCoroutine { continuation ->
-    CookieManager.getInstance().setCookie(server + "/", edge.cookie.toString()) {
-        if (continuation.isActive) continuation.resume(Unit)
-    }
-}
-
 private fun clearanceCookies(server: String, userAgent: String): List<CloudflareClearance> {
     if (!WebViewFeature.isFeatureSupported(WebViewFeature.GET_COOKIE_INFO)) return emptyList()
     return CookieManagerCompat.getCookieInfo(CookieManager.getInstance(), server + "/")
@@ -199,9 +183,9 @@ private fun clearanceCookies(server: String, userAgent: String): List<Cloudflare
 }
 
 /** Handles renderer loss as a retryable page failure, without terminating the native activity. */
-private class VerificationWebClient(private val server: String, private val failure: (String) -> Unit,
-    private val rendererGone: (WebView) -> Unit, private val ready: () -> Unit) : WebViewClient() {
-    private fun trusted(url: String) = url.toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, server) && it.encodedPath == "/verify" } == true
+private class VerificationWebClient(private val server: String, private val client: String, private val failure: (String) -> Unit,
+    private val rendererGone: (WebView) -> Unit, private val started: () -> Unit, private val ready: () -> Unit) : WebViewClient() {
+    private fun trusted(url: String) = url.toHttpUrlOrNull()?.let { InstanceAccess.sameOrigin(it, server) && it.encodedPath == "/verify" && it.queryParameter("client") == client } == true
     override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
         rendererGone(view)
         (view.parent as? android.view.ViewGroup)?.removeView(view)
@@ -211,6 +195,7 @@ private class VerificationWebClient(private val server: String, private val fail
     }
     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean = request.isForMainFrame && !trusted(request.url.toString())
     override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
+        started()
         if (!trusted(url)) { view.stopLoading(); failure("The verification page left this instance. Try again.") }
     }
     override fun onPageFinished(view: WebView, url: String) { if (trusted(url)) ready() }

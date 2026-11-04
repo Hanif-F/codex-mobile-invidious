@@ -497,6 +497,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(self.access_status(), headers={'Set-Cookie': cookie})
             return self.respond(dict(error='Not found'), 404) if state['accessMissing'] else self.respond(self.access_status())
         if p == '/verify':
+            if parse_qs(url.query).get('client') == ['native-cloudflare']:
+                return self.xml('''<!doctype html><meta name=viewport content="width=device-width"><title>Cloudflare verification</title>
+<h1>Cloudflare verification</h1><p role="status">Waiting for the app to confirm Cloudflare access…</p>''', content_type='text/html')
             return self.xml('''<!doctype html><meta name=viewport content="width=device-width"><title>Fixture verification</title>
 <button id=complete>Complete fixture verification</button><script>document.getElementById('complete').onclick=async function(){
 const r=await fetch('/api/v1/verification/complete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({transport:'native',turnstileToken:'fixture-response'})});
