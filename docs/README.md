@@ -2,7 +2,8 @@
 
 This is the current documentation for the Android app in `androidInvidious`.
 The current guides describe the opaque Material 3 implementation in this working
-tree, including the 2 November 2026 Cloudflare clearance/recovery fixes,
+tree, including the 4 November 2026 upright player controls and separate
+verification flows, the 2 November 2026 Cloudflare clearance/recovery fixes,
 24 October video-metadata error recovery,
 23 October automatic verification flow,
 22 October instance-access client support and the

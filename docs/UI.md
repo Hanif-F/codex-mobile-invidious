@@ -265,7 +265,15 @@ Download, Share and More use four equal-width columns with filled circular icon
 buttons and centered labels underneath. Circles are 56dp where space permits and
 48dp on narrow rows; labels wrap at large text sizes without shrinking type.
 Portrait Play/Pause/Replay stays centered in the player. Short pictures use a
-single-row footer for time, seeking and fullscreen, with chapters in the header.
+two-row footer with time and fullscreen above full-width seeking, with the readable,
+ellipsized chapter title in the header. Narrow players also use this layout when
+large text leaves too little room for a chapter title in the regular footer.
+Time stays beside the centered transport's
+horizontal bounds, preferring elapsed/duration and showing elapsed alone when
+needed; accessibility retains the complete timestamp and chapter title. Fit checks
+use the individual controls rather than reserving the whole footer against
+transport. Compact SponsorBlock prompts clear the header, timestamp and transport
+on the time side of the picture, mirroring in RTL.
 Tiny pictures put secondary controls and SponsorBlock prompts in More player
 controls; opening this popup keeps controls visible. Queue opens as a full-height
 phone sheet or wide supporting pane. Comments, chapters, queue and docked chat

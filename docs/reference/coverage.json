@@ -180,8 +180,8 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/ChaptersSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Chapters Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "035b618a9a41bfa07a2d4431109ca5fa4ebf84dac1209d370c3f77095d0ad242"
+      "description": "Chapter selection, visible header/footer titles and full-width seeking across fullscreen, drawer state/lifecycle, live and PiP scenarios; exact cases are enumerated in the test catalog.",
+      "sha256": "81b27fdd665eba43fb0ea3211ad9409dfcb2e240c50e95962e89f489f18c5e65"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ClipsSmokeTest.kt": {
       "area": "Android device tests",
@@ -342,14 +342,14 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/PlayerControlsPresentationTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Portrait centering, responsive and popup controls, large text/RTL, fullscreen and landscape compatibility, playback states and 25% dim rendering.",
-      "sha256": "a459f92f3f3a920960498fd7cc988a20b054aa07fb3f6ed18d1272dc1dd0211b"
+      "description": "Portrait centering, readable chapter text and two-row/full-width seeking layouts, tiny-popup transitions, large text/RTL, fullscreen/landscape compatibility, playback states and 25% dim rendering.",
+      "sha256": "c8a477650ec43ab78b2b4e3a753611ecab7ae339a38cbc7926cf7b3261a6f7a8"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/PlayerFeedbackPresentationTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "SponsorBlock and seek feedback positioning, popup access, actions and shared 25% dim rendering.",
-      "sha256": "e6674fae2fbecbbdd1536bfb7011a2ff05db075be035cc3f62b4304ba7e1a949"
+      "description": "SponsorBlock clearance against individual controls across compact/regular, RTL and large-text layouts, popup access, seek feedback, actions and shared 25% dim rendering.",
+      "sha256": "2cbd87db3164c2d18a45455fafa826f62ddedd63f2555f45eac9bbed2bce79c5"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/PlaylistRssSmokeTest.kt": {
       "area": "Android device tests",
@@ -1050,8 +1050,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/PlayerControlsUi.kt": {
       "area": "Compose UI",
       "guide": "docs/UI.md",
-      "description": "Centered portrait transport, responsive footer and secondary-control popup, fullscreen controls and the shared 25% dim layer.",
-      "sha256": "78599d5014f79decba76e91f37af9b1898122db4cc0fad05a7940b9da1672bc2"
+      "description": "Centered portrait transport with readable header chapters in short pictures, separate time/full-width seeking rows, corner notices and tiny-control popup, fullscreen controls and the shared 25% dim layer.",
+      "sha256": "d3acd281d71b84459685efc862b537823ff7f2808b04d298f09df70c2b373f97"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PlayerGestures.kt": {
       "area": "Compose UI",

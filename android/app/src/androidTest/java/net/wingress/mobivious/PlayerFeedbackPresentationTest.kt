@@ -15,6 +15,7 @@ import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInputModeManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsActions
@@ -23,6 +24,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -46,6 +48,7 @@ class PlayerFeedbackPresentationTest {
     private val width = mutableIntStateOf(390)
     private val height = mutableIntStateOf(220)
     private val fontScale = mutableFloatStateOf(1f)
+    private val direction = mutableStateOf(LayoutDirection.Ltr)
     private val dark = mutableStateOf(false)
     private val backdrop = mutableStateOf(Color(0xFFECEFF1))
     private val seek = mutableStateOf<Long?>(null)
@@ -57,7 +60,8 @@ class PlayerFeedbackPresentationTest {
     @Composable private fun Content() {
         inputModeManager = LocalInputModeManager.current
         MaterialTheme(colorScheme = if (dark.value) darkColorScheme() else lightColorScheme()) {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue)) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale.floatValue),
+                LocalLayoutDirection provides direction.value) {
                 Box(Modifier.width(width.intValue.dp).height(height.intValue.dp)
                     .background(backdrop.value).testTag("feedback-surface")) {
                     PlayerControlsDim(controls.value, Modifier.matchParentSize())
@@ -81,11 +85,14 @@ class PlayerFeedbackPresentationTest {
 
     @Test fun compactActionsStayAtBottomLeftAndClearTheTimelineAndOtherControls() {
         compose.setContent { Content() }
-        for ((wide, tall, scale, full) in listOf(
+        for ((wide, tall, scale, full, rtl) in listOf(
             Layout(390, 220, 1f, false), Layout(320, 180, 1f, false),
+            Layout(360, 203, 1f, false), Layout(432, 243, 1f, false),
+            Layout(320, 180, 1f, false, true), Layout(390, 220, 2f, false, true),
             Layout(600, 340, 1f, true))) {
             compose.runOnIdle {
                 width.intValue = wide; height.intValue = tall; fontScale.floatValue = scale; fullscreen.value = full
+                direction.value = if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
                 controls.value = true
             }
             compose.waitForIdle()
@@ -95,18 +102,23 @@ class PlayerFeedbackPresentationTest {
                 .assertWidthIsAtLeast(48.dp).getUnclippedBoundsInRoot()
             val close = compose.onNodeWithContentDescription("Dismiss SponsorBlock segment")
                 .assertHeightIsAtLeast(48.dp).assertWidthIsAtLeast(48.dp).getUnclippedBoundsInRoot()
-            val footer = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
             val settings = compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot()
             val play = compose.onNodeWithTag("player-play-pause").getUnclippedBoundsInRoot()
-            assertEquals(surface.left.value + 8, pill.left.value, .5f)
+            if (rtl) assertEquals(surface.right.value - 8, pill.right.value, .5f)
+            else assertEquals(surface.left.value + 8, pill.left.value, .5f)
             assertTrue(pill.right - pill.left < (surface.right - surface.left) * .75f)
-            assertTrue(pill.top >= surface.top && pill.bottom <= footer.top - 8.dp)
-            assertTrue(skip.right <= close.left)
-            for (other in listOf(settings, play)) assertTrue("SponsorBlock must not cover another control",
+            assertTrue(pill.top >= surface.top)
+            assertTrue(skip.right <= close.left || close.right <= skip.left)
+            val time = compose.onNodeWithTag("player-time").getUnclippedBoundsInRoot()
+            assertTrue("SponsorBlock must clear the timestamp", pill.bottom <= time.top - 8.dp)
+            for (other in listOf(settings, play, time,
+                compose.onNodeWithContentDescription(if (full) "Return to watch page" else "Minimize player").getUnclippedBoundsInRoot(),
+                compose.onNodeWithContentDescription(if (full) "Exit full screen" else "Full screen").getUnclippedBoundsInRoot(),
+                compose.onNodeWithTag("feedback-timeline").getUnclippedBoundsInRoot())) assertTrue("SponsorBlock must not cover another control",
                 pill.right <= other.left || pill.left >= other.right || pill.bottom <= other.top || pill.top >= other.bottom)
             compose.onNodeWithText("Sponsor · 8s").assertDoesNotExist()
             compose.onNodeWithContentDescription("Full screen").takeIf { !full }?.performClick()
-            captureWatchScreenshot("player-feedback-${wide}-${tall}-${if (full) "full" else "watch"}")
+            captureWatchScreenshot("player-feedback-${wide}-${tall}-${(scale * 100).toInt()}-${if (rtl) "rtl" else "ltr"}-${if (full) "full" else "watch"}")
             compose.runOnIdle { controls.value = false }
             compose.mainClock.advanceTimeBy(200)
             compose.waitForIdle()
@@ -114,7 +126,7 @@ class PlayerFeedbackPresentationTest {
             assertTrue(hiddenPill.bottom > pill.bottom)
             assertTrue(hiddenPill.bottom <= surface.bottom - 8.dp)
         }
-        assertEquals(2, fullscreenClicks)
+        assertEquals(6, fullscreenClicks)
     }
 
     @Test fun skipAndCloseRemainAccessibleAndConfirmationIsCompact() {
@@ -175,5 +187,5 @@ class PlayerFeedbackPresentationTest {
         }
     }
 
-    private data class Layout(val width: Int, val height: Int, val scale: Float, val fullscreen: Boolean)
+    private data class Layout(val width: Int, val height: Int, val scale: Float, val fullscreen: Boolean, val rtl: Boolean = false)
 }

@@ -116,15 +116,23 @@ class ChaptersSmokeTest {
             val rail = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
             assertTrue("Time $time must fit in rail $rail", time.top >= rail.top && time.bottom <= rail.bottom)
             assertTrue("Seek target $timeline must fit in rail $rail", timeline.top >= rail.top && timeline.bottom <= rail.bottom)
-            assertTrue(chapter.top >= rail.top && chapter.bottom <= rail.bottom)
+            compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertIsDisplayed()
+            if (chapter.top >= rail.top) {
+                assertTrue(chapter.bottom <= rail.bottom)
+                assertTrue("Time $time overlaps chapter $chapter", time.right <= chapter.left)
+            } else {
+                val header = compose.onNodeWithTag("player-header").getUnclippedBoundsInRoot()
+                assertFalse(fullscreen)
+                assertTrue(chapter.top >= header.top && chapter.bottom <= header.bottom)
+            }
             assertEquals((expand.top + expand.bottom).value / 2, (time.top + time.bottom).value / 2, .5f)
             val gap = (line.top + line.bottom - time.top - time.bottom).value / 2
             assertEquals(if (fullscreen) 48f else 24f, gap, .5f)
-            assertTrue("Time $time overlaps chapter $chapter", time.right <= chapter.left)
             assertTrue("Chapter $chapter must sit above timeline $timeline", chapter.bottom <= timeline.top)
             assertTrue("Fullscreen $expand must sit above timeline $timeline", expand.bottom <= timeline.top)
             assertTrue("Timeline $timeline must span rail $rail", timeline.left - rail.left <= 12.dp && rail.right - timeline.right <= 12.dp)
             assertTrue(settings.bottom <= rail.top)
+            captureWatchScreenshot("upright-controls-${if (fullscreen) "fullscreen" else "watch"}-${(surface.right - surface.left).value.toInt()}")
         }
         checkControls(false)
         compose.onNodeWithContentDescription("Full screen").performClick(); reacquire()

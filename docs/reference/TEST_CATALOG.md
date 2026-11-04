@@ -982,7 +982,7 @@ Test support/helper file; no declared `@Test` methods.
 
 ### ChaptersSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChaptersSmokeTest.kt) — Chapters Smoke declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/ChaptersSmokeTest.kt) — Chapter selection, visible header/footer titles and full-width seeking across fullscreen, drawer state/lifecycle, live and PiP scenarios; exact cases are enumerated in the test catalog.
 
 - `chapterSelectionNeedsNoExtraRequestsAndScrubbingPreservesPlayback`
 - `fullWidthTimelineAndCenteredPlaybackStayInPlaceAcrossFullscreen`
@@ -1403,9 +1403,10 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### PlayerControlsPresentationTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlayerControlsPresentationTest.kt) — Portrait centering, responsive and popup controls, large text/RTL, fullscreen and landscape compatibility, playback states and 25% dim rendering.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlayerControlsPresentationTest.kt) — Portrait centering, readable chapter text and two-row/full-width seeking layouts, tiny-popup transitions, large text/RTL, fullscreen/landscape compatibility, playback states and 25% dim rendering.
 
 - `portraitTransportStaysCenteredAcrossPhoneSizesLargeTextRtlAndTinyPictures`
+- `portraitControlsRecoverFromTinyPopupAndHideTogether`
 - `tinyPopupDispatchesChapterSettingsChatAndFullscreenActions`
 - `landscapeRetainsItsCompactHeaderTransportFallback`
 - `noSeekButtonsAndChatStaysToTheLeftOfSettings`
@@ -1418,7 +1419,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### PlayerFeedbackPresentationTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlayerFeedbackPresentationTest.kt) — SponsorBlock and seek feedback positioning, popup access, actions and shared 25% dim rendering.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/PlayerFeedbackPresentationTest.kt) — SponsorBlock clearance against individual controls across compact/regular, RTL and large-text layouts, popup access, seek feedback, actions and shared 25% dim rendering.
 
 - `compactActionsStayAtBottomLeftAndClearTheTimelineAndOtherControls`
 - `skipAndCloseRemainAccessibleAndConfirmationIsCompact`
@@ -1696,4 +1697,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **1024 declared test methods** (including ignored tests).
+Inventory total: **1025 declared test methods** (including ignored tests).

@@ -1,5 +1,51 @@
 # Focused implementation verification
 
+## Consistent upright player controls — 4 November 2026
+
+Short upright players now keep time/fullscreen above full-width seeking and show
+an ellipsized chapter title in the header. Play/Pause remains exactly centered.
+Regular footer selection also requires room for readable chapter text, covering
+tall/narrow pictures at large font scales. Individual control bounds determine
+fit; compact SponsorBlock prompts clear those controls and mirror with time in RTL.
+The tiny-player popup, complete accessibility labels and auto-hiding remain.
+
+Final Android 16/API 36 `emulator-5554` checks:
+
+- **18 distinct device cases passed, 0 failed/skipped**, including both complete
+  presentation classes and the four chapter/preview journeys below. Presentation
+  coverage includes 320×180, 360×203, 390×220 and 432×243dp, large text/RTL,
+  tall/narrow readable chapters, tiny-popup transitions, keyboard/click actions,
+  chapter position updates and SponsorBlock clearance.
+- The two selected `ChaptersSmokeTest` methods also **passed at density 560**,
+  producing a 368dp-wide real watch player. The original density **480** was
+  restored and confirmed. Compact/regular watch and fullscreen screenshots were
+  inspected; time is above seeking, chapter text is visible and transport centered.
+- `JAVA_HOME=/opt/android-studio/jbr ANDROID_HOME=/home/haha.m.lady/Android/Sdk
+  android/gradlew -p android :app:testDebugUnitTest :app:lintDebug --console=plain
+  --offline`: **497 JVM tests passed, 0 failed/skipped**; debug lint passed with
+  **0 errors, 24 existing warnings**.
+- `python3 scripts/check-documentation.py --refresh`,
+  `python3 scripts/check-documentation.py` and `git diff --check`: **passed**.
+
+The final 18-case command, from the repository root:
+
+```sh
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline -Pandroid.testInstrumentationRunnerArguments.class=net.wingress.mobivious.PlayerControlsPresentationTest,net.wingress.mobivious.PlayerFeedbackPresentationTest,net.wingress.mobivious.ChaptersSmokeTest#chapterSelectionNeedsNoExtraRequestsAndScrubbingPreservesPlayback,net.wingress.mobivious.ChaptersSmokeTest#fullWidthTimelineAndCenteredPlaybackStayInPlaceAcrossFullscreen,net.wingress.mobivious.SeekPreviewsSmokeTest#draggingShowsFullPlayerHighestResolutionAndRestoresPlayingOrPausedIntent,net.wingress.mobivious.SeekPreviewsSmokeTest#dragCancellationAndFullscreenTransitionClearPreviewsWithoutCommitting
+```
+
+The narrow rerun used that runner with only the two `ChaptersSmokeTest` selectors,
+between `adb -s emulator-5554 shell wm density 560` and restoration of the prior
+density using an EXIT/signal trap. Connected tasks built their required debug APKs.
+No release artifact, physical-phone run or full connected-suite acceptance is
+claimed; existing unselected/ignored cases remain outside these focused results.
+There are no server or API-contract changes.
+
+Initial presentation attempts failed on test-harness details: a decimal screenshot
+filename rejected by the capture helper and a fullscreen assertion using the
+embedded Minimize label. Both were corrected; the final complete selection passed.
+Logs use `.tools/upright-controls-*.log`; preserved initial/final XML, source diff,
+base commit and screenshots are under `.tools/upright-controls-results/`.
+
 ## Separate verification flows and settings recovery — 4 November 2026
 
 Cloudflare and backend Turnstile now have separately owned dialogs. The server

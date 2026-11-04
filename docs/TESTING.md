@@ -491,6 +491,21 @@ refresh. Player presentation tests sample known backgrounds to verify a uniform
 25% dim layer, transparent individual controls and an unobscured picture after
 controls hide; they also retain their layout and interaction checks.
 
+`PlayerControlsPresentationTest` checks centered portrait transport, readable
+chapter text and timestamps above full-width seeking at 320×180, 360×203,
+390×220 and 432×243dp, including large text/RTL and transitions through the tiny
+popup. Chapter actions and pending-position labels run in both compact and regular
+layouts; tall/narrow pictures with large text also retain visible chapter text.
+`PlayerFeedbackPresentationTest` checks SponsorBlock clearance against
+individual controls, including compact RTL/large-text placement. Run both classes
+with the focused device runner, plus the chapter selection/fullscreen and preview
+drag/cancellation methods in `ChaptersSmokeTest` and `SeekPreviewsSmokeTest`.
+The full-width chapter journey accepts either header or footer titles and captures
+the actual player; rerun it at a narrower emulator density and restore that density
+afterward to verify the compact layout with the real timeline.
+Review the captured `portrait-centered-*` and `player-feedback-*` screenshots;
+emulator results do not establish physical-phone acceptance.
+
 `SeekPreviewTest` exercises storyboard parsing, quality selection, clip offsets,
 cache reuse, cancellation, stale results and the tap-only 250 ms download
 timer with a virtual clock. `SeekPreviewsSmokeTest` uses multiple locally generated

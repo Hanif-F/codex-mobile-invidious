@@ -88,9 +88,11 @@ class PlayerControlsPresentationTest {
 
     @Test fun portraitTransportStaysCenteredAcrossPhoneSizesLargeTextRtlAndTinyPictures() {
         compose.setContent { Content() }
-        for ((wide, tall, scale, rtl, full) in listOf(
+        for ((wide, tall, scale, rtl, full, chapterInHeader) in listOf(
             Layout(320, 180, 1f, false, false), Layout(360, 203, 1f, false, false),
-            Layout(390, 220, 1f, false, false), Layout(240, 160, 2f, true, false),
+            Layout(390, 220, 1f, false, false), Layout(432, 243, 1f, false, false, chapterInHeader = false),
+            Layout(320, 180, 2f, true, false), Layout(240, 160, 2f, true, false),
+            Layout(240, 320, 2f, true, false),
             Layout(320, 96, 1f, false, false), Layout(320, 400, 2f, true, true),
             Layout(600, 340, 1f, false, true))) {
             compose.runOnIdle {
@@ -106,6 +108,7 @@ class PlayerControlsPresentationTest {
             assertEquals(surface.middleY, button.middleY, .5f)
             compose.onNodeWithTag("player-transport").assertExists()
             val tiny = compose.onAllNodesWithTag("player-more-controls").fetchSemanticsNodes().isNotEmpty()
+            if (!full) assertEquals("Only genuinely tiny pictures need the popup", tall == 96, tiny)
             if (tiny) {
                 val more = compose.onNodeWithTag("player-more-controls").getUnclippedBoundsInRoot()
                 assertSeparate(button, more)
@@ -126,6 +129,31 @@ class PlayerControlsPresentationTest {
                 compose.onNodeWithTag("player-chapter-title").assertContentDescriptionEquals("Current chapter: $title")
                 compose.onNodeWithTag("test-timeline").assertWidthIsAtLeast(64.dp)
                 compose.onNodeWithTag("player-time").assertIsDisplayed()
+                if (!full) {
+                    val chapter = compose.onNodeWithTag("player-chapter-title").assertWidthIsAtLeast(48.dp)
+                        .assertHeightIsAtLeast(48.dp).getUnclippedBoundsInRoot()
+                    val chapterText = compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true)
+                        .assertIsDisplayed().assertTextEquals(title)
+                    val layouts = mutableListOf<TextLayoutResult>()
+                    chapterText.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                    assertEquals(1, layouts.single().lineCount)
+                    assertTrue(layouts.single().isLineEllipsized(0))
+                    val time = compose.onNodeWithTag("player-time").getUnclippedBoundsInRoot()
+                    val line = compose.onNodeWithTag("test-seek-track").getUnclippedBoundsInRoot()
+                    val timeline = compose.onNodeWithTag("test-timeline").getUnclippedBoundsInRoot()
+                    val footer = compose.onNodeWithTag("player-footer").getUnclippedBoundsInRoot()
+                    val header = compose.onNodeWithTag("player-header").getUnclippedBoundsInRoot()
+                    assertTrue("Timestamp must sit above seeking", time.bottom < line.top)
+                    assertEquals(footer.left.value, timeline.left.value, .5f)
+                    assertEquals(footer.right.value, timeline.right.value, .5f)
+                    if (chapterInHeader) assertTrue(chapter.top >= header.top && chapter.bottom <= header.bottom)
+                    else assertTrue(chapter.top >= footer.top && chapter.bottom <= timeline.top)
+                    val targets = listOf(button, chapter, time, timeline,
+                        compose.onNodeWithContentDescription("Player settings").getUnclippedBoundsInRoot(),
+                        compose.onNodeWithContentDescription("Full screen").getUnclippedBoundsInRoot(),
+                        compose.onNodeWithContentDescription("Minimize player").getUnclippedBoundsInRoot())
+                    targets.forEachIndexed { index, a -> targets.drop(index + 1).forEach { b -> assertSeparate(a, b) } }
+                }
             }
             captureWatchScreenshot("portrait-centered-$wide-$tall-${if (rtl) "rtl" else "ltr"}")
         }
@@ -133,6 +161,30 @@ class PlayerControlsPresentationTest {
 
     private fun assertSeparate(a: DpRect, b: DpRect) {
         assertTrue("Controls overlap: $a and $b", a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top)
+    }
+
+    @Test fun portraitControlsRecoverFromTinyPopupAndHideTogether() {
+        compose.setContent { Content() }
+        for ((wide, tall) in listOf(432 to 243, 390 to 220, 320 to 96, 320 to 180)) {
+            compose.runOnIdle { width.intValue = wide; height.intValue = tall }
+            if (tall == 96) {
+                compose.onNodeWithTag("player-more-controls").performClick()
+                compose.onNodeWithTag("player-controls-popup").assertIsDisplayed()
+            } else {
+                compose.onNodeWithTag("player-controls-popup").assertDoesNotExist()
+                compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertIsDisplayed()
+                compose.onNodeWithTag("player-time").assertIsDisplayed()
+                compose.onNodeWithTag("test-timeline").assertIsDisplayed()
+            }
+        }
+        compose.runOnIdle { controlsVisible.value = false }
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithTag("player-chapter-title").assertDoesNotExist()
+        compose.onNodeWithTag("player-time").assertDoesNotExist()
+        compose.onNodeWithTag("test-timeline").assertDoesNotExist()
+        compose.onNodeWithTag("player-play-pause").assertDoesNotExist()
+        compose.runOnIdle { controlsVisible.value = true }
+        compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun tinyPopupDispatchesChapterSettingsChatAndFullscreenActions() {
@@ -229,6 +281,7 @@ class PlayerControlsPresentationTest {
         compose.setContent { Content() }
         compose.onNodeWithTag("player-time").assertTextEquals("0:05").assertContentDescriptionEquals("0:05 / 4:04:32")
         compose.onNodeWithTag("player-chapter-title").assertIsDisplayed().performClick()
+        compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(1, chapterClicks)
         compose.onNodeWithTag("test-timeline").assertWidthIsAtLeast(64.dp)
         compose.onNodeWithContentDescription("Full screen").assertIsDisplayed()
@@ -253,20 +306,22 @@ class PlayerControlsPresentationTest {
     }
 
     @Test fun chapterTracksScrubbingAndSupportsClickAndKeyboardWithoutDisplacingSettings() {
-        height.intValue = 320
         compose.setContent { Content() }
-        compose.onNodeWithTag("player-time").assertTextEquals("0:05 / 2:00")
-        compose.onNodeWithTag("player-chapter-title").performClick()
-        assertEquals(1, chapterClicks)
-        compose.runOnIdle { position.longValue = 35000 }
-        compose.onNodeWithTag("player-time").assertTextEquals("0:35 / 2:00")
-        compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertTextEquals("Second chapter")
-        compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
-        compose.onNodeWithTag("player-chapter-title").performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
-            .assertIsFocused()
-            .performKeyInput { keyDown(Key.Enter); keyUp(Key.Enter) }
-        compose.waitForIdle()
-        assertEquals(2, chapterClicks)
+        for ((index, tall) in listOf(180, 320).withIndex()) {
+            compose.runOnIdle { height.intValue = tall; position.longValue = 5000 }
+            compose.onNodeWithTag("player-time").assertTextEquals("0:05 / 2:00")
+            compose.onNodeWithTag("player-chapter-title").performClick()
+            assertEquals(index * 2 + 1, chapterClicks)
+            compose.runOnIdle { position.longValue = 35000 }
+            compose.onNodeWithTag("player-time").assertTextEquals("0:35 / 2:00")
+            compose.onNodeWithTag("player-current-chapter", useUnmergedTree = true).assertTextEquals("Second chapter")
+            compose.runOnIdle { assertTrue(inputModeManager.requestInputMode(InputMode.Keyboard)) }
+            compose.onNodeWithTag("player-chapter-title").performSemanticsAction(SemanticsActions.RequestFocus) { assertTrue(it()) }
+                .assertIsFocused()
+                .performKeyInput { keyDown(Key.Enter); keyUp(Key.Enter) }
+            compose.waitForIdle()
+            assertEquals(index * 2 + 2, chapterClicks)
+        }
         compose.onNodeWithContentDescription("Player settings").performClick()
         assertEquals(1, settingsClicks)
         compose.onNodeWithContentDescription("Full screen").performClick()
@@ -300,7 +355,8 @@ class PlayerControlsPresentationTest {
         compose.onNodeWithTag("player-time").assertTextEquals("0:05 / —")
     }
 
-    private data class Layout(val width: Int, val height: Int, val fontScale: Float, val rtl: Boolean, val fullscreen: Boolean)
+    private data class Layout(val width: Int, val height: Int, val fontScale: Float, val rtl: Boolean,
+        val fullscreen: Boolean, val chapterInHeader: Boolean = true)
     private val DpRect.middleX get() = (left.value + right.value) / 2
     private val DpRect.middleY get() = (top.value + bottom.value) / 2
 }

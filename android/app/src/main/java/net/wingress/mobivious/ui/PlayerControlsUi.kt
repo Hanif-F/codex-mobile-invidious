@@ -116,7 +116,7 @@ private fun PortraitPlayerControls(playback: PlaybackState, positionMs: Long, se
     val style = MaterialTheme.typography.labelSmall
     var headerHeight by remember { mutableStateOf(48.dp) }
     var regularFooterHeight by remember { mutableStateOf(96.dp) }
-    var compactFooterHeight by remember { mutableStateOf(48.dp) }
+    val compactFooterHeight = 96.dp
     var noticeWidth by remember { mutableStateOf(120.dp) }
     var noticeHeight by remember { mutableStateOf(48.dp) }
     var popup by remember(playback.mediaId) { mutableStateOf(false) }
@@ -128,24 +128,33 @@ private fun PortraitPlayerControls(playback: PlaybackState, positionMs: Long, se
     BoxWithConstraints(Modifier.fillMaxSize()) {
         fun fits(size: Dp, footer: Dp) = maxHeight / 2 - size / 2 >= headerHeight + 1.dp &&
             maxHeight / 2 + size / 2 <= maxHeight - footer - 1.dp
-        val regularSize = if (fits(64.dp, regularFooterHeight)) 64.dp else 48.dp
-        val regular = fits(regularSize, regularFooterHeight)
-        val compactSize = if (fits(64.dp, compactFooterHeight)) 64.dp else 48.dp
-        val size = if (regular) regularSize else compactSize
-        val footerHeight = if (regular) regularFooterHeight else compactFooterHeight
         fun textWidth(text: String) = with(density) {
             measurer.measure(AnnotatedString(text), style, maxLines = 1, softWrap = false).size.width.toDp()
         } + 4.dp
-        val timeSpace = maxWidth - 16.dp - 48.dp - 64.dp - 8.dp
-        val compactTime = textWidth(playbackTimeLabel(playback, positionMs)) > timeSpace
+        val completeTimeWidth = textWidth(playbackTimeLabel(playback, positionMs))
+        val regularSize = if (fits(64.dp, regularFooterHeight)) 64.dp else 48.dp
+        // The regular footer needs an 80dp chapter title beside time, fullscreen
+        // and its spacing (60dp), inside 8dp horizontal picture margins.
+        val regular = fits(regularSize, regularFooterHeight) && (playback.chapters.isEmpty() ||
+            completeTimeWidth + 80.dp + 60.dp <= maxWidth - 16.dp)
+        // Only the seek target spans the center in the compact footer. Time and
+        // fullscreen sit to either side of transport in the row above it.
+        val compactSize = if (fits(64.dp, 48.dp)) 64.dp else 48.dp
+        val size = if (regular) regularSize else compactSize
+        val footerHeight = if (regular) regularFooterHeight else compactFooterHeight
+        val labelHeight = with(density) { measurer.measure(AnnotatedString("Mg"), style).size.height.toDp() }
+        val contentOffset = minOf(12.dp, (48.dp - labelHeight) / 2).coerceAtLeast(0.dp)
+        val timeSpace = (maxWidth / 2 - size / 2 - 12.dp).coerceAtLeast(0.dp)
+        val compactTime = completeTimeWidth > timeSpace
         val timeWidth = textWidth(if (compactTime) playerTime(positionMs) else playbackTimeLabel(playback, positionMs))
-        val headerTargets = 1 + (if (onCollapse != null) 1 else 0) +
-            (if (hasChat) 1 else 0) + (if (playback.chapters.isNotEmpty()) 1 else 0)
+        val headerTargets = 1 + (if (onCollapse != null) 1 else 0) + (if (hasChat) 1 else 0)
+        val chapterSpace = if (playback.chapters.isEmpty()) 0.dp else 80.dp
         // Notices occupy a corner, rather than reserving a full-width band below transport.
+        val noticeBottom = if (regular) footerHeight else compactFooterHeight - 24.dp - contentOffset + labelHeight / 2
         val noticeFits = notice == null || noticeWidth + 8.dp <= maxWidth / 2 - size / 2 &&
-            maxHeight - footerHeight - noticeHeight - 16.dp >= headerHeight + 1.dp
-        val overflow = (!regular && (!fits(48.dp, compactFooterHeight) || timeWidth > timeSpace ||
-            48.dp * headerTargets + 8.dp > maxWidth)) || !noticeFits
+            maxHeight - noticeBottom - noticeHeight - (if (regular) 16.dp else 8.dp) >= headerHeight + 1.dp
+        val overflow = (!regular && (!fits(48.dp, 48.dp) || labelHeight > 48.dp || timeWidth > timeSpace ||
+            48.dp * headerTargets + chapterSpace + 8.dp > maxWidth)) || !noticeFits
         val transportSize = if (overflow) 48.dp else size
         AnimatedVisibility(showControls, enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
             modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()) {
@@ -161,8 +170,8 @@ private fun PortraitPlayerControls(playback: PlaybackState, positionMs: Long, se
                 .onSizeChanged { headerHeight = with(density) { it.height.toDp() } }, verticalAlignment = Alignment.CenterVertically) {
                 if (onCollapse != null) PlayerIconButton(Icons.Default.KeyboardArrowDown, "Minimize player", onClick = onCollapse)
                 if (playback.chapters.isNotEmpty()) PlayerChapterTitle(playback.chapters, positionMs,
-                    Modifier.size(48.dp), compact = true, open = onChapters)
-                Spacer(Modifier.weight(1f))
+                    Modifier.weight(1f), open = onChapters)
+                else Spacer(Modifier.weight(1f))
                 if (hasChat) PlayerIconButton(Icons.AutoMirrored.Filled.Chat, if (chatOpen) "Hide chat replay" else "Show chat replay",
                     Modifier.testTag("player-chat").semantics { selected = chatOpen }, onClick = onChat)
                 PlayerIconButton(Icons.Default.Settings, "Player settings", enabled = settingsEnabled, onClick = onSettings)
@@ -172,12 +181,13 @@ private fun PortraitPlayerControls(playback: PlaybackState, positionMs: Long, se
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 8.dp)) {
             if (regular) Box(Modifier.onSizeChanged { regularFooterHeight = with(density) { it.height.toDp() } }) {
                 PlayerControlFooter(playback, positionMs, false, onFullscreen, onChapters, timeline = timeline)
-            } else Row(Modifier.fillMaxWidth().testTag("player-footer")
-                .onSizeChanged { compactFooterHeight = with(density) { it.height.toDp() } },
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                PlayerTime(playback, positionMs, Modifier.width(timeWidth), compactTime)
-                timeline(Modifier.weight(1f).height(48.dp), 0.dp)
-                PlayerIconButton(Icons.Default.Fullscreen, "Full screen", onClick = onFullscreen)
+            } else Column(Modifier.fillMaxWidth().testTag("player-footer")) {
+                Row(Modifier.fillMaxWidth().height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+                    PlayerTime(playback, positionMs, Modifier.width(timeWidth).offset(y = contentOffset), compactTime)
+                    Spacer(Modifier.weight(1f))
+                    PlayerIconButton(Icons.Default.Fullscreen, "Full screen", contentOffset = contentOffset, onClick = onFullscreen)
+                }
+                timeline(Modifier.fillMaxWidth().height(48.dp), (-12).dp)
             }
         }
         AnimatedVisibility(showControls, enter = fadeIn(tween(160)), exit = fadeOut(tween(160)),
@@ -186,8 +196,11 @@ private fun PortraitPlayerControls(playback: PlaybackState, positionMs: Long, se
                 PlayerPlayControl(playback, Modifier.size(transportSize), play = onPlay)
             }
         }
-        if (notice != null && !overflow) Box(Modifier.align(AbsoluteAlignment.BottomLeft)
-            .absolutePadding(left = 8.dp, right = maxWidth / 2 + size / 2, bottom = if (showControls) footerHeight + 8.dp else 8.dp)
+        if (notice != null && !overflow) Box(Modifier.align(if (regular) AbsoluteAlignment.BottomLeft else Alignment.BottomStart)
+            .then(if (regular) Modifier.absolutePadding(left = 8.dp, right = maxWidth / 2 + size / 2,
+                bottom = if (showControls) noticeBottom + 8.dp else 8.dp)
+            else Modifier.padding(start = 8.dp, end = maxWidth / 2 + size / 2,
+                bottom = if (showControls) noticeBottom + 8.dp else 8.dp))
             .onSizeChanged {
                 noticeWidth = with(density) { it.width.toDp() }
                 noticeHeight = with(density) { it.height.toDp() }
