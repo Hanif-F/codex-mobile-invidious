@@ -1,5 +1,63 @@
 # Focused implementation verification
 
+## Patch release 0.13.5 — 4 November 2026
+
+Bumped `versionName` to **0.13.5** and `versionCode` to **35**, based on `3e2b8b4`.
+The release includes the upright-player layout fix and the separate verification
+dialogs/account-settings recovery in `237392d`. Only version metadata changed in
+app sources after the completed implementation checks below.
+
+New release checks:
+
+- `scripts/build-release.sh`: **passed**, running the unchanged standard
+  `:app:testDebugUnitTest :app:assembleRelease :app:lintRelease` tasks.
+  **497 JVM tests passed, 0 failed/skipped**; release lint **0 errors, 36 warnings**.
+- From `android/`, `JAVA_HOME=/opt/android-studio/jbr
+  ANDROID_HOME=/home/haha.m.lady/Android/Sdk ./gradlew :app:lintDebug --console=plain
+  --offline`: **passed**, **0 errors, 24 warnings**.
+- Build-tools 36.0.0 `apksigner verify --verbose --print-certs`, `aapt2 dump badging`
+  and `zipalign -c -P 16 -v 4`: **passed**. Package `net.wingress.mobivious`, version
+  **0.13.5**, code **35**, min SDK **33**, target SDK **37**. The signing certificate
+  matches the local 0.13.4 APK, whose digest matches GitHub's published asset.
+- `sha256sum -c Mobivious-0.13.5.apk.sha256` and
+  `python3 artifacts/release-0.13.5/verify-packaging.py`: **passed**. DEX is
+  uncompressed; the archived mapping matches the current release mapping and every
+  archived `SHA256SUMS` entry verifies.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-ui-performance.sh --label
+  release-0_13_5-watch --record --journey watch`: **passed**, **1 case, 0 skipped**,
+  using the isolated optimized benchmark package at density **560**. Its normal-speed
+  video was validated and visually inspected; time sits above seeking and playback
+  is centered. Density **480** was restored. This is an optimized UI check, with no
+  timing benchmark or physical-device performance claim.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-ui-performance.sh --label
+  release-0_13_5-navigation --record --journey navigation`: **failed**, interrupted
+  by Gboard's microphone-permission dialog before the next video could be found.
+  The `release-0_13_5-navigation-retry` run also **failed** at that lookup while
+  Gboard's voice-typing onboarding covered the search screen. No microphone access
+  was granted. The retry temporarily set `show_ime_with_hard_keyboard=0`, which did
+  not prevent the floating voice overlay; the prior absent setting was restored.
+  Navigation/miniplayer acceptance remains **pending**, with both recordings/logs
+  preserved. App and test source were not changed to bypass these failures.
+- Documentation inventory/fingerprint/link checks and `git diff --check`: **passed**.
+
+APK: **7,352,072 bytes**. SHA-256:
+`257cc92e63f72decdcaf9594fd3e85660ff483255d15b14b4f1f4a72fc7390fa`.
+The immutable R8 archive is
+`artifacts/r8/0.13.5/257cc92e63f72decdcaf9594fd3e85660ff483255d15b14b4f1f4a72fc7390fa/`.
+Raw build/packaging evidence is in ignored `artifacts/release-build-0.13.5.log`
+and `artifacts/release-0.13.5/`; release notes are in
+`artifacts/release-notes-0.13.5.md`.
+Optimized journey evidence is under `.tools/ui-performance/release-0_13_5-*`.
+The APK and `.apk.sha256` are the assets for
+[v0.13.5](https://github.com/Hanif-F/codex-mobile-invidious/releases/tag/v0.13.5).
+
+The completed **18 distinct player device cases**, two narrow-density reruns and
+**39 verification/account-recovery fixture cases** below remain implementation
+evidence. Version-only packaging does not rerun those debug journeys. The separate
+Cloudflare flow requires the matching server `/verify?client=native-cloudflare`
+handoff page; this APK does not deploy it. Physical-phone and full connected-suite
+acceptance remain outside these results; existing ignored cases remain unchanged.
+
 ## Consistent upright player controls — 4 November 2026
 
 Short upright players now keep time/fullscreen above full-width seeking and show
