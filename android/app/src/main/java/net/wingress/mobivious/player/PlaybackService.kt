@@ -30,6 +30,8 @@ import android.util.Log
 import java.util.UUID
 import org.json.JSONObject
 
+internal const val SKIP_PLAYBACK_POSITION = "skipPlaybackPosition"
+
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackService : MediaSessionService() {
     companion object {
@@ -443,6 +445,7 @@ class PlaybackService : MediaSessionService() {
         }
     }
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {
+        if (item?.mediaMetadata?.extras?.getBoolean(SKIP_PLAYBACK_POSITION) == true) return
         item?.mediaMetadata?.extras?.getString("downloadId")?.let { id ->
             val localPosition = if (ended || player.duration > 0 && position >= player.duration - 2000) 0 else position
             if (started) app.playbackScope.launch { app.downloads.position(id, localPosition) }

@@ -254,6 +254,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `offlineSnapshotsExpireAndNeverCrossAccountKeys`
 - `linksAndTimestamps`
 - `explicitTimeOverridesResumeAndFinishedVideosRestart`
+- `musicGenreMatchesOnlyTheTrimmedCategory`
 - `parsersKeepUnavailableHistoryAndCaptionVariants`
 - `recommendationsKeepTheFirstRankedVideoWithoutCollapsingPlaylistOccurrences`
 - `rejectInsecureAndCredentialBearingInstances`
@@ -834,6 +835,7 @@ Test support/helper file; no declared `@Test` methods.
 - `unifiedControlsGesturesAndFullscreen`
 - `refreshPreservesPausedAndPlayingSettings`
 - `hlsExplicitResumeCaptionsAndAudioOnly`
+- `musicStreamIgnoresGuestAndAccountPositionsButHonorsTimestampsAndRetry`
 - `accountBrowsingAndServicePlayback`
 
 ### AppThemePresentationTest
@@ -1156,6 +1158,7 @@ Test support/helper file; no declared `@Test` methods.
 
 - `onlineDownloadSharesHistoryProgressAndCompletion`
 - `serverResumeLoadsAndRetryKeepsTheCurrentPosition`
+- `downloadedMusicStartsOverForGuestsAndAccountsAndKeepsWatchHistory`
 - `failedSyncPersistsAcrossRecreationAndReconnectDrainsWithoutReopeningVideo`
 - `preferencesDisableAccountWritesButKeepLocalDownloadResume`
 - `settingChangesDuringPlaybackImmediatelyStopAndRestartPositionSync`
@@ -1697,4 +1700,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **1025 declared test methods** (including ignored tests).
+Inventory total: **1028 declared test methods** (including ignored tests).

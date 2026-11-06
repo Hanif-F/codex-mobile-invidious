@@ -26,7 +26,15 @@ class DownloadSyncFixtureTest(unittest.TestCase):
                     body = response.read()
                     return json.loads(body) if body else None
 
-            self.assertEqual(12, request('/api/v1/videos/testvideo01/downloads')['video']['lengthSeconds'])
+            video = '/api/v1/videos/testvideo01'
+            catalog_path = video + '/downloads'
+            self.assertNotIn('genre', request(video))
+            self.assertNotIn('genre', request(catalog_path)['video'])
+            request('/test/music-resume', {})
+            self.assertEqual('  mUsIc  ', request(video)['genre'])
+            self.assertEqual('  mUsIc  ', request(catalog_path)['video']['genre'])
+            self.assertNotIn('genre', request('/api/v1/videos/testvideo02'))
+            self.assertEqual(12, request(catalog_path)['video']['lengthSeconds'])
             request('/test/download-sync', {'downloadSync': True, 'playbackWriteStatus': 503, 'playbackReadStatus': 401})
             catalog = request('/api/v1/videos/testvideo01/downloads')
             self.assertEqual(120, catalog['video']['lengthSeconds'])
@@ -44,6 +52,8 @@ class DownloadSyncFixtureTest(unittest.TestCase):
             request('/api/v1/auth/history/testvideo01', {}, 'POST')
             self.assertEqual(45, request('/api/v1/auth/playback/testvideo01')['position'])
             request('/test/reset', {})
+            self.assertNotIn('genre', request(video))
+            self.assertNotIn('genre', request(catalog_path)['video'])
             self.assertEqual(12, request('/api/v1/videos/testvideo01/downloads')['video']['lengthSeconds'])
             self.assertEqual({}, request('/api/v1/auth/playback')['positions'])
             request('/api/v1/auth/playback/testvideo01', {'position': 20}, 'PUT')

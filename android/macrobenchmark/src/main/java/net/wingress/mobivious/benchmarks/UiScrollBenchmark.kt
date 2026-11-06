@@ -300,13 +300,15 @@ class UiScrollBenchmark {
                 check(device.wait(Until.gone(By.res(id)),20_000)) {"Prior benchmark download did not delete"}
             }
         }
+        feed("Popular")
+        device.waitForIdle()
         repeat(3) { index ->
-            feed("Popular")
             val selector = By.res("video-actions-perf%07d".format(index))
-            repeat(12) { if (!device.hasObject(selector)) swipe(true) }
-            required(selector).click(); click("Download")
+            reveal(selector)
+            navigateControl(selector, By.text("Download")); click("Download")
             required(By.res("download-choice-v360")).click()
             required(By.res("download-confirm").enabled(true)).click()
+            check(device.wait(Until.gone(By.res("download-dialog")), 20_000)) { "Download dialog did not close" }
         }
         root("You"); required(By.res("you-downloads")).click(); required(By.textContains("Downloading"))
     }, measure = { SystemClock.sleep(7000) })

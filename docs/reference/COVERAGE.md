@@ -2,7 +2,7 @@
 
 [Documentation index](../README.md) · [Source map](SOURCE_MAP.md) · [Test catalog](TEST_CATALOG.md) · [Review manifest](coverage.json)
 
-The current guides describe Mobivious **0.13.5** (version code **35**). This report is generated from the current Gradle configuration and reviewed inventory; counts describe files, not measured execution coverage.
+The current guides describe Mobivious **0.13.6** (version code **36**). This report is generated from the current Gradle configuration and reviewed inventory; counts describe files, not measured execution coverage.
 
 ## File coverage
 

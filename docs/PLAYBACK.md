@@ -268,6 +268,11 @@ player, and retry/reload preserves its explicit current position. Streamed playb
 uses the same pending-progress precedence. Guests retain local behavior and never
 upload their viewing after signing in.
 
+Videos with the Music genre start from the beginning on a fresh open or queue
+selection, including downloaded files. Explicit timestamps and the active
+position on retry still apply. Music playback records watch history when enabled
+and skips saved-position reads and new checkpoints.
+
 An application-owned coordinator retries while the app or playback service is alive,
 on connectivity/access recovery and next launch. Failure backoff grows from five
 seconds to five minutes; new checkpoints do not reset it. Relaunch/reconnect refreshes

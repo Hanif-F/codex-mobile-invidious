@@ -1,5 +1,44 @@
 # Focused implementation verification
 
+## Patch release 0.13.6 — 6 November 2026
+
+Music starts from the beginning on fresh opens, including downloads. Android
+uses the existing video genre, preserves explicit positions and watch history,
+and skips new playback checkpoints for Music. The release is based on
+`e696f1f` and uses version code **36**.
+
+- `scripts/build-release.sh` passed. The full JVM suite passed **498 tests**
+  with no failures or skips. Release lint reported **0 errors, 36 warnings**.
+- `./gradlew :app:lintDebug --console=plain --offline` passed with **0 errors,
+  24 warnings**.
+- The focused `scripts/test-android.sh --device-only --offline` runs on
+  **emulator-5554**, Pixel 8 Pro AVD with Android 16, passed **19 distinct
+  cases** across runs. This includes Music streams and downloads, explicit
+  positions and retry, normal resume, history and download sync recovery,
+  clip bounds, timestamped links, background/PiP and paired-media remux.
+  The download request-count regression passed after waiting for artwork to
+  finish before measuring. The clip editor storyboard authorization assertion
+  still fails at `ClipsSmokeTest.kt:314`. The same failure reproduced on the
+  0.13.5 source using a debug version code override for installation.
+  The full connected suite and the ignored video conversion case remain unverified.
+- Python fixture checks for `test_download_sync_fixture.py` and
+  `test_video_metadata_fixture.py` passed.
+- The optimized `scripts/test-ui-performance.sh --record --journey` runs
+  passed for `watch`, `navigation`, `settingsSaving` and `downloads` on
+  the isolated benchmark package. The downloads journey passed after waiting
+  for the feed and dialog transitions instead of refreshing between selections.
+  These runs exercised ordinary UI without measuring performance.
+- `apksigner verify --verbose --print-certs`, `aapt2 dump badging`,
+  `zipalign -c -P 16 -v 4` and the APK and R8 checksum checks passed.
+  The certificate matches the published 0.13.5 APK. The APK is **7,352,072
+  bytes**, unchanged from 0.13.5, with **6,330,564 uncompressed DEX bytes**
+  (+664 bytes, +0.01%). SHA-256 is
+  `01a4ad7dc1f5899a4e69e92542e5cfd814aa4f9c70b31b3e2cdaf37334518fca`.
+  The R8 archive is under `artifacts/r8/0.13.6/<APK-SHA256>/`.
+
+Raw evidence is in `.tools/music-resume-0.13.6/` and
+`.tools/ui-performance/release-0_13_6-*/`.
+
 ## Patch release 0.13.5 — 4 November 2026
 
 Bumped `versionName` to **0.13.5** and `versionCode` to **35**, based on `3e2b8b4`.

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "reviewedSourceCommit": "3e2b8b4ebbb42bfafef1e8c4567217009d2afd2c",
-  "reviewedDate": "2026-11-04",
-  "version": "0.13.5",
+  "reviewedSourceCommit": "e696f1fdecc08d8e28290960446a6dc9baf859f8",
+  "reviewedDate": "2026-11-06",
+  "version": "0.13.6",
   "documents": [
     "AGENTS.md",
     "FEATURE_PARITY.md",
@@ -49,7 +49,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "7e25e49c929cf07c7bb8cdd29481aec81d27adf926ecf1ed25821cc995624bb9"
+      "sha256": "87f40dbb800f2829d21807a8bd4200b70fa5abd3712c3bf696c6c9ec44de6c50"
     },
     "android/app/proguard-rules.pro": {
       "area": "Build configuration",
@@ -97,7 +97,7 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "App playback journeys including displayed HTTP/empty-metadata failure recovery with queue identity and autoplay/paused intent retained.",
-      "sha256": "9fbc763176d188f8cfb34d9fc0ae4ad1804a2c44b21e6d6bf9f2489cf4f90ab0"
+      "sha256": "bf9fcd2f67e6a05956c43b19d2e6e53d65c5d1dd60a2e50a0244dadbd47a9e79"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/AppThemePresentationTest.kt": {
       "area": "Android device tests",
@@ -691,7 +691,7 @@
       "area": "Data and domain",
       "guide": "docs/API.md",
       "description": "API/domain models and parsers, source queue pages, library action state, stream/caption metadata and validated video links; integrates channel title/thumbnail rules.",
-      "sha256": "77b0b88b3247a0c02534790ad60be7063a73e3ed76d98b74697afd2d4b2b373b"
+      "sha256": "5158d4d71a7f28b44fb643f0ec0b65b4fee7a534a88e2221fb624180266f78c8"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/OriginalTitlePreferences.kt": {
       "area": "Data and domain",
@@ -774,8 +774,8 @@
     "android/app/src/main/java/net/wingress/mobivious/player/DownloadPlayback.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
-      "description": "Local single/paired media sources and completed captions without remote metadata.",
-      "sha256": "56bbe205bc9761881dd6d9ffaa8a3056ccad07258d3719b7ae5a69febe387dcd"
+      "description": "Local single/paired media sources, completed captions and Music eligibility from stored metadata.",
+      "sha256": "7849f98ae6a1251cdc02096a13a7b44e782df20e7f269f390369897beec181e3"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/PlaybackQueue.kt": {
       "area": "Playback",
@@ -792,14 +792,14 @@
     "android/app/src/main/java/net/wingress/mobivious/player/PlaybackService.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
-      "description": "ExoPlayer/MediaSession lifetime, trusted commands, history/progress ownership, SponsorBlock and PiP transport actions. Integrates session playback statistics.",
-      "sha256": "aaa9f9d639d89c6baf04c944a74fda099f6171aa315ab7004464639c43ccc31b"
+      "description": "ExoPlayer/MediaSession lifetime, trusted commands, history/progress ownership, Music checkpoint suppression, SponsorBlock and PiP transport actions. Integrates session playback statistics.",
+      "sha256": "33bd43b7859b580cbadc9398079626da2c972576127fe64d9fb51492fae2ac31"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueCoordinator.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
-      "description": "Service-owned lazy resolution, source pagination, occurrence transitions, tracks, bounds, offline media, clips and successor behavior; integrates channel title/thumbnail rules.",
-      "sha256": "91564a2311ebfbb72e916b3a57571422895bbbeaf1cd12b26b176209a07c364d"
+      "description": "Service-owned lazy resolution, source pagination, occurrence transitions, tracks, bounds, offline media, Music resume policy, clips and successor behavior. Integrates channel title and thumbnail rules.",
+      "sha256": "40f6a70b20ba41e9b42e0900e31f522801d2c7131450987f7255212c0314a7d1"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueSessionPlayer.kt": {
       "area": "Playback",
@@ -1321,7 +1321,7 @@
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
       "description": "Core declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "ee7157d05165b07106c3dc5f75a2e2139aa9869345e4241446735286cf292508"
+      "sha256": "3ec16092c5c679c822b521f905d8cf294381ea70eb07bbd96ab3c1a16b616f3e"
     },
     "android/app/src/test/java/net/wingress/mobivious/DeArrowTest.kt": {
       "area": "JVM tests",
@@ -1543,7 +1543,7 @@
       "area": "Performance verification",
       "guide": "docs/TESTING.md",
       "description": "Eighteen current-UI performance journeys with ordinary-control setup, automatic-save recovery and measured gesture provenance.",
-      "sha256": "486728c34cd7d1aacda9ff7ea41d9c478fc2449927805b570526ab64394a5f8a"
+      "sha256": "e6aa08b96c0e6fdc73aec1765acb64de1c7d8ae56ea4bd00e4ae928177e1eed7"
     },
     "android/macrobenchmark/src/main/res/xml/fixture_network_security.xml": {
       "area": "Performance verification",
@@ -1626,8 +1626,8 @@
     "scripts/fixture-server.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Threaded local API/media fixture, scenario tracing, controlled challenge/rotation barriers and single-use HTTP/empty-video failures.",
-      "sha256": "e4b5e428288590e49c2e37587fb0761619a3482fe4aaa4ae1defc383ea3e4b4b"
+      "description": "Threaded local API/media fixture, scenario tracing, Music metadata, controlled challenge/rotation barriers and single-use HTTP/empty-video failures.",
+      "sha256": "3b47b4b8cbeb15354756653c1ec2fb4e38d4e792abcd8d02f9a7c261bbcb1c89"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",
@@ -1903,16 +1903,16 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Downloaded history/progress, server/local resume, recreation/recovery, live settings and authentication/account isolation journeys.",
-      "sha256": "e9772249505a8e2fc52812c557615fde6094a5711894adfe970b198758035743"
+      "sha256": "1f5e4eeeb51de2c658e87707783e9c3a917649e815944b1df501f9b5de8b37e2"
     },
     "scripts/tests/test_download_sync_fixture.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Opt-in long download media, playback read/write failure, recovery and reset fixture contracts.",
-      "sha256": "312b8fcc0ab430cabf51bb47ba0d9e06ab6cb75e7f04d7fa0739faa7f4535770"
+      "description": "Opt-in long download media, Music genre, playback read/write failure, recovery and reset fixture contracts.",
+      "sha256": "b830d21586d3214701681a39845ba830e50f5ba7d4d8dbfa8d1a5f9941dd7648"
     }
   },
-  "reviewedSourceState": "Cloudflare recovery working tree; current acceptance evidence and limitations are recorded in VERIFICATION.md.",
+  "reviewedSourceState": "Music playback and patch release updates; current acceptance evidence and limitations are recorded in VERIFICATION.md.",
   "historicalDocuments": [
     "FEATURE_PARITY.md"
   ]

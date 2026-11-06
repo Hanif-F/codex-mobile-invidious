@@ -79,6 +79,11 @@ check live settings without a ViewModel refresh and non-disruptive failed resume
 The normal download catalog remains 12 seconds. `test_download_sync_fixture.py`
 checks these controls, recovery and reset independently of Android.
 
+The opt-in `/test/music-resume` fixture supplies Music genre metadata for
+streaming and downloads. The Music cases in `AppSmokeTest` and
+`DownloadSyncSmokeTest` check guest and signed-in playback, explicit positions,
+watch history and checkpoint suppression.
+
 Run focused cases through the standard fixture runner:
 
 ```sh

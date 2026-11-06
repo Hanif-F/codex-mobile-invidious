@@ -18,7 +18,11 @@ internal object DownloadPlayback {
         val details = repository.localDetails(record)
         val metadata = MediaMetadata.Builder().setTitle(title).setArtist(details.video.author)
             .setArtworkUri(if (hideArtwork) null else details.video.thumbnail.takeIf(String::isNotBlank)?.let(Uri::parse))
-            .setExtras(Bundle().apply { putString("occurrence", occurrence); putString("downloadId", record.id); putBoolean("savePosition", savePosition); putBoolean("history", history) }).build()
+            .setExtras(Bundle().apply {
+                putString("occurrence", occurrence); putString("downloadId", record.id)
+                putBoolean("savePosition", savePosition); putBoolean("history", history)
+                putBoolean(SKIP_PLAYBACK_POSITION, details.isMusicGenre)
+            }).build()
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))
         val media = record.assets.filter { it.media }.sortedBy { if (it.choice.kind == DownloadKind.VIDEO) 0 else 1 }
         val sources = media.mapIndexed { index, asset ->

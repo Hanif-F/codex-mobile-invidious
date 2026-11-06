@@ -60,7 +60,8 @@ class DownloadSyncSmokeTest {
         val id = runBlocking {
             app.downloads.create(app.store.server, app.api.downloads(video), DownloadSelection(audio = "aen"))
         }
-        until { app.downloads.find(id)?.playable == true }
+        // Await artwork too before a test takes its baseline of network requests.
+        until { app.downloads.find(id)?.let { it.playable && !it.active } == true }
         return id
     }
     private fun play(id: String) {
@@ -100,6 +101,37 @@ class DownloadSyncSmokeTest {
         compose.runOnUiThread { activity.model.retryPlayback() }
         until { activity.model.playback.value.playerState == Player.STATE_READY && !activity.model.playback.value.loading }
         assertTrue(activity.model.playback.value.position in 54_500..55_500)
+    }
+    @Test fun downloadedMusicStartsOverForGuestsAndAccountsAndKeepsWatchHistory() {
+        command("music-resume")
+        val id = download()
+        runBlocking { app.downloads.position(id, 45_000) }
+        val before = state().getJSONArray("allRequests").toString()
+        play(id)
+        assertTrue(activity.model.playback.value.position < 3_000L)
+        seek(55_000)
+        compose.runOnUiThread { activity.model.closePlayer() }
+        until { activity.model.queue.value.current == null }
+        assertEquals(45_000L, app.downloads.find(id)!!.positionMs)
+        assertEquals(before, state().getJSONArray("allRequests").toString())
+
+        login()
+        command("watched", """{"positions":{"$video":60}}""")
+        play(id)
+        assertTrue(activity.model.playback.value.position < 3_000L)
+        until { state().getJSONArray("watched").toString().contains(video) }
+        seek(75_000)
+        compose.runOnUiThread { activity.model.retryPlayback() }
+        until { !activity.model.queue.value.loading && activity.model.playback.value.playerState == Player.STATE_READY }
+        assertTrue(activity.model.playback.value.position in 74_500L..75_500L)
+        compose.runOnUiThread { activity.model.closePlayer() }
+        until { activity.model.queue.value.current == null }
+        assertEquals(45_000L, app.downloads.find(id)!!.positionMs)
+        assertNull(app.playbackSync.pending()[video]?.position)
+        val fixture = state()
+        assertEquals(60L, fixture.getJSONObject("positions").getLong(video))
+        val requests = fixture.getJSONArray("allRequests")
+        assertFalse((0 until requests.length()).any { requests.getJSONObject(it).getString("path") == "/api/v1/auth/playback/$video" })
     }
     @Test fun failedSyncPersistsAcrossRecreationAndReconnectDrainsWithoutReopeningVideo() {
         login(); val id = download()

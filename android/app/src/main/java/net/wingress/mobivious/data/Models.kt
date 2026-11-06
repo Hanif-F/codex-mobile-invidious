@@ -24,6 +24,7 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
     val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
     val music: List<MusicCredit> = emptyList(), val notice: String = "", val liveChatReplay: Boolean = false, val storyboards: List<StoryboardTrack> = emptyList(),
     val likeCountPrecision: CountPrecision = CountPrecision.UNVERIFIED, val projectionType: String = "") {
+    internal val isMusicGenre: Boolean get() = genre.trim().equals("Music", ignoreCase = true)
     val chatAvailable: Boolean get() = liveChatReplay && !video.live && upcoming != true
     val chapters: List<VideoChapter> = ChapterRules.parse(description, video.duration, video.live)
 }

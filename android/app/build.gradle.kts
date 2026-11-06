@@ -14,8 +14,8 @@ android {
         applicationId = "net.wingress.mobivious"
         minSdk = 33
         targetSdk = 37
-        versionCode = 35
-        versionName = "0.13.5"
+        versionCode = 36
+        versionName = "0.13.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "ALLOW_FIXTURE_HTTP", "false")
     }

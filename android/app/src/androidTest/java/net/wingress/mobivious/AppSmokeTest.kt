@@ -284,6 +284,57 @@ class AppSmokeTest {
         waitFor { activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.audioOnly(false); activity.model.closePlayer(); activity.updatePip(false) }
     }
+    @Test fun musicStreamIgnoresGuestAndAccountPositionsButHonorsTimestampsAndRetry() {
+        command("music-resume")
+        val video = "testvideo01"
+        val app = activity.application as MobiviousApplication
+        fun open(seconds: Long? = null) {
+            compose.runOnUiThread { activity.model.play(video, seconds) }
+            waitFor(40_000) { activity.model.playback.value.details?.video?.id == video &&
+                !activity.model.queue.value.loading && activity.model.playback.value.playing }
+        }
+        fun close() {
+            compose.runOnUiThread { activity.model.closePlayer() }
+            waitFor { activity.model.queue.value.current == null }
+        }
+
+        compose.runOnUiThread {
+            app.store.guestPreferences(AccountPreferences(savePosition = true))
+            activity.model.refreshSharedSettings()
+        }
+        waitFor { activity.model.preferences.value.savePosition }
+        compose.runOnUiThread { app.store.setPosition(app.api.context(), video, 44) }
+        open()
+        assertTrue(activity.model.playback.value.position < 3_000L)
+        compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(50_000) }
+        waitFor { activity.model.playback.value.position in 49_500L..50_500L }
+        close()
+        assertEquals(44L, app.store.position(video, app.api.context()))
+
+        compose.runOnUiThread { activity.model.action { activity.model.login("MusicResumeViewer", "fixture-password") } }
+        waitFor { activity.model.account.value != null && activity.model.preferences.value.savePosition }
+        command("watched", """{"positions":{"$video":45}}""")
+        open()
+        assertTrue(activity.model.playback.value.position < 3_000L)
+        waitFor { fixture().getJSONArray("watched").toString().contains(video) }
+        close()
+
+        open(36)
+        assertTrue(activity.model.playback.value.position in 36_000L..40_000L)
+        compose.runOnUiThread { activity.model.controller.value!!.pause(); activity.model.seekTo(56_000) }
+        waitFor { activity.model.playback.value.position in 55_500L..56_500L }
+        val reads = fixture().getJSONArray("videoDetailRequests").length()
+        compose.runOnUiThread { activity.model.retryPlayback() }
+        waitFor { fixture().getJSONArray("videoDetailRequests").length() > reads &&
+            !activity.model.queue.value.loading && activity.model.playback.value.playerState == Player.STATE_READY }
+        assertTrue(activity.model.playback.value.position in 55_500L..56_500L)
+        close()
+        val state = fixture()
+        val requests = state.getJSONArray("allRequests")
+        assertFalse((0 until requests.length()).any { requests.getJSONObject(it).getString("path") == "/api/v1/auth/playback/$video" })
+        assertEquals(45L, state.getJSONObject("positions").getLong(video))
+        assertNull(app.playbackSync.pending()[video]?.position)
+    }
     @Test fun accountBrowsingAndServicePlayback() {
         command("reset")
         compose.runOnUiThread { activity.model.switchServer("http://127.0.0.1:18080") }

@@ -48,6 +48,16 @@ class CoreTest {
         assertEquals(50, PlaybackRules.save(50, 100, false))
         assertEquals(0, PlaybackRules.save(50, 100, true))
     }
+    @Test fun musicGenreMatchesOnlyTheTrimmedCategory() {
+        fun details(genre: String?) = ApiParser.details(JSONObject().put("videoId", "abcdefghijk").put("genre", genre))
+
+        assertTrue(details("Music").isMusicGenre)
+        assertTrue(details("  mUsIc\t").isMusicGenre)
+        assertFalse(details(null).isMusicGenre)
+        assertFalse(details("").isMusicGenre)
+        assertFalse(details("Music videos").isMusicGenre)
+        assertFalse(details("Entertainment").isMusicGenre)
+    }
     @Test fun parsersKeepUnavailableHistoryAndCaptionVariants() {
         val videos = ApiParser.videos(JSONArray("""[{"video_id":"abcdefghijk","title":null},{"video_id":"bbbbbbbbbbb","title":"Saved","length_seconds":123}]"""))
         assertEquals(2, videos.size); assertTrue(videos[0].unavailable); assertEquals(123, videos[1].duration)
