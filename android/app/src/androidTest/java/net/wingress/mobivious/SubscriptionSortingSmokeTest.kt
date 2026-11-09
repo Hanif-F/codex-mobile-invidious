@@ -97,6 +97,24 @@ class SubscriptionSortingSmokeTest {
         assertEquals(before, requests())
     }
 
+    @Test fun feedShortcutsUseRelevanceDespiteDirectorySortAndFilter() {
+        compose.runOnUiThread { activity.model.navigate("Subscriptions") }
+        compose.onNodeWithTag("subscription-channels-button").performClick()
+        until { activity.model.route == "subscription-channels" && !activity.model.subscriptionChannels.value.loading }
+        choose(SubscriptionSort.ALPHABETICAL)
+        until { activity.model.subscriptionChannels.value.sort == SubscriptionSort.ALPHABETICAL }
+        compose.onNodeWithTag("subscription-channel-search").performTextInput("Beta")
+        compose.onNodeWithTag("subscription-channel-$favorite").assertDoesNotExist()
+        compose.onNodeWithTag("subscription-channel-search-submit").performClick()
+        compose.navigateBack()
+        until { activity.model.route.isEmpty() && activity.model.tab == "Subscriptions" }
+
+        fun shortcutStart(name: String) = compose.onNode(hasText(name) and hasAnyAncestor(hasTestTag("subscription-shortcuts")))
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot.left
+        assertTrue(shortcutStart("Zulu Studio") < shortcutStart("Beta Studio"))
+        assertTrue(shortcutStart("Beta Studio") < shortcutStart("Alpha Studio"))
+    }
+
     @Test fun choiceSurvivesNewActivityAndIsScopedToInstance() {
         choose(SubscriptionSort.MOST_WATCHED)
         compose.onNodeWithTag("subscription-channel-$favorite").performClick()

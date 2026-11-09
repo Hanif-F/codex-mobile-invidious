@@ -8,8 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -29,6 +32,45 @@ class SubscriptionPresentationTest {
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         for (command in listOf("mkdir -p /data/local/tmp/mobivious-subscriptions-ui", "screencap -p /data/local/tmp/mobivious-subscriptions-ui/$name.png"))
             android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use { it.readBytes() }
+    }
+
+    private fun placeholderLayout(): TextLayoutResult {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Search subscriptions", useUnmergedTree = true).assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single()
+    }
+
+    @Test fun feedSearchPlaceholderFitsTheAvailableWidth() {
+        var width by mutableStateOf(440.dp)
+        compose.setContent { AppTheme(true, AccentPreset.BLUE) {
+            CompositionLocalProvider(LocalPageInset provides 16.dp,
+                LocalDensity provides Density(LocalDensity.current.density, 1f)) {
+                Surface(Modifier.width(width)) {
+                    SubscriptionFeedControls(true, "", "", {}, {}, {}, {}, {})
+                }
+            }
+        } }
+        val normal = placeholderLayout()
+        assertEquals(1, normal.lineCount)
+        assertFalse(normal.isLineEllipsized(0))
+        fun lineWidth(layout: TextLayoutResult) = layout.getLineRight(0) - layout.getLineLeft(0)
+        // The semantics result exposes the original style even when the rendered text shrinks.
+        val input = normal.layoutInput
+        val standard = TextMeasurer(input.fontFamilyResolver, input.density, input.layoutDirection)
+            .measure(input.text, style = AppTokens.typography.bodyLarge, maxLines = 1, softWrap = false)
+        assertEquals(lineWidth(standard), lineWidth(normal), 0.5f)
+        capture("feed-search-wide")
+
+        compose.runOnIdle { width = 390.dp }
+        val compact = placeholderLayout()
+        assertEquals(1, compact.lineCount)
+        assertFalse(compact.isLineEllipsized(0))
+        assertTrue("The compact hint should be narrower than the wide hint", lineWidth(compact) < lineWidth(normal))
+        val search = compose.onNodeWithTag("subscription-search").fetchSemanticsNode().boundsInRoot
+        val channels = compose.onNodeWithTag("subscription-channels-button").fetchSemanticsNode().boundsInRoot
+        assertTrue(search.right <= channels.left)
+        capture("feed-search-compact")
     }
 
     @Test fun narrowLargeTextFeedReflowsAndKeepsItsContentBelowChrome() {
@@ -53,6 +95,11 @@ class SubscriptionPresentationTest {
             val header = compose.onNodeWithTag("app-toolbar").fetchSemanticsNode().boundsInRoot
             val first = compose.onNodeWithTag("upload-0").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
             assertTrue(first.top >= header.bottom)
+            assertEquals(1, placeholderLayout().lineCount)
+            val search = compose.onNodeWithTag("subscription-search").fetchSemanticsNode().boundsInRoot
+            val channels = compose.onNodeWithTag("subscription-channels-button").fetchSemanticsNode().boundsInRoot
+            assertTrue(search.bottom <= channels.top)
+            if (isDark) capture("feed-search-stacked-large")
             compose.onNodeWithTag("subscription-channels-button").assertHeightIsAtLeast(48.dp).performClick()
             compose.onNodeWithTag("subscription-search").performTextReplacement("studio")
             compose.onNodeWithTag("subscription-search-submit").performClick()

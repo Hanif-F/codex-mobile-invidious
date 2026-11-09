@@ -176,6 +176,19 @@ class SubscriptionsTest {
         assertEquals(SubscriptionSort.RELEVANCE, SubscriptionSort.saved("invalid"))
     }
 
+    @Test fun shortcutsUseRelevanceRegardlessOfDirectorySortAndSearch() {
+        val state = SubscriptionChannelsState(
+            channels = listOf(Channel("b", "alpha"), Channel("z", "Zulu"), Channel("a", "Alpha"), Channel("c", "Bravo"), Channel("d", "delta")),
+            query = "bravo", sort = SubscriptionSort.ALPHABETICAL,
+            stats = mapOf("z" to SubscriptionStats(null, 4, 4, 3.0), "c" to SubscriptionStats(null, 1, 1, 1.0),
+                "d" to SubscriptionStats(null, 2, 2, 1.0)))
+        assertEquals(listOf("c"), state.matches.map { it.id })
+        assertEquals(listOf("z", "c", "d", "a", "b"), state.shortcuts.map { it.id })
+        for (reason in listOf(SubscriptionDirectory.LEGACY, SubscriptionDirectory.HISTORY_PERMISSION)) {
+            assertEquals(listOf("a", "b", "c", "d", "z"), state.copy(unavailableReason = reason).shortcuts.map { it.id })
+        }
+    }
+
     @Test fun sortChoicePersistsWithoutFetchAndSurvivesFailureAndLegacyFallback() {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         try {

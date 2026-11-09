@@ -64,18 +64,24 @@ data class SubscriptionChannelsState(val context: ApiContext? = null, val channe
     val stats: Map<String, SubscriptionStats> = emptyMap(), val sort: SubscriptionSort = SubscriptionSort.RELEVANCE,
     val unavailableReason: String? = null, val busy: Set<String> = emptySet(),
     val actionErrors: Map<String, String> = emptyMap()) {
-    val effectiveSort: SubscriptionSort get() = if (unavailableReason == null) sort else SubscriptionSort.ALPHABETICAL
+    val effectiveSort: SubscriptionSort get() = availableSort(sort)
     val matches: List<Channel>
-        get() {
-            val name = compareBy<Channel> { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }
-            val comparator = when (effectiveSort) {
-                SubscriptionSort.ALPHABETICAL -> name
-                SubscriptionSort.LATEST -> compareByDescending<Channel> { stats[it.id]?.latestUpload ?: Long.MIN_VALUE }.then(name)
-                SubscriptionSort.MOST_WATCHED -> compareByDescending<Channel> { stats[it.id]?.allTimeWatched ?: 0 }.then(name)
-                SubscriptionSort.RELEVANCE -> compareByDescending<Channel> { stats[it.id]?.relevance ?: 0.0 }.then(name)
-            }
-            return channels.filter { it.name.contains(query.trim(), ignoreCase = true) }.sortedWith(comparator)
+        get() = channels.filter { it.name.contains(query.trim(), ignoreCase = true) }.sortedWith(comparator(effectiveSort))
+    internal val shortcuts: List<Channel>
+        get() = channels.sortedWith(comparator(availableSort(SubscriptionSort.RELEVANCE)))
+
+    private fun availableSort(requested: SubscriptionSort) =
+        if (unavailableReason == null) requested else SubscriptionSort.ALPHABETICAL
+
+    private fun comparator(sort: SubscriptionSort): Comparator<Channel> {
+        val name = compareBy<Channel> { it.name.lowercase(Locale.ROOT) }.thenBy { it.id }
+        return when (sort) {
+            SubscriptionSort.ALPHABETICAL -> name
+            SubscriptionSort.LATEST -> compareByDescending<Channel> { stats[it.id]?.latestUpload ?: Long.MIN_VALUE }.then(name)
+            SubscriptionSort.MOST_WATCHED -> compareByDescending<Channel> { stats[it.id]?.allTimeWatched ?: 0 }.then(name)
+            SubscriptionSort.RELEVANCE -> compareByDescending<Channel> { stats[it.id]?.relevance ?: 0.0 }.then(name)
         }
+    }
 }
 
 /** Session-only channel directory. Reads cannot replace newer results or cross account/instance changes. */

@@ -3,6 +3,7 @@ package net.wingress.mobivious.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.TextAutoSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material3.*
 import androidx.activity.compose.BackHandler
@@ -29,15 +30,21 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** A single dispatch path consumes physical Enter before an IME can submit it twice. */
 @Composable
-internal fun SearchField(value: String, update: (String) -> Unit, label: String, tag: String, modifier: Modifier=Modifier, enabled: Boolean=true, submit: () -> Unit) {
+internal fun SearchField(value: String, update: (String) -> Unit, label: String, tag: String, modifier: Modifier=Modifier,
+    enabled: Boolean=true, fitPlaceholder: Boolean=false, submit: () -> Unit) {
     val keyboard=LocalSoftwareKeyboardController.current
     val focus=LocalFocusManager.current
     val search={ keyboard?.hide();focus.clearFocus();submit() }
     val c=MaterialTheme.colorScheme
-    OutlinedTextField(value,update,placeholder={Text(label)},singleLine=true,enabled=enabled,
+    OutlinedTextField(value,update,placeholder={
+        if (fitPlaceholder) Text(label, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+            autoSize = TextAutoSize.StepBased(minFontSize = 12.sp, maxFontSize = LocalTextStyle.current.fontSize, stepSize = 0.5.sp))
+        else Text(label)
+    },singleLine=true,enabled=enabled,
         shape=MaterialTheme.shapes.medium,
         colors=OutlinedTextFieldDefaults.colors(focusedContainerColor=c.surfaceContainerHighest,
             unfocusedContainerColor=c.surfaceContainerHighest,unfocusedBorderColor=c.outline,focusedBorderColor=c.primary),

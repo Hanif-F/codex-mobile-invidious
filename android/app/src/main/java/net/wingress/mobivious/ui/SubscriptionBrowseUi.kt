@@ -48,10 +48,10 @@ internal fun SubscriptionFeedControls(signedIn: Boolean, query: String, submitte
         if (!signedIn) channelsButton()
         else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (stackSearch) {
-                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.fillMaxWidth(), submit = submit)
+                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.fillMaxWidth(), fitPlaceholder = true, submit = submit)
                 channelsButton()
             } else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.weight(1f), submit = submit)
+                SearchField(query, edit, "Search subscriptions", "subscription-search", Modifier.weight(1f), fitPlaceholder = true, submit = submit)
                 channelsButton()
             }
             if (query.isNotBlank() || submitted.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {

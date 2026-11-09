@@ -13,6 +13,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -94,7 +95,8 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
     val clipOpened by vm.clipOpened.collectAsStateWithLifecycle()
     val subscriptionChannels by vm.subscriptionChannels.collectAsStateWithLifecycle()
     val deviceContext = vm.api.context()
-    val subscriptions = subscriptionChannels.takeIf { it.context == vm.api.context() }?.channels.orEmpty()
+    val currentSubscriptionChannels = subscriptionChannels.takeIf { it.context == deviceContext }
+    val subscriptions = currentSubscriptionChannels?.channels.orEmpty()
     val prefs by vm.preferences.collectAsStateWithLifecycle()
     val accent by vm.store.accentPreset.collectAsStateWithLifecycle()
     val preferenceEdits by vm.preferenceSaves.edits.collectAsStateWithLifecycle()
@@ -450,7 +452,7 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         }) { guestModifier, top -> Column(guestModifier.padding(top = top)) {
                             EmptyState("Your videos, together", "Sign in with your Invidious account to see subscriptions, playlists, and history.", "Sign in") { signIn() }
                         } }
-                        else SubscriptionChannelsScreen(subscriptionChannels.takeIf { it.context == vm.api.context() } ?: SubscriptionChannelsState(), vm.store.server, prefs.thinMode,
+                        else SubscriptionChannelsScreen(currentSubscriptionChannels ?: SubscriptionChannelsState(), vm.store.server, prefs.thinMode,
                             subscriptionList, { query -> vm.searchSubscriptionChannels(query); scope.launch { subscriptionList.scrollToItem(0) } }, vm::refreshSubscriptions,
                             { id -> navigate("Subscriptions", "channel:$id") },
                             { sort -> vm.sortSubscriptionChannels(sort, deviceContext); scope.launch { subscriptionList.scrollToItem(0) } },
@@ -492,9 +494,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             Modifier.padding(horizontal = AppTokens.inset, vertical = 8.dp), style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant) }
                         if (subscriptionFeed) {
-                            if (subscriptions.isNotEmpty() && scopedSearch.submitted.isBlank()) item(key = "subscription-shortcuts") {
-                                androidx.compose.foundation.lazy.LazyRow(contentPadding = PaddingValues(horizontal = AppTokens.inset), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    items(subscriptions, key = { it.id }) { c -> SubscriptionChannelChip(c, vm.store.server, prefs.thinMode) { navigate("Subscriptions", "channel:${c.id}") } }
+                            if (currentSubscriptionChannels != null && subscriptions.isNotEmpty() && scopedSearch.submitted.isBlank()) item(key = "subscription-shortcuts") {
+                                val shortcuts = remember(subscriptions, currentSubscriptionChannels.stats, currentSubscriptionChannels.unavailableReason) {
+                                    currentSubscriptionChannels.shortcuts
+                                }
+                                LazyRow(Modifier.testTag("subscription-shortcuts"), contentPadding = PaddingValues(horizontal = AppTokens.inset),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    items(shortcuts, key = { it.id }) { c -> SubscriptionChannelChip(c, vm.store.server, prefs.thinMode) { navigate("Subscriptions", "channel:${c.id}") } }
                                 }
                             }
                             item(key = "subscription-controls") { SubscriptionFeedControls(account != null, scopedSearch.draft, scopedSearch.submitted,
