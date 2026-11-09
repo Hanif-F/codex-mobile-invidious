@@ -353,12 +353,13 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 ### InstanceAccessTest
 
-[Source](../../android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt) — Instance access, redirect credential stripping, cache isolation, stale contexts and recovery contracts.
+[Source](../../android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt) — Instance access, login headers and compressed responses, redirect credential stripping, cache isolation, stale contexts and recovery contracts.
 
 - `discoveryDefaultsAndOnlyKnownCodesBecomeAccessErrors`
 - `headersAreBoundToOriginExpiryAndCurrentContext`
 - `redirectHopsStripBothSecretsAndPreserveRange`
 - `gateDenialsNeverExpireAccountsOrUseFeedFallback`
+- `loginGateAcceptsHeaderOrGzipBodyAndLeavesOtherResponsesReadable`
 - `completionRechecksPassAndPersistsAcrossAccountsButNotInstances`
 - `oldServersAreUnsupportedButOutagesAndRejectedPassesStayErrors`
 - `lateDenialsAndCompletionsCannotChangeANewContext`
@@ -648,6 +649,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `failedWriteRetainsMembershipAndAllowsRetryWithoutGuessingUnknownState`
 - `oldAccountWriteCannotRepopulateChannelsOrErrorsAfterReset`
 - `allSortsUseTheirOwnMetricAndBreakTiesByNameAndId`
+- `shortcutsUseRelevanceRegardlessOfDirectorySortAndSearch`
 - `sortChoicePersistsWithoutFetchAndSurvivesFailureAndLegacyFallback`
 - `directoryParserAcceptsZeroAndUnknownButRejectsMalformedStats`
 - `directoryApiRequestsStatsAndOnlyFallsBackForMissingHistoryPermission`
@@ -1222,13 +1224,14 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### InstanceAccessSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt) — Fixture-backed automatic verification, browsing retry, cancellation/lifecycle/context isolation, encryption, playback and protected-download recovery journeys.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt) — Fixture-backed verification, browse sign-in and retry, cancellation and context isolation, encryption, playback and protected-download recovery journeys.
 
 - `verificationUsesTheNativePageAndEncryptedInstancePass`
 - `automaticVerificationCoalescesDenialsAndRetriesBrowsingOnce`
 - `verificationWaitsForTheCurrentBrowseRequestBeforeRetrying`
 - `automaticVerificationRetriesTheFailedSearchPageWithoutLosingEarlierResults`
 - `requiredLoginUsesNativeSignInWithRegistrationDisabledAndThenVerification`
+- `browseLoginCardOpensNativeSignInAndReloadsPopular`
 - `cancelledAndRecreatedVerificationCanBeRetried`
 - `accountAndServerChangesDiscardVerificationAndRejectStaleCompletions`
 - `verificationCompletingInBackgroundKeepsPlaybackPausedWhenBackgroundIsDisabled`
@@ -1594,15 +1597,17 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionPresentationTest.kt) — Subscription/channel hierarchy, scoped search, native controls and large-text layout. Exact cases appear in the test catalog.
 
+- `feedSearchPlaceholderFitsTheAvailableWidth`
 - `narrowLargeTextFeedReflowsAndKeepsItsContentBelowChrome`
 - `directoryLastRowAndCountStayAccessibleWithLargeTextAndOpaqueSurfaces`
 - `channelTabsScrollAndSortMenusKeepTheirSelectedSemantics`
 
 ### SubscriptionSortingSmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionSortingSmokeTest.kt) — Subscription Sorting Smoke declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionSortingSmokeTest.kt) — Directory sort/filter, relevance-ordered feed shortcuts, refresh/fallback and account isolation journeys.
 
 - `relevanceDefaultAndAllFourSortsFilterLocallyWithCorrectDetails`
+- `feedShortcutsUseRelevanceDespiteDirectorySortAndFilter`
 - `choiceSurvivesNewActivityAndIsScopedToInstance`
 - `legacyAndPermissionFallbackKeepChoiceWhileFailuresRetainRows`
 - `repeatWatchesAndMemberPreferenceRefreshStatsAndLateReadCannotSurviveSignOut`
@@ -1700,4 +1705,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **1028 declared test methods** (including ignored tests).
+Inventory total: **1033 declared test methods** (including ignored tests).

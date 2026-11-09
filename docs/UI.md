@@ -15,7 +15,10 @@ requests. Other access prompts remain suppressed on sign-in. Required sign-in an
 verification retain their access prompts. Later/Cancel or Back leaves navigation,
 Server settings and local Downloads usable; cancellation survives recreation and
 PiP until Retry on the failed action reopens verification. Concurrent access
-failures share one dialog. Verification shows the selected origin,
+failures share one dialog. A browse request blocked by required login shows
+“Sign in to continue.” and a **Sign in** action after the prompt is dismissed.
+Backing out returns to the card. Signing in reloads the browse destination with
+its current search and filters. Verification shows the selected origin,
 an origin-restricted WebView, load/error feedback and Retry/Cancel actions. It
 retains the default browser user agent, JavaScript and DOM storage for Turnstile.
 **Cloudflare verification** loads the dedicated `/verify?client=native-cloudflare`
@@ -86,8 +89,8 @@ ordinary thumbnails. Wide comfortable feeds use columns of at least 280dp.
 Feed content caps at 1200dp; library/settings lists at 800dp; account/server forms
 at 600dp. Insets are 16dp on compact windows and 24dp otherwise. You uses continuous
 library rows in the order Playlists, History, My Clips, Downloads, following
-identity and guest sign-in guidance. Subscription creator shortcuts precede
-Channels/scoped search and uploads. Channel banner/identity precede tabs, sorting,
+identity and guest sign-in guidance. Subscription creator shortcuts appear in
+relevance order above Channels, scoped search and uploads. Channel banner/identity precede tabs, sorting,
 scoped search and results. The channel header uses the same explicit neutral
 surface in light/dark appearance, with or without banner artwork or thin mode.
 

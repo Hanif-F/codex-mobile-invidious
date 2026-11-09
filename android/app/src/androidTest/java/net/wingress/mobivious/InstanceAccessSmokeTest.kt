@@ -173,6 +173,35 @@ class InstanceAccessSmokeTest {
         runBlocking { assertTrue(vm.api.discovery("popular").isNotEmpty()) }
         assertTrue(runBlocking { vm.api.registration(vm.api.context()) }.loginRequired)
     }
+    @Test fun browseLoginCardOpensNativeSignInAndReloadsPopular() {
+        command("access", """{"accessLogin":true}""")
+        compose.runOnUiThread { vm.navigate("Popular") }
+        until { vm.browse.value.errorReason == AccessReason.LOGIN }
+        compose.onNodeWithText("Later").performClick()
+
+        val inCard = hasAnyAncestor(hasTestTag("browse-error-card"))
+        val signIn = compose.onNode(hasText("Sign in") and inCard)
+        compose.revealInBrowse(hasTestTag("browse-error-card"))
+        compose.onNode(hasText("Sign in to continue.") and inCard).assertIsDisplayed()
+        compose.onNode(hasText("Retry") and inCard).assertDoesNotExist()
+        compose.onNodeWithText("Configure server").assertExists()
+        signIn.assertIsDisplayed().assertHasClickAction()
+        captureWatchScreenshot("browse-login-required")
+
+        signIn.performClick()
+        compose.onNodeWithTag("account-username").assertIsDisplayed()
+        compose.navigateBack()
+        compose.revealInBrowse(hasTestTag("browse-error-card"))
+        signIn.assertIsDisplayed().performClick()
+        compose.onNodeWithTag("account-username").performTextInput("Fixture")
+        compose.onNodeWithTag("account-password").performTextInput("fixture-password")
+        compose.onNodeWithTag("account-auth-submit").performScrollTo().performClick()
+
+        until { vm.account.value != null && vm.tab == "Popular" && vm.route.isEmpty() &&
+            !vm.browse.value.loading && vm.browse.value.videos.isNotEmpty() }
+        assertEquals(1, vm.browse.value.page)
+        compose.onNodeWithTag("browse-error-card").assertDoesNotExist()
+    }
     @Test fun cancelledAndRecreatedVerificationCanBeRetried() {
         command("access", """{"accessEnabled":true}"""); denied()
         compose.onNodeWithTag("instance-verification-cancel").performClick()

@@ -1,5 +1,44 @@
 # Focused implementation verification
 
+## Patch release 0.13.7 — 9 November 2026
+
+The browse card for required login offers native sign-in and reloads the same
+destination after authentication. Subscription shortcuts use relevance order
+independently of the directory's sort and search. This release is based on
+`1ace161` and uses version code **37**.
+
+- `:app:testDebugUnitTest --tests` passed **52 tests** across `InstanceAccessTest`,
+  `CloudflareAccessTest`, and `SubscriptionsTest`. `scripts/build-release.sh`
+  passed **500 JVM tests**, built the signed APK and passed release lint with
+  **0 errors, 36 warnings**. `:app:lintDebug --console=plain --offline` passed
+  with **0 errors, 18 warnings**.
+- `ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline`
+  passed **21 tests** with no skips, using explicit selectors on a Pixel 8 Pro
+  AVD with Android 16. The new browse-card case covers dismissing the access
+  prompt, opening native sign-in, returning with Back, and restoring Popular
+  after login. The remaining cases cover regular channel Retry, account and
+  Cloudflare access, playback and download recovery, clip bounds, paired export,
+  subscription sorting and presentation. The browse-card screenshot was reviewed.
+- `scripts/test-ui-performance.sh --record --journey` passed `navigation`,
+  `subscriptions`, `settingsSaving`, `watch`, and `downloads` with valid video
+  recordings. The test harness now dismisses startup access prompts during fixture
+  setup, waits for the feed after closing search, reveals auto-hidden playback
+  controls and reacquires replaced list rows. After the original emulator's
+  gfxstream crash, the recorded passes used the same AVD with software ANGLE and
+  Vulkan disabled. Recordings are under `.tools/ui-performance/release-0_13_7-*/`.
+- `apksigner verify --verbose --print-certs`, `aapt2 dump badging`,
+  `zipalign -c -P 16 -v 4`, the APK checksum and the R8 archive checks passed.
+  The signing certificate matches the published 0.13.6 APK. The APK is
+  **7,352,068 bytes** (−4 bytes) with **6,339,348 uncompressed DEX bytes**
+  (+8,784 bytes, +0.1388%). SHA-256 is
+  `11b1e92b1189fde77ff7c0b4b7fa0a503bb4a6ea9ab8f27cd3c65f4101e31477`.
+  The matching R8 archive is under `artifacts/r8/0.13.7/<APK-SHA256>/`.
+
+Logs, test XML and the screenshot are in `.tools/release-0.13.7/`. The guest
+probe stopped at the live instance's Cloudflare challenge. Live sign-in and the
+full connected suite remain unverified. The existing clip editor storyboard
+failure and ignored video conversion case were outside the selected tests.
+
 ## Patch release 0.13.6 — 6 November 2026
 
 Music starts from the beginning on fresh opens, including downloads. Android

@@ -6,6 +6,9 @@ import okhttp3.*
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.mockwebserver.*
+import okio.Buffer
+import okio.GzipSink
+import okio.buffer
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
@@ -67,6 +70,42 @@ class InstanceAccessTest {
                 try { api.request("api/v1/popular"); fail("Gate accepted") } catch (e: InstanceAccessException) { assertEquals(reason, e.reason) }
             }
             assertEquals(0, expired); assertEquals(AccessReason.LOGIN, access.issue.value?.reason)
+        }
+    }
+    @Test fun loginGateAcceptsHeaderOrGzipBodyAndLeavesOtherResponsesReadable() = runBlocking {
+        fun gzip(body: String): Buffer = Buffer().also { compressed ->
+            GzipSink(compressed).buffer().use { it.writeUtf8(body) }
+        }
+
+        MockWebServer().use { server ->
+            val address = server.url("/").toString().trimEnd('/')
+            val context = ApiContext(address, null)
+            val access = InstanceAccess({ context }, Memory())
+            val api = InvidiousApi({ address }, { null }, access = access)
+            val responses = listOf(
+                MockResponse().setResponseCode(401).setHeader("X-Invidious-Login-Required", "1"),
+                MockResponse().setResponseCode(401).setHeader("Content-Encoding", "gzip")
+                    .setBody(gzip("""{"error":"login_required"}"""))
+            )
+            for (response in responses) {
+                server.enqueue(response)
+                val error = runCatching { api.discovery("popular") }.exceptionOrNull() as? InstanceAccessException
+                assertEquals(AccessReason.LOGIN, error?.reason)
+                assertEquals(AccessIssue(context, AccessReason.LOGIN), access.issue.value)
+                access.clear(context)
+            }
+
+            server.enqueue(MockResponse().setResponseCode(401).setHeader("Content-Encoding", "gzip")
+                .setBody(gzip("""{"error":"Incorrect username or password."}""")))
+            val error = runCatching { api.login("Fixture", "wrong") }.exceptionOrNull() as? ApiException
+            assertEquals(401, error?.status)
+            assertEquals("Incorrect username or password.", error?.message)
+            assertNull(access.issue.value)
+
+            server.enqueue(MockResponse().setResponseCode(401).setHeader("cf-mitigated", "challenge")
+                .setHeader("X-Invidious-Login-Required", "1"))
+            val challenge = runCatching { api.discovery("popular") }.exceptionOrNull() as? InstanceAccessException
+            assertEquals(AccessReason.CLOUDFLARE, challenge?.reason)
         }
     }
     @Test fun completionRechecksPassAndPersistsAcrossAccountsButNotInstances() = runBlocking {

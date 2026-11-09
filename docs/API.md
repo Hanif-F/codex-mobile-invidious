@@ -57,7 +57,9 @@ the returned pass against discovery, then encrypts it locally. It never exchange
 account cookies with the WebView. Registration discovery additionally parses
 `loginRequired`, default false for older servers.
 
-HTTP 401 `login_required` opens native sign-in. HTTP 403 `verification_required`
+HTTP 401 with `X-Invidious-Login-Required: 1` or a JSON `login_required` error
+offers native sign-in. The body marker is also recognized on gzip responses.
+HTTP 403 `verification_required`
 or `verification_expired` opens verification automatically in the foreground;
 503 `verification_unavailable`
 offers retry without expiring the account or serving a cached protected feed.

@@ -36,8 +36,10 @@ Multiple taps cannot send duplicate writes for the same channel. Returning from
 sign-in can complete a guest subscribe intent only for its original instance;
 canceled channel authentication clears that intent.
 
-The upload feed and channel directory are separate views. Feed search is a server
-search across subscribed content, independent of feed-only filters. Directory
+The upload feed and channel directory are separate views. The feed shortcuts
+use relevance order, with A–Z as the fallback when statistics are unavailable.
+Directory search and sort choices apply only to the directory. Feed search is a
+server search across subscribed content, independent of feed-only filters. Directory
 name filtering/sorting is local. Latest uses nullable upload timestamp; Most
 watched uses all-time distinct count; Relevance uses the server score. Name and
 ID break ties. Missing stats/history permission fall back to A–Z; a failed refresh

@@ -19,11 +19,14 @@ import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
+import okio.GzipSource
+import okio.buffer
 import org.json.JSONObject
 
 enum class AccessReason(val message: String) {
     CLOUDFLARE("Cloudflare requires verification to access this instance."),
-    LOGIN("This instance requires sign-in."),
+    LOGIN("Sign in to continue."),
     VERIFICATION("This instance requires verification."),
     UNAVAILABLE("Verification is temporarily unavailable. Try again.")
 }
@@ -151,6 +154,26 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
     private fun check(context: ApiContext) {
         if (context != current()) throw CancellationException("Account or instance changed")
     }
+
+    private fun accessReason(response: Response): AccessReason? {
+        if (response.header("cf-mitigated").equals("challenge", true)) return AccessReason.CLOUDFLARE
+        if (response.code == 401 && response.header("X-Invidious-Login-Required") == "1") return AccessReason.LOGIN
+        if (response.code !in listOf(401, 403, 503)) return null
+
+        val limit = 8192L
+        val preview = response.peekBody(limit)
+        // Network interceptors see gzip before OkHttp decompresses the body for callers.
+        val body = if (response.code == 401 && response.header("Content-Encoding").equals("gzip", true)) {
+            try {
+                GzipSource(preview.source()).buffer().use { source ->
+                    source.request(limit)
+                    source.readUtf8(minOf(limit, source.buffer.size))
+                }
+            } catch (_: IOException) { "" }
+        } else preview.string()
+        return classify(response.code, response.header("X-Invidious-Verification-Required"), body)
+    }
+
     /** Network interceptors run again on redirects, unlike application interceptors. */
     fun client(base: OkHttpClient = statusClient, context: () -> ApiContext = current): OkHttpClient = base.newBuilder()
         .addInterceptor { chain ->
@@ -175,11 +198,7 @@ class InstanceAccess(private val current: () -> ApiContext, private val persiste
                 revision.value to builder.build()
             }
             val response = chain.proceed(outgoing)
-            val reason = if (sameOrigin(request.url, target.server)) {
-                if (response.header("cf-mitigated").equals("challenge", true)) AccessReason.CLOUDFLARE
-                else if (response.code in listOf(401, 403, 503))
-                    classify(response.code, response.header("X-Invidious-Verification-Required"), response.peekBody(8192).string()) else null
-            } else null
+            val reason = if (sameOrigin(request.url, target.server)) accessReason(response) else null
             if (reason != null) {
                 response.close()
                 if (!report(target, reason, sentRevision)) throw SupersededAccessException()

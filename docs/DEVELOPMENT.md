@@ -70,9 +70,8 @@ ignored by Git.
 
 ### Current toolchain and direct dependencies
 
-These are the repository's configured versions for 0.13.6, rather than a request
-to install the newest upstream release. The Gradle files are authoritative after
-a dependency update.
+These are the repository's configured versions for 0.13.7. The Gradle files are
+authoritative after a dependency update.
 
 | Component | Configured version / purpose |
 | --- | --- |
@@ -94,7 +93,7 @@ a dependency update.
 | JUnit / JVM JSON | 4.13.2 / 20251224. |
 | Android test JUnit / runner / Espresso | 1.3.0 / 1.7.0 / 3.7.0. |
 
-Release uses `net.wingress.mobivious`, version code 36 and version name 0.13.6.
+Release uses `net.wingress.mobivious`, version code 37 and version name 0.13.7.
 Debug adds `.debug` and `-debug`, allowing separate installation as Mobivious
 Preview. BuildConfig and Compose are enabled. Release builds use R8 code
 optimization/obfuscation and resource shrinking; debug builds remain unoptimized.

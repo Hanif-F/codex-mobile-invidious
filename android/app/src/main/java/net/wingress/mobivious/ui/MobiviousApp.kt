@@ -593,7 +593,13 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                             }
                         }
                         if (state.loading && !state.refreshing) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                        if (state.error != null) item { ErrorCard(state.error!!, vm::retryBrowse); if (state.videos.isEmpty() && state.searchResults.isEmpty()) LibraryActionButton("Configure server", Modifier.padding(horizontal = 16.dp)) { dialog = ""; settingsPage = "Server" } }
+                        state.error?.let { error -> item {
+                            if (state.errorReason == AccessReason.LOGIN) ErrorCard(error, "Sign in", ::accessSignIn)
+                            else ErrorCard(error, "Retry", vm::retryBrowse)
+                            if (state.videos.isEmpty() && state.searchResults.isEmpty()) {
+                                LibraryActionButton("Configure server", Modifier.padding(horizontal = 16.dp)) { dialog = ""; settingsPage = "Server" }
+                            }
+                        } }
                         if (!state.loading && (if (generalSearch) vm.visibleSearchResults(state.searchResults).isEmpty() && state.searchResults.isNotEmpty() else visibleVideos.isEmpty() && state.videos.isNotEmpty())) item {
                             Column(Modifier.padding(16.dp)) {
                                 Text(if (generalSearch) "Results hidden by your visibility settings" else "Videos hidden by your visibility settings")
@@ -676,7 +682,15 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
 @Composable private fun EmptyState(title: String, detail: String, action: String, onClick: () -> Unit) {
     LibraryEmptyState(title, detail, Icons.Default.PlayCircleOutline, action.takeIf(String::isNotBlank), onClick)
 }
-@Composable private fun ErrorCard(message: String, retry: () -> Unit) { Card(Modifier.padding(16.dp).fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) { Column(Modifier.padding(16.dp)) { Text(message); Box { LibraryActionButton("Retry", onClick = retry) } } } }
+@Composable private fun ErrorCard(message: String, action: String, onClick: () -> Unit) {
+    Card(Modifier.padding(16.dp).fillMaxWidth().testTag("browse-error-card"),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+        Column(Modifier.padding(16.dp)) {
+            Text(message)
+            Box { LibraryActionButton(action, onClick = onClick) }
+        }
+    }
+}
 internal fun resolved(base: String, path: String) = base.toHttpUrlOrNull()?.resolve(path)?.toString() ?: path
 internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
 @Composable internal fun VideoCard(vm: AppViewModel, video: Video, server: String, play: () -> Unit, channel: (String) -> Unit, signIn: () -> Unit, remove: (() -> Unit)? = null, audioPlay: (() -> Unit)? = null, removalLabel: String = "Remove", avatarOwner: String? = null,

@@ -182,9 +182,10 @@ Signed-in filters/timestamps/delay sync with the server; guest saves remain loca
 
 ## Subscriptions and library
 
-**Subscriptions** shows account uploads with creator shortcuts, refresh, scoped
-video search, a Channels directory and RSS/OPML actions. Feed settings control
-page size, order, latest-per-channel, unwatched-only and pending-notifications-only.
+**Subscriptions** shows account uploads with creator shortcuts ordered by relevance,
+refresh, scoped video search, a Channels directory and RSS/OPML actions. Feed
+settings control page size, order, latest-per-channel, unwatched-only and
+pending-notifications-only.
 The last option filters account feed content; it does not enable Android alerts.
 
 **Channels** searches the loaded subscription names locally and sorts by Relevance,

@@ -123,6 +123,11 @@ failure/recovery presentation. Run these through the focused device runner;
 
 ## Instance access verification
 
+`InstanceAccessTest` checks login-required HTTP headers and gzip bodies while
+preserving ordinary authentication errors. `InstanceAccessSmokeTest` checks the
+browse sign-in card after dismissing the prompt, returning with Back, and
+reloading Popular after successful native sign-in.
+
 `CloudflareAccessTest` covers challenge headers before status/body handling,
 bootstrap isolation, native candidate rejection, expiry/user-agent/origin fences,
 session-only cookies, redirects, rotation/deletion, separate gates and bounded
@@ -375,7 +380,9 @@ cd android
 On a connected device, use the isolated optimized benchmark package for focused
 ordinary-UI account setup, navigation, watch, settings-saving and download
 journeys. The existing performance runner's `--record` mode exercises those
-flows without a timing benchmark. Supplement these with background/PiP playback,
+flows without a timing benchmark. Initial setup dismisses any access prompt from
+the default instance before switching to the disposable fixture through Server
+settings. Supplement these with background/PiP playback,
 clip preview, offline resume and paired-media export checks. Keep the existing
 accepted-video-conversion emulator limitation explicit; an ignored case is not
 runtime acceptance. Preserve the installed release and its data during tests.

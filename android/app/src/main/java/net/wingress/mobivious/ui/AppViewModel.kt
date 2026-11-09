@@ -55,7 +55,8 @@ data class BrowseState(val title: String = "For you", val videos: List<Video> = 
     val history: HistoryPage? = null, val clips: List<Clip> = emptyList(), val lists: List<Playlist> = emptyList(),
     val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
     val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false,
-    val searchResults: List<SearchResult> = emptyList(), val searchKeys: Set<String> = emptySet())
+    val searchResults: List<SearchResult> = emptyList(), val searchKeys: Set<String> = emptySet(),
+    val errorReason: AccessReason? = null)
 data class PostDetailState(val link: PostLink? = null, val context: ApiContext? = null,
     val post: CommunityPost? = null, val loading: Boolean = false, val error: String? = null)
 data class LinkResolutionState(val link: ChannelLink? = null, val context: ApiContext? = null,
@@ -837,8 +838,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         browse.value = saved.browse.copy(loading = false, refreshing = false)
         navigation.value = tab to route; restoredBrowse.value++
         if (route == "subscription-channels") refreshSubscriptions()
+        val reloadAfterSignIn = afterSignIn && (saved.browse.errorReason == AccessReason.LOGIN || saved.tab in listOf("You", "Subscriptions"))
         if (!refreshSaved && saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
-        else if (refreshSaved || saved.browse.loading || afterSignIn && saved.tab in listOf("You", "Subscriptions")) load(false, refreshChannel = false)
+        else if (refreshSaved || saved.browse.loading || reloadAfterSignIn) load(false, refreshChannel = false)
     }
     fun openGlobalSearch(text: String, newSearch: Boolean = true) {
         if (text.isBlank()) return
@@ -1119,7 +1121,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         val selectedPostLink = postDetail.value.link ?: selectedRoute.takeIf { it.startsWith("post:") }?.let { PostLink(it.substringAfter(':')) }
-        browse.value = displayed.copy(loading = true, refreshing = retainFeed, error = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
+        browse.value = displayed.copy(loading = true, refreshing = retainFeed, error = null, errorReason = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
                 val originalTitles = api.originalTitlePreference(context)
@@ -1248,7 +1250,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 if (generation == browseGeneration && context == api.context()) {
-                    browse.value = browse.value.copy(loading = false, refreshing = false, error = friendly(e), retryMore = more)
+                    browse.value = browse.value.copy(loading = false, refreshing = false, error = friendly(e),
+                        errorReason = InstanceAccess.failure(e)?.reason, retryMore = more)
                     if (selectedRoute.startsWith("post:")) postDetail.value = postDetail.value.copy(loading = false, error = friendly(e))
                 }
             } finally {
@@ -1406,7 +1409,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context()
         if (channelId == null && context.account == null) return
         browseJob?.cancel(); val generation = ++browseGeneration
-        browse.value = browse.value.copy(loading = true, error = null)
+        browse.value = browse.value.copy(loading = true, error = null, errorReason = null)
         browseJob = viewModelScope.launch {
             try {
                 val originalTitles = api.originalTitlePreference(context)
@@ -1420,7 +1423,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     browse.value = browse.value.copy(clips = clips.distinctBy { it.id }, page = page, end = count < 30, loading = false, error = null, originalTitles = originalTitles)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (generation == browseGeneration && context == api.context())
-                browse.value = browse.value.copy(loading = false, error = friendly(e), retryMore = false) }
+                browse.value = browse.value.copy(loading = false, error = friendly(e),
+                    errorReason = InstanceAccess.failure(e)?.reason, retryMore = false) }
         }
     }
     fun confirmDeleteClip(clip: Clip) { if (clip.owned(api.context())) { clipDeleteError.value = null; clipDelete.value = clip } }
@@ -1879,7 +1883,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         subscriptionsController.toggle(subscriptionCreator(id))
     }
     override fun onCleared() { cancelAccumulatedSeek(); MediaController.releaseFuture(future) }
-    private fun friendly(e: Exception) = if (e is ApiException || e is IllegalArgumentException) e.message ?: "Request failed." else "Cannot reach this instance. Check the address and connection, then retry."
+    private fun friendly(e: Exception) = when {
+        InstanceAccess.failure(e)?.reason == AccessReason.LOGIN -> AccessReason.LOGIN.message
+        e is ApiException || e is IllegalArgumentException -> e.message ?: "Request failed."
+        else -> "Cannot reach this instance. Check the address and connection, then retry."
+    }
 }
 private suspend fun ListenableFuture<MediaController>.awaitController(): MediaController = suspendCancellableCoroutine { continuation ->
     // Cancelling one queued action must not cancel the controller shared by the whole ViewModel.

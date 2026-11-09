@@ -11,6 +11,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.Configurator
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import java.net.HttpURLConnection
@@ -29,6 +30,7 @@ class UiScrollBenchmark {
     private val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
     private val args = InstrumentationRegistry.getArguments()
     private var currentJourney: String? = null
+    private var connectingToFixture = false
     private var gesturePhase = "setup"
     private val gestures = mutableListOf<JSONObject>()
 
@@ -62,9 +64,20 @@ class UiScrollBenchmark {
         required(selector).click()
     }
     private fun desc(text: String) = required(By.desc(text)).click()
+    private fun dismissStartupAccessPrompt() {
+        if (!connectingToFixture) return
+        val action = when {
+            device.hasObject(By.text("Instance access")) -> "Later"
+            device.hasObject(By.text("Cloudflare verification")) ||
+                device.hasObject(By.text("Instance verification")) -> "Cancel"
+            else -> return
+        }
+        device.findObject(By.text(action))?.click()
+    }
     private fun navigateControl(control: BySelector, destination: BySelector) {
         val deadline=SystemClock.uptimeMillis()+20_000
         do {
+            dismissStartupAccessPrompt()
             device.findObject(control)?.click()
             if(device.wait(Until.hasObject(destination),500)) return
         } while(SystemClock.uptimeMillis()<deadline)
@@ -72,7 +85,14 @@ class UiScrollBenchmark {
     }
     private fun reveal(selector: BySelector, minHeight: Int = (16*InstrumentationRegistry.getInstrumentation().context.resources.displayMetrics.density).toInt()) {
         repeat(40) {
-            if ((device.findObject(selector)?.visibleBounds?.height() ?: 0)>=minHeight) return
+            dismissStartupAccessPrompt()
+            try {
+                if ((device.findObject(selector)?.visibleBounds?.height() ?: 0) >= minHeight) return
+            } catch (_: StaleObjectException) {
+                // The list can replace a row between finding it and reading its bounds.
+                SystemClock.sleep(50)
+                return@repeat
+            }
             swipe(true)
         }
         error("Benchmark control is outside the viewport: $selector")
@@ -96,6 +116,36 @@ class UiScrollBenchmark {
         navigateControl(By.res("navigation-$tab"),
             if(tab=="You") By.res("you-identity") else By.res("navigation-$tab").selected(true))
     }
+    private fun connectToFixture() {
+        connectingToFixture = true
+        try {
+            openSettings()
+            scrollTo("Server")
+            openPreferencePage("Server")
+            dismissStartupAccessPrompt()
+            required(By.clazz("android.widget.EditText")).text = "http://127.0.0.1:18080"
+            click("Connect")
+            val deadline = SystemClock.uptimeMillis() + 20_000
+            var confirmed = false
+            var discarded = false
+            val shellRoot = By.res("navigation-Popular")
+            while (!device.hasObject(By.res("settings-root")) && !device.hasObject(shellRoot)) {
+                dismissStartupAccessPrompt()
+                if (!confirmed && device.hasObject(By.text("Change server?"))) {
+                    click("Connect", By.text("Connect").hasAncestor(By.hasDescendant(By.text("Change server?"))))
+                    confirmed = true
+                }
+                if (!discarded && device.hasObject(By.text("Continue"))) {
+                    click("Continue")
+                    discarded = true
+                }
+                if (SystemClock.uptimeMillis() >= deadline) required(By.res("settings-root"))
+                SystemClock.sleep(50)
+            }
+        } finally {
+            connectingToFixture = false
+        }
+    }
     @Before fun configureThroughUi() {
         Configurator.getInstance().waitForIdleTimeout=0
         fixture()
@@ -103,21 +153,7 @@ class UiScrollBenchmark {
         val launch = InstrumentationRegistry.getInstrumentation().context.packageManager.getLaunchIntentForPackage(TARGET)!!
         launch.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
         InstrumentationRegistry.getInstrumentation().context.startActivity(launch)
-        openSettings(); scrollTo("Server"); openPreferencePage("Server")
-        required(By.clazz("android.widget.EditText")).text = "http://127.0.0.1:18080"
-        click("Connect")
-        val deadline=SystemClock.uptimeMillis()+20_000
-        var confirmed=false;var discarded=false
-        val shellRoot=By.res("navigation-Popular")
-        while(!device.hasObject(By.res("settings-root")) && !device.hasObject(shellRoot)) {
-            if(!confirmed && device.hasObject(By.text("Change server?"))) {
-                click("Connect", By.text("Connect").hasAncestor(By.hasDescendant(By.text("Change server?"))))
-                confirmed=true
-            }
-            if(!discarded && device.hasObject(By.text("Continue"))) {click("Continue");discarded=true}
-            if(SystemClock.uptimeMillis()>=deadline) required(By.res("settings-root"))
-            SystemClock.sleep(50)
-        }
+        connectToFixture()
         if(device.hasObject(By.res("settings-root")))
             navigateControl(By.desc("Back from Settings"),By.res("navigation-You"))
         root("You")
@@ -316,15 +352,37 @@ class UiScrollBenchmark {
         feed("Popular"); click("Benchmark video 000"); required(By.text("Benchmark playing video"))
         required(By.desc("Pause"))
     })
+    private fun minimizePlayingWatch() {
+        val watch = required(By.res("watch-content")).visibleBounds
+        val metadataTop = required(By.res("watch-metadata")).visibleBounds.top
+        val minimize = By.desc("Minimize player")
+        val pause = By.desc("Pause")
+        val mini = By.res("mini-player")
+        val deadline = SystemClock.uptimeMillis() + 20_000
+        do {
+            val button = device.findObject(minimize)
+            if (button == null && metadataTop > watch.top) {
+                // Tap the video above its metadata and away from the center playback button.
+                device.click(watch.centerX(), watch.top + (metadataTop - watch.top) / 3)
+            } else if (button != null && device.hasObject(pause)) {
+                button.click()
+            }
+            if (device.wait(Until.hasObject(mini), 650)) return
+        } while (SystemClock.uptimeMillis() < deadline)
+        required(pause)
+        required(mini)
+    }
     @Test fun navigation() = runJourney("navigation", prepare = { feed("Popular") }, measure = {
         listOf("Trending", "Subscriptions", "You", "Popular").forEach {root(it);SystemClock.sleep(350)}
         required(By.res("video-actions-perf0000000")).click()
         required(By.text("Save to playlist")); SystemClock.sleep(350); device.pressBack()
-        desc("Search");required(By.clazz("android.widget.EditText"));SystemClock.sleep(350);desc("Close search")
-        click("Benchmark video 000"); required(By.desc("Pause"))
-        navigateControl(By.desc("Minimize player"),By.res("mini-player"))
-        navigateControl(By.text("Benchmark playing video"),By.desc("Minimize player"))
-        required(By.desc("Pause"));navigateControl(By.desc("Minimize player"),By.res("mini-player"))
+        desc("Search")
+        required(By.clazz("android.widget.EditText"))
+        navigateControl(By.desc("Close search"), By.res("video-actions-perf0000000"))
+        click("Benchmark video 000")
+        minimizePlayingWatch()
+        navigateControl(By.text("Benchmark playing video"), By.res("watch-content"))
+        minimizePlayingWatch()
     })
     companion object { const val TARGET = "net.wingress.mobivious.benchmark" }
 }

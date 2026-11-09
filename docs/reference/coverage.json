@@ -49,7 +49,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "87f40dbb800f2829d21807a8bd4200b70fa5abd3712c3bf696c6c9ec44de6c50"
+      "sha256": "ac917c32f0247ba0cd0c1a72073d9986c0051ce882e1b25e70f4795603929109"
     },
     "android/app/proguard-rules.pro": {
       "area": "Build configuration",
@@ -427,13 +427,13 @@
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
       "description": "Subscription/channel hierarchy, scoped search, native controls and large-text layout. Exact cases appear in the test catalog.",
-      "sha256": "0a6f72a02dfca6eb9c7889991dfaf8540b2d9d56b8bcc2bf53260ca7cb916a70"
+      "sha256": "dd4e53695262f278501dd31e9044a3846ec70132935a305b8dc3910dc748e2e5"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionSortingSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Subscription Sorting Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "ee068147b928f056ef4f5b0aff228efc06d1d669d1f5daea320a93c0f453cc84"
+      "description": "Directory sort/filter, relevance-ordered feed shortcuts, refresh/fallback and account isolation journeys.",
+      "sha256": "1809279fa8454649e2ab158a53b025be24af1bd81a1495dbf28446e8d65262b5"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/SubscriptionsPresentationTest.kt": {
       "area": "Android device tests",
@@ -739,7 +739,7 @@
       "area": "Data and domain",
       "guide": "docs/LIBRARY.md",
       "description": "Directory statistics, local search/sort fallback and revision-fenced confirmed subscription mutations.",
-      "sha256": "2b9d714c3ed39a0c1c2e0068156db5164355b3a706554c60b2c922536193f018"
+      "sha256": "977eb7dbadaca3b6c816ca8d01dcca88ef4a72ae6796d5797755fbf62765b3d5"
     },
     "android/app/src/main/java/net/wingress/mobivious/data/WatchedState.kt": {
       "area": "Data and domain",
@@ -901,7 +901,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination. Integrates session playback statistics.",
-      "sha256": "76b75e11c39be4459a91e6f3fcb242649520b0cfaf9b3dfaa6d3496ec0636934"
+      "sha256": "0855dd282259aecbbac73614410de6ef21effff20147856150e2919ae4183608"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1027,7 +1027,7 @@
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
       "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "856f3c95e73bf6d4a99f4800c55b62ba98113a15139dfe97e168ccd7f5e4deae"
+      "sha256": "314aac6e2e17785a9750378587133fcc644df5031cba180b7376556bb5915f64"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
       "area": "Compose UI",
@@ -1099,7 +1099,7 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Shared search input, transient suggestions/history editor and results toolbar with removable filters.",
-      "sha256": "d5f0bbdd0da035ccd84c1f23d5f4cbdc11389bed5db39a902b478c0a7d8a0491"
+      "sha256": "039cb46d282b528234f907ffd3de8c412041bd7d5dbbf09ce139096f8cc8d6dc"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SettingsUi.kt": {
       "area": "Compose UI",
@@ -1123,7 +1123,7 @@
       "area": "Compose UI",
       "guide": "docs/UI.md",
       "description": "Subscription/channel toolbars, scoped inputs, independent channel tabs, adaptive sort pills/dropdown and expanding inline channel search.",
-      "sha256": "759a2aedeb7914c4ce1df67ca7ce4e189082d819cdc9115f606b3976d1d24c5a"
+      "sha256": "98333e46ae26fed625a708b45f3c4b5c0212dbdb39b8e44ffb91e5e44222a1b3"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/SubscriptionControl.kt": {
       "area": "Compose UI",
@@ -1447,7 +1447,7 @@
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
       "description": "Subscriptions declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "881eb6e5499968f4144f84be35c9a16408cc7519f539ef3f0e1ff2fa2a31ffe5"
+      "sha256": "7a9e9abcdf1968f9887260a311634f1f18c8626211aacc9e130aee34464d0a5b"
     },
     "android/app/src/test/java/net/wingress/mobivious/VideoGeometryTest.kt": {
       "area": "JVM tests",
@@ -1542,8 +1542,8 @@
     "android/macrobenchmark/src/main/java/net/wingress/mobivious/benchmarks/UiScrollBenchmark.kt": {
       "area": "Performance verification",
       "guide": "docs/TESTING.md",
-      "description": "Eighteen current-UI performance journeys with ordinary-control setup, automatic-save recovery and measured gesture provenance.",
-      "sha256": "e6aa08b96c0e6fdc73aec1765acb64de1c7d8ae56ea4bd00e4ae928177e1eed7"
+      "description": "Optimized UI journeys with ordinary-control fixture setup, startup access prompt dismissal, save recovery and gesture evidence.",
+      "sha256": "8bb083a7ac5f2f9a02c750d9ec48dc7d3c47fe7a315abc4f8a4e3a72e33f54b9"
     },
     "android/macrobenchmark/src/main/res/xml/fixture_network_security.xml": {
       "area": "Performance verification",
@@ -1788,8 +1788,8 @@
     "android/app/src/main/java/net/wingress/mobivious/data/InstanceAccess.kt": {
       "area": "Data and domain",
       "guide": "docs/API.md",
-      "description": "Independent Cloudflare/backend access gates, native validation, coalesced late-rotation confirmation and revision-fenced recovery.",
-      "sha256": "d869af2ad352d10d59830a9a402ce94f9dc4429922945aba83b4ab28b86596c4"
+      "description": "Independent Cloudflare/backend access gates, header and gzip login detection, native validation and revision-fenced recovery.",
+      "sha256": "59b2c5fd6d3cbb6576386968ce7c9f7441d63fc90964e6146cd1af9be41f8086"
     },
     "android/app/src/main/java/net/wingress/mobivious/downloads/ProtectedDownloadService.kt": {
       "area": "Android foundation",
@@ -1806,14 +1806,14 @@
     "android/app/src/test/java/net/wingress/mobivious/InstanceAccessTest.kt": {
       "area": "JVM tests",
       "guide": "docs/TESTING.md",
-      "description": "Instance access, redirect credential stripping, cache isolation, stale contexts and recovery contracts.",
-      "sha256": "f01dd0a65419538d64be25a45500902e7c49acec4f0ade8bc29945d0c88a0218"
+      "description": "Instance access, login headers and compressed responses, redirect credential stripping, cache isolation, stale contexts and recovery contracts.",
+      "sha256": "a781ae093a8811c214a2bfd6d8ec9432a1d323b4e9883a46c40420204791cb9a"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/InstanceAccessSmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Fixture-backed automatic verification, browsing retry, cancellation/lifecycle/context isolation, encryption, playback and protected-download recovery journeys.",
-      "sha256": "763f2dc5a623c8329701a13f29f42ceed36f33e778a34a9e5a6688edff3649bf"
+      "description": "Fixture-backed verification, browse sign-in and retry, cancellation and context isolation, encryption, playback and protected-download recovery journeys.",
+      "sha256": "ce3cb2d561ef4bfbd626a0003c21624f03bb3c8d533857afb9e7d4e1e90798fc"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/LiveInstanceAccessSmokeTest.kt": {
       "area": "Android device tests",
