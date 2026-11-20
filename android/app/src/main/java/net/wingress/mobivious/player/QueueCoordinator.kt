@@ -366,6 +366,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
         val metadata = MediaMetadata.Builder().setTitle(displayTitle(details.video, entry.key, entry.clip?.title)).setArtist(details.video.author)
             .setArtworkUri(if (artworkHidden(details.video, entry.key)) null else Uri.parse(resolve(details.video.thumbnail))).setExtras(Bundle().apply {
                 putString("occurrence", entry.key); putBoolean("clip", entry.clip != null); putBoolean("history", entry.clip == null && context.account != null && prefs.watchHistory); putBoolean("savePosition", entry.clip == null && prefs.savePosition)
+                putBoolean(CAN_COMPLETE_HISTORY, entry.clip == null && bounded?.endMs == null && !details.video.live)
                 putBoolean(SKIP_PLAYBACK_POSITION, details.isMusicGenre)
                 putString("channelId", details.video.channelId); putBoolean("liveNow", details.video.live)
                 putString("sponsorblock", prefs.sponsorBlock.effective(details.video.channelId).json().toString())

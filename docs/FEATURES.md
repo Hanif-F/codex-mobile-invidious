@@ -54,6 +54,8 @@ Community/live aliases normalize to Posts/Streams. Auto-generated channels do
 not expose the generic Playlists tab. Video tabs support Newest/Oldest/Popular;
 the age-gated fallback uses Newest. Generic playlist tabs support their own sort.
 Scoped channel search preserves the selected tab for returning from results.
+Bare channel-tab links such as `/markrober/streams` open the corresponding
+native tab when the instance resolves the channel.
 
 Creator identity can show a banner, avatar, verified badge, subscribers, handle,
 pronouns, inventory and a rich description. Missing optional metadata stays hidden.
@@ -143,8 +145,12 @@ rich links, clickable timestamps and available statistics/details: views, likes,
 publication date, category, license, visibility, premiere/upcoming state, region
 availability, family suitability and music credits. Only explicitly exact server
 counts gain exact-total presentation; rounded or unverified counts stay qualified.
+Watch details show the YouTube AI disclosure when the video supplies it.
+Upcoming channel cards show the scheduled premiere date when available.
 
 Manual chapters are derived from timestamp lines in the supplied description.
+If the plain description has fewer than two usable chapters, Mobivious tries the
+rich description already loaded for the video.
 At least two valid chapters within a known non-live duration are required.
 The chapter panel seeks without replacing the queue occurrence. Automatic
 chapters remain unsupported; seek previews are independent of manual chapters.

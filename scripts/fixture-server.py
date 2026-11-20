@@ -151,7 +151,7 @@ recommended = dict(video, videoId='testvideo02', title='Another original title')
 unknown_video = dict(video, videoId='unknownvid1', title='Unknown duration fixture', lengthSeconds=0)
 live_video = dict(video, videoId='streamvid01', title='Live indicator fixture', liveNow=True)
 def reset_playback():
-    state.update(positions={}, playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False,
+    state.update(positions={}, completed=[], playbackRequests=0, failPlayback=False, playbackDelayNext=0, indicatorVideos=False,
                  duplicateRecommendations=False, downloadSync=False, playbackWriteStatus=0, playbackReadStatus=0,
                  musicGenre='')
 reset_playback()
@@ -987,7 +987,8 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             self.respond(dict(entries=entries, total=total, hasMore=size > 0 and page*size < total, today=state['historyToday'], timezone='Asia/Jakarta') if organized else entries)
         elif p == '/api/v1/auth/playback':
             state['playbackRequests'] += 1
-            payload = dict(positions=dict(state['positions']), watched=list(state['watched']))
+            payload = dict(positions=dict(state['positions']), watched=list(state['watched']),
+                           completed=list(state['completed']), historyEvents=True)
             delay = state['playbackDelayNext']; state['playbackDelayNext'] = 0
             if delay: time.sleep(min(5000, max(0, delay)) / 1000)
             self.respond(dict(error='Fixture indicators unavailable') if state['failPlayback'] else payload, 503 if state['failPlayback'] else 200)
@@ -1230,7 +1231,7 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state['mediaPaths'].clear()
             return self.respond({})
         if p == '/test/watched':
-            for key in ('watched', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
+            for key in ('watched', 'completed', 'positions', 'failPlayback', 'playbackDelayNext', 'indicatorVideos'):
                 if key in data: state[key] = data[key]
             state['position'] = state['positions'].get('testvideo01', 0)
             if data.get('seedPlaylist'):
@@ -1302,7 +1303,8 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             state.update(captionFixture=True, captionFail=bool(data.get('fail', False)))
             return self.respond({})
         # Do not log credentials or bearer values, even in disposable fixtures.
-        state['events'].append(dict(method=self.command, path=p))
+        request_event = dict(method=self.command, path=p)
+        state['events'].append(request_event)
         if p == '/api/v1/auth/clips' or p.startswith('/api/v1/auth/clips/'):
             state['clipRequests'].append(dict(method=self.command, path=p, body=data, authorized=bool(self.headers.get('Authorization'))))
             if self.headers.get('Authorization') != 'Bearer fixture-token': return self.respond(dict(error='Request must be authenticated'), 403)
@@ -1434,12 +1436,23 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             self.respond(status=204)
         elif p.startswith('/api/v1/auth/history'):
             if p == '/api/v1/auth/history' and self.command == 'DELETE':
-                state['watched'] = []; state['positions'].clear(); state['position'] = 0
+                state['watched'] = []; state['completed'] = []; state['positions'].clear(); state['position'] = 0
             else:
                 if not prefs['watch_history']: return self.respond(dict(error='Watch history is disabled in preferences.'), 409)
                 id = p.rsplit('/', 1)[-1]
-                state['watched'] = [entry for entry in state['watched'] if entry != id]
-                if self.command != 'DELETE': state['watched'].append(id)
+                if self.command == 'DELETE':
+                    state['watched'] = [entry for entry in state['watched'] if entry != id]
+                    state['completed'] = [entry for entry in state['completed'] if entry != id]
+                else:
+                    event = parse_qs(urlparse(self.path).query, keep_blank_values=True).get('event', [None])[0]
+                    if event not in (None, 'visit', 'complete'):
+                        return self.respond(dict(error='Invalid watch history event.'), 400)
+                    if event is not None:
+                        request_event['event'] = event
+                    if event != 'complete' or id not in state['watched']:
+                        state['watched'] = [entry for entry in state['watched'] if entry != id] + [id]
+                    if event != 'visit' and id not in state['completed']:
+                        state['completed'].append(id)
             self.respond(status=204)
         elif p == '/api/v1/auth/playlists' and self.command == 'POST':
             plid = 'IVfixture' if not state['playlists'] else f"IVfixture{len(state['playlists'])}"

@@ -172,7 +172,7 @@ class AppSmokeTest {
         compose.onNodeWithText("360p24 · H.264", substring = true).assertExists()
         compose.onNodeWithText("English").assertExists()
         compose.onNodeWithText("Audio").performClick()
-        compose.onNodeWithText("Auto").assertExists()
+        compose.onNodeWithText("Audio tracks").assertExists()
         // The fixture's audio has no language tag and must still have a selectable row.
         compose.onNodeWithText("Audio track 1").performClick()
         compose.runOnUiThread { assertTrue(activity.model.controller.value!!.trackSelectionParameters.overrides.values.any { it.type == C.TRACK_TYPE_AUDIO }) }

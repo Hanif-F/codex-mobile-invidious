@@ -42,22 +42,56 @@ class PlaybackSyncTest {
     private fun success() = MockResponse().setResponseCode(204)
     private fun preferences(history: Boolean = true, position: Boolean = true) = MockResponse()
         .setBody("""{"watch_history":$history,"save_player_pos":$position}""")
+    private fun snapshot(protocol: HistoryProtocol = HistoryProtocol.LEGACY): MockResponse {
+        val body = JSONObject("""{"watched":[],"positions":{}}""")
+        if (protocol != HistoryProtocol.LEGACY) body.put("completed", org.json.JSONArray())
+        if (protocol == HistoryProtocol.EVENTS) body.put("historyEvents", true)
+        return MockResponse().setBody(body.toString())
+    }
 
     @Test fun journalCoalescesPositionsPreservesCompletionAndSurvivesRecreation() = runBlocking {
         Fixture().use { f ->
             f.sync.enqueueHistory(f.context, id)
+            f.sync.enqueueHistory(f.context, id, HistoryEvent.COMPLETE)
             f.sync.enqueuePosition(f.context, id, 40)
             f.sync.enqueuePosition(f.context, id, 0)
             val restored = PlaybackSyncRepository(f.api, f.store)
             assertEquals(0L, restored.resolvePosition(f.context, id, 99))
             assertTrue(restored.pending()[id]!!.history != null)
-            f.server.enqueue(preferences()); f.server.enqueue(success()); f.server.enqueue(success())
+            assertNotNull(restored.pending()[id]!!.completion)
+            f.server.enqueue(preferences()); f.server.enqueue(snapshot(HistoryProtocol.EVENTS))
+            repeat(3) { f.server.enqueue(success()) }
             assertEquals(PlaybackSyncResult.COMPLETE, restored.flush())
             assertTrue(restored.pending().isEmpty())
             assertEquals("/api/v1/auth/preferences", f.server.takeRequest().path)
-            assertEquals("POST", f.server.takeRequest().method)
+            assertEquals("/api/v1/auth/playback", f.server.takeRequest().path)
+            assertEquals("visit", f.server.takeRequest().requestUrl!!.queryParameter("event"))
+            assertEquals("complete", f.server.takeRequest().requestUrl!!.queryParameter("event"))
             assertEquals("DELETE", f.server.takeRequest().method)
             assertTrue(f.store.positions(f.context).isEmpty())
+        }
+    }
+    @Test fun intermediateServersOnlyReceiveCompletionAndLegacyServersOnlyReceiveVisits() = runBlocking {
+        for (protocol in listOf(HistoryProtocol.COMPLETION_ONLY, HistoryProtocol.LEGACY)) {
+            Fixture().use { f ->
+                val watched = WatchedRepository(f.api, f.store, f.sync).apply { reset() }
+                f.sync.changed = watched::reconcilePending
+                watched.recordWatched(f.context, id)
+                f.server.enqueue(snapshot(protocol))
+                if (protocol == HistoryProtocol.LEGACY) f.server.enqueue(success())
+                assertEquals(PlaybackSyncResult.COMPLETE, f.sync.flush())
+                assertEquals("/api/v1/auth/playback", f.server.takeRequest().path)
+                assertTrue(id in watched.state.value.watched)
+                assertFalse(id in watched.state.value.completed)
+                assertEquals(if (protocol == HistoryProtocol.LEGACY) 2 else 1, f.server.requestCount)
+                if (protocol == HistoryProtocol.LEGACY) assertNull(f.server.takeRequest().requestUrl!!.queryParameter("event"))
+                else f.server.enqueue(success())
+                watched.recordWatched(f.context, id, HistoryEvent.COMPLETE)
+                assertEquals(PlaybackSyncResult.COMPLETE, f.sync.flush())
+                assertTrue(id in watched.state.value.completed)
+                assertEquals(2, f.server.requestCount)
+                if (protocol == HistoryProtocol.COMPLETION_ONLY) assertNull(f.server.takeRequest().requestUrl!!.queryParameter("event"))
+            }
         }
     }
     @Test fun oldAcknowledgementCannotEraseNewerSeek() = runBlocking {
@@ -136,7 +170,7 @@ class PlaybackSyncTest {
             f.server.enqueue(MockResponse().setResponseCode(401))
             assertEquals(PlaybackSyncResult.PAUSED, f.sync.flush()); assertEquals(0, f.expired)
             assertEquals(PlaybackSyncResult.PAUSED, f.sync.flush()); assertEquals(1, f.server.requestCount)
-            f.sync.reconnect(); f.server.enqueue(preferences()); f.server.enqueue(success())
+            f.sync.reconnect(); f.server.enqueue(preferences()); f.server.enqueue(snapshot()); f.server.enqueue(success())
             assertEquals(PlaybackSyncResult.COMPLETE, f.sync.flush()); assertTrue(f.sync.pending().isEmpty())
             f.server.enqueue(MockResponse().setResponseCode(401))
             try { f.api.watched(id) } catch (_: ApiException) { }
@@ -241,13 +275,14 @@ class PlaybackSyncTest {
         Fixture().use { f ->
             val watched = WatchedRepository(f.api, f.store, f.sync)
             watched.reset(); watched.configure(f.context, true); f.sync.changed = watched::reconcilePending
-            watched.recordWatched(f.context, id); watched.savePosition(f.context, id, 50)
+            watched.recordWatched(f.context, id); watched.recordWatched(f.context, id, HistoryEvent.COMPLETE)
+            watched.savePosition(f.context, id, 50)
             val arrived = CountDownLatch(1); val release = CountDownLatch(1)
             f.server.dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
                     if (request.path == "/api/v1/auth/playback") {
-                        arrived.countDown(); check(release.await(5, TimeUnit.SECONDS))
-                        return MockResponse().setBody("""{"watched":[],"positions":{}}""")
+                        if (arrived.count > 0) { arrived.countDown(); check(release.await(5, TimeUnit.SECONDS)) }
+                        return snapshot(HistoryProtocol.EVENTS)
                     }
                     return success()
                 }
@@ -258,6 +293,7 @@ class PlaybackSyncTest {
             } finally { release.countDown() }
             refresh.await()
             assertTrue(id in watched.state.value.watched); assertEquals(50L, watched.state.value.positions[id])
+            assertTrue(id in watched.state.value.completed)
         }
     }
     @Test fun pendingHistorySurvivesRepositoryRestartAndDisabledUnsentHistoryDisappears() = runBlocking {
@@ -266,7 +302,7 @@ class PlaybackSyncTest {
             val watched = WatchedRepository(f.api, f.store, f.sync)
             watched.reset(); watched.configure(f.context, true); f.sync.changed = watched::reconcilePending
             assertTrue(id in watched.state.value.watched)
-            f.server.enqueue(success()); f.sync.flush()
+            f.server.enqueue(snapshot()); f.server.enqueue(success()); f.sync.flush()
             assertTrue(id in watched.state.value.watched)
             val second = "bbbbbbbbbbb"
             watched.recordWatched(f.context, second)

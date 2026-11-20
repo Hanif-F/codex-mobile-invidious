@@ -31,6 +31,7 @@ import java.util.UUID
 import org.json.JSONObject
 
 internal const val SKIP_PLAYBACK_POSITION = "skipPlaybackPosition"
+internal const val CAN_COMPLETE_HISTORY = "canCompleteHistory"
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 class PlaybackService : MediaSessionService() {
@@ -79,7 +80,7 @@ class PlaybackService : MediaSessionService() {
     private var history = false
     private var savePosition = false
     private var started = false
-    private var marked = false
+    private val recordedHistory = mutableSetOf<HistoryEvent>()
     private var playbackGeneration = 0L
     private var current: MediaItem? = null
     private val sponsor = SponsorBlockEngine()
@@ -177,7 +178,7 @@ class PlaybackService : MediaSessionService() {
                         if (args.getString("mediaId") != player.currentMediaItem?.mediaId || ownerContext != app.api.context())
                             return Futures.immediateFuture(SessionResult(SessionError.ERROR_INVALID_STATE))
                         history = args.getBoolean("history") && owner != null && player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true
-                        if (!history) marked = false
+                        if (!history) recordedHistory.clear()
                         savePosition = player.currentMediaItem?.mediaMetadata?.extras?.getBoolean("clip") != true && (app.playbackQueue.value.current?.linkPlayback?.options?.savePosition ?: args.getBoolean("savePosition"))
                         app.watched.configure(ownerContext!!, savePosition)
                         return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
@@ -206,7 +207,7 @@ class PlaybackService : MediaSessionService() {
                 history = mediaItem?.mediaMetadata?.extras?.getBoolean("history") ?: false
                 savePosition = mediaItem?.mediaMetadata?.extras?.getBoolean("savePosition") ?: false
                 started = false
-                marked = false
+                recordedHistory.clear()
                 playbackGeneration++
                 if (mediaItem != null) app.watched.configure(ownerContext!!, savePosition)
                 resetSponsor(mediaItem)
@@ -220,7 +221,14 @@ class PlaybackService : MediaSessionService() {
             }
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY && player.playerError == null) { recovery.ready(); recoverySnapshot = null }
-                if (state == Player.STATE_ENDED) { if (queue.enforceEnd()) persist() else { persist(ended = true); queue.advance(automatic = true) } }
+                if (state == Player.STATE_ENDED) {
+                    if (queue.enforceEnd()) persist()
+                    else {
+                        recordCompletion(ended = true)
+                        persist(ended = true)
+                        queue.advance(automatic = true)
+                    }
+                }
             }
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                 if (recovery.recovering) recoverySnapshot = recoverySnapshot?.copy(playing = playWhenReady)
@@ -241,13 +249,21 @@ class PlaybackService : MediaSessionService() {
             override fun onEvents(player: Player, events: Player.Events) { queue.applySelection(); queue.syncModeOverrides(); queue.enforceEnd(); evaluateSponsor() }
         })
         scope.launch { while (isActive) { delay(15_000); if (player.isPlaying) { recordHistory(); persist() } } }
-        scope.launch { while (isActive) { delay(100); recovery.sample(player.isPlaying, player.currentPosition); queue.enforceEnd(); if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor() } }
+        scope.launch {
+            while (isActive) {
+                delay(100)
+                recovery.sample(player.isPlaying, player.currentPosition)
+                queue.enforceEnd()
+                if (player.isPlaying) recordCompletion()
+                if (player.isPlaying || sponsorNotice.isNotEmpty()) evaluateSponsor()
+            }
+        }
         scope.launch { app.playbackSync.configurationChanges.collect {
             val context = ownerContext
             if (context == app.api.context() && current?.mediaMetadata?.extras?.getString("downloadId") != null) {
                 val settings = app.playbackSync.settings(context!!)
                 history = sameOwner(owner) && settings?.history == true
-                if (!history) marked = false
+                if (!history) recordedHistory.clear()
                 savePosition = settings?.position == true
                 app.watched.configure(context, savePosition)
                 if (player.isPlaying) recordHistory()
@@ -431,17 +447,24 @@ class PlaybackService : MediaSessionService() {
         return SessionResult(SessionResult.RESULT_SUCCESS)
     }
     private fun sameOwner(account: Account?): Boolean = account != null && account == app.store.account.value && account.server == app.store.server
-    private fun recordHistory() {
-        if (marked || !history || !sameOwner(owner) || ownerContext != app.api.context()) return
+    private fun recordCompletion(ended: Boolean = false) {
+        if (!history || !started || HistoryEvent.COMPLETE in recordedHistory || player.isCurrentMediaItemLive ||
+            current?.mediaMetadata?.extras?.getBoolean(CAN_COMPLETE_HISTORY) != true) return
+        if (PlaybackRules.reachedCompletion(player.currentPosition, player.duration, ended))
+            recordHistory(HistoryEvent.COMPLETE)
+    }
+
+    private fun recordHistory(event: HistoryEvent = HistoryEvent.VISIT) {
+        if (event in recordedHistory || !history || !sameOwner(owner) || ownerContext != app.api.context()) return
         val item = current ?: return
         if (item.mediaMetadata.extras?.getBoolean("clip") == true) return
         val context = ownerContext ?: return
         val generation = playbackGeneration
-        marked = true
+        recordedHistory.add(event)
         app.playbackScope.launch {
-            try { app.watched.recordWatched(context, item.mediaId) }
+            try { app.watched.recordWatched(context, item.mediaId, event) }
             catch (e: CancellationException) { throw e }
-            catch (_: Exception) { if (generation == playbackGeneration && context == ownerContext) marked = false }
+            catch (_: Exception) { if (generation == playbackGeneration && context == ownerContext) recordedHistory.remove(event) }
         }
     }
     private fun persist(ended: Boolean = false, item: MediaItem? = current, position: Long = player.currentPosition) {

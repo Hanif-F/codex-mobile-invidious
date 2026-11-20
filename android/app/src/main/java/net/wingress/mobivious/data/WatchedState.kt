@@ -8,44 +8,54 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import kotlin.math.roundToInt
 
-data class PlaybackSnapshot(val watched: Set<String> = emptySet(), val positions: Map<String, Long> = emptyMap()) {
+internal enum class HistoryEvent(val wire: String) { VISIT("visit"), COMPLETE("complete") }
+internal enum class HistoryProtocol { LEGACY, COMPLETION_ONLY, EVENTS }
+
+data class PlaybackSnapshot(val watched: Set<String> = emptySet(), val positions: Map<String, Long> = emptyMap(),
+    val completed: Set<String>? = null, val historyEvents: Boolean = false) {
+    internal val historyProtocol get() = when {
+        historyEvents -> HistoryProtocol.EVENTS
+        completed != null -> HistoryProtocol.COMPLETION_ONLY
+        else -> HistoryProtocol.LEGACY
+    }
+
     companion object {
         private val videoId = Regex("^[A-Za-z0-9_-]{11}$")
+        private fun org.json.JSONArray.videoIds() =
+            (0 until length()).mapNotNull { opt(it) as? String }.filter(videoId::matches).toSet()
+
         fun parse(json: JSONObject): PlaybackSnapshot {
             val positions = json.getJSONObject("positions")
             val watched = json.getJSONArray("watched")
-            return PlaybackSnapshot((0 until watched.length()).mapNotNull { watched.opt(it) as? String }
-                .filter { videoId.matches(it) }.toSet(), positions.keys().asSequence().mapNotNull { id ->
+            val completed = if (json.has("completed")) json.optJSONArray("completed")?.videoIds().orEmpty() else null
+            return PlaybackSnapshot(watched.videoIds(), positions.keys().asSequence().mapNotNull { id ->
                 val value = positions.opt(id)
                 if (videoId.matches(id) && value is Number && value.toDouble().isFinite() &&
                     value.toDouble() >= 0 && value.toDouble() <= Int.MAX_VALUE && value.toDouble() == value.toLong().toDouble())
                     id to value.toLong() else null
-            }.toMap())
+            }.toMap(), completed, json.opt("historyEvents") == true)
         }
     }
 }
 
 data class WatchedState(val context: ApiContext? = null, val watched: Set<String> = emptySet(),
     val positions: Map<String, Long> = emptyMap(), val loading: Boolean = false, val error: String? = null,
-    val historyRevision: Long = 0)
+    val historyRevision: Long = 0, val completed: Set<String> = emptySet())
 
 data class VideoIndicator(val watched: Boolean, val percent: Int?, val bar: Float?) {
     val description: String get() = listOfNotNull(if (watched) "In watch history" else null,
-        percent?.let { "Playback progress $it percent" }).joinToString(". ")
+        if (bar == 1f) "Playback complete" else percent?.let { "Playback progress $it percent" }).joinToString(". ")
 }
 
 object WatchedIndicators {
     fun forVideo(video: Video, state: WatchedState): VideoIndicator {
         val watched = video.id in state.watched
-        val position = state.positions[video.id]
+        val position = state.positions[video.id]?.takeIf { it > 0 }
         val percent = if (position != null && video.duration > 0 && !video.live)
-            (position.toDouble() / video.duration * 100).roundToInt().coerceIn(0, 100) else null
-        val bar = when {
-            position != null -> percent?.let { if (it > 90) 1f else it.coerceAtLeast(5) / 100f }
-            watched -> 1f
-            else -> null
-        }
-        return VideoIndicator(watched, percent, bar)
+            (position.toDouble() / video.duration * 100).roundToInt().coerceIn(0, 99) else null
+        if (!video.live && video.id in state.completed && (percent == null || percent >= 95))
+            return VideoIndicator(watched, null, 1f)
+        return VideoIndicator(watched, percent, percent?.let { it.coerceAtLeast(5) / 100f })
     }
 }
 
@@ -70,6 +80,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     private var positionGeneration = 0L
     private val historyGeneration = mutableMapOf<String, Long>()
     private val historyRevisions = mutableMapOf<String, Long>()
+    private val completionRevisions = mutableMapOf<String, Long>()
     private val positionRevisions = mutableMapOf<String, Long>()
     private val pendingPositions = mutableSetOf<String>()
     private var journalPending = emptyMap<String, PendingPlayback>()
@@ -78,6 +89,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     private var savePosition = false
     private var positionsConfigured = false
     private var snapshot = PlaybackSnapshot()
+    private val localVisits = mutableSetOf<String>()
     private data class Refresh(val context: ApiContext, val epoch: Long, val revision: Long)
     private var refreshing: Refresh? = null
     private data class Write(val context: ApiContext, val epoch: Long, val clear: Long, val position: Long, val history: Long)
@@ -85,8 +97,9 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
     fun reset(context: ApiContext = api.context()) = synchronized(lock) {
         if (mutableState.value.context == context) return@synchronized
         epoch++; revision++; clearGeneration++; positionGeneration++
-        historyGeneration.clear(); historyRevisions.clear(); positionRevisions.clear(); pendingPositions.clear()
+        historyGeneration.clear(); historyRevisions.clear(); completionRevisions.clear(); positionRevisions.clear(); pendingPositions.clear()
         historyRevision = 0
+        localVisits.clear()
         journalPending = sync?.pending(context).orEmpty()
         refreshing = null; clearedAt = revision; positionsClearedAt = revision
         savePosition = sync?.settings(context)?.position == true; positionsConfigured = false; snapshot = PlaybackSnapshot(positions = if (savePosition) local.positions(context) else emptyMap())
@@ -117,12 +130,20 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         val context = api.context()
         if (mutableState.value.context == context) {
             val next = sync?.pending(context).orEmpty()
+            val historyEnabled = sync?.settings(context)?.history == true
+            val protocol = api.knownHistoryProtocol(context)
             (journalPending.keys + next.keys).forEach { id ->
                 val before = journalPending[id]; val after = next[id]
-                if (before?.history != after?.history) {
+                if (before?.history != after?.history || before?.completion != after?.completion) {
                     historyRevisions[id] = ++revision
-                    if (before?.history != null && after?.history == null) {
-                        if (sync?.settings(context)?.history == true) snapshot = snapshot.copy(watched = snapshot.watched + id)
+                    if (historyEnabled) {
+                        if (before?.history != null && after?.history == null) acknowledgeHistory(id, HistoryEvent.VISIT, protocol)
+                        if (before?.completion != null && after?.completion == null) {
+                            acknowledgeHistory(id, HistoryEvent.COMPLETE, protocol)
+                            completionRevisions[id] = revision
+                        }
+                    }
+                    if (before?.history != null && after?.history == null || before?.completion != null && after?.completion == null) {
                         historyRevision++
                     }
                 }
@@ -137,15 +158,25 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
             publish()
         }
     }
+    private fun acknowledgeHistory(id: String, event: HistoryEvent, protocol: HistoryProtocol?) {
+        if (event == HistoryEvent.VISIT && protocol == HistoryProtocol.COMPLETION_ONLY) {
+            localVisits.add(id)
+            return
+        }
+        localVisits.remove(id)
+        snapshot = snapshot.copy(watched = snapshot.watched + id,
+            completed = if (event == HistoryEvent.COMPLETE) snapshot.completed.orEmpty() + id else snapshot.completed)
+    }
     private fun publish() {
         val context = mutableState.value.context
         val pending = if (context == api.context() && context.account != null) sync?.pending(context).orEmpty() else emptyMap()
-        val watched = snapshot.watched + pending.filterValues { it.history != null }.keys
+        val completed = snapshot.completed.orEmpty() + pending.filterValues { it.completion != null }.keys
+        val watched = snapshot.watched + localVisits + pending.filterValues { it.history != null || it.completion != null }.keys
         val positions = snapshot.positions.toMutableMap()
         pending.forEach { (id, entry) -> if (entry.position != null) {
             if (entry.seconds == 0L) positions.remove(id) else positions[id] = entry.seconds
         } }
-        mutableState.value = mutableState.value.copy(watched = watched,
+        mutableState.value = mutableState.value.copy(watched = watched, completed = completed,
             positions = if (savePosition) positions else emptyMap(), historyRevision = historyRevision)
     }
     suspend fun refresh() {
@@ -166,8 +197,13 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
                 // Clearing history invalidates the whole older snapshot.
                 if (clearedAt <= request.revision) {
                     val watched = fetched.watched.toMutableSet()
+                    val completed = (fetched.completed ?: snapshot.completed.orEmpty().intersect(watched)).toMutableSet()
+                    localVisits.removeAll(fetched.watched)
                     historyRevisions.filterValues { it > request.revision }.keys.forEach { id ->
                         if (id in snapshot.watched) watched.add(id) else watched.remove(id)
+                    }
+                    completionRevisions.filterValues { it > request.revision }.keys.forEach { id ->
+                        if (id in snapshot.completed.orEmpty()) completed.add(id) else completed.remove(id)
                     }
                     val positions = when {
                         !savePosition -> mutableMapOf()
@@ -177,7 +213,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
                     if (savePosition) (positionRevisions.filterValues { it > request.revision }.keys + pendingPositions).forEach { id ->
                         snapshot.positions[id]?.let { positions[id] = it } ?: positions.remove(id)
                     }
-                    snapshot = PlaybackSnapshot(watched, positions)
+                    snapshot = fetched.copy(watched = watched, positions = positions, completed = completed)
                 }
                 publish()
             }
@@ -215,20 +251,25 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
             } }
         }
     }
-    suspend fun recordWatched(context: ApiContext, id: String) {
+    internal suspend fun recordWatched(context: ApiContext, id: String, event: HistoryEvent = HistoryEvent.VISIT) {
         val ticket = ticket(context, id)
         if (context.account == null) return
         if (sync != null) {
-            if (sync.enqueueHistory(context, id)) synchronized(lock) {
-                if (valid(ticket) && ticket.history == (historyGeneration[id] ?: 0L)) {
-                    historyRevisions[id] = ++revision; historyRevision++; publish()
+            synchronized(lock) {
+                if (valid(ticket) && ticket.history == (historyGeneration[id] ?: 0L) && sync.enqueueHistory(context, id, event)) {
+                    historyRevisions[id] = ++revision
+                    historyRevision++
+                    publish()
                 }
             }
             return
         }
-        write(ticket, { ticket.history == (historyGeneration[id] ?: 0L) }, operation = { api.watched(id, context) }) {
-            snapshot = snapshot.copy(watched = snapshot.watched + id)
+        val protocol = api.knownHistoryProtocol(context) ?: HistoryProtocol.LEGACY
+        write(ticket, { ticket.history == (historyGeneration[id] ?: 0L) },
+            operation = { api.sendHistoryEvent(id, event, protocol, context) }) {
+            acknowledgeHistory(id, event, protocol)
             historyRevisions[id] = revision + 1
+            if (event == HistoryEvent.COMPLETE) completionRevisions[id] = revision + 1
             historyRevision++
         }
     }
@@ -259,8 +300,10 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         write(ticket, operation = { api.removeHistory(id, context) }) {
             sync?.discard(context, id)
             historyGeneration[id] = (historyGeneration[id] ?: 0L) + 1
-            snapshot = snapshot.copy(watched = snapshot.watched - id)
+            localVisits.remove(id)
+            snapshot = snapshot.copy(watched = snapshot.watched - id, completed = snapshot.completed?.minus(id))
             historyRevisions[id] = revision + 1
+            completionRevisions[id] = revision + 1
             historyRevision++
         }
     }
@@ -269,6 +312,7 @@ class WatchedRepository(private val api: InvidiousApi, private val local: LocalP
         write(ticket, operation = { api.clearHistory(context) }) {
             sync?.discard(context)
             clearGeneration++; clearedAt = revision + 1; positionsClearedAt = clearedAt
+            localVisits.clear()
             local.clearPositions(context); snapshot = PlaybackSnapshot()
             historyRevision++
         }

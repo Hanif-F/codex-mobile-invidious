@@ -27,6 +27,7 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     private val originalTitles: OriginalTitlePreferences? = null, private val access: InstanceAccess? = null,
     private val onPreferences: (ApiContext, AccountPreferences) -> Unit = { _, _ -> }) {
     private val preferencesRevision = java.util.concurrent.atomic.AtomicLong()
+    @Volatile private var historySupport: Pair<ApiContext, HistoryProtocol>? = null
     private val accessClient = access?.client(client) ?: client
     private val contributionClient = accessClient.newBuilder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).build()
     fun context() = ApiContext(server(), account(), generation())
@@ -407,10 +408,42 @@ class InvidiousApi(private val server: () -> String, private val account: () -> 
     suspend fun importDeArrowIdentity(privateId: String, context: ApiContext) { request("api/v1/auth/dearrow/identity", "PUT", JSONObject().put("privateId", privateId), true, context = context) }
     suspend fun dearrowSubmissions(id: String, context: ApiContext) = ApiParser.dearrowSubmissions(JSONObject(request("api/v1/auth/dearrow/$id/submissions", auth = true, context = context)))
     suspend fun contributeDeArrow(id: String, fields: JSONObject, context: ApiContext) { request("api/v1/auth/dearrow/$id", "POST", fields, true, context = context) }
-    suspend fun playback(context: ApiContext = context()) = PlaybackSnapshot.parse(JSONObject(request("api/v1/auth/playback", auth = true, context = context)))
+    suspend fun playback(context: ApiContext = context(), optionalSync: Boolean = false): PlaybackSnapshot =
+        PlaybackSnapshot.parse(JSONObject(request("api/v1/auth/playback", auth = true, context = context, optionalSync = optionalSync)))
+            .also { if (context == context()) historySupport = context to it.historyProtocol }
+
+    internal fun knownHistoryProtocol(context: ApiContext): HistoryProtocol? =
+        historySupport?.takeIf { it.first == context }?.second
+
+    internal fun refreshHistoryProtocol() { historySupport = null }
+
+    internal suspend fun historyProtocol(context: ApiContext): HistoryProtocol {
+        knownHistoryProtocol(context)?.let { return it }
+        return try {
+            playback(context, optionalSync = true).historyProtocol
+        } catch (e: ApiException) {
+            if (e.status !in listOf(404, 405)) throw e
+            if (context == context()) historySupport = context to HistoryProtocol.LEGACY
+            HistoryProtocol.LEGACY
+        }
+    }
     suspend fun position(id: String, context: ApiContext = context(), optionalSync: Boolean = false): Long = try { JSONObject(request("api/v1/auth/playback/$id", auth = true, context = context, optionalSync = optionalSync)).optLong("position") } catch (e: ApiException) { if (e.status == 404) 0 else throw e }
     suspend fun position(id: String, seconds: Long, context: ApiContext = context(), optionalSync: Boolean = false) { if (seconds == 0L) request("api/v1/auth/playback/$id", "DELETE", auth = true, context = context, optionalSync = optionalSync) else request("api/v1/auth/playback/$id", "PUT", JSONObject().put("position", seconds.coerceAtMost(Int.MAX_VALUE.toLong())), true, context = context, optionalSync = optionalSync) }
-    suspend fun watched(id: String, context: ApiContext = context(), optionalSync: Boolean = false) { request("api/v1/auth/history/$id", "POST", auth = true, context = context, optionalSync = optionalSync) }
+    suspend fun watched(id: String, context: ApiContext = context(), optionalSync: Boolean = false) {
+        postHistory(id, context, optionalSync)
+    }
+    internal suspend fun sendHistoryEvent(id: String, event: HistoryEvent, protocol: HistoryProtocol,
+        context: ApiContext, optionalSync: Boolean = false) {
+        when (protocol) {
+            HistoryProtocol.EVENTS -> postHistory(id, context, optionalSync, event)
+            HistoryProtocol.COMPLETION_ONLY -> if (event == HistoryEvent.COMPLETE) watched(id, context, optionalSync)
+            HistoryProtocol.LEGACY -> if (event == HistoryEvent.VISIT) watched(id, context, optionalSync)
+        }
+    }
+    private suspend fun postHistory(id: String, context: ApiContext, optionalSync: Boolean, event: HistoryEvent? = null) {
+        request("api/v1/auth/history/$id", "POST", auth = true, context = context,
+            query = event?.let { mapOf("event" to it.wire) }.orEmpty(), optionalSync = optionalSync)
+    }
     suspend fun removeHistory(id: String, context: ApiContext = context()) { request("api/v1/auth/history/$id", "DELETE", auth = true, context = context) }
     suspend fun clearHistory(context: ApiContext = context()) { request("api/v1/auth/history", "DELETE", auth = true, context = context) }
     suspend fun logout() { request("api/v1/auth/tokens/unregister", "POST", auth = true) }

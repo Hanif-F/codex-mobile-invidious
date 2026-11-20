@@ -81,7 +81,8 @@ compare calendar dates against that server day. If a later page reports a new da
 the client reloads the first page instead of mixing calendar groups. Legacy arrays
 retain basic viewing, including unavailable IDs, with organized search disabled.
 
-`WatchedRepository` maintains watched IDs, optional positions and history revision.
+`WatchedRepository` maintains history membership, explicit completion, optional
+positions and the history revision.
 Reads merge untouched entries while retaining newer local/confirmed writes; clear and
 per-video generations stop old writes resurrecting removed history. Account history
 and progress writes share a durable per-profile journal for streamed and downloaded
@@ -89,7 +90,8 @@ videos. Pending entries update indicators immediately; successful upload also ad
 the history revision. Position writes keep local fallback when the server upload fails. Guests have progress only
 when enabled, not shared watch history. Removing one history entry leaves progress;
 clear removes both. Badges/progress bars hide unknown percentages for live/unknown
-duration; known progress has a small visible floor and near-complete fill.
+duration. Saved partial progress has a small visible floor. Only explicit
+completion can fill a progress bar.
 
 `DisplayFormats` centralizes localized compact audience counts, grouped inventories,
 bytes/bitrates, clock times and dates. Unknown/negative/fractional/overflow numbers

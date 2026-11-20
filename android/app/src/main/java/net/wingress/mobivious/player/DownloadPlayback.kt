@@ -21,6 +21,7 @@ internal object DownloadPlayback {
             .setExtras(Bundle().apply {
                 putString("occurrence", occurrence); putString("downloadId", record.id)
                 putBoolean("savePosition", savePosition); putBoolean("history", history)
+                putBoolean(CAN_COMPLETE_HISTORY, !details.video.live)
                 putBoolean(SKIP_PLAYBACK_POSITION, details.isMusicGenre)
             }).build()
         val factory = DefaultMediaSourceFactory(DefaultDataSource.Factory(context))

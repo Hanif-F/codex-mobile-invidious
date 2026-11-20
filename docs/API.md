@@ -113,7 +113,8 @@ server supplying those fields; playlist aggregates and clip statistics are separ
 
 VideoDetails includes description/plain HTML, video metadata, dash/hls/fallback,
 captions, recommended videos, adaptive/format streams, optional likes/credits,
-availability/premiere/region flags, `liveChatReplay` and storyboard tracks.
+availability/premiere/region flags, the YouTube `aiMade` disclosure, `liveChatReplay`
+and storyboard tracks. Upcoming cards use the supplied `premiereTimestamp`.
 Missing fields preserve compatibility. Replay requires archived, non-upcoming
 content and an explicit availability flag. Comments/replies preserve their own
 continuations and suppress repeated cursors. No discussion mutation API is used.
@@ -165,9 +166,10 @@ inputs. Android sorts returned numbers locally.
 | PATCH `/api/v1/auth/chat_preferences` | Dedicated chat timestamp/user/word preference patch → account preferences. |
 | GET/PUT `/api/v1/auth/chat_timing/:id` | `{offsetMs}` for replay delay; PUT accepts ±3,600,000 ms. |
 | GET `/api/v1/auth/history` | `details=true`, `organized=true`, `q`, `page`; organized entries/total/hasMore/today/timezone, or legacy flat array. |
-| POST/DELETE `/api/v1/auth/history/:id` | Mark watched / remove history entry. |
+| POST `/api/v1/auth/history/:id` | `event=visit` records history and `event=complete` marks playback complete when the server advertises support. Older instances use the unqualified POST. |
+| DELETE `/api/v1/auth/history/:id` | Remove the history entry and completion mark. |
 | DELETE `/api/v1/auth/history` | Clear shared history (client clears local progress snapshot after confirmation). |
-| GET `/api/v1/auth/playback` | `{watched: [ids], positions: {id: seconds}}`. |
+| GET `/api/v1/auth/playback` | `{watched: [ids], positions: {id: seconds}}` with optional `completed: [ids]` and `historyEvents: true`. |
 | GET/PUT/DELETE `/api/v1/auth/playback/:id` | Read, `{position}` write in seconds, or clear. Missing saved position reads as zero on 404. |
 | GET `/api/v1/auth/blocked_channels` | Confirmed `{authorId,author}` rows. |
 | POST/DELETE `/api/v1/auth/blocked_channels/:id` | `{name}` when blocking / unblock. |
@@ -239,8 +241,9 @@ IO/5xx failures may use a snapshot younger than 24 hours; 4xx errors never do.
 Explicit root-feed refresh disables this fallback so failure retains the currently
 displayed rows and reports Retry. Normal browsing keeps its existing cached-results
 behavior; successful refresh responses still update the snapshot.
-Successful cached-endpoint bodies are shape-validated before storage. Other reads
-and all writes have no offline mutation queue. See [Storage](STORAGE_AND_SECURITY.md).
+Successful cached-endpoint bodies are shape-validated before storage.
+Playback history events and positions use the dedicated playback journal.
+See [Storage](STORAGE_AND_SECURITY.md).
 
 ## Compatibility and server rollout
 
@@ -251,6 +254,7 @@ and all writes have no offline mutation queue. See [Storage](STORAGE_AND_SECURIT
 | Seek interval | Shared integer `seek_seconds`: 5, 10, 20 or 30; default/fallback 10. Existing GET/PATCH preferences and scopes. Deploy server support before distributing Android. An older server omits the field and rejects unsupported saves through the existing update-required flow. No migration or endpoint. |
 | Native login/registration/account management | Mobile/account extensions; old server explains update. New permission groups may require renewed sign-in. |
 | History/progress, blocks, subscription search | Fork extensions and matching native scopes. Renew old tokens after scope additions. |
+| Separate history visits and completion | Updated `GET /playback` advertises `historyEvents: true`. The existing history scope and completion storage suffice. Older instances receive compatible writes. |
 | Saved playlists/RSS | Fork APIs/scopes and migration 20 for per-account bookmarks/backfill. |
 | DeArrow contributions | Fork APIs/scopes and the existing migration 13 identity table/key; this contribution update introduces no new migration or key rotation. |
 | Clips | Clips extension and migration 19, plus native token/channel-tab updates; renew sign-in for old scopes. |

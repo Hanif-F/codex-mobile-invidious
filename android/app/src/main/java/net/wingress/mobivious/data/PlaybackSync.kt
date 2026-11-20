@@ -12,13 +12,17 @@ import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 data class PlaybackSyncSettings(val history: Boolean, val position: Boolean)
-data class PendingPlayback(val history: Long? = null, val position: Long? = null, val seconds: Long = 0)
+data class PendingPlayback(val history: Long? = null, val position: Long? = null, val seconds: Long = 0,
+    val completion: Long? = null) {
+    internal val hasWrites get() = history != null || position != null || completion != null
+}
 data class PlaybackJournal(val revision: Long = 0, val settings: PlaybackSyncSettings? = null,
     val pending: Map<String, PendingPlayback> = emptyMap()) {
     fun json() = JSONObject().put("revision", revision).apply {
         settings?.let { put("settings", JSONObject().put("history", it.history).put("position", it.position)) }
         put("pending", JSONObject().apply { pending.forEach { (id, entry) ->
-            put(id, JSONObject().put("history", entry.history).put("position", entry.position).put("seconds", entry.seconds))
+            put(id, JSONObject().put("history", entry.history).put("position", entry.position)
+                .put("seconds", entry.seconds).put("completion", entry.completion))
         } })
     }
     companion object {
@@ -32,7 +36,8 @@ data class PlaybackJournal(val revision: Long = 0, val settings: PlaybackSyncSet
                 val value = entries.getJSONObject(id)
                 PendingPlayback(if (value.isNull("history")) null else value.getLong("history"),
                     if (value.isNull("position")) null else value.getLong("position"),
-                    value.getLong("seconds").coerceIn(0, Int.MAX_VALUE.toLong()))
+                    value.getLong("seconds").coerceIn(0, Int.MAX_VALUE.toLong()),
+                    if (value.isNull("completion")) null else value.getLong("completion"))
             })
         }
     }
@@ -79,8 +84,9 @@ class PlaybackSyncRepository(private val api: InvidiousApi, private val store: P
             val settings = PlaybackSyncSettings(preferences.watchHistory, preferences.savePosition)
             val before = store.playbackJournal(context)
             val pending = before.pending.mapValues { (_, entry) -> entry.copy(
-                history = entry.history.takeIf { settings.history }, position = entry.position.takeIf { settings.position })
-            }.filterValues { it.history != null || it.position != null }
+                history = entry.history.takeIf { settings.history }, position = entry.position.takeIf { settings.position },
+                completion = entry.completion.takeIf { settings.history })
+            }.filterValues(PendingPlayback::hasWrites)
             val next = before.copy(settings = settings, pending = pending)
             if (next != before) store.savePlaybackJournal(context, next)
             settingsRevision++; confirmed = context; paused = null
@@ -88,15 +94,24 @@ class PlaybackSyncRepository(private val api: InvidiousApi, private val store: P
         configurationRevision.update { it + 1 }
         changed()
     }
-    override fun reconnect() = synchronized(lock) { confirmed = null; paused = null }
-    fun enqueueHistory(context: ApiContext, id: String): Boolean {
+    override fun reconnect() = synchronized(lock) {
+        confirmed = null
+        paused = null
+        api.refreshHistoryProtocol()
+    }
+
+    internal fun enqueueHistory(context: ApiContext, id: String, event: HistoryEvent = HistoryEvent.VISIT): Boolean {
         synchronized(lock) {
             current(context); require(SponsorBlockRules.validVideo(id))
             if (context.account == null) return false
             val before = store.playbackJournal(context)
             if (before.settings?.history != true) return false
             val revision = before.revision + 1
-            val entry = (before.pending[id] ?: PendingPlayback()).copy(history = revision)
+            val pending = before.pending[id] ?: PendingPlayback()
+            val entry = when (event) {
+                HistoryEvent.VISIT -> pending.copy(history = revision)
+                HistoryEvent.COMPLETE -> pending.copy(completion = revision)
+            }
             store.savePlaybackJournal(context, before.copy(revision = revision, pending = before.pending + (id to entry)))
         }
         changed(); return true
@@ -120,20 +135,20 @@ class PlaybackSyncRepository(private val api: InvidiousApi, private val store: P
             current(context)
             val before = store.playbackJournal(context)
             val pending = if (id == null) emptyMap() else before.pending.mapValues { (key, entry) ->
-                if (key == id) entry.copy(history = null) else entry
-            }.filterValues { it.history != null || it.position != null }
+                if (key == id) entry.copy(history = null, completion = null) else entry
+            }.filterValues(PendingPlayback::hasWrites)
             store.savePlaybackJournal(context, before.copy(pending = pending))
         }
         changed()
     }
-    private fun acknowledge(context: ApiContext, id: String, sent: PendingPlayback, history: Boolean) {
+    private fun acknowledge(context: ApiContext, id: String, clearSent: (PendingPlayback) -> PendingPlayback) {
         synchronized(lock) {
             current(context)
             val before = store.playbackJournal(context)
             val entry = before.pending[id] ?: return
-            val next = if (history && entry.history == sent.history) entry.copy(history = null)
-                else if (!history && entry.position == sent.position) entry.copy(position = null) else entry
-            val pending = if (next.history == null && next.position == null) before.pending - id else before.pending + (id to next)
+            val next = clearSent(entry)
+            if (next == entry) return
+            val pending = if (next.hasWrites) before.pending + (id to next) else before.pending - id
             store.savePlaybackJournal(context, before.copy(pending = pending))
         }
         changed()
@@ -167,15 +182,20 @@ class PlaybackSyncRepository(private val api: InvidiousApi, private val store: P
         try {
             if (synchronized(lock) { confirmed != context }) refreshSettings(context)
             val batch = pending(context)
+            val historyProtocol = if (batch.values.any { it.history != null || it.completion != null }) api.historyProtocol(context) else null
             for ((id, entry) in batch) {
                 current(context)
-                if (entry.history != null && pending(context)[id]?.history == entry.history) {
-                    api.watched(id, context, optionalSync = true)
-                    acknowledge(context, id, entry, history = true)
+                if (historyProtocol != null && entry.history != null && pending(context)[id]?.history == entry.history) {
+                    api.sendHistoryEvent(id, HistoryEvent.VISIT, historyProtocol, context, optionalSync = true)
+                    acknowledge(context, id) { if (it.history == entry.history) it.copy(history = null) else it }
+                }
+                if (historyProtocol != null && entry.completion != null && pending(context)[id]?.completion == entry.completion) {
+                    api.sendHistoryEvent(id, HistoryEvent.COMPLETE, historyProtocol, context, optionalSync = true)
+                    acknowledge(context, id) { if (it.completion == entry.completion) it.copy(completion = null) else it }
                 }
                 if (entry.position != null && pending(context)[id]?.position == entry.position) {
                     api.position(id, entry.seconds, context, optionalSync = true)
-                    acknowledge(context, id, entry, history = false)
+                    acknowledge(context, id) { if (it.position == entry.position) it.copy(position = null) else it }
                 }
             }
             PlaybackSyncResult.COMPLETE

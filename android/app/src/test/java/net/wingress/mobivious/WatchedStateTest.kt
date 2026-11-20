@@ -60,26 +60,33 @@ class WatchedStateTest {
     }
 
     @Test fun snapshotParsesIndependentStateAndRejectsMalformedEntries() {
-        val parsed = PlaybackSnapshot.parse(JSONObject("""{"watched":["$first","$first",null,4,"bad"],"positions":{"$first":0,"$second":42,"ccccccccccc":-1,"ddddddddddd":1.5,"eeeeeeeeeee":"20","fffffffffff":2147483648,"bad":10}}"""))
+        val parsed = PlaybackSnapshot.parse(JSONObject("""{"watched":["$first","$first",null,4,"bad"],"completed":["$second","bad",null], "historyEvents":true,"positions":{"$first":0,"$second":42,"ccccccccccc":-1,"ddddddddddd":1.5,"eeeeeeeeeee":"20","fffffffffff":2147483648,"bad":10}}"""))
         assertEquals(setOf(first), parsed.watched)
         assertEquals(mapOf(first to 0L, second to 42L), parsed.positions)
+        assertEquals(setOf(second), parsed.completed)
+        assertEquals(HistoryProtocol.EVENTS, parsed.historyProtocol)
         assertThrows(org.json.JSONException::class.java) { PlaybackSnapshot.parse(JSONObject("{}")) }
     }
-    @Test fun barsMatchWebRoundingMinimumAndCompletionThresholds() {
+    @Test fun savedPositionsUsePartialBarsEvenNearTheEnd() {
         val video = Video(first, "Video", duration = 1000)
-        listOf(0L to .05f, 10L to .05f, 50L to .05f, 900L to .9f, 904L to .9f, 905L to 1f, 1200L to 1f).forEach { (position, expected) ->
+        listOf(10L to .05f, 50L to .05f, 900L to .9f, 904L to .9f, 950L to .95f, 1200L to .99f).forEach { (position, expected) ->
             val indicator = WatchedIndicators.forVideo(video, WatchedState(positions = mapOf(first to position)))
             assertEquals(expected, indicator.bar!!, .0001f)
             assertFalse(indicator.watched)
         }
+        assertNull(WatchedIndicators.forVideo(video, WatchedState(watched = setOf(first), positions = mapOf(first to 0L))).bar)
     }
     @Test fun historyMembershipAndProgressHaveDistinctAccessibleDescriptions() {
         val indicator = WatchedIndicators.forVideo(Video(first, "Video", duration = 100), WatchedState(watched = setOf(first), positions = mapOf(first to 40)))
         assertTrue(indicator.watched); assertEquals(40, indicator.percent); assertEquals(.4f, indicator.bar!!, .0001f)
         assertEquals("In watch history. Playback progress 40 percent", indicator.description)
-        val complete = WatchedIndicators.forVideo(Video(first, "Video"), WatchedState(watched = setOf(first)))
+        val complete = WatchedIndicators.forVideo(Video(first, "Video"), WatchedState(watched = setOf(first), completed = setOf(first)))
         assertEquals(1f, complete.bar!!, .0001f); assertNull(complete.percent)
-        assertEquals("In watch history", complete.description)
+        assertEquals("In watch history. Playback complete", complete.description)
+        val saved = WatchedState(watched = setOf(first), completed = setOf(first))
+        val video = Video(first, "Video", duration = 100)
+        assertEquals(.4f, WatchedIndicators.forVideo(video, saved.copy(positions = mapOf(first to 40))).bar!!, .0001f)
+        assertEquals(1f, WatchedIndicators.forVideo(video, saved.copy(positions = mapOf(first to 95))).bar!!, .0001f)
     }
     @Test fun liveAndUnknownDurationsNeverInventPartialProgress() {
         listOf(Video(first, "Unknown"), Video(first, "Invalid", duration = -1), Video(first, "Live", duration = 120, live = true)).forEach { video ->

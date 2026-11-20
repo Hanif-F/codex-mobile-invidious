@@ -48,6 +48,12 @@ class CoreTest {
         assertEquals(50, PlaybackRules.save(50, 100, false))
         assertEquals(0, PlaybackRules.save(50, 100, true))
     }
+    @Test fun completionRequiresNinetyFivePercentOrAPlaybackEnd() {
+        assertFalse(PlaybackRules.reachedCompletion(113_999, 120_000, ended = false))
+        assertTrue(PlaybackRules.reachedCompletion(114_000, 120_000, ended = false))
+        assertFalse(PlaybackRules.reachedCompletion(20_000, -1, ended = false))
+        assertTrue(PlaybackRules.reachedCompletion(20_000, -1, ended = true))
+    }
     @Test fun musicGenreMatchesOnlyTheTrimmedCategory() {
         fun details(genre: String?) = ApiParser.details(JSONObject().put("videoId", "abcdefghijk").put("genre", genre))
 

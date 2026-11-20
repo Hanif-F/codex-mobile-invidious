@@ -87,6 +87,10 @@ class ContentLinksSmokeTest {
         until { activity.model.route == "channel:$owner" && !activity.model.browse.value.loading }
         assertEquals(ChannelTab.SHORTS, activity.model.channelTab.value)
         assertEquals(2, fixture().getJSONArray("resolveRequests").length())
+        incoming("/fixture/streams")
+        until { activity.model.channelTab.value == ChannelTab.STREAMS && !activity.model.browse.value.loading }
+        val requests = fixture().getJSONArray("resolveRequests")
+        assertEquals("https://www.youtube.com/fixture/streams", requests.getJSONObject(2).getString("url"))
         assertEquals(0, fixture().getJSONArray("searchRequests").length())
     }
     @Test fun sharedHashtagsUseNativePaginationAndChannelLinksPreservePlayback() {

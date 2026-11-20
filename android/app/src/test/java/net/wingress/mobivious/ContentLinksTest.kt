@@ -30,6 +30,17 @@ class ContentLinksTest {
         assertNull(VideoLinks.parse("https://evil.test/show/VLPLshows", server))
         assertNull(VideoLinks.parse("https://user:secret@www.youtube.com/show/VLPLshows", server))
     }
+    @Test fun bareChannelTabLinksRequireAnAcceptedHostAndRecognizedPath() {
+        val expected = ContentLink.Channel(ChannelLink(resolveUrl = "https://www.youtube.com/markrober/streams", tab = ChannelTab.STREAMS))
+        for (origin in listOf(server, "https://www.youtube.com", "https://mobivious.wingress.net")) {
+            assertEquals(expected, ContentLinks.parse("$origin/markrober/STREAMS/", server))
+        }
+        assertEquals(expected, ContentLinks.resolve("/markrober/streams", server))
+        for (path in listOf("/api/videos", "/feed/channels", "/channel/streams", "/markrober/unknown",
+            "/markrober/streams/extra", "/bad%2Fname/streams"))
+            assertNull(path, ContentLinks.parse(server + path, server))
+        assertNull(ContentLinks.parse("https://example.com/markrober/streams", server))
+    }
     @Test fun legacyCommentLinkOverridesNormalizeAndPreserveEmptySlotsWithoutEditingDefaults() {
         val saved = AccountPreferences(comments = listOf("", ""))
         val options = VideoLinks.parse("$server/watch?v=$id&comments=,reddit", server)!!.playback.options

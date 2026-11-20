@@ -29,6 +29,14 @@ class VideoInformationPresentationTest {
         listed = false, genre = "Music", license = "", familyFriendly = false, allowedRegions = listOf("ID", "US"),
         music = listOf(MusicCredit("Song", "Artist", "Album", "Music license")))
 
+    @Test fun watchNoticesShowOnlySuppliedAiDisclosure() {
+        val current = mutableStateOf(details)
+        compose.setContent { MaterialTheme { Column { VideoNotices(current.value) } } }
+        compose.onNodeWithTag("video-ai-made").assertDoesNotExist()
+        compose.runOnIdle { current.value = details.copy(aiMade = true) }
+        compose.onNodeWithTag("video-ai-made").assertTextEquals("Labeled AI-made on YouTube")
+    }
+
     @Test fun metadataAndCreditsFitNarrowDarkLargeFontLayouts() {
         compose.setContent { MaterialTheme(colorScheme = darkColorScheme()) {
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, 2f)) {

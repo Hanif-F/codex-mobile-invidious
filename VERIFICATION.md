@@ -1,5 +1,68 @@
 # Focused implementation verification
 
+## Invidious parity after the playback fix — 20 November 2026
+
+Native account history distinguishes visits from completed playback while retaining
+the existing token scope. The Android changes also cover the YouTube AI
+disclosure, rich-description chapters, upcoming premiere cards and bare channel-tab links.
+
+- Focused `:app:testDebugUnitTest --tests` passed **72 tests** across
+  `WatchedStateTest`, `PlaybackSyncTest`, `VideoInformationTest`,
+  `ContentLinksTest`, `ChaptersTest` and `CoreTest`.
+- `./gradlew :app:testDebugUnitTest :app:lintDebug --offline --console=plain`
+  passed **504 JVM tests** with no failures or skips. Debug lint reported
+  **0 errors and 18 warnings**, matching the previous count.
+- **33 distinct selected emulator cases passed** across the initial fixture run
+  and focused reruns. The download completion test now verifies a paused seek
+  remains incomplete before playback resumes. The player controls test now expects
+  the current Audio menu heading. The initial playback Retry test passed on rerun.
+- `python3 -m unittest discover -s scripts/tests` passed **43 tests**. The Android
+  documentation checker and both repositories' `git diff --check` passed.
+- The full guarded Invidious account harness ran via
+  `crystal run tests/database/accounts.cr -Dskip_videojs_download` against a
+  disposable PostgreSQL database. It passed the native history contract and the
+  Companion byte-range regression. Normal and API-only Crystal source builds
+  with `--no-codegen`, format checks and the server documentation checker passed.
+
+The signed-in emulator's installed Mobivious 0.13.7 played `2HpsdzOpWRY` over
+DASH against the deployed playback fix. MediaSession reported playback at
+58.3 seconds before the seek and 68.8 seconds afterward, with no player error.
+The new history contract was exercised against the disposable fixture and
+server harness. Deployment and physical-device acceptance of the parity update
+remain pending.
+
+Device selectors for the initial run and targeted reruns used Android 16 on
+`emulator-5554`:
+
+```bash
+selectors=(
+  'net.wingress.mobivious.WatchedIndicatorsSmokeTest'
+  'net.wingress.mobivious.DownloadSyncSmokeTest#onlineDownloadSharesHistoryProgressAndCompletion'
+  'net.wingress.mobivious.DownloadSyncSmokeTest#downloadedMusicStartsOverForGuestsAndAccountsAndKeepsWatchHistory'
+  'net.wingress.mobivious.DownloadSyncSmokeTest#failedSyncPersistsAcrossRecreationAndReconnectDrainsWithoutReopeningVideo'
+  'net.wingress.mobivious.DownloadSyncSmokeTest#settingChangesDuringPlaybackImmediatelyStopAndRestartPositionSync'
+  'net.wingress.mobivious.DownloadSyncSmokeTest#authenticationFailureKeepsLocalPlaybackAndOtherAccountsCannotDrainTheQueue'
+  'net.wingress.mobivious.DeviceProfileStorageTest#playbackJournalMigratesWithIdentitySurvivesRestartAndPurgesWithItsOwner'
+  'net.wingress.mobivious.ContentLinksSmokeTest#sharedChannelAliasesResolveAndRetryWithoutSearching'
+  'net.wingress.mobivious.ContentLinksSmokeTest#richWatchInformationAndTimestampSeekKeepTheQueueOccurrence'
+  'net.wingress.mobivious.ContentLinksSmokeTest#boundsPauseWithoutAdvancingAndReplayStartsAtTheRequestedTime'
+  'net.wingress.mobivious.ChaptersRuntimeTest'
+  'net.wingress.mobivious.ChaptersSmokeTest#chapterSelectionNeedsNoExtraRequestsAndScrubbingPreservesPlayback'
+  'net.wingress.mobivious.ChaptersSmokeTest#liveDescriptionsNeverExposeChapters'
+  'net.wingress.mobivious.ChannelSmokeTest#shortsHideEpochDatesAndUnknownDurationsWithoutDetailRequests'
+  'net.wingress.mobivious.ChannelSmokeTest#channelNavigationSwitchingAndIndependentPagination'
+  'net.wingress.mobivious.VideoInformationPresentationTest#watchNoticesShowOnlySuppliedAiDisclosure'
+  'net.wingress.mobivious.VideoInformationPresentationTest#metadataAndCreditsFitNarrowDarkLargeFontLayouts'
+  'net.wingress.mobivious.InstanceAccessSmokeTest#playbackVerificationAutomaticallyRetriesAndKeepsPositionAndOptions'
+  'net.wingress.mobivious.InstanceAccessSmokeTest#backgroundAndPipAccessExpiryResumeAfterForegroundVerification'
+  'net.wingress.mobivious.InstanceAccessSmokeTest#browseLoginCardOpensNativeSignInAndReloadsPopular'
+  'net.wingress.mobivious.AppSmokeTest#unifiedControlsGesturesAndFullscreen'
+  'net.wingress.mobivious.AppSmokeTest#failedInitialPlaybackRetryPreservesAutoplayAndPausedIntent'
+)
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+  "-Pandroid.testInstrumentationRunnerArguments.class=$(IFS=,; printf '%s' "${selectors[*]}")"
+```
+
 ## Patch release 0.13.7 — 9 November 2026
 
 The browse card for required login offers native sign-in and reloads the same

@@ -6,6 +6,18 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VideoInformationTest {
+    @Test fun disclosureAndPremiereCardRequireExplicitMetadata() {
+        val fields = JSONObject("""{"videoId":"abcdefghijk","title":"Video","aiMade":true,"isUpcoming":true,"premiereTimestamp":1800000000}""")
+        val details = ApiParser.details(fields)
+        assertTrue(details.aiMade)
+        assertEquals(1800000000L, details.video.upcomingPremiere)
+        fields.put("aiMade", "true").put("isUpcoming", false)
+        assertFalse(ApiParser.details(fields).aiMade)
+        assertNull(ApiParser.video(fields).upcomingPremiere)
+        fields.put("isUpcoming", true).put("premiereTimestamp", 0)
+        assertNull(ApiParser.video(fields).upcomingPremiere)
+    }
+
     @Test fun suppliedMetadataPreservesFalseZeroAndMusicCredits() {
         val details = ApiParser.details(JSONObject("""{"videoId":"abcdefghijk","title":"Video","description":"Plain","descriptionHtml":"<b>Rich</b>","likeCount":0,"authorVerified":true,"subCountText":"12.3K","isUpcoming":true,"premiereTimestamp":1800000000,"isListed":false,"genre":"Music","genreUrl":"/channel/UCmusic","license":"","isFamilyFriendly":false,"allowedRegions":["ID","US","ID"],"musicTracks":[{"song":"Song","artist":"Artist","album":"Album","license":"Music license"}],"error":"Premieres soon"}"""))
         assertEquals("<b>Rich</b>", details.descriptionHtml); assertEquals(0L, details.likes); assertEquals(true, details.authorVerified)

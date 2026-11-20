@@ -73,7 +73,7 @@ class WatchedIndicatorsSmokeTest {
     }
 
     @Test fun sharedCardsCoverListsAndCompactThumbnailFreeLayouts() {
-        command("watched", """{"indicatorVideos":true,"seedPlaylist":true,"watched":["$first","$second"],"positions":{"$first":40}}""")
+        command("watched", """{"indicatorVideos":true,"seedPlaylist":true,"watched":["$first","$second"],"completed":["$second"],"positions":{"$first":40}}""")
         login(); until { first in activity.model.watched.value.watched }
         listOf("Popular" to "", "Search" to "", "Subscriptions" to "", "Popular" to "channel:${"UC" + "a".repeat(22)}",
             "You" to "playlist:IVfixture", "You" to "history").forEach { (tab, route) ->
@@ -123,7 +123,7 @@ class WatchedIndicatorsSmokeTest {
     }
 
     @Test fun unknownDurationAndLiveCardsKeepBadgesWithoutPartialBars() {
-        command("watched", """{"indicatorVideos":true,"watched":["$first","$second","unknownvid1","streamvid01"],"positions":{"$first":40,"unknownvid1":10,"streamvid01":30}}""")
+        command("watched", """{"indicatorVideos":true,"watched":["$first","$second","unknownvid1","streamvid01"],"completed":["$second"],"positions":{"$first":40,"unknownvid1":10,"streamvid01":30}}""")
         login(); until { activity.model.watched.value.watched.size == 4 }
         navigate("Popular")
         card(second); watched(second).assertExists()
@@ -132,12 +132,13 @@ class WatchedIndicatorsSmokeTest {
     }
 
     @Test fun historyRemovalPreservesProgressAndClearRemovesBoth() {
-        command("watched", """{"watched":["$first","$second"],"positions":{"$first":40}}""")
+        command("watched", """{"watched":["$first","$second"],"completed":["$first","$second"],"positions":{"$first":40}}""")
         login(); until { first in activity.model.watched.value.watched }
         navigate("You", "history"); card(first)
         compose.onNodeWithTag("video-actions-$first").performClick()
         compose.onNodeWithText("Remove from history").performClick()
         until { first !in activity.model.watched.value.watched && !activity.model.browse.value.loading }
+        assertFalse(first in activity.model.watched.value.completed)
         assertEquals(40L, activity.model.watched.value.positions[first])
         navigate("Popular"); watched(first).assertDoesNotExist(); progress(first).assertExists()
         navigate("You", "history")
@@ -152,6 +153,7 @@ class WatchedIndicatorsSmokeTest {
         login()
         compose.onNodeWithText("A quiet moment · playback fixture").performClick()
         until { activity.model.playback.value.playing && first in activity.model.watched.value.watched }
+        assertFalse(first in activity.model.watched.value.completed)
         compose.runOnUiThread { activity.model.store.background = true; activity.model.store.pip = false; activity.model.audioOnly(true); activity.model.controller.value!!.seekTo(45_000) }
         until { (activity.model.watched.value.positions[first] ?: 0) >= 44 }
         val instrumentation = InstrumentationRegistry.getInstrumentation()
@@ -162,13 +164,16 @@ class WatchedIndicatorsSmokeTest {
         compose.runOnUiThread { activity.startActivity(Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)) }
         until { activity.lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED) && activity.window.decorView.hasWindowFocus() && activity.model.playback.value.playing }
         compose.runOnUiThread { activity.model.controller.value!!.seekTo(119_000) }
-        until { first !in activity.model.watched.value.positions }
+        until { first !in activity.model.watched.value.positions && first in activity.model.watched.value.completed }
+        until { fixture().getJSONArray("completed").toString().contains(first) }
         compose.navigateBack()
         watched(first).assertExists()
         assertEquals(1f, progress(first).fetchSemanticsNode().config[SemanticsProperties.ProgressBarRangeInfo].current, .001f)
         screenshot("completed")
         val events = fixture().getJSONArray("events")
-        assertEquals(1, (0 until events.length()).count { events.getJSONObject(it).optString("method") == "POST" && events.getJSONObject(it).optString("path") == "/api/v1/auth/history/$first" })
+        val historyEvents = (0 until events.length()).map(events::getJSONObject)
+            .filter { it.optString("method") == "POST" && it.optString("path") == "/api/v1/auth/history/$first" }
+        assertEquals(listOf("visit", "complete"), historyEvents.map { it.getString("event") })
     }
 
     @Test fun refreshFailureRetainsStateAndSignOutHidesAccountIndicators() {

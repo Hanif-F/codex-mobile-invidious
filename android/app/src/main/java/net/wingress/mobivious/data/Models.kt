@@ -10,7 +10,7 @@ data class Video(val id: String, val title: String, val author: String = "", val
     val history: HistoryMetadata? = null, val playlistIndex: Int? = null, val authorAvatar: String = "",
     val publishedAt: Long? = null, val viewCountPrecision: CountPrecision = CountPrecision.UNVERIFIED,
     val publicationTime: Long? = publishedAt, val viewCountType: ViewCountType? = null,
-    val viewCountText: String = "")
+    val viewCountText: String = "", val upcomingPremiere: Long? = null)
 data class Caption(val label: String, val language: String, val url: String)
 data class AudioIdentity(val id: String, val name: String, val default: Boolean?)
 data class StreamFormat(val id: String, val mimeType: String, val codec: String,
@@ -23,10 +23,11 @@ data class VideoDetails(val video: Video, val description: String, val dash: Str
     val listed: Boolean? = null, val genre: String = "", val genreUrl: String = "", val license: String? = null,
     val familyFriendly: Boolean? = null, val allowedRegions: List<String>? = null,
     val music: List<MusicCredit> = emptyList(), val notice: String = "", val liveChatReplay: Boolean = false, val storyboards: List<StoryboardTrack> = emptyList(),
-    val likeCountPrecision: CountPrecision = CountPrecision.UNVERIFIED, val projectionType: String = "") {
+    val likeCountPrecision: CountPrecision = CountPrecision.UNVERIFIED, val projectionType: String = "",
+    val aiMade: Boolean = false) {
     internal val isMusicGenre: Boolean get() = genre.trim().equals("Music", ignoreCase = true)
     val chatAvailable: Boolean get() = liveChatReplay && !video.live && upcoming != true
-    val chapters: List<VideoChapter> = ChapterRules.parse(description, video.duration, video.live)
+    val chapters: List<VideoChapter> = ChapterRules.fromDescriptions(description, descriptionHtml, video.duration, video.live)
 }
 data class MusicCredit(val song: String, val artist: String, val album: String, val license: String = "")
 enum class ChannelTab(val path: String, val label: String) {
@@ -75,6 +76,9 @@ object ApiParser {
     fun thumbnail(json: JSONObject): String = json.optJSONArray("videoThumbnails")?.objects()?.let { images ->
         images.firstOrNull { it.text("quality") in listOf("medium", "high", "sddefault") } ?: images.firstOrNull()
     }?.text("url") ?: ""
+    private fun premiereTimestamp(json: JSONObject): Long? =
+        json.nonNegativeLong("premiereTimestamp")?.takeIf { it in 1_104_537_600..253_402_300_799L }
+
     fun video(json: JSONObject): Video = Video(json.text("videoId", json.text("video_id")),
         json.text("title", "Unavailable video"), json.text("author", json.text("channel_name")),
         json.text("authorId", json.text("channel_id")), thumbnail(json),
@@ -84,7 +88,8 @@ object ApiParser {
         playlistIndex = if (json.opt("index") is Number) json.getInt("index") else null, authorAvatar = Avatars.parse(json),
         publishedAt = DisplayFormats.publication(json.nonNegativeLong("published")), viewCountPrecision = CountPrecision.parse(json.text("viewCountPrecision")),
         publicationTime = ChannelSpoilerRules.publication(json), viewCountType = ViewCountType.parse(json.text("viewCountType")),
-        viewCountText = VideoViewCounts.text(json))
+        viewCountText = VideoViewCounts.text(json),
+        upcomingPremiere = premiereTimestamp(json).takeIf { json.opt("isUpcoming") == true })
     fun videos(array: JSONArray): List<Video> = array.objects().filter { it.text("videoId", it.text("video_id")).isNotBlank() }.map(::video)
     fun details(json: JSONObject): VideoDetails = VideoDetails(video(json), json.text("description"),
         json.text("dashUrl"), json.text("hlsUrl"), json.optJSONArray("formatStreams")?.objects()?.lastOrNull()?.text("url") ?: "",
@@ -93,7 +98,7 @@ object ApiParser {
         (json.optJSONArray("adaptiveFormats")?.objects().orEmpty() + json.optJSONArray("formatStreams")?.objects().orEmpty()).map(::streamFormat),
         descriptionHtml = json.text("descriptionHtml"), likes = json.nonNegativeLong("likeCount").takeUnless { json.text("likeCountPrecision") == "unknown" },
         authorVerified = json.opt("authorVerified") as? Boolean, subscribers = json.text("subCountText").takeUnless { it == "-" }.orEmpty(),
-        upcoming = json.opt("isUpcoming") as? Boolean, premiereTimestamp = json.nonNegativeLong("premiereTimestamp")?.takeIf { it in 1_104_537_600..253_402_300_799L },
+        upcoming = json.opt("isUpcoming") as? Boolean, premiereTimestamp = premiereTimestamp(json),
         listed = json.opt("isListed") as? Boolean, genre = json.text("genre"), genreUrl = json.text("genreUrl"), license = json.opt("license") as? String,
         familyFriendly = json.opt("isFamilyFriendly") as? Boolean, allowedRegions = json.optJSONArray("allowedRegions")?.let { a ->
             (0 until a.length()).mapNotNull { (a.opt(it) as? String)?.takeIf { code -> code.matches(Regex("[A-Z]{2}")) } }.distinct() },
@@ -103,7 +108,7 @@ object ApiParser {
         likeCountPrecision = CountPrecision.parse(json.text("likeCountPrecision")),
         projectionType = json.text("projectionType").ifBlank {
             json.optJSONArray("adaptiveFormats")?.objects().orEmpty().firstOrNull { it.text("projectionType") in listOf("EQUIRECTANGULAR", "MESH") }?.text("projectionType").orEmpty()
-        })
+        }, aiMade = json.opt("aiMade") == true)
     fun streamFormat(j: JSONObject): StreamFormat {
         val size = j.text("size").split('x')
         val type = j.text("type", j.text("mimeType"))

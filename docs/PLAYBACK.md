@@ -246,8 +246,10 @@ to the current unbounded video seek the current occurrence instead of replacing 
 
 ## Progress and history
 
-First real full-video playback, including a download, marks history once per transition when account history
-is enabled. Failures can retry on later ticks. Position is persisted on pause,
+First real playback, including a download, records an account history visit once
+per transition when enabled. Full videos mark completion at 95% during playback
+or when they end naturally. Live media, clips and links with an explicit end
+cannot mark completion. Position is persisted on pause,
 seek/removal transitions and every 15 seconds while playing. Online position is
 in seconds; ending or reaching the final 15 seconds clears it. Local fallback is
 saved before account progress upload. Ownership must still match the original
@@ -259,7 +261,12 @@ ending/last two seconds resets that download position. Signed-in downloads use t
 active account/instance's history and resume settings, even for a different download
 origin. Shared history/positions enter a durable per-profile journal before upload.
 The newest position replaces older pending positions, including an explicit zero
-for completion. Acknowledgements remove only the revision actually uploaded.
+to clear resume. Visits and completion carry separate revisions. Acknowledgements
+remove only the revision actually uploaded. Playback cards show saved partial
+progress or a full bar for explicit completion.
+
+Instances that report completion without accepting explicit events receive a
+history write at completion. Earlier instances receive the legacy visit write.
 
 On opening a download, unsynced account progress wins; otherwise an enabled account
 resume setting loads the server position, with local fallback. Initial preference/

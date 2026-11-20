@@ -82,6 +82,7 @@ class DownloadSyncSmokeTest {
         login(); val id = download(); val before = state().getInt("mediaRequests")
         play(id)
         until { state().getJSONArray("watched").toString().contains(video) }
+        assertFalse(state().getJSONArray("completed").toString().contains(video))
         seek(45_000)
         until { state().getJSONObject("positions").optLong(video) == 45L }
         until { app.downloads.find(id)!!.positionMs == 45_000L }
@@ -89,6 +90,9 @@ class DownloadSyncSmokeTest {
         assertEquals(45L, app.watched.state.value.positions[video])
         seek(119_000)
         until { !state().getJSONObject("positions").has(video) }
+        assertFalse(state().getJSONArray("completed").toString().contains(video))
+        compose.runOnUiThread { activity.model.controller.value!!.play() }
+        until { state().getJSONArray("completed").toString().contains(video) }
         assertTrue(video in app.watched.state.value.watched)
         assertEquals(before, state().getInt("mediaRequests"))
     }

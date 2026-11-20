@@ -5,6 +5,9 @@ object LinkPlaybackRules {
 }
 
 object PlaybackRules {
+    fun reachedCompletion(positionMs: Long, durationMs: Long, ended: Boolean): Boolean =
+        ended || durationMs > 0 && positionMs >= durationMs - durationMs / 20
+
     fun seek(position: Long, duration: Long): Long = if (duration > 0) position.coerceIn(0, duration) else position.coerceAtLeast(0)
     fun resume(saved: Long, duration: Long, explicit: Long?): Long {
         val start = explicit ?: saved.takeIf { it > 0 && (duration <= 0 || it < duration - 20) } ?: 0

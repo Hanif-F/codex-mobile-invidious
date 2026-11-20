@@ -38,6 +38,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.CustomAccessibilityAction
@@ -751,6 +752,11 @@ internal fun time(seconds: Long): String = DisplayFormats.clock(seconds)
                     size = 24.dp, modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
                     tag = "video-avatar-${video.id}", onClick = if (ContentVisibility.validChannel(video.channelId)) ({ channel(video.channelId) }) else null)
                 VideoMetadataLine(video, Modifier.padding(top = 4.dp))
+                video.upcomingPremiere?.let {
+                    LocalConfiguration.current
+                    Text("Premieres ${DisplayFormats.timestamp(it)}", Modifier.testTag("video-card-premiere-${video.id}"),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 video.history?.let { history ->
                     Text("Released: ${DisplayFormats.date(history.released).ifBlank { "Unknown date" }}", style = MaterialTheme.typography.bodySmall)
                     Text("Watched: ${DisplayFormats.date(history.watched).ifBlank { "Unknown watch date" }}", style = MaterialTheme.typography.bodySmall)

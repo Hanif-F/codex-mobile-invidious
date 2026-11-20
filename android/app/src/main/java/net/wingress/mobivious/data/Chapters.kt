@@ -1,5 +1,7 @@
 package net.wingress.mobivious.data
 
+import android.text.Html
+
 data class VideoChapter(val startMs: Long, val title: String)
 
 /** Matches the web fork's manual description chapters; requires no upstream lookup. */
@@ -8,6 +10,15 @@ object ChapterRules {
     private const val whitespace = "[\\p{Z}\\u0009-\\u000D\\u0085]"
     private val timestamp = Regex("^$whitespace*(?:[-*•]$whitespace+)?([0-9]+):([0-9]{2})(?::([0-9]{2}))?(?:$whitespace+|$whitespace*[-–—|]$whitespace*)(.+?)$whitespace*$")
     private val separator = Regex("^[-–—|:]$whitespace*")
+    private val nonContent = Regex("""<(script|style)\b[^>]*>.*?</\1\s*>""",
+        setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
+
+    fun fromDescriptions(description: String, html: String, durationSeconds: Long, live: Boolean): List<VideoChapter> {
+        val chapters = parse(description, durationSeconds, live)
+        if (chapters.isNotEmpty() || live || durationSeconds <= 0 || html.isBlank()) return chapters
+        val text = Html.fromHtml(nonContent.replace(html, ""), Html.FROM_HTML_MODE_COMPACT)?.toString().orEmpty()
+        return parse(text, durationSeconds)
+    }
 
     fun parse(description: String, durationSeconds: Long, live: Boolean = false): List<VideoChapter> {
         if (live || durationSeconds <= 0) return emptyList()

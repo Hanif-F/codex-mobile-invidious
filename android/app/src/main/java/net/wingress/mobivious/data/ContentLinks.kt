@@ -75,6 +75,10 @@ sealed interface ContentLink {
 object ContentLinks {
     internal val youtubeHosts = setOf("youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be", "www.youtu.be",
         "youtube-nocookie.com", "www.youtube-nocookie.com")
+    private val channelPrefixes = setOf("channel", "c", "user")
+    private val reservedRoutes = setOf("admin", "api", "attribution_link", "clip", "companion", "e", "embed", "feed",
+        "feeds", "ggpht", "hashtag", "live", "mix", "playlist", "post", "preferences", "profile", "redirect", "sb",
+        "search", "shorts", "show", "v", "vi", "videoplayback", "w", "watch")
     fun youtube(url: HttpUrl) = url.host in youtubeHosts && url.port == if (url.isHttps) 443 else 80
     fun accepted(url: HttpUrl, instance: String): Boolean {
         if (url.username.isNotEmpty() || url.password.isNotEmpty()) return false
@@ -121,15 +125,25 @@ object ContentLinks {
         if (path.size == 2 && path[0] == "hashtag") return path[1].takeIf { it.isNotBlank() && it.length <= 100 && '/' !in it && it.none(Char::isISOControl) }?.let(ContentLink::Hashtag)
         val first = path.firstOrNull() ?: return null
         val handle = first.startsWith('@')
-        if (!handle && first !in listOf("channel", "c", "user")) return null
-        val name = (if (handle) first.drop(1) else path.getOrNull(1))?.takeIf {
+        val bare = !handle && first !in channelPrefixes
+        if (bare && (path.size != 2 || first.lowercase() in reservedRoutes)) return null
+        val name = (when {
+            handle -> first.drop(1)
+            bare -> first
+            else -> path.getOrNull(1)
+        })?.takeIf {
             it.isNotBlank() && it.length <= 128 && '/' !in it && '\\' !in it && it.none(Char::isISOControl)
         } ?: return null
-        val suffix = path.getOrNull(if (handle) 1 else 2)
+        val suffix = path.getOrNull(if (handle || bare) 1 else 2)?.lowercase()
         val tab = ChannelTab.entries.firstOrNull { it.path == when (suffix) { "community" -> "posts"; "live" -> "streams"; else -> suffix } }
         if (first == "channel") return name.takeIf(ContentVisibility::validChannel)?.let { ContentLink.Channel(ChannelLink(it, tab = tab)) }
+        if (bare && (tab == null || tab == ChannelTab.CLIPS)) return null
         val canonical = "https://www.youtube.com".toHttpUrlOrNull()!!.newBuilder().apply {
-            if (handle) addPathSegment("@$name") else { addPathSegment(first); addPathSegment(name) }
+            when {
+                bare -> { addPathSegment(name); addPathSegment(path[1].lowercase()) }
+                handle -> addPathSegment("@$name")
+                else -> { addPathSegment(first); addPathSegment(name) }
+            }
         }.build().toString()
         return ContentLink.Channel(ChannelLink(resolveUrl = canonical, tab = tab))
     }

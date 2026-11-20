@@ -215,6 +215,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 [Source](../../android/app/src/test/java/net/wingress/mobivious/ContentLinksTest.kt) — Content Links declared scenarios; exact cases are enumerated in the test catalog.
 
 - `showsResolveAsPlaylistsAndChannelTabsWithinAcceptedOrigins`
+- `bareChannelTabLinksRequireAnAcceptedHostAndRecognizedPath`
 - `legacyCommentLinkOverridesNormalizeAndPreserveEmptySlotsWithoutEditingDefaults`
 - `aliasesPreservePreciseTimesAndNormalizeOnlyYoutubeIndexes`
 - `unsafeOriginsPathsAndOverflowAreRejected`
@@ -254,6 +255,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 - `offlineSnapshotsExpireAndNeverCrossAccountKeys`
 - `linksAndTimestamps`
 - `explicitTimeOverridesResumeAndFinishedVideosRestart`
+- `completionRequiresNinetyFivePercentOrAPlaybackEnd`
 - `musicGenreMatchesOnlyTheTrimmedCategory`
 - `parsersKeepUnavailableHistoryAndCaptionVariants`
 - `recommendationsKeepTheFirstRankedVideoWithoutCollapsingPlaylistOccurrences`
@@ -472,6 +474,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 [Source](../../android/app/src/test/java/net/wingress/mobivious/PlaybackSyncTest.kt) — Playback journal persistence/coalescing, ownership, settings, stale responses, authentication and virtual-time retry/reconnect regression coverage.
 
 - `journalCoalescesPositionsPreservesCompletionAndSurvivesRecreation`
+- `intermediateServersOnlyReceiveCompletionAndLegacyServersOnlyReceiveVisits`
 - `oldAcknowledgementCannotEraseNewerSeek`
 - `accountInstanceAndTokenChangesKeepOwnershipWithoutCredentialsInJournal`
 - `confirmedSettingsAndRemovalDiscardOnlyTheAppropriateFields`
@@ -670,6 +673,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 [Source](../../android/app/src/test/java/net/wingress/mobivious/VideoInformationTest.kt) — Video Information declared scenarios; exact cases are enumerated in the test catalog.
 
+- `disclosureAndPremiereCardRequireExplicitMetadata`
 - `suppliedMetadataPreservesFalseZeroAndMusicCredits`
 - `oldAndMalformedOptionalFieldsRemainUnknown`
 
@@ -700,7 +704,7 @@ Generated inventory of declared `@Test` methods. Names describe intended coverag
 
 - `historyRevisionAdvancesForRepeatWatchesButNotPlaybackPositions`
 - `snapshotParsesIndependentStateAndRejectsMalformedEntries`
-- `barsMatchWebRoundingMinimumAndCompletionThresholds`
+- `savedPositionsUsePartialBarsEvenNearTheEnd`
 - `historyMembershipAndProgressHaveDistinctAccessibleDescriptions`
 - `liveAndUnknownDurationsNeverInventPartialProgress`
 - `bulkApiUsesExistingBearerContractWithoutCookies`
@@ -981,6 +985,7 @@ Test support/helper file; no declared `@Test` methods.
 - `emptyDescriptionLoadsWithoutChapters`
 - `ordinaryDescriptionLoadsWithoutChapters`
 - `manualChaptersLoadOnAndroid`
+- `richDescriptionsSupplyMissingChaptersWithoutOverridingPlainChapters`
 - `unicodeWhitespaceAndTitlesLoadOnAndroid`
 - `liveVideoLoadsWithoutChapters`
 
@@ -1624,6 +1629,7 @@ Test support/helper file; no declared `@Test` methods.
 
 [Source](../../android/app/src/androidTest/java/net/wingress/mobivious/VideoInformationPresentationTest.kt) — Video Information Presentation declared scenarios; exact cases are enumerated in the test catalog.
 
+- `watchNoticesShowOnlySuppliedAiDisclosure`
 - `metadataAndCreditsFitNarrowDarkLargeFontLayouts`
 - `descriptionOwnsMetadataVisibilityAndGenreLinksStillWork`
 - `emptyDescriptionsStillShowMetadataAndMissingMetadataAddsNoSection`
@@ -1705,4 +1711,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **1033 declared test methods** (including ignored tests).
+Inventory total: **1039 declared test methods** (including ignored tests).

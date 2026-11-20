@@ -36,6 +36,7 @@ internal fun openExternalContent(context: Context, url: String, failed: () -> Un
 @Composable
 internal fun VideoNotices(details: VideoDetails) {
     if (details.listed == false) Text("Unlisted", Modifier.testTag("video-unlisted"), style = MaterialTheme.typography.labelLarge)
+    if (details.aiMade) Text("Labeled AI-made on YouTube", Modifier.testTag("video-ai-made"), style = MaterialTheme.typography.bodyMedium)
     if (details.upcoming == true || details.premiereTimestamp != null || details.notice.isNotBlank()) {
         val date = DisplayFormats.timestamp(details.premiereTimestamp).takeIf(String::isNotBlank)
         val notice = details.notice.ifBlank { if (details.upcoming == true) "Upcoming video" else "Premiere" }
