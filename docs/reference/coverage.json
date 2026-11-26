@@ -49,7 +49,7 @@
       "area": "Build configuration",
       "guide": "docs/DEVELOPMENT.md",
       "description": "App ID/version/SDK, signing/build variants, release/benchmark R8 and resource shrinking, Java target and runtime/test dependencies.",
-      "sha256": "d8c98c2ad7902e6a54aaaae58d2fa0f17bdd8c7b937b33e0914e4f6b4664552b"
+      "sha256": "bb08ccad7618d8d42fb6b4188bb452136ed4f6e84cdb6ade1530e61c29ab6da1"
     },
     "android/app/proguard-rules.pro": {
       "area": "Build configuration",
@@ -360,8 +360,8 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/QueueLibrarySmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Queue Library Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "581b4d5bac9bf6a055e1834463123f49db6c961e7b4efba19c7a71c9b6793219"
+      "description": "Queue and library journeys, including retained playlist scroll after direct and service-owned deletion.",
+      "sha256": "a8a69f8a5e04d4c53a712385143bd5c56a062d9b39c18337c9a09691cc75c935"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/ResponsiveShellSmokeTest.kt": {
       "area": "Android device tests",
@@ -378,8 +378,8 @@
     "android/app/src/androidTest/java/net/wingress/mobivious/SearchHistorySmokeTest.kt": {
       "area": "Android device tests",
       "guide": "docs/TESTING.md",
-      "description": "Search History Smoke declared scenarios; exact cases are enumerated in the test catalog.",
-      "sha256": "d0e903f8fd5ef00bbe5a7f41c0eaf90cc801fdda1f5d7505ed9b86dec5abbf48"
+      "description": "Search and history journeys, including deletion on later filtered pages and recovery after failed reads.",
+      "sha256": "6511ae3ceba2f6a0878813da8da4a590aea77657b1abf440da7fe15f0146afd6"
     },
     "android/app/src/androidTest/java/net/wingress/mobivious/SecondaryScreensJourneyTest.kt": {
       "area": "Android device tests",
@@ -780,8 +780,8 @@
     "android/app/src/main/java/net/wingress/mobivious/player/PlaybackQueue.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
-      "description": "Canonical playback runtime snapshot, occurrence identity, share URLs, repeat and source merge/successor rules.",
-      "sha256": "397566bbc2600751e6ca0013c91ce8063d05c9eab93f0293be71800e21a61b01"
+      "description": "Playback runtime snapshot, occurrence identity, confirmed playlist deletions, share URLs, repeat and source merge/successor rules.",
+      "sha256": "51e4d6708774043d1b5aa311bbf901fd61fa00fd8c9f103a4e51ea935862d909"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/PlaybackRules.kt": {
       "area": "Playback",
@@ -798,8 +798,8 @@
     "android/app/src/main/java/net/wingress/mobivious/player/QueueCoordinator.kt": {
       "area": "Playback",
       "guide": "docs/PLAYBACK.md",
-      "description": "Service-owned lazy resolution, source pagination, occurrence transitions, tracks, bounds, offline media, Music resume policy, clips and successor behavior. Integrates channel title and thumbnail rules.",
-      "sha256": "250f6e6749c4b0e2adb0d96b1fbd8da0845acd51486e4d7556bff857a96341b8"
+      "description": "Service-owned lazy resolution, source pagination and deletion, occurrence transitions, tracks, bounds, offline media, Music resume policy, clips and successor behavior. Integrates channel title and thumbnail rules.",
+      "sha256": "7cb4db3d8252fc403826a0cc1042878abef767e10d1632b304d3b2b9641ec804"
     },
     "android/app/src/main/java/net/wingress/mobivious/player/QueueSessionPlayer.kt": {
       "area": "Playback",
@@ -900,8 +900,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/AppViewModel.kt": {
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
-      "description": "App-facing StateFlows, browse/navigation snapshots, account/library actions, preference writes and MediaController coordination. Integrates session playback statistics.",
-      "sha256": "0855dd282259aecbbac73614410de6ef21effff20147856150e2919ae4183608"
+      "description": "App-facing StateFlows, navigation snapshots, retained library reloads after deletion, account actions, preference writes and MediaController coordination. Integrates session playback statistics.",
+      "sha256": "4a91cd76ea523a9a3416c356bada80d5606e9c1464cbc5afee29b0fec18a19f0"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/AppWindowLayout.kt": {
       "area": "Compose UI",
@@ -1026,8 +1026,8 @@
     "android/app/src/main/java/net/wingress/mobivious/ui/MobiviousApp.kt": {
       "area": "Compose UI",
       "guide": "docs/ARCHITECTURE.md",
-      "description": "Root Compose shell, browse/watch/library/settings composition, panels, dialogs and navigation/action wiring.",
-      "sha256": "d6bae6c052e233ae1a104b5e7715338b8698a41c35fb668448d8536c968bdd36"
+      "description": "Root Compose shell, stable keys for mutable library video rows, watch and settings panels, dialogs and navigation wiring.",
+      "sha256": "27d2fb73a7ba6e8a8cef424de54de1d0f9e6a32e0b13dfd127d4a395eb7ada38"
     },
     "android/app/src/main/java/net/wingress/mobivious/ui/PanelComponents.kt": {
       "area": "Compose UI",
@@ -1626,8 +1626,8 @@
     "scripts/fixture-server.py": {
       "area": "Scripts",
       "guide": "docs/TESTING.md",
-      "description": "Threaded local API/media fixture, scenario tracing, Music metadata, controlled challenge/rotation barriers and single-use HTTP/empty-video failures.",
-      "sha256": "1eff23fe4c2bb281425f616fe057660333d586f25e2dba307b15b21b7c4fe869"
+      "description": "Threaded local API/media fixture with scenario tracing, Music metadata, verification barriers, large playlists and one-shot video or history failures.",
+      "sha256": "c1eec2452344c15ba4ca5beb862ea4820152ad8c1f80a0c38ac5b85843c3133a"
     },
     "scripts/fixture_support.py": {
       "area": "Scripts",

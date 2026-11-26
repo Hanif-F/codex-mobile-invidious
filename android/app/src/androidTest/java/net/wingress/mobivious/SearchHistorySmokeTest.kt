@@ -8,6 +8,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import net.wingress.mobivious.data.*
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.*
 import org.junit.Assert.*
@@ -236,6 +237,59 @@ class SearchHistorySmokeTest {
         until { !vm.browse.value.loading && vm.browse.value.history?.total == 0 }
         assertEquals(0, fixture().getJSONObject("positions").length())
         compose.onNodeWithText("Your history is empty").assertExists()
+    }
+
+    @Test fun historyDeletionKeepsLaterSearchResultsThroughFailuresAndRetry() {
+        val matchingIds = (0..24).map { "hist" + it.toString().padStart(7, '0') }
+        val entries = JSONArray()
+        (matchingIds + "histunmatch").forEach { id ->
+            entries.put(JSONObject().put("video_id", id)
+                .put("title", if (id in matchingIds) "Archive $id" else "Other video")
+                .put("latest_watched", "2026-10-04"))
+        }
+        command(body = JSONObject().put("max_results", 8).put("historyEntries", entries).toString())
+        openHistory()
+        submit("history-search", "archive")
+        compose.revealInBrowse(hasText("Load more"))
+        compose.onNodeWithText("Load more").performClick()
+        until { !vm.browse.value.loading && vm.browse.value.videos.size == 16 }
+
+        val removed = vm.browse.value.videos[10]
+        val neighbor = vm.browse.value.videos[11]
+        val actions = hasTestTag("video-actions-${removed.id}")
+        compose.onNodeWithTag("browse-video-list").performScrollToIndex(12)
+        compose.revealInBrowse(actions)
+        val position = vm.browse.value.position
+        assertTrue(position.index >= 8)
+
+        command(body = """{"historyFailDeleteOnce":true}""")
+        compose.onNode(actions).performClick()
+        compose.onNodeWithText("Remove from history").performClick()
+        compose.waitUntilExactlyOneExists(hasText("Fixture history deletion failed"), 5_000)
+        assertEquals(position, vm.browse.value.position)
+        compose.onNode(actions).assertIsDisplayed()
+        compose.waitUntilDoesNotExist(hasText("Fixture history deletion failed"), 8_000)
+
+        command(body = """{"historyFailPageOnce":2}""")
+        compose.onNode(actions).performClick()
+        compose.onNodeWithText("Remove from history").performClick()
+        until { vm.browse.value.error == "Fixture history read failed" && !vm.browse.value.loading }
+        assertFalse(vm.browse.value.videos.any { it.id == removed.id })
+        assertEquals(15, vm.browse.value.videos.size)
+        assertTrue(vm.browse.value.position.index >= 8)
+        compose.onNodeWithTag("video-card-${neighbor.id}").assertIsDisplayed()
+
+        compose.revealInBrowse(hasText("Retry"))
+        compose.onNodeWithText("Retry").performClick()
+        until { !vm.browse.value.loading && vm.browse.value.error == null }
+        assertEquals(16, vm.browse.value.videos.size)
+        assertEquals("archive", vm.scopedSearch.value.submitted)
+        assertEquals(24, vm.browse.value.history?.total)
+        assertTrue(vm.browse.value.position.index >= 8)
+        compose.revealInBrowse(hasText("Load more"))
+        compose.onNodeWithText("Load more").performClick()
+        until { !vm.browse.value.loading && vm.browse.value.end }
+        assertEquals(matchingIds.asReversed() - removed.id, vm.browse.value.videos.map { it.id })
     }
 
     @Test fun oldHistoryServerRetainsViewingAndExplainsDisabledSearch() {

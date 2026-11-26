@@ -561,7 +561,7 @@ internal class QueueCoordinator(private val app: MobiviousApplication, private v
                     app.api.removeFromPlaylist(source.id, entry.video.indexId, context); check(token, context)
                     update(state.copy(source = state.source?.copy(count = (state.source!!.count - 1).coerceAtLeast(0)), items = state.items.map {
                         when { it.key == key -> it.copy(removed = true); it.sourceIndex != null && it.sourceIndex > (entry.sourceIndex ?: Int.MAX_VALUE) -> it.copy(sourceIndex = it.sourceIndex - 1); else -> it }
-                    }))
+                    }, deletedSourceOccurrences = state.deletedSourceOccurrences + entry.video.indexId))
                 } catch (e: CancellationException) { throw e } catch (e: Exception) { if (valid(token, context)) update(state.copy(sourceError = "Could not remove playlist item: ${e.message}")) }
             }
         }

@@ -1,5 +1,41 @@
 # Focused implementation verification
 
+## Scroll after library deletion — 26 November 2026
+
+History and owned playlists keep their loaded pages and scroll position after an
+individual deletion. The emulator cases cover a failed History delete, retry after
+a failed History read, removal of a single duplicate playlist occurrence, queue
+advancement, and returning to a playlist changed while another tab was open.
+
+- The focused device runner passed all **11 selected tests** on Android 16
+  (`emulator-5554`) with no skips. The local report is at
+  `android/app/build/reports/androidTests/connected/debug/index.html`.
+- From `android/`, `./gradlew --offline :app:testDebugUnitTest :app:lintDebug --console=plain`
+  passed **504 JVM tests** with no skips. Debug lint reported **0 errors and 18 warnings**,
+  matching the previous count.
+- `python3 -m unittest discover -s scripts/tests -p 'test_*_fixture.py'` passed
+  **14 tests**. A separate loopback probe checked the large-playlist and one-shot
+  History failure controls and their reset behavior.
+- `python3 scripts/check-documentation.py` and `git diff --check` passed.
+
+```bash
+selectors=(
+  'net.wingress.mobivious.SearchHistorySmokeTest#historyDeletionKeepsLaterSearchResultsThroughFailuresAndRetry'
+  'net.wingress.mobivious.SearchHistorySmokeTest#historyRemovalPreservesProgressAndClearRequiresConfirmation'
+  'net.wingress.mobivious.SearchHistorySmokeTest#historySearchCoversLaterPagesAndDateGroupsKeepUnknownEntries'
+  'net.wingress.mobivious.SearchHistorySmokeTest#oldHistoryServerRetainsViewingAndExplainsDisabledSearch'
+  'net.wingress.mobivious.SearchHistorySmokeTest#historyPaginationReloadsWhenServerCalendarDayChanges'
+  'net.wingress.mobivious.QueueLibrarySmokeTest#playlistDeletionKeepsScrollAndPagesForDirectAndQueueRemovals'
+  'net.wingress.mobivious.QueueLibrarySmokeTest#localRemovalDoesNotDeleteSavedPlaylistAndCurrentFinishes'
+  'net.wingress.mobivious.QueueLibrarySmokeTest#repeatOneRestartsAndRemovedPlayingSourceStillAdvances'
+  'net.wingress.mobivious.NavigationHubSmokeTest#playlistSegmentsKeepTheirOwnPositionsAcrossDetailsAndGlobalSearch'
+  'net.wingress.mobivious.PlaylistRssSmokeTest#ownedPlaylistDeletionStillRequiresConfirmation'
+  'net.wingress.mobivious.ViewCountsSmokeTest#historyPlaylistAndMixPaginationUseSuppliedCountsWithoutFetchingVideos'
+)
+ANDROID_SERIAL=emulator-5554 scripts/test-android.sh --device-only --offline \
+  "-Pandroid.testInstrumentationRunnerArguments.class=$(IFS=,; printf '%s' "${selectors[*]}")"
+```
+
 ## Invidious parity after the playback fix — 20 November 2026
 
 Native account history distinguishes visits from completed playback while retaining

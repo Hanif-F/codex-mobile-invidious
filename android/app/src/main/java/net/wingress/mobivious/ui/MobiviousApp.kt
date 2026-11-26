@@ -581,7 +581,14 @@ fun MobiviousApp(vm: AppViewModel, activity: MainActivity, pip: Boolean, shared:
                         groups.forEach { (group, videos) ->
                             if (group != null) item(key = "history-group-$group") { Text(group.label, Modifier.padding(horizontal = 16.dp, vertical = 12.dp).testTag("history-group-${group.name}"), style = MaterialTheme.typography.titleLarge) }
                             val rows = videos.chunked(if (route.isEmpty() && PreferenceRules.isDiscovery(tab) || subscriptionFeed || channelPage && channelTab?.videoTab == true) feedColumns else 1)
-                            itemsIndexed(rows, key={ index,row -> "row:$index:"+row.joinToString { it.id+":"+it.indexId+":"+(it.playlistIndex?.toString() ?: "") } },contentType={_,_->"video-row"}) { _,row ->
+                            itemsIndexed(rows, key = { index, row ->
+                                val video = row.singleOrNull()
+                                when {
+                                    route == "history" && video != null -> "history-video:${video.id}"
+                                    playlist?.owned == true && video != null && video.indexId.isNotBlank() -> "playlist-video:${video.indexId}"
+                                    else -> "row:$index:" + row.joinToString { "${it.id}:${it.indexId}:${it.playlistIndex?.toString().orEmpty()}" }
+                                }
+                            }, contentType = { _, _ -> "video-row" }) { _,row ->
                               Row(Modifier.fillMaxWidth()) {
                                 row.forEach { video -> Box(Modifier.weight(1f)) { VideoCard(vm, video, vm.store.server, { play(video, playlist) }, { id -> navigate(tab, "channel:$id") }, { signIn() }, if (playlist?.let { list -> list.owned } == true || route == "history") ({
                                 val list = playlist

@@ -21,7 +21,8 @@ data class PlaybackQueueSnapshot(val token: String = "", val context: ApiContext
     val sourceError: String? = null, val sourceLoading: Boolean = false, val sourceComplete: Boolean = true,
     val repeat: QueueRepeat = QueueRepeat.OFF, val explicitQueue: Boolean = false,
     val videoSelection: VideoSelection = VideoSelection(), val audioSelection: AudioSelection = AudioSelection(),
-    val carriedOptions: PlaybackLinkOptions = PlaybackLinkOptions(), val recovering: Boolean = false) {
+    val carriedOptions: PlaybackLinkOptions = PlaybackLinkOptions(), val recovering: Boolean = false,
+    val deletedSourceOccurrences: Set<String> = emptySet()) {
     val currentIndex get() = items.indexOfFirst { it.key == currentKey }
     val current get() = items.getOrNull(currentIndex)
     val hasExplicitQueue get() = token.isNotEmpty() && explicitQueue

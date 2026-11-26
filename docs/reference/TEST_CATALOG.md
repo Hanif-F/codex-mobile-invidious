@@ -1459,7 +1459,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### QueueLibrarySmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/QueueLibrarySmokeTest.kt) — Queue Library Smoke declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/QueueLibrarySmokeTest.kt) — Queue and library journeys, including retained playlist scroll after direct and service-owned deletion.
 
 - `standaloneManualQueueCollapseAndNewSessionVisibility`
 - `singleItemQueueWithoutRecommendationsAndImplicitContinuation`
@@ -1469,6 +1469,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `audioMenuStartsWithoutVideoAndCarriesThroughNext`
 - `duplicateOccurrencesAutomaticAdvanceAndRepeatAll`
 - `localRemovalDoesNotDeleteSavedPlaylistAndCurrentFinishes`
+- `playlistDeletionKeepsScrollAndPagesForDirectAndQueueRemovals`
 - `backgroundQueueAndActivityRecreationUseServiceState`
 - `mixAndPlaylistLinksRetainContextsAndMixDisablesAll`
 - `repeatOneRestartsAndRemovedPlayingSourceStillAdvances`
@@ -1496,7 +1497,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 
 ### SearchHistorySmokeTest
 
-[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SearchHistorySmokeTest.kt) — Search History Smoke declared scenarios; exact cases are enumerated in the test catalog.
+[Source](../../android/app/src/androidTest/java/net/wingress/mobivious/SearchHistorySmokeTest.kt) — Search and history journeys, including deletion on later filtered pages and recovery after failed reads.
 
 - `iconImeAndPhysicalEnterEachSubmitExactlyOnce`
 - `imeSubmissionPreservesPastedVideoTimestamps`
@@ -1506,6 +1507,7 @@ Explicit Ignore: "Emulator 37.2.12 host gfxstream TextureResize SIGSEGV during a
 - `subscriptionSearchLoadsBeyondHiddenPagesAndIgnoresFeedOnlyFilters`
 - `historySearchCoversLaterPagesAndDateGroupsKeepUnknownEntries`
 - `historyRemovalPreservesProgressAndClearRequiresConfirmation`
+- `historyDeletionKeepsLaterSearchResultsThroughFailuresAndRetry`
 - `oldHistoryServerRetainsViewingAndExplainsDisabledSearch`
 - `delayedSearchCannotReplaceNewChannelTabOrAccount`
 - `historyPaginationReloadsWhenServerCalendarDayChanges`
@@ -1711,4 +1713,4 @@ Test support/helper file; no declared `@Test` methods.
 - `playbackUpdatesInBackgroundAndCompletionKeepsTheWatchedBadge`
 - `refreshFailureRetainsStateAndSignOutHidesAccountIndicators`
 
-Inventory total: **1039 declared test methods** (including ignored tests).
+Inventory total: **1041 declared test methods** (including ignored tests).

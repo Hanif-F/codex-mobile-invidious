@@ -56,7 +56,7 @@ data class BrowseState(val title: String = "For you", val videos: List<Video> = 
     val posts: List<CommunityPost> = emptyList(), val channels: List<Channel> = emptyList(),
     val position: CommentPosition = CommentPosition(), val retryMore: Boolean = false,
     val searchResults: List<SearchResult> = emptyList(), val searchKeys: Set<String> = emptySet(),
-    val errorReason: AccessReason? = null)
+    val errorReason: AccessReason? = null, val libraryRevision: Long = 0)
 data class PostDetailState(val link: PostLink? = null, val context: ApiContext? = null,
     val post: CommunityPost? = null, val loading: Boolean = false, val error: String? = null)
 data class LinkResolutionState(val link: ChannelLink? = null, val context: ApiContext? = null,
@@ -414,6 +414,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private var preferencesContext: ApiContext? = null
     private var identityGeneration = 0L
     private var browseGeneration = 0
+    private class LibraryChanges {
+        var revision = 0L
+        val removedAt = mutableMapOf<String, Long>()
+    }
+    private val libraryChanges = mutableMapOf<String, LibraryChanges>()
     private var requestedVideo: String? = null
     private var homeAppliedContext: ApiContext? = null
     private var navigationRevision = 0L
@@ -543,9 +548,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             preferenceSaves.discardKeys { it.startsWith("chat_delay:") && it.substringAfter(':')!=state.current?.video?.id }
             if (state.token != previous.token || state.hasExplicitQueue != previous.hasExplicitQueue)
                 queueExpanded.value = false
-            if (previous.source?.id == state.source?.id && previous.source?.count != state.source?.count && state.source != null) {
-                if (route == "playlist:${state.source.id}") refresh()
-                if (account.value != null) refreshAccount()
+            val source = state.source
+            val previousSource = previous.source
+            if (source != null && state.context == api.context() && previous.context == state.context &&
+                previousSource?.id == source.id) {
+                val removed = when {
+                    previous.token != state.token -> state.deletedSourceOccurrences
+                    previous.deletedSourceOccurrences != state.deletedSourceOccurrences ->
+                        state.deletedSourceOccurrences - previous.deletedSourceOccurrences
+                    else -> emptySet()
+                }
+                if (removed.isNotEmpty() || previousSource.count != source.count)
+                    playlistContentsChanged(source.id, removed)
             }
             if (previous.currentKey != state.currentKey || previous.context != state.context) cancelAccumulatedSeek(false)
             if (viewing.value.occurrence != state.currentKey || viewing.value.context != state.context)
@@ -585,7 +599,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             chatController.bind("", "", false)
             commentController.bind(null, false)
             subscriptionsController.reset(); subscriptionChannelParent = false; subscriptionFeedSearch = SearchInput()
-            dismissLinkResolution(); browseJob?.cancel(); browseGeneration++; browse.value = BrowseState()
+            dismissLinkResolution(); browseJob?.cancel(); browseGeneration++; libraryChanges.clear(); browse.value = BrowseState()
             blockUndo.value = null
             playlistRevision++; playlistBusy.value = emptySet(); playlistErrors.value = emptyMap()
             playlist.value = null; playlistSeed = null; playlistLink = null; playlists.value = emptyList()
@@ -835,11 +849,13 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             searchInput.value = saved.search; searchType.value = saved.searchType
             sort = saved.searchSort; date = saved.searchDate; durationFilter = saved.searchDuration; searchFeatures.value = saved.searchFeatures
         }
-        browse.value = saved.browse.copy(loading = false, refreshing = false)
+        val restored = if (saved.context == api.context()) withoutDeletedRows(route, saved.browse) else saved.browse
+        browse.value = restored.copy(loading = false, refreshing = false)
         navigation.value = tab to route; restoredBrowse.value++
         if (route == "subscription-channels") refreshSubscriptions()
         val reloadAfterSignIn = afterSignIn && (saved.browse.errorReason == AccessReason.LOGIN || saved.tab in listOf("You", "Subscriptions"))
-        if (!refreshSaved && saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
+        if (saved.context == api.context() && libraryReloadPending()) load(false, retainLibrary = true)
+        else if (!refreshSaved && saved.browse.loading && (route == "clips" || route.startsWith("channel:") && channelTab.value == ChannelTab.CLIPS)) reloadClipPages(saved.browse.page)
         else if (refreshSaved || saved.browse.loading || reloadAfterSignIn) load(false, refreshChannel = false)
     }
     fun openGlobalSearch(text: String, newSearch: Boolean = true) {
@@ -865,7 +881,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     val hasBrowseBack: Boolean get() = browseReturns.isNotEmpty() || tab == "Search" && searchReturn != null || route == "sign-in" && signInReturn != null
     fun browsePosition(position: CommentPosition) {
-        if (!browse.value.loading && browse.value.position != position) browse.value = browse.value.copy(position = position)
+        val current = browse.value
+        if ((!current.loading || current.refreshing && libraryReloadPending()) && current.position != position)
+            browse.value = current.copy(position = position)
     }
     fun openPost(link: PostLink) {
         if (!PostLinks.validId(link.id)) return
@@ -1056,7 +1074,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun removeHistory(id: String) {
         val context = api.context()
-        action { app.watched.removeHistory(context, id); if (api.context() == context) refresh() }
+        action {
+            app.watched.removeHistory(context, id)
+            if (api.context() == context) reloadChangedLibrary("history", setOf(id))
+        }
     }
     fun clearHistory() {
         val context = api.context()
@@ -1065,8 +1086,40 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun more() = load(true)
     fun retryBrowse() {
         access.prompt()
-        if (!browse.value.retryMore && route.isEmpty() && tab in listOf("Popular", "Trending", "Subscriptions")) refreshFeed()
+        if (libraryReloadPending()) load(false, retainLibrary = true)
+        else if (!browse.value.retryMore && route.isEmpty() && tab in listOf("Popular", "Trending", "Subscriptions")) refreshFeed()
         else load(browse.value.retryMore, refreshChannel = false)
+    }
+    private fun libraryReloadPending() = browse.value.libraryRevision != (libraryChanges[route]?.revision ?: 0L)
+
+    private fun withoutDeletedRows(targetRoute: String, current: BrowseState): BrowseState {
+        val changes = libraryChanges[targetRoute] ?: return current
+        if (current.libraryRevision >= changes.revision || changes.removedAt.isEmpty()) return current
+        fun removed(key: String) = (changes.removedAt[key] ?: 0L) > current.libraryRevision
+        val history = current.history
+        val remaining = current.videos.filterNot { video ->
+            removed(if (targetRoute == "history") video.id else video.indexId)
+        }
+        val removedCount = current.videos.size - remaining.size
+        if (removedCount == 0) return current
+        return current.copy(videos = remaining, history = history?.copy(
+            entries = history.entries.filterNot { removed(it.id) },
+            total = history.total?.let { (it - removedCount).coerceAtLeast(0) }))
+    }
+
+    private fun reloadChangedLibrary(targetRoute: String, removedKeys: Set<String>) {
+        val changes = libraryChanges.getOrPut(targetRoute, ::LibraryChanges)
+        changes.revision++
+        removedKeys.forEach { changes.removedAt[it] = changes.revision }
+        if (route != targetRoute) return
+        browse.value = withoutDeletedRows(targetRoute, browse.value)
+        load(false, retainLibrary = true)
+    }
+
+    private fun playlistContentsChanged(id: String, removedKeys: Set<String>) {
+        playlistRevision++
+        reloadChangedLibrary("playlist:$id", removedKeys)
+        if (account.value != null) refreshPlaylists()
     }
     internal fun retryBrowseAfterVerification(context: ApiContext) {
         // A denial can open verification before its browse coroutine has published retryMore.
@@ -1096,7 +1149,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             load(false, refreshChannel = false)
         }
     }
-    private fun load(more: Boolean, refreshChannel: Boolean = true, retainFeed: Boolean = false) {
+    private fun load(more: Boolean, refreshChannel: Boolean = true, retainFeed: Boolean = false, retainLibrary: Boolean = false) {
         if (route == "downloads") { browseJob?.cancel(); browseGeneration++; browse.value = BrowseState(title = "Downloaded", end = true); downloads.refresh(); return }
 
         if (route == "subscription-channels") {
@@ -1106,14 +1159,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             if (!state.loading) refreshSubscriptions()
             return
         }
-        if (more && (browse.value.loading || browse.value.end)) return
+        if (more && (browse.value.loading || browse.value.end || libraryReloadPending())) return
         browseJob?.cancel()
         val generation = ++browseGeneration
         val old = if (more) browse.value else BrowseState()
-        val displayed = if (retainFeed) browse.value else old
-        if (!more && !retainFeed) browseReset.value++
-        val page = if (more) old.page + 1 else 1
+        val retainRows = retainFeed || retainLibrary
+        val displayed = if (retainRows) browse.value else old
+        if (!more && !retainRows) browseReset.value++
+        var page = if (more) old.page + 1 else 1
         val selectedTab = tab; val selectedRoute = route; val selectedQuery = query
+        val libraryRevision = libraryChanges[selectedRoute]?.revision ?: 0L
         val selectedDiscovery = discovery.value; val selectedRegion = preferences.value.region; val selectedCategory = trendingCategory.value
         val selectedSearchType = searchType.value; val selectedSort = sort; val selectedDate = date; val selectedDuration = durationFilter; val selectedFeatures = searchFeatures.value
         val listSort = channelPlaylistSort.value; val videoSort = channelVideoSort.value; val revision = playlistRevision
@@ -1121,7 +1176,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         val context = api.context()
         val selectedChannel = channel.value; val selectedChannelTab = channelTab.value
         val selectedPostLink = postDetail.value.link ?: selectedRoute.takeIf { it.startsWith("post:") }?.let { PostLink(it.substringAfter(':')) }
-        browse.value = displayed.copy(loading = true, refreshing = retainFeed, error = null, errorReason = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
+        browse.value = displayed.copy(loading = true, refreshing = retainRows, error = null, errorReason = null, title = if (selectedRoute == "history") "History" else if (selectedRoute == "playlists") "Playlists" else if (selectedRoute == "clips") "My Clips" else if (selectedRoute.startsWith("post:")) "Post" else if (selectedRoute.startsWith("hashtag:")) "#${selectedRoute.substringAfter(':')}" else selectedTab)
         browseJob = viewModelScope.launch {
             try {
                 val originalTitles = api.originalTitlePreference(context)
@@ -1196,27 +1251,55 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     selectedRoute.startsWith("playlist:") -> {
                         val id = selectedRoute.substringAfter(':'); val mix = id.startsWith("RD")
-                        val result = api.queuePage(id, if (more) (old.videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1 else 0,
+                        fun nextIndex(videos: List<Video>) = (videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1
+                        var result = api.queuePage(id, if (more) nextIndex(old.videos) else 0,
                             if (mix && more) old.videos.lastOrNull()?.id else if (mix) playlistSeed ?: playlists.value.find { it.id == id }?.seedVideoId else null, context)
+                        var entries = result.videos
+                        hasMore = if (mix) entries.isNotEmpty() && !ContentVisibility.exhausted(old.videos, entries)
+                            else entries.isNotEmpty() && nextIndex(entries) < result.source.count
+                        while (retainLibrary && !mix && page < displayed.page && hasMore == true) {
+                            val index = nextIndex(entries)
+                            result = api.queuePage(id, index, context = context)
+                            if (nextIndex(result.videos) <= index) {
+                                hasMore = false
+                                break
+                            }
+                            entries = ContentVisibility.merge(entries, result.videos)
+                            page++
+                            hasMore = nextIndex(entries) < result.source.count
+                        }
                         if (generation == browseGeneration && context == api.context()) {
                             val metadata = result.playlist ?: Playlist(id, result.source.title, result.source.count)
                             playlist.value = metadata.copy(owned = metadata.owned || playlists.value.any { it.id == id && it.owned }, saved = if (revision == playlistRevision) metadata.saved || listsSubscribed(id) else listsSubscribed(id), seedVideoId = playlistSeed ?: metadata.seedVideoId)
                             if (playlistSeed == null) playlistSeed = metadata.seedVideoId
                             if (revision == playlistRevision && playlists.value.any { it.id == id }) playlists.value = playlists.value.map { if (it.id == id) playlist.value!! else it }
                         }
-                        hasMore = if (mix) result.videos.isNotEmpty() && !ContentVisibility.exhausted(old.videos, result.videos)
-                            else (result.videos.mapNotNull { it.playlistIndex }.maxOrNull() ?: -1) + 1 < result.source.count && result.videos.isNotEmpty()
-                        result.videos
+                        entries
                     }
                     selectedRoute == "history" -> {
-                        val response = api.history(page, scopedQuery, context)
+                        var response = api.history(page, scopedQuery, context)
                         if (generation != browseGeneration || context != api.context()) throw CancellationException("History request superseded")
                         if (more && response.organized && old.history?.today != null && response.today != old.history.today) {
                             load(false); return@launch
                         }
                         if (!response.organized) scopedSearch.value = SearchInput()
+                        var entries = response.entries
+                        while (retainLibrary && page < displayed.page && response.hasMore) {
+                            val next = api.history(++page, scopedQuery, context)
+                            if (generation != browseGeneration || context != api.context()) throw CancellationException("History request superseded")
+                            if (next.today != response.today) {
+                                load(false, retainLibrary = true)
+                                return@launch
+                            }
+                            if (ContentVisibility.exhausted(entries, next.entries)) {
+                                response = next.copy(hasMore = false)
+                                break
+                            }
+                            entries = ContentVisibility.merge(entries, next.entries)
+                            response = next
+                        }
                         history = response; hasMore = response.hasMore
-                        response.entries
+                        entries
                     }
                     selectedTab == "Search" && selectedRoute.isEmpty() -> {
                         val response = if (selectedQuery.isBlank()) GeneralSearchPage(emptyList(), emptySet()) else
@@ -1238,11 +1321,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 if (generation == browseGeneration && context == api.context()) aiFilter.prepare(
                     (videos + clips.map { it.video }).map { it.channelId }, preferences.value.aiFilter, AiPageGroup.browsing(selectedTab, selectedRoute))
                 if (generation == browseGeneration && context == api.context()) {
-                    browse.value = browse.value.copy(videos = ContentVisibility.merge(old.videos, videos), loading = false, refreshing = false, page = page, originalTitles = originalTitles,
+                    val mergedVideos = ContentVisibility.merge(old.videos, videos)
+                    val browseVideos = if (selectedRoute.startsWith("playlist:") && playlist.value?.owned == true) {
+                        val occurrences = mutableSetOf<String>()
+                        mergedVideos.filter { it.indexId.isBlank() || occurrences.add(it.indexId) }
+                    } else mergedVideos
+                    browse.value = browse.value.copy(videos = browseVideos, loading = false, refreshing = false, page = page, originalTitles = originalTitles,
                         continuation = continuation, history = history, clips = (old.clips + clips).distinctBy { it.id }, lists = (old.lists + lists).distinctBy { it.id },
                         posts = (old.posts + posts).distinctBy { it.key }, channels = (old.channels + channels).distinctBy { it.id },
                         searchResults = SearchResults.merge(old.searchResults, searchResults), searchKeys = old.searchKeys + searchKeys,
-                        position = if (retainFeed) CommentPosition() else browse.value.position,
+                        position = if (retainFeed) CommentPosition() else browse.value.position, libraryRevision = libraryRevision,
                         retryMore = false, end = if (selectedTab == "Search" && selectedRoute.isEmpty()) hasMore != true else if (hasMore != null) !hasMore || !selectedRoute.startsWith("channel:") && more && videos.isNotEmpty() && ContentVisibility.exhausted(old.videos, videos) else videos.isEmpty() || more && ContentVisibility.exhausted(old.videos, videos) ||
                             PreferenceRules.isDiscovery(selectedTab) && selectedRoute.isEmpty() || selectedRoute.startsWith("channel:") && continuation.isBlank() ||
                             selectedTab == "Subscriptions" && selectedRoute.isEmpty() && (preferences.value.latestOnly || preferences.value.notificationsOnly))
@@ -1455,9 +1543,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun removePlaylistVideo(list: Playlist, video: Video) {
         if (!list.owned) return
-        val occurrence = queue.value.items.firstOrNull { it.video.indexId == video.indexId }
-        if (queue.value.source?.id == list.id && occurrence != null) queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", occurrence.key) }
-        else action { val context = api.context(); api.removeFromPlaylist(list.id, video.indexId, context); if (context == api.context()) { refresh(); refreshAccount(); message.value = "Removed from playlist" } }
+        val context = api.context()
+        val state = queue.value
+        val occurrence = state.items.firstOrNull { it.video.indexId == video.indexId && video.indexId.isNotBlank() }
+        if (state.context == context && state.source?.id == list.id && occurrence != null)
+            queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", occurrence.key) }
+        else action {
+            api.removeFromPlaylist(list.id, video.indexId, context)
+            if (context == api.context()) {
+                playlistContentsChanged(list.id, setOf(video.indexId))
+                message.value = "Removed from playlist"
+            }
+        }
     }
     fun selectQueue(key: String) { cancelAccumulatedSeek(false); val state = queue.value; val index = state.items.indexOfFirst { it.key == key }; val prefix = if (state.source?.mix == false && (state.items.mapNotNull { it.sourceIndex }.minOrNull() ?: 0) > 0) 1 else 0; if (index >= 0) controller.value?.seekTo(index + prefix, C.TIME_UNSET) }
     fun nextQueue(direction: Int) { cancelAccumulatedSeek(false); if (direction > 0) controller.value?.seekToNextMediaItem() else controller.value?.seekToPreviousMediaItem() }

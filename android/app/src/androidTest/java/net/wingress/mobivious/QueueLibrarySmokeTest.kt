@@ -242,6 +242,63 @@ class QueueLibrarySmokeTest {
         waitFor { activity.model.queue.value.currentKey != key && activity.model.playback.value.playing }
         assertEquals("testvideo01", activity.model.queue.value.current!!.video.id)
     }
+
+    @Test fun playlistDeletionKeepsScrollAndPagesForDirectAndQueueRemovals() {
+        val vm = activity.model
+        command("queue", """{"largePlaylist":true}""")
+        ui { vm.store.save(Account("fixture-token", "Alice", Long.MAX_VALUE, vm.store.server)) }
+        waitFor { vm.playlists.value.any { it.id == "IVqueue" && it.owned && it.count == 170 } }
+        ui { vm.openPlaylist(vm.playlists.value.single { it.id == "IVqueue" }) }
+        waitFor { !vm.browse.value.loading && vm.browse.value.videos.size == 100 }
+        compose.revealInBrowse(hasText("Load more"))
+        compose.onNodeWithText("Load more").performClick()
+        waitFor { !vm.browse.value.loading && vm.browse.value.videos.size == 150 }
+
+        val list = compose.onNodeWithTag("browse-video-list")
+        val duplicate = vm.browse.value.videos[105]
+        val neighbor = vm.browse.value.videos[106]
+        list.performScrollToIndex(106)
+        compose.revealInBrowse(hasTestTag("video-actions-${duplicate.id}"))
+        compose.onNodeWithTag("video-actions-${duplicate.id}").performClick()
+        compose.onNodeWithText("Remove from playlist").performClick()
+        waitFor { !vm.browse.value.loading && vm.playlist.value?.count == 169 && vm.browse.value.videos.size == 150 }
+        assertEquals(listOf("1"), vm.browse.value.videos.filter { it.id == duplicate.id }.map { it.indexId })
+        assertTrue(vm.browse.value.position.index > 100)
+        compose.onNodeWithTag("video-card-${neighbor.id}").assertIsDisplayed()
+
+        // Keep the detail list visible while the service removes a row above the viewport.
+        ui { vm.play("testvideo01", source = "IVqueue", index = 0) }
+        waitFor { !vm.queue.value.loading && vm.playback.value.playing && !vm.browse.value.loading }
+        val anchorIndex = vm.browse.value.videos.indexOfFirst { it.id == neighbor.id }
+        list.performScrollToIndex(anchorIndex + 1)
+        val anchor = compose.onNodeWithTag("video-card-${neighbor.id}").assertIsDisplayed()
+        val top = anchor.fetchSemanticsNode().boundsInRoot.top
+        val key = vm.queue.value.currentKey!!
+        ui { vm.queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", key) } }
+        waitFor { !vm.browse.value.loading && vm.playlist.value?.count == 168 && vm.browse.value.videos.size == 150 }
+        assertEquals(top, anchor.assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top, 1f)
+        assertTrue(vm.playback.value.playing)
+        assertFalse(vm.browse.value.videos.any { it.id == duplicate.id })
+
+        compose.revealInBrowse(hasText("Load more"))
+        compose.onNodeWithText("Load more").performClick()
+        waitFor { !vm.browse.value.loading && vm.browse.value.end }
+        val expected = (0 until 170).filterNot { it == 0 || it == 105 }.map { (it + 1).toString(16).uppercase() }
+        assertEquals(expected, vm.browse.value.videos.map { it.indexId })
+
+        val backgroundRemoval = vm.queue.value.items.first { it.sourceIndex != null && !it.removed }
+        compose.selectFeed("Popular")
+        waitFor { vm.tab == "Popular" && !vm.browse.value.loading }
+        val feedReset = vm.browseReset.value
+        ui { vm.queueCommand(PlaybackService.QUEUE_DELETE_SOURCE) { putString("key", backgroundRemoval.key) } }
+        waitFor { vm.playlists.value.any { it.id == "IVqueue" && it.count == 167 } }
+        assertEquals(feedReset, vm.browseReset.value)
+        compose.selectFeed("You")
+        waitFor { vm.route == "playlist:IVqueue" && !vm.browse.value.loading && vm.playlist.value?.count == 167 }
+        assertEquals(expected - backgroundRemoval.video.indexId, vm.browse.value.videos.map { it.indexId })
+        assertTrue(vm.browse.value.position.index > 100)
+    }
+
     @Test fun backgroundQueueAndActivityRecreationUseServiceState() {
         playSource()
         val token = activity.model.queue.value.token

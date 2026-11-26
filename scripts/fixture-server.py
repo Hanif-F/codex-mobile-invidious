@@ -215,6 +215,7 @@ reset_home_subscriptions()
 def reset_search_history():
     state.update(searchTest=False, searchMixed=False, searchRequests=[], searchDelayNext=0, searchFailNext=False,
                  historyRequests=[], historyEntries=[], historyToday='2026-10-04', historyLegacy=False,
+                 historyFailPageOnce=0, historyFailDeleteOnce=False,
                  suggestionRequests=[], suggestionDelayNext=0, suggestionFailNext=False, suggestionStatus=200)
 reset_search_history()
 
@@ -974,6 +975,9 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             q = params.get('q', [''])[0].strip().lower()
             page = max(1, int(params.get('page', ['1'])[0]))
             state['historyRequests'].append(dict(q=q, page=page))
+            if state['historyFailPageOnce'] == page:
+                state['historyFailPageOnce'] = 0
+                return self.respond(dict(error='Fixture history read failed'), 503)
             catalog = {v['videoId']: v for v in [video, recommended, unknown_video, live_video]}
             saved = {e['video_id']: e for e in state['historyEntries']}
             entries = [saved.get(id, dict(video_id=id, title=catalog.get(id, {}).get('title'), channel_name=video['author'], channel_id=video['authorId'], length_seconds=catalog.get(id, {}).get('lengthSeconds', 0), authorThumbnails=video['authorThumbnails'])) for id in reversed(state['watched'])]
@@ -1142,7 +1146,13 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
             if not state['playlists']: state['playlists'] = [dict(playlistId='IVowned', title='My private playlist', privacy='private', videoCount=1, videos=[dict(video, indexId='A', index=0)])]
             return self.respond(state)
         if p == '/test/queue':
-            state['playlists'] = [dict(playlistId='IVqueue', title='Queue fixture', privacy='private', videoCount=3, videos=[dict(video, indexId='A', index=0), dict(video, indexId='B', index=1), dict(recommended, indexId='C', index=2)])]
+            if data.get('largePlaylist'):
+                entries = [dict(video, videoId=f'list{i:07d}', title=f'Playlist video {i}') for i in range(170)]
+                entries[0] = entries[105] = video
+                entries = [dict(item, indexId=f'{i + 1:X}', index=i) for i, item in enumerate(entries)]
+            else:
+                entries = [dict(video, indexId='A', index=0), dict(video, indexId='B', index=1), dict(recommended, indexId='C', index=2)]
+            state['playlists'] = [dict(playlistId='IVqueue', title='Queue fixture', privacy='private', videoCount=len(entries), videos=entries)]
             state['failPlaylistSave'] = bool(data.get('failSave', False))
             return self.respond(state)
         elif p == '/test/avatars':
@@ -1273,7 +1283,8 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
                 if key in data: state[key] = data[key]
             return self.respond({})
         if p == '/test/search-history':
-            for key in ('searchTest', 'searchDelayNext', 'searchFailNext', 'historyEntries', 'historyToday', 'historyLegacy', 'suggestionDelayNext', 'suggestionFailNext', 'suggestionStatus'):
+            for key in ('searchTest', 'searchDelayNext', 'searchFailNext', 'historyEntries', 'historyToday', 'historyLegacy',
+                        'historyFailPageOnce', 'historyFailDeleteOnce', 'suggestionDelayNext', 'suggestionFailNext', 'suggestionStatus'):
                 if key in data: state[key] = data[key]
             if 'historyEntries' in data: state['watched'] = [entry['video_id'] for entry in data['historyEntries']]
             if 'max_results' in data: prefs['max_results'] = data['max_results']
@@ -1441,6 +1452,9 @@ const detail=await r.json();if(r.ok)window.dispatchEvent(new CustomEvent('invidi
                 if not prefs['watch_history']: return self.respond(dict(error='Watch history is disabled in preferences.'), 409)
                 id = p.rsplit('/', 1)[-1]
                 if self.command == 'DELETE':
+                    if state['historyFailDeleteOnce']:
+                        state['historyFailDeleteOnce'] = False
+                        return self.respond(dict(error='Fixture history deletion failed'), 503)
                     state['watched'] = [entry for entry in state['watched'] if entry != id]
                     state['completed'] = [entry for entry in state['completed'] if entry != id]
                 else:

@@ -73,6 +73,9 @@ playlist requires its hexadecimal occurrence `indexId`; removing from the local
 queue marks only the queue occurrence. See [Playback](PLAYBACK.md) for source-page
 loading and repeat behavior. Queue reordering/shuffle are not implemented.
 
+Removing a video from an owned playlist keeps the loaded pages and scroll position
+while the app updates the list. This includes deletions made through the playback queue.
+
 ## History, progress and formatting
 
 Organized history is server-owned: entries include `release_date` and
@@ -80,6 +83,9 @@ Organized history is server-owned: entries include `release_date` and
 compare calendar dates against that server day. If a later page reports a new day,
 the client reloads the first page instead of mixing calendar groups. Legacy arrays
 retain basic viewing, including unavailable IDs, with organized search disabled.
+
+Removing a video keeps the current history search and scroll position. If the list
+update fails after the delete succeeds, Retry reloads the same range of pages.
 
 `WatchedRepository` maintains history membership, explicit completion, optional
 positions and the history revision.

@@ -59,6 +59,16 @@ Production timeouts and real-dispatcher concurrency cases remain unchanged.
 Measured timings and runner acceptance are recorded in
 [the verification report](../VERIFICATION.md#testing-workflow-optimization--21-october-2026).
 
+## Library deletion and scroll position
+
+`SearchHistorySmokeTest#historyDeletionKeepsLaterSearchResultsThroughFailuresAndRetry`
+checks a later page of filtered history, a rejected delete, and retry after a
+successful delete followed by a failed read. The `/test/search-history` fixture
+can fail one deletion or one read of a selected page.
+`QueueLibrarySmokeTest#playlistDeletionKeepsScrollAndPagesForDirectAndQueueRemovals`
+uses the opt-in large `/test/queue` playlist to verify duplicate occurrences,
+viewport anchoring, overlapping pages, and deletion through the playback service.
+
 ## Downloaded playback synchronization
 
 `PlaybackSyncTest` covers journal round trips/coalescing, completion deletions,
